@@ -933,7 +933,7 @@ export type TimeOfDay = 'day' | 'dusk' | 'night';
 
 const RGB = PALETTE.map((hex) => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)] as const);
 /** Luces: no se oscurecen nunca. */
-const LIGHTS = new Set<number>([4, C.lamp, C.lampWarm]);
+const LIGHTS = new Set<number>([C.lamp, C.lampWarm]);
 
 function nearest(r: number, g: number, b: number): number {
   let best = 0;
@@ -1105,6 +1105,52 @@ export function walker(variant: number, frame: number, dir: 1 | -1): Pix {
   set(rx, 8 + ry, 0);
   return p;
 }
+
+/** Retrato de la ficha: vecino de frente, 12×18 px (spec §8.1). */
+export function portrait(variant: number): Pix {
+  const p = new Pix(12, 18);
+  const skin = SKINS[variant % SKINS.length]!;
+  const hair = HAIRS[Math.floor(variant / 4) % HAIRS.length]!;
+  const shirt = SHIRTS[Math.floor(variant / 3) % SHIRTS.length]!;
+  const trousers = TROUSERS[Math.floor(variant / 7) % TROUSERS.length]!;
+  const longHair = hash(variant, 3) > 0.5;
+  // Cabeza (5×5) con luz a la izquierda.
+  p.rect(4, 2, 4, 5, skin);
+  p.vline(3, 3, 3, skin);
+  p.vline(8, 3, 3, skin);
+  p.vline(7, 2, 5, SKINS[Math.min(3, SKINS.indexOf(skin) + 1)]!);
+  p.set(5, 4, 0);
+  p.set(7, 4, 0);
+  p.hline(5, 6, 2, MAT.red[2]);
+  // Pelo.
+  p.hline(4, 0, 4, hair);
+  p.hline(3, 1, 6, hair);
+  p.set(3, 2, hair);
+  p.set(8, 2, hair);
+  if (longHair) {
+    p.vline(2, 2, 6, hair);
+    p.vline(9, 2, 6, hair);
+  }
+  // Cuello y tronco.
+  p.hline(5, 7, 2, skin);
+  p.rect(2, 8, 8, 5, shirt[1]);
+  p.vline(2, 8, 5, shirt[0]);
+  p.vline(9, 8, 5, shirt[2]);
+  p.hline(3, 8, 6, shirt[0]);
+  p.vline(1, 9, 3, shirt[1]);
+  p.vline(10, 9, 3, shirt[2]);
+  p.set(1, 12, skin);
+  p.set(10, 12, skin);
+  // Piernas y zapatos.
+  p.rect(3, 13, 6, 1, trousers);
+  p.rect(3, 14, 2, 3, trousers);
+  p.rect(7, 14, 2, 3, trousers);
+  p.hline(3, 17, 2, 0);
+  p.hline(7, 17, 2, 0);
+  return p;
+}
+
+export const portraitSprite = (variant: number) => sprite(`portrait${variant}`, () => portrait(variant));
 
 export const walkerSprite = (variant: number, frame: number, dir: 1 | -1, tod: TimeOfDay = 'day') =>
   sprite(`walker${variant}-${frame}-${dir}`, () => walker(variant, frame, dir), tod);

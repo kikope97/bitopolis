@@ -22,6 +22,7 @@ import {
 import { tickToDate } from '@bitopolis/shared';
 import { api } from './api.ts';
 import { formatDate, money } from './i18n.ts';
+import { portraitSprite } from './sprites.ts';
 import { $, h, sheet, toast } from './ui.ts';
 
 type Cmd = (c: Command) => Promise<boolean>;
@@ -88,8 +89,16 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
   }
   const last = [...state.decisionLog].reverse().filter((d) => d.citizenId === c.id).slice(0, 3);
   const hook = hookFor(state, c.id);
+  // Retrato pixel art (12×18) ampliado ×4.
+  const face = h('canvas', { class: 'portrait', width: '48', height: '72', 'aria-hidden': 'true' }) as HTMLCanvasElement;
+  const g = face.getContext('2d');
+  if (g) {
+    g.imageSmoothingEnabled = false;
+    g.drawImage(portraitSprite(c.id % 64), 0, 0, 48, 72);
+  }
   sheet(
     h('span', {}, h('span', { 'aria-hidden': 'true' }, '★ '), c.name),
+    face,
     h('p', {}, `${c.profession || 'vecina'}, ${c.age} años · ${moodWord(c.happiness)} (${Math.round(c.happiness)}) · ${money(c.money)}`),
     h('p', {}, `${c.owns ? (c.mortgage > 0 ? `Propietario (le quedan ${money(c.mortgage)} de hipoteca)` : 'Propietario') : 'De alquiler'} · ${job ? `trabaja en ${(job.name ?? BUILD_NAMES[job.kind] ?? '').toLowerCase()}` : 'trabaja fuera'}`),
     h('p', {}, `Quiere ${DESIRE_TEXT[c.desire]}; teme ${FEAR_TEXT[c.fear]}. Meta: ${GOAL_TEXT[c.goal]} ${goalDone(state, c) ? '✓' : ''}`),

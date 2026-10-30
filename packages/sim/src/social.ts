@@ -282,7 +282,9 @@ function updateRelations(state: GameState): void {
           setRelation(state, a, b, 'pareja', 80);
           addMemory(state, a, 'nueva_pareja', 4, 4, [b.id]);
           addMemory(state, b, 'nueva_pareja', 4, 4, [a.id]);
-          pushEvent(state, 'info', `${a.name.split(' ')[0]} y ${b.name.split(' ')[0]} empiezan a salir`, { ref: a.id });
+          // Con el mismo nombre de pila, el nombre completo («Gonzalo y Gonzalo» no se entiende).
+          const [na, nb] = [a, b].map((x) => x.name.split(' ')[0]!);
+          pushEvent(state, 'info', na === nb ? `${a.name} y ${b.name} empiezan a salir` : `${na} y ${nb} empiezan a salir`, { ref: a.id });
         }
       }
     }
