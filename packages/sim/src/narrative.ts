@@ -1,6 +1,7 @@
 import { tickToDate, TICKS_PER_DAY } from '@bitopolis/shared';
 import { averageHappiness, freeHomes, happinessFactors, vacancies } from './tick.ts';
 import { activeObjectives, NEED_TEXT, needOf } from './social.ts';
+import { daysToElection, FACTION_TEXT, politicsActive } from './politics.ts';
 import type { GameEvent, GameState } from './state.ts';
 
 /** Consejero (Modo normal): consejos por reglas con los datos reales. */
@@ -49,6 +50,12 @@ export function ruleAdvice(state: GameState, q: AdvisorQuestion): string[] {
   else if (worry === 'Trabaja fuera') lines.push('Mucha gente trabaja fuera: crea empleo con zonas comerciales o industriales.');
   else if (worry) lines.push(`Ataca lo que más molesta: ${worry.toLowerCase()}.`);
   if (f.demanda.R > 40 && f.viviendas_libres < 3) lines.push('Hay demanda de vivienda: pinta más zona residencial con agua y luz.');
+  // Elecciones: la facción más descontenta y lo que pide.
+  if (politicsActive(state)) {
+    const [name, worst] = Object.entries(state.politics.factions).sort((a, b) => a[1].satisfaction - b[1].satisfaction)[0]!;
+    const months = Math.round(daysToElection(state) / 30);
+    if (worst.demand && (months <= 12 || state.politics.approval < 55)) lines.push(`Quedan ${months} meses para votar. Los más descontentos son ${FACTION_TEXT[name as keyof typeof FACTION_TEXT].toLowerCase()}: piden ${worst.demand}.`);
+  }
   if (lines.length === 0) lines.push(`Vamos bien. El siguiente objetivo: ${f.objetivos[0] ?? 'seguir creciendo'}.`);
   return lines.slice(0, 3);
 }
@@ -61,7 +68,7 @@ export interface DiaryEntry {
   lines: string[];
 }
 
-const DIARY_KINDS = new Set(['arrival', 'departure', 'built', 'business', 'decision', 'milestone', 'bankrupt', 'tax', 'info']);
+const DIARY_KINDS = new Set(['arrival', 'departure', 'built', 'business', 'decision', 'milestone', 'bankrupt', 'tax', 'info', 'politics', 'election']);
 
 export function diary(state: GameState, maxDays = 12): DiaryEntry[] {
   const byDay = new Map<number, GameEvent[]>();

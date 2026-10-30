@@ -1,5 +1,6 @@
 import { TICKS_PER_DAY, TICKS_PER_MONTH, tickToDate } from '@bitopolis/shared';
 import {
+  HONEYMOON,
   CAMPAIGN_EFFECT,
   CAMPAIGN_MONTHS,
   ELECTION_MONTHS,
@@ -99,6 +100,9 @@ function govSupport(state: GameState, c: Citizen): number {
   const f = factionOf(state, c);
   if (state.politics.party && f === state.politics.party.faction) p += state.politics.mayor === 'player' ? -0.12 : 0.12;
   p += (state.politics.mayor === 'player' ? 1 : -1) * state.politics.campaign[f] * CAMPAIGN_EFFECT;
+  // Luna de miel: el primer año tras unas elecciones, el descontento aún se achaca a quien gobernaba antes.
+  const last = state.politics.history.at(-1);
+  if (last) p += Math.max(0, 1 - (state.tick - last.tick) / (12 * TICKS_PER_MONTH)) * HONEYMOON;
   return Math.max(0.05, Math.min(0.95, p));
 }
 

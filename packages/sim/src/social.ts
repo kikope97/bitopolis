@@ -574,6 +574,8 @@ export function ruleAnswer(state: GameState, c: Citizen, q: Question, worst: str
     case 'me_votarias': {
       const score = c.happiness - c.grudge + (broken ? -20 : 0) + (pending ? 5 : 0);
       if (broken) return `¿Después de prometer ${NEED_TEXT[broken.need]} y no cumplir? Lo dudo mucho.`;
+      if (state.politics.party?.leaderId === c.id) return `Yo me presento con «${state.politics.party.name}». Ya sabe la respuesta.`;
+      if (c.vote) return 'El voto es secreto, alcalde. Ya lo tengo decidido.';
       if (score >= 65) return `Sí, ${first} le votaría. Lo está haciendo bien.`;
       if (score >= 45) return 'Depende de lo que haga estos meses.';
       return 'Hoy por hoy, no.';

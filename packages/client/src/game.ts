@@ -32,6 +32,7 @@ import { sfx, startMusic, stopMusic, unlockAudio } from './audio.ts';
 import { coins, dust, pop } from './fx.ts';
 import { onPrefs, prefs } from './prefs.ts';
 import { openSettings } from './settings-ui.ts';
+import { openElectionNight, openPolitics, renderPollChip } from './politics-ui.ts';
 import { timeOfDay } from './render.ts';
 
 const DRAG_PX = 10;
@@ -240,6 +241,8 @@ export function startGame(opts: GameOptions): void {
     $('#hud-pop').textContent = plural(state.citizens.length, 'vecino', 'vecinos');
     const happy = state.citizens.length ? Math.round(state.citizens.reduce((s, c) => s + c.happiness, 0) / state.citizens.length) : 0;
     $('#hud-happy').textContent = `☺ ${happy}`;
+    renderPollChip(state, () => openPolitics(social));
+    $('#game').classList.toggle('opposition', state.politics.mayor !== 'player');
     updateDemand();
     updateToolLocks();
     renderObjectives(state);
@@ -329,6 +332,16 @@ export function startGame(opts: GameOptions): void {
         calmPause();
         const th = state.buildings.find((b) => b.kind === 'townhall');
         if (th) coins(...screenOf(th.x, th.y), 8);
+      } else if (e.kind === 'election') {
+        const won = state.politics.history.at(-1)?.winner === 'player';
+        if (won) sfx.milestone();
+        else sfx.warn();
+        vibrate(150);
+        calmPause();
+        openElectionNight(social);
+      } else if (e.kind === 'politics') {
+        toast(e.text, { kind: e.text.startsWith('Faltan') && state.politics.approval < 50 ? 'warn' : 'info', sticky: e.text.startsWith('Faltan'), onClick: () => openPolitics(social) });
+        if (e.text.startsWith('Faltan') || e.text.includes('funda')) calmPause();
       } else if (e.kind === 'departure' || e.kind === 'business') {
         toast(e.text, { kind: 'warn' });
         calmPause();
@@ -895,6 +908,7 @@ export function startGame(opts: GameOptions): void {
       item('Pleno municipal', () => openPleno(social)),
       item('Consejero', () => openAdvisor(social)),
       item('Diario del pueblo', () => openDiary(social)),
+      item('Política y elecciones', () => openPolitics(social)),
       ...(state.aiMode
         ? [
             item('Gasto de la IA', () => void openUsage(token)),

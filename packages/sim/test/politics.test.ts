@@ -51,7 +51,7 @@ describe('elecciones (v1.0)', () => {
     // En la oposición no se puede gobernar, pero sí hablar y hacer campaña.
     const build = applyCommand(s, { type: 'SetTax', level: 'low' });
     expect(build.ok).toBe(false);
-    expect(build.error).toMatch(/oposición/);
+    expect(build.ok ? '' : build.error).toMatch(/oposición/);
     const named = s.citizens.find((c) => c.named)!;
     expect(applyCommand(s, { type: 'TalkTo', citizenId: named.id, question: 'me_votarias' }).ok).toBe(true);
     expect(checkInvariants(s)).toEqual([]);

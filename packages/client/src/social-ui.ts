@@ -4,7 +4,10 @@ import {
   BUILD_NAMES,
   type Citizen,
   diary,
+  FACTION_TEXT,
+  factionOf,
   GOAL_TEXT,
+  politicsActive,
   goalDone,
   type GameState,
   happinessFactors,
@@ -103,6 +106,14 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
     h('p', {}, `${c.owns ? (c.mortgage > 0 ? `Propietario (le quedan ${money(c.mortgage)} de hipoteca)` : 'Propietario') : 'De alquiler'} · ${job ? `trabaja en ${(job.name ?? BUILD_NAMES[job.kind] ?? '').toLowerCase()}` : 'trabaja fuera'}`),
     h('p', {}, `Quiere ${DESIRE_TEXT[c.desire]}; teme ${FEAR_TEXT[c.fear]}. Meta: ${GOAL_TEXT[c.goal]} ${goalDone(state, c) ? '✓' : ''}`),
     hook ? h('p', { class: 'hook' }, h('strong', {}, 'Ahora mismo: '), `${HOOK_TEXT[hook.kind]}.`) : '',
+    politicsActive(state)
+      ? h(
+          'p',
+          {},
+          `Facción: ${FACTION_TEXT[factionOf(state, c)].toLowerCase()}.`,
+          state.politics.party?.leaderId === c.id ? h('strong', {}, ` Lidera «${state.politics.party.name}»${state.politics.mayor === c.id ? ' y es el alcalde' : ''}.`) : '',
+        )
+      : '',
     h('h3', {}, 'Hablar'),
     ask,
     answer,
@@ -242,21 +253,40 @@ export function openDiary(ctx: SocialCtx): void {
   sheet('Diario del pueblo', ...items);
 }
 
-/** Tarjeta de objetivos (1–3 visibles, con recompensa). */
+/** Tarjeta de objetivos (1–3 visibles, con recompensa). Se pliega para no tapar el mapa. */
 export function renderObjectives(state: GameState): void {
   const box = $('#objectives');
   const list = activeObjectives(state);
-  const sig = list.map((o) => o.id).join(',');
+  const folded = (() => {
+    try {
+      const v = localStorage.getItem('bitopolis.objectives');
+      return v ? v === 'plegado' : window.innerWidth < 720;
+    } catch {
+      return window.innerWidth < 720;
+    }
+  })();
+  const sig = `${list.map((o) => o.id).join(',')}|${folded}`;
   if (box.dataset.sig === sig) return;
   // Al cumplirse uno, se anuncia al lector de pantalla.
   if (box.dataset.sig !== undefined) {
-    const gone = box.dataset.sig.split(',').filter((id) => id && !list.some((o) => o.id === id));
+    const before = box.dataset.sig.split('|')[0]!.split(',');
+    const gone = before.filter((id) => id && !list.some((o) => o.id === id));
     if (gone.length) $('#sr-live').textContent = `Objetivo cumplido. Nuevos objetivos: ${list.map((o) => o.text).join('; ')}`;
   }
   box.dataset.sig = sig;
+  const toggle = h('button', { class: 'obj-toggle', 'aria-expanded': String(!folded) }, folded ? `Objetivos (${list.length}) ▸` : 'Objetivos ▾');
+  toggle.addEventListener('click', () => {
+    try {
+      localStorage.setItem('bitopolis.objectives', folded ? 'abierto' : 'plegado');
+    } catch {
+      /* sin almacenamiento */
+    }
+    renderObjectives(state);
+  });
+  box.classList.toggle('folded', folded);
   box.replaceChildren(
-    h('strong', {}, 'Objetivos'),
-    ...list.map((o) => h('span', { class: 'obj' }, `○ ${o.text}`, h('small', {}, ` +${money(o.reward)}${o.unlock ? ' y un edificio' : ''}`))),
+    toggle,
+    ...(folded ? [] : list.map((o) => h('span', { class: 'obj' }, `○ ${o.text}`, h('small', {}, ` +${money(o.reward)}${o.unlock ? ' y un edificio' : ''}`)))),
   );
 }
 

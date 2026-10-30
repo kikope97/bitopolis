@@ -123,6 +123,8 @@ export const VOTE_ABSTENTION_BASE = 0.18;
 /** Campaña: una al mes en los últimos 12 meses; cada una mueve el voto de la facción. */
 export const CAMPAIGN_MONTHS = 12;
 export const CAMPAIGN_EFFECT = 0.06;
+/** Apoyo extra al gobierno recién elegido (se apaga en 12 meses). */
+export const HONEYMOON = 0.25;
 /** Interés mensual de la deuda: 1 % hasta 5.000 € y 3 % por encima. */
 export const DEBT_INTEREST = 0.01;
 export const DEBT_INTEREST_HIGH = 0.03;

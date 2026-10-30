@@ -428,3 +428,20 @@ html[data-text='200'] .fab-label small { font-size: 0.4rem; }
 html[data-contrast='alto'] .btn, html[data-contrast='alto'] .seg-btn, html[data-contrast='alto'] .toast { box-shadow: none; }
 .sp[aria-disabled='true'] { opacity: 0.45; border-style: dashed; }
 body.placing #toasts { bottom: calc(260px + env(safe-area-inset-bottom)); }
+
+/* ---------- política (v1.0) ---------- */
+.obj-toggle { pointer-events: auto; background: none; border: 0; padding: 0; min-height: 32px; color: var(--text); font-weight: 700; text-align: left; cursor: pointer; }
+.objectives.folded { padding-top: 2px; padding-bottom: 2px; }
+.pol-bar { display: grid; grid-template-columns: minmax(7em, 34%) 1fr 3.5em; align-items: center; gap: 8px; margin: 6px 0; }
+.pol-track { height: 16px; border: 2px solid var(--line); background: var(--bg); }
+.pol-fill { display: block; height: 100%; background: var(--muted); transition: width 1.4s steps(14); }
+.pol-bar.me .pol-fill { background: var(--accent); }
+.pol-bar.rival .pol-fill { background: repeating-linear-gradient(90deg, #ff8fa3 0 6px, #b13e53 6px 8px); }
+.pol-bar.abst .pol-fill { background: repeating-linear-gradient(45deg, #94b0c2 0 3px, transparent 3px 6px); }
+.pol-num { font-variant-numeric: tabular-nums; text-align: right; }
+.faction { border-bottom: 1px solid var(--line); padding: 4px 0 8px; }
+.faction p { margin: 2px 0 6px; }
+.pol-banner { border-left: 4px solid var(--bad); padding: 6px 10px; background: var(--panel-2); }
+#hud-poll.neg { color: var(--bad); }
+.game.opposition .tools { opacity: 0.55; }
+.game.opposition .tool-info::before { content: 'Oposición · '; color: var(--bad); font-weight: 700; }
