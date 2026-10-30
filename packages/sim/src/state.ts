@@ -1,9 +1,10 @@
 import type { TaxLevel } from '@bitopolis/shared';
 import { emptyFields, type Fields } from './fields.ts';
 import { chance, nextInt, type RngState, seedRng } from './prng.ts';
+import type { Goal, Hook, Memory, Pleno, PromiseRecord, Relation } from './social.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
-export const FORMAT_VERSION = 4;
+export const FORMAT_VERSION = 5;
 
 export const MAP_W = 48;
 export const MAP_H = 48;
@@ -24,6 +25,8 @@ export type BuildingKind =
   | 'school'
   | 'clinic'
   | 'police'
+  | 'plaza'
+  | 'market'
   | 'house'
   /** Crecen solos sobre zonas. */
   | 'res'
@@ -88,8 +91,16 @@ export interface Citizen {
   traits: Traits;
   desire: Desire;
   fear: Fear;
-  /** Últimas decisiones (texto del motor, nunca del jugador). */
-  memory: string[];
+  /** Profesión (de una lista del motor). */
+  profession: string;
+  /** Meta personal (derivada de su deseo). */
+  goal: Goal;
+  /** Relaciones con nombre (amistad, rivalidad, pareja, rencor). */
+  relations: Relation[];
+  /** Recuerdos (capa 2): plantillas del motor, máx. 5, por importancia. */
+  memories: Memory[];
+  /** Resumen narrativo (capa 3), se reescribe cada mes. */
+  summary: string;
   /** No se le vuelve a preguntar antes de este tick. */
   cooldownUntil: number;
   /** Es dueño de la vivienda en la que vive. */
@@ -152,6 +163,7 @@ export type EventKind =
   | 'business'
   | 'tax'
   | 'decision'
+  | 'milestone'
   | 'warning'
   | 'info';
 
@@ -222,6 +234,14 @@ export interface GameState {
   prevTaxes: Record<TaxKey, TaxLevel>;
   /** Externalidades por casilla. */
   fields: Fields;
+  /** Director de historias: ganchos activos. */
+  hooks: Hook[];
+  pleno: Pleno | null;
+  promises: PromiseRecord[];
+  lastPlenoTick: number;
+  objectivesDone: string[];
+  /** Edificios desbloqueados por hitos (plaza, mercado). */
+  unlocked: string[];
 }
 
 export interface NewGameOptions {
@@ -264,6 +284,12 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20 }: Ne
     taxesSplit: false,
     prevTaxes: { ibi: 'medium', tasas: 'medium', plusvalia: 'medium' },
     fields: emptyFields(MAP_W * MAP_H),
+    hooks: [],
+    pleno: null,
+    promises: [],
+    lastPlenoTick: -1,
+    objectivesDone: [],
+    unlocked: [],
   };
   // Árboles dispersos (se talan gratis al construir encima).
   for (let i = 0; i < tiles.length; i++) {
@@ -293,9 +319,13 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20 }: Ne
     traits: randomTraits(rng),
     desire: 'prosperar',
     fear: 'paro',
-    memory: [],
     cooldownUntil: 0,
     ...NO_PROPERTY,
+    profession: 'administrativa',
+    goal: 'ahorrar',
+    relations: [],
+    memories: [{ tick: 0, kind: 'llego', about: [], importance: 2, valence: 0 }],
+    summary: '',
   };
   state.citizens.push(first);
   state.treasury = INITIAL_SUBSIDY;

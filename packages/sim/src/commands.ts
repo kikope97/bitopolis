@@ -1,6 +1,7 @@
 import { Command, type BuildKind, type ZoneKind } from '@bitopolis/shared';
 import { BUILD, WAGE_OUTSIDE, ZONE_COST_PER_TILE, ZONE_UNLOCK_POP } from './balance.ts';
 import { applyDecision, canApplyDecision } from './decisions.ts';
+import { answerPetition, canConvenePleno, closePleno, convenePleno, talkTo } from './social.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import {
   buildingAt,
@@ -26,6 +27,9 @@ export const BUILD_NAMES: Record<string, string> = {
   park: 'Parque',
   school: 'Colegio',
   clinic: 'Centro de salud',
+  police: 'Comisaría',
+  plaza: 'Plaza Mayor',
+  market: 'Mercado',
   res: 'Viviendas',
   shop: 'Tienda',
   factory: 'Taller',
@@ -80,7 +84,10 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       if (cmd.kind === 'road') return validateCommand(state, { type: 'BuildRoad', x: cmd.x, y: cmd.y, x2: cmd.x, y2: cmd.y });
       if (!inBounds(state, cmd.x, cmd.y)) return { ok: false, error: 'Fuera del mapa' };
       const spec = BUILD[cmd.kind];
-      if (pop < spec.unlockPop) return { ok: false, error: `Se desbloquea con ${spec.unlockPop} vecinos` };
+      if ((cmd.kind === 'plaza' || cmd.kind === 'market') && !state.unlocked.includes(cmd.kind)) {
+        return { ok: false, error: cmd.kind === 'plaza' ? 'La Plaza Mayor se desbloquea con el hito de 50 vecinos' : 'El Mercado se desbloquea con el hito de 200 vecinos' };
+      }
+      if (pop < spec.unlockPop && cmd.kind !== 'plaza' && cmd.kind !== 'market') return { ok: false, error: `Se desbloquea con ${spec.unlockPop} vecinos` };
       const t = state.map.tiles[tileIndex(state, cmd.x, cmd.y)];
       if (t === Tile.Road || buildingAt(state, cmd.x, cmd.y)) return { ok: false, error: 'Ese sitio está ocupado' };
       if (!hasAdjacentRoad(state, cmd.x, cmd.y)) return { ok: false, error: 'Necesita una carretera al lado' };
@@ -115,6 +122,16 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       return state.projects.some((p) => p.buildingId === cmd.buildingId) ? { ok: true } : { ok: false, error: 'No hay obra' };
     case 'CitizenAct':
       return canApplyDecision(state, cmd.citizenId, cmd.action) ? { ok: true } : { ok: false, error: 'Decisión ya no válida' };
+    case 'ConvenePleno': {
+      const r = canConvenePleno(state);
+      return r.ok ? { ok: true } : { ok: false, error: r.error! };
+    }
+    case 'AnswerPetition':
+      return state.pleno?.petitions.some((p) => p.id === cmd.petitionId && !p.answer) ? { ok: true } : { ok: false, error: 'Esa petición ya está respondida' };
+    case 'ClosePleno':
+      return state.pleno ? { ok: true } : { ok: false, error: 'No hay pleno abierto' };
+    case 'TalkTo':
+      return state.citizens.some((c) => c.id === cmd.citizenId && c.named) ? { ok: true } : { ok: false, error: 'Ese vecino no está' };
   }
 }
 
@@ -221,6 +238,18 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
     }
     case 'CitizenAct':
       applyDecision(state, cmd.citizenId, cmd.action, cmd.motivo, cmd.source);
+      break;
+    case 'ConvenePleno':
+      convenePleno(state);
+      break;
+    case 'AnswerPetition':
+      answerPetition(state, cmd.petitionId, cmd.answer);
+      break;
+    case 'ClosePleno':
+      closePleno(state);
+      break;
+    case 'TalkTo':
+      talkTo(state, state.citizens.find((c) => c.id === cmd.citizenId)!);
       break;
   }
   return { ok: true };

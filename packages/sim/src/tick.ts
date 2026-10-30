@@ -42,6 +42,7 @@ import {
   updateGrudges,
 } from './economy.ts';
 import { updateFields } from './fields.ts';
+import { goalFor, memoryMood, onCitizenLeaves, PROFESSIONS, relationMood, socialDay } from './social.ts';
 import {
   type Building,
   type Citizen,
@@ -235,6 +236,9 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
   f.push(c.jobId !== null ? { label: 'Trabaja en el pueblo', value: 8 } : { label: 'Trabaja fuera', value: -4 });
   if (c.mortgage > 0 && c.money < 300) f.push({ label: 'Le cuesta pagar la hipoteca', value: -6 });
   f.push(...taxMood(state, c));
+  f.push(...relationMood(c));
+  const mem = memoryMood(state, c);
+  if (mem) f.push({ label: mem > 0 ? 'Buenos recuerdos recientes' : 'Malos recuerdos recientes', value: mem });
   if (state.bankrupt) f.push({ label: 'Ayuntamiento en quiebra', value: -8 });
   return f;
 }
@@ -391,10 +395,18 @@ function arrivals(state: GameState): void {
       traits: named ? randomTraits(state.rng) : { terco: 50, ahorro: 50, social: 50, ambicion: 50 },
       desire: named ? pick(state.rng, DESIRES) : 'prosperar',
       fear: named ? pick(state.rng, FEARS) : 'paro',
-      memory: [],
       cooldownUntil: 0,
       ...NO_PROPERTY,
+      profession: named ? pick(state.rng, PROFESSIONS) : '',
+      goal: 'ahorrar',
+      relations: [],
+      memories: [],
+      summary: '',
     };
+    if (named) {
+      c.goal = goalFor(c.desire);
+      c.memories.push({ tick: state.tick, kind: 'llego', about: [], importance: 2, valence: 1 });
+    }
     state.citizens.push(c);
     transfer(state, OUTSIDE, c.id, nextInt(state.rng, 600, 2_500));
     pushEvent(state, 'arrival', `${c.name} se muda al pueblo`, { ref: c.id });
@@ -411,6 +423,7 @@ function departures(state: GameState): void {
     const broke = c.money === 0 && c.homeId === null && chance(state.rng, 0.1);
     if (unhappy || broke) {
       sellOnDeparture(state, c);
+      onCitizenLeaves(state, c);
       transfer(state, c.id, OUTSIDE, c.money);
       state.citizens = state.citizens.filter((x) => x !== c);
       const why = broke ? 'sin casa ni dinero' : 'descontento';
@@ -438,6 +451,7 @@ function endOfDay(state: GameState): void {
   maybeSplitTaxes(state);
   updateGrudges(state);
   detectTriggers(state);
+  socialDay(state);
   accumulateRates(state);
 }
 

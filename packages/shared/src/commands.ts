@@ -5,7 +5,7 @@ export const TaxLevel = z.enum(['low', 'medium', 'high']);
 export type TaxLevel = z.infer<typeof TaxLevel>;
 
 /** Lo que el alcalde puede construir directamente. */
-export const BuildKind = z.enum(['road', 'water', 'power', 'park', 'school', 'clinic', 'police', 'house']);
+export const BuildKind = z.enum(['road', 'water', 'power', 'park', 'school', 'clinic', 'police', 'house', 'plaza', 'market']);
 export type BuildKind = z.infer<typeof BuildKind>;
 
 export const ZoneKind = z.enum(['none', 'R', 'C', 'I']);
@@ -27,6 +27,12 @@ export const Command = z.discriminatedUnion('type', [
   z.object({ type: z.literal('Zone'), zone: ZoneKind, x: Coord, y: Coord, w: Size, h: Size }),
   z.object({ type: z.literal('Demolish'), x: Coord, y: Coord }),
   z.object({ type: z.literal('NotifyProject'), buildingId: z.number().int().min(1), on: z.boolean() }),
+  /** Pleno municipal: convocar, responder a cada petición y cerrar. */
+  z.object({ type: z.literal('ConvenePleno') }),
+  z.object({ type: z.literal('AnswerPetition'), petitionId: z.number().int().min(1), answer: z.enum(['promise', 'reject']) }),
+  z.object({ type: z.literal('ClosePleno') }),
+  /** Hablar con un vecino: solo preguntas predefinidas (nunca texto libre). */
+  z.object({ type: z.literal('TalkTo'), citizenId: z.number().int().min(1), question: z.enum(['como_estas', 'que_necesitas', 'me_votarias']) }),
   /** Decisión de un vecino con nombre (IA o reglas) entre sus acciones válidas. */
   z.object({
     type: z.literal('CitizenAct'),

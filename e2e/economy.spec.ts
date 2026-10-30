@@ -4,7 +4,7 @@ import { applyCommand, runSimulation } from '../packages/sim/src/index.ts';
 
 /** Pueblo grande generado con el motor e importado como copia .bitopolis. */
 function bigTown() {
-  const { state } = runSimulation({ seed: 1, days: 420, profile: 'derrochador' });
+  const { state } = runSimulation({ seed: 1, days: 420, profile: 'constructor' });
   const cx = state.map.w / 2;
   const cy = state.map.h / 2;
   applyCommand(state, { type: 'Build', kind: 'house', x: cx + 1, y: cy + 1 });

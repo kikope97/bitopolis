@@ -160,7 +160,7 @@ describe('externalidades', () => {
 
 describe('economía a un año', () => {
   it('hay propietarios, se separan los tributos y el dinero cuadra', () => {
-    const { state, report } = runSimulation({ seed: 1, days: 400, profile: 'derrochador', checkEveryDay: true });
+    const { state, report } = runSimulation({ seed: 1, days: 420, profile: 'constructor', checkEveryDay: true });
     expect(report.invariantErrors).toEqual([]);
     expect(state.citizens.some((c) => c.owns)).toBe(true);
     expect(state.taxesSplit).toBe(true);

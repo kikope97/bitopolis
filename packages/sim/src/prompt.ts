@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ACTION_LABELS, cleanMotivo, MOTIVO_MAX } from './decisions.ts';
 import { BUILD_NAMES } from './commands.ts';
 import type { Citizen, GameState, Pending } from './state.ts';
+import { GOAL_TEXT, HOOK_TEXT, hookFor, memoryText, NEED_TEXT } from './social.ts';
 import { averageHappiness } from './tick.ts';
 
 /**
@@ -12,7 +13,7 @@ import { averageHappiness } from './tick.ts';
  * - Salida estructurada con enum de acciones válidas; se valida con zod.
  */
 
-export const PROMPT_VERSION = 1;
+export const PROMPT_VERSION = 2;
 
 export const SYSTEM_PROMPT = `Eres el narrador de Bitópolis, un pueblo español pequeño. Interpretas a vecinos con nombre que toman UNA decisión cada uno.
 
@@ -20,7 +21,7 @@ Reglas:
 - Para cada vecino, elige exactamente una acción de su lista "acciones". No inventes acciones.
 - Decide según su personalidad (rasgos 0-100), su deseo, su miedo, su situación y sus recuerdos. La "terquedad" alta puede llevarle a decisiones poco racionales.
 - "motivo": una frase corta (máx. ${MOTIVO_MAX} caracteres) en primera persona, en español de España, natural y con personalidad. Sin comillas, sin emojis, sin mencionar números de rasgos ni que eres una IA.
-- No repitas tus "ultimos_motivos" ni frases hechas. Nada de cifras ni euros en el motivo.
+- Cada motivo debe ser distinto: usa su profesión, relaciones, recuerdos y el "gancho" si lo hay. Nada de cifras ni euros en el motivo.
 - Responde solo con JSON que cumpla el esquema.
 
 Ejemplos de tono (no los copies):
@@ -77,8 +78,13 @@ function citizenView(state: GameState, c: Citizen, p: Pending) {
     casa: home ? (c.owns ? 'vivienda en propiedad' : home.kind === 'house' ? 'casa municipal de alquiler' : 'piso de alquiler') : 'sin casa',
     hipoteca: c.mortgage > 0,
     trabajo: job ? BUILD_NAMES[job.kind]!.toLowerCase() : 'fuera del pueblo',
-    recuerdos: c.memory,
-    ultimos_motivos: recentMotivos(state, c.id),
+    profesion: c.profession,
+    meta: GOAL_TEXT[c.goal],
+    // Capa 1 (hechos) y capa 2 (recuerdos): solo datos y plantillas del motor.
+    relaciones: c.relations.map((r) => ({ con: state.citizens.find((x) => x.id === r.id)?.name.split(' ')[0] ?? '?', tipo: r.kind, intensidad: r.strength >= 70 ? 'fuerte' : r.strength >= 40 ? 'media' : 'leve' })),
+    promesas_pendientes: state.promises.filter((p) => p.status === 'pending' && p.supporters.includes(c.id)).map((p) => NEED_TEXT[p.need]),
+    recuerdos: [...c.memories].sort((a, b) => b.importance - a.importance).slice(0, 3).map((m) => memoryText(state, m)),
+    gancho: hookFor(state, c.id) ? HOOK_TEXT[hookFor(state, c.id)!.kind] : null,
     situacion: TRIGGER_TEXT[p.trigger],
     acciones: p.actions.map((a) => {
       const [v, arg] = a.split(':');
@@ -157,7 +163,7 @@ export interface ParsedDecisions {
 const norm = (s: string) => s.toLowerCase().replace(/[^a-záéíóúñü ]/g, '').replace(/\s+/g, ' ').trim();
 
 /** Valida la respuesta: JSON, esquema y acción permitida para cada vecino. */
-export function parseDecisions(raw: string, pendings: Pending[], recent: Record<number, string[]> = {}): ParsedDecisions {
+export function parseDecisions(raw: string, pendings: Pending[], recent: Record<number, string[]> = {}, allowRepeat = false): ParsedDecisions {
   const all = pendings.map((p) => p.citizenId);
   let data: unknown;
   try {
@@ -184,7 +190,7 @@ export function parseDecisions(raw: string, pendings: Pending[], recent: Record<
     const motivo = cleanMotivo(d.motivo);
     if (motivo.length < 4) bad('motivo_vacio');
     else if (/[0-9€]/.test(motivo)) bad('motivo_con_cifras');
-    else if ((recent[p.citizenId] ?? []).some((m) => norm(m) === norm(motivo))) bad('motivo_repetido');
+    else if (!allowRepeat && (recent[p.citizenId] ?? []).some((m) => norm(m) === norm(motivo))) bad('motivo_repetido');
     else decisions.push({ citizenId: p.citizenId, action: d.accion, motivo });
   }
   const ok = new Set(decisions.map((d) => d.citizenId));

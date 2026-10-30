@@ -64,6 +64,22 @@ export const MIGRATIONS: Record<number, Migration> = {
       fields: s.fields ?? { pollution: new Array(n).fill(0), noise: new Array(n).fill(0), crime: new Array(n).fill(0), land: new Array(n).fill(50) },
     };
   },
+  // 4 → 5 (v0.4): fichas completas, memoria en 3 capas, ganchos, plenos, objetivos.
+  4: (s) => ({
+    ...s,
+    formatVersion: 5,
+    citizens: (s.citizens ?? []).map((c: Record<string, any>) => {
+      const { memory: _old, ...rest } = c;
+      void _old;
+      return { profession: c.named ? 'vecina' : '', goal: 'ahorrar', relations: [], memories: [], summary: '', ...rest };
+    }),
+    hooks: s.hooks ?? [],
+    pleno: s.pleno ?? null,
+    promises: s.promises ?? [],
+    lastPlenoTick: s.lastPlenoTick ?? -1,
+    objectivesDone: s.objectivesDone ?? [],
+    unlocked: s.unlocked ?? [],
+  }),
 };
 
 export function migrate(raw: unknown): GameState {

@@ -4,6 +4,7 @@ import { JOBS, SHOP_NAMES } from './balance.ts';
 import { buyHome, canBuyHome, canFound, foundBusiness, sellOnDeparture, shopTypesFor } from './economy.ts';
 import { OUTSIDE, transfer } from './money.ts';
 import { hash32 } from './hash.ts';
+import { onCitizenLeaves } from './social.ts';
 import {
   type Citizen,
   type DecisionLogEntry,
@@ -151,6 +152,7 @@ export function applyDecision(state: GameState, citizenId: number, action: strin
     }
     case 'irse':
       sellOnDeparture(state, c);
+      onCitizenLeaves(state, c);
       transfer(state, c.id, OUTSIDE, c.money);
       state.citizens = state.citizens.filter((x) => x !== c);
       effect = 'se va del pueblo';
@@ -187,7 +189,6 @@ export function applyDecision(state: GameState, citizenId: number, action: strin
   const entry: DecisionLogEntry = { tick: state.tick, citizenId, trigger: p.trigger, action, motivo: text, source };
   state.decisionLog.push(entry);
   if (state.decisionLog.length > LOG_LIMIT) state.decisionLog.splice(0, state.decisionLog.length - LOG_LIMIT);
-  c.memory = [...c.memory, `${p.trigger}: ${effect}`].slice(-3);
   pushEvent(state, 'decision', `${c.name} ${effect}: «${text}»`, { ref: citizenId });
   return true;
 }

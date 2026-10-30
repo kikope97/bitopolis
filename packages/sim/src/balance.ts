@@ -21,6 +21,9 @@ export const BUILD: Record<BuildKind, BuildSpec> = {
   school: { materials: 5_000, workers: 5, days: 4, unlockPop: 10 },
   clinic: { materials: 5_000, workers: 5, days: 4, unlockPop: 10 },
   police: { materials: 4_000, workers: 4, days: 3, unlockPop: 20 },
+  /** Hitos: se desbloquean con objetivos (no por población). */
+  plaza: { materials: 3_000, workers: 5, days: 3, unlockPop: 50 },
+  market: { materials: 6_000, workers: 6, days: 4, unlockPop: 200 },
 };
 
 /** Obras que crecen solas sobre zonas (las paga un inversor de fuera). */
@@ -45,6 +48,8 @@ export const JOBS: Record<BuildingKind, number> = {
   school: 3,
   clinic: 3,
   police: 3,
+  plaza: 0,
+  market: 4,
   house: 0,
   res: 0,
   shop: 3,
@@ -61,6 +66,8 @@ export const MAINTENANCE: Record<BuildingKind, number> = {
   school: 450,
   clinic: 450,
   police: 350,
+  plaza: 80,
+  market: 250,
   house: 20,
   res: 0,
   shop: 0,
@@ -73,6 +80,8 @@ export const SERVICE: Partial<Record<BuildingKind, { radius: number; happiness: 
   school: { radius: 8, happiness: 5 },
   clinic: { radius: 8, happiness: 5 },
   police: { radius: 10, happiness: 3 },
+  plaza: { radius: 6, happiness: 8 },
+  market: { radius: 8, happiness: 6 },
 };
 
 /** Edificios a los que llega cada planta por la red. */

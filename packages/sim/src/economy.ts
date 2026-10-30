@@ -35,6 +35,7 @@ import {
 import { hash32 } from './hash.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance } from './prng.ts';
+import { addMemory, onBusinessFounded } from './social.ts';
 import {
   type Building,
   type Citizen,
@@ -105,7 +106,12 @@ export function updateGrudges(state: GameState): void {
   const up = (a: TaxLevel, b: TaxLevel) => LEVEL_INDEX[b] - LEVEL_INDEX[a];
   if (!state.taxesSplit) {
     const d = up(state.prevTaxLevel, state.taxLevel);
-    if (d > 0) for (const c of state.citizens) c.grudge += GRUDGE_RAISE.all * d;
+    if (d > 0) {
+      for (const c of state.citizens) {
+        c.grudge += GRUDGE_RAISE.all * d;
+        if (c.named) addMemory(state, c, 'subida_impuestos', 3, -2);
+      }
+    }
   } else {
     for (const k of TAX_KEYS) {
       const d = up(state.prevTaxes[k], state.taxes[k]);
@@ -192,6 +198,7 @@ export function buyHome(state: GameState, c: Citizen): boolean {
   c.boughtPrice = price;
   c.mortgage = price - down;
   c.boughtTick = state.tick;
+  if (c.named) addMemory(state, c, 'compro_casa', 4, 4);
   pushEvent(state, 'info', `${c.name} compra la vivienda en la que vive`, { ref: c.id });
   return true;
 }
@@ -280,6 +287,8 @@ export function foundBusiness(state: GameState, c: Citizen, type: string): boole
     outsideToday: 0,
     notify: false,
   });
+  if (c.named) addMemory(state, c, 'abrio_negocio', 5, 4);
+  onBusinessFounded(state, c);
   pushEvent(state, 'business', `${c.name} abre ${b.name.toLowerCase().startsWith('bar') ? 'un' : 'una'} ${b.name}`, { ref: b.id });
   return true;
 }

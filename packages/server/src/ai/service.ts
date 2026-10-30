@@ -176,7 +176,7 @@ export class AiService {
     let retried = 0;
     try {
       const provider = this.providerOverride ? this.providerOverride(s) : makeProvider(s.provider, s.key, s.baseUrl);
-      const call = async (system: string, user: string, list: Pending[]) => {
+      const call = async (system: string, user: string, list: Pending[], retry = false) => {
         const r = await provider.complete(
           { system, user, schema: buildDecisionRequest(state, list).schema, model: s.model, maxTokens: 200 + list.length * MAX_OUT_PER_CITIZEN },
           AbortSignal.timeout(TIMEOUT_MS),
@@ -184,7 +184,8 @@ export class AiService {
         usage.in += r.usage.in;
         usage.cachedIn += r.usage.cachedIn;
         usage.out += r.usage.out;
-        return parseDecisions(r.text, list, Object.fromEntries(list.map((p) => [p.citizenId, recentMotivos(state, p.citizenId, 3)])));
+        // En el reintento se acepta un motivo repetido (mejor que pasar a reglas).
+        return parseDecisions(r.text, list, Object.fromEntries(list.map((p) => [p.citizenId, recentMotivos(state, p.citizenId, 3)])), retry);
       };
       let parsed = await call(req.system, req.user, pendings);
       const add = (ds: typeof parsed.decisions) => {
@@ -201,7 +202,7 @@ export class AiService {
         const r2 = buildDecisionRequest(state, again);
         // La nota va al final (parte variable) para no romper el prefijo cacheable.
         const note = `${r2.user}\n\nTu respuesta anterior no era válida (${parsed.error ?? 'acción no permitida o falta un vecino'}). Usa solo las acciones de cada vecino y un motivo nuevo, sin cifras.`;
-        parsed = await call(r2.system, note, again);
+        parsed = await call(r2.system, note, again, true);
         add(parsed.decisions);
         retried = parsed.decisions.length;
         if (parsed.invalid.length > 0) status = 'partial';
