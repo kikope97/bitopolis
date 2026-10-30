@@ -33,6 +33,8 @@ export const Command = z.discriminatedUnion('type', [
   z.object({ type: z.literal('ClosePleno') }),
   /** Hablar con un vecino: solo preguntas predefinidas (nunca texto libre). */
   z.object({ type: z.literal('TalkTo'), citizenId: z.number().int().min(1), question: z.enum(['como_estas', 'que_necesitas', 'me_votarias']) }),
+  /** Campaña electoral con una facción (v1.0): una al mes, en el año antes de votar. */
+  z.object({ type: z.literal('Campaign'), faction: z.enum(['jubilados', 'jovenes', 'empresarios', 'ecologistas']) }),
   /** Decisión de un vecino con nombre (IA o reglas) entre sus acciones válidas. */
   z.object({
     type: z.literal('CitizenAct'),

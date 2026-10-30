@@ -2,9 +2,10 @@ import type { TaxLevel } from '@bitopolis/shared';
 import { emptyFields, type Fields } from './fields.ts';
 import { chance, nextInt, type RngState, seedRng } from './prng.ts';
 import type { Goal, Hook, Memory, Pleno, PromiseRecord, Relation } from './social.ts';
+import { emptyPolitics, type Politics } from './politics-core.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
-export const FORMAT_VERSION = 5;
+export const FORMAT_VERSION = 6;
 
 export const MAP_W = 48;
 export const MAP_H = 48;
@@ -117,6 +118,8 @@ export interface Citizen {
   boughtTick: number;
   /** Memoria de las subidas de impuestos (0–40): resta felicidad y se olvida despacio. */
   grudge: number;
+  /** Voto decidido antes de las elecciones (solo vecinos con nombre; se borra al votar). */
+  vote?: 'gobierno' | 'oposicion' | 'abstencion';
 }
 
 export type TaxKey = 'ibi' | 'tasas' | 'plusvalia';
@@ -143,7 +146,7 @@ export interface Pending {
   dueTick: number;
 }
 
-export type Trigger = 'llegada' | 'sin_trabajo' | 'infeliz' | 'subida_impuestos' | 'ahorros' | 'opinion' | 'comprar_casa' | 'emprender';
+export type Trigger = 'llegada' | 'sin_trabajo' | 'infeliz' | 'subida_impuestos' | 'ahorros' | 'opinion' | 'comprar_casa' | 'emprender' | 'elecciones';
 
 export interface DecisionLogEntry {
   tick: number;
@@ -165,6 +168,8 @@ export type EventKind =
   | 'decision'
   | 'milestone'
   | 'warning'
+  | 'politics'
+  | 'election'
   | 'info';
 
 export interface GameEvent {
@@ -242,6 +247,8 @@ export interface GameState {
   objectivesDone: string[];
   /** Edificios desbloqueados por hitos (plaza, mercado). */
   unlocked: string[];
+  /** Elecciones, facciones y oposición (v1.0). */
+  politics: Politics;
 }
 
 export interface NewGameOptions {
@@ -290,6 +297,7 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20 }: Ne
     lastPlenoTick: -1,
     objectivesDone: [],
     unlocked: [],
+    politics: emptyPolitics(),
   };
   // Árboles dispersos (se talan gratis al construir encima).
   for (let i = 0; i < tiles.length; i++) {

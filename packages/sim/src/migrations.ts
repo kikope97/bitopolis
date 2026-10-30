@@ -1,3 +1,4 @@
+import { emptyPolitics } from './politics-core.ts';
 import { FORMAT_VERSION, type GameState } from './state.ts';
 
 /**
@@ -80,6 +81,8 @@ export const MIGRATIONS: Record<number, Migration> = {
     objectivesDone: s.objectivesDone ?? [],
     unlocked: s.unlocked ?? [],
   }),
+  // 5 → 6 (v1.0): política (elecciones cada 4 años, facciones y oposición).
+  5: (s) => ({ ...s, formatVersion: 6, politics: s.politics ?? emptyPolitics(s.tick ?? 0) }),
 };
 
 export function migrate(raw: unknown): GameState {

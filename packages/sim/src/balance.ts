@@ -108,6 +108,21 @@ export const TAX_HAPPINESS = { low: 6, medium: 0, high: -10 } as const;
 export const BUSINESS_SEED_CASH = 3_500;
 export const BUSINESS_CASH_CAP = 6_000;
 export const DEBT_LIMIT = 6_000;
+
+/* ---------------- elecciones (v1.0) ---------------- */
+/** Elecciones cada 4 años de juego. */
+export const ELECTION_MONTHS = 48;
+/** Facciones y oposición desde 50 vecinos (ronda 06: a 200 casi nadie llegaba en 4 años). */
+export const OPPOSITION_POP = 50;
+/** Con la intención de voto por debajo, un vecino influyente funda un partido. */
+export const OPPOSITION_APPROVAL = 72;
+/** Avisos de popularidad: meses antes de las elecciones. */
+export const POLL_WARN_MONTHS = [12, 6, 3, 1];
+/** Abstención mínima (los indecisos se abstienen más). */
+export const VOTE_ABSTENTION_BASE = 0.18;
+/** Campaña: una al mes en los últimos 12 meses; cada una mueve el voto de la facción. */
+export const CAMPAIGN_MONTHS = 12;
+export const CAMPAIGN_EFFECT = 0.06;
 /** Interés mensual de la deuda: 1 % hasta 5.000 € y 3 % por encima. */
 export const DEBT_INTEREST = 0.01;
 export const DEBT_INTEREST_HIGH = 0.03;

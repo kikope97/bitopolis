@@ -38,6 +38,8 @@ export const MEMORY_KINDS = [
   'nueva_amistad',
   'nueva_pareja',
   'le_quitaron_el_local',
+  'fundo_partido',
+  'voto',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -154,6 +156,10 @@ export function memoryText(state: GameState, m: Memory): string {
       return `Empezó a salir con ${who}`;
     case 'le_quitaron_el_local':
       return `${who} se quedó el local que quería`;
+    case 'fundo_partido':
+      return 'Fundó un partido para presentarse a las elecciones';
+    case 'voto':
+      return 'Votó en las elecciones';
   }
 }
 
@@ -614,6 +620,7 @@ export const OBJECTIVES: ObjectiveDef[] = [
   { id: 'promesa', text: 'Cumple una promesa del pleno', reward: 1_500, done: (s) => s.promises.some((p) => p.status === 'kept') },
   { id: 'sin_deuda', text: 'Cierra 6 meses seguidos con superávit (con 30 vecinos o más)', reward: 2_000, done: (s) => s.citizens.length >= 30 && s.stats.length >= 6 && s.stats.slice(-6).every((m) => m.income >= m.expenses) },
   { id: 'doscientos', text: 'Llega a 200 vecinos', reward: 10_000, unlock: 'market', done: (s) => s.citizens.length >= 200 },
+  { id: 'elecciones', text: 'Gana unas elecciones con rival', reward: 3_000, done: (s) => s.politics.history.some((h) => h.winner === 'player' && !h.unopposed) },
 ];
 
 /** Siempre hay de 1 a 3 objetivos visibles. */

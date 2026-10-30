@@ -43,6 +43,7 @@ import {
 } from './economy.ts';
 import { updateFields } from './fields.ts';
 import { goalFor, memoryMood, onCitizenLeaves, PROFESSIONS, relationMood, socialDay } from './social.ts';
+import { politicsDay } from './politics.ts';
 import {
   type Building,
   type Citizen,
@@ -452,6 +453,7 @@ function endOfDay(state: GameState): void {
   updateGrudges(state);
   detectTriggers(state);
   socialDay(state);
+  politicsDay(state);
   accumulateRates(state);
 }
 

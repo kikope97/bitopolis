@@ -1,6 +1,7 @@
-import { Command, type BuildKind, type ZoneKind } from '@bitopolis/shared';
+import { Command, tickToDate, type BuildKind, type ZoneKind } from '@bitopolis/shared';
 import { BUILD, DEBT_LIMIT, WAGE_OUTSIDE, ZONE_COST_PER_TILE, ZONE_UNLOCK_POP } from './balance.ts';
 import { applyDecision, canApplyDecision } from './decisions.ts';
+import { campaign, canCampaign } from './politics.ts';
 import { addMemory, answerPetition, canConvenePleno, closePleno, convenePleno, talkTo } from './social.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import {
@@ -66,11 +67,32 @@ function roadNewTiles(state: GameState, x: number, y: number, x2: number, y2: nu
 }
 
 /** Valida sin aplicar. El motor es quien decide si un comando es legal. */
+/** Mientras gobierna el alcalde rival, sus órdenes pasan por aquí (no las del jugador). */
+let governing = false;
+
+/** Orden del gobierno rival (v1.0): misma validación, sin el bloqueo de la oposición. */
+export function governmentCommand(state: GameState, cmd: Command): boolean {
+  governing = true;
+  try {
+    return applyCommand(state, cmd).ok;
+  } finally {
+    governing = false;
+  }
+}
+
+/** En la oposición el jugador solo puede hablar con los vecinos (y la IA decidir). */
+const OPPOSITION_ALLOWED = new Set(['TalkTo', 'NotifyProject', 'CitizenAct', 'Campaign']);
+
 export function validateCommand(state: GameState, raw: unknown): CommandResult {
   const parsed = Command.safeParse(raw);
   if (!parsed.success) return { ok: false, error: 'comando mal formado' };
   const cmd = parsed.data;
   const pop = state.citizens.length;
+  const pol = state.politics;
+  if (pol && pol.mayor !== 'player' && !governing && !OPPOSITION_ALLOWED.has(cmd.type)) {
+    const year = tickToDate(pol.nextElection).year;
+    return { ok: false, error: `Estás en la oposición: gobierna ${pol.party?.leaderName ?? 'otro alcalde'} hasta las elecciones del año ${year}` };
+  }
   switch (cmd.type) {
     case 'SetTax':
       return { ok: true };
@@ -129,6 +151,10 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
     }
     case 'AnswerPetition':
       return state.pleno?.petitions.some((p) => p.id === cmd.petitionId && !p.answer) ? { ok: true } : { ok: false, error: 'Esa petición ya está respondida' };
+    case 'Campaign': {
+      const r = canCampaign(state);
+      return r.ok ? { ok: true } : { ok: false, error: r.error! };
+    }
     case 'ClosePleno':
       return state.pleno ? { ok: true } : { ok: false, error: 'No hay pleno abierto' };
     case 'TalkTo':
@@ -248,6 +274,9 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       break;
     case 'AnswerPetition':
       answerPetition(state, cmd.petitionId, cmd.answer);
+      break;
+    case 'Campaign':
+      campaign(state, cmd.faction);
       break;
     case 'ClosePleno':
       closePleno(state);

@@ -5,6 +5,7 @@ import { BUILD_NAMES } from './commands.ts';
 import type { Citizen, GameState, Pending } from './state.ts';
 import { GOAL_TEXT, HOOK_TEXT, hookFor, memoryText, NEED_TEXT } from './social.ts';
 import { averageHappiness } from './tick.ts';
+import { daysToElection, FACTION_TEXT, factionOf, politicsActive } from './politics.ts';
 
 /**
  * Petición a la IA para un lote de decisiones (spec §9.2).
@@ -46,6 +47,7 @@ const TRIGGER_TEXT: Record<string, string> = {
   opinion: 'el alcalde pasea por el pueblo y le pregunta qué tal',
   comprar_casa: 'podría comprar la vivienda en la que vive de alquiler',
   emprender: 'tiene ahorros y hay un local comercial libre',
+  elecciones: 'hay elecciones municipales en unos días y decide su voto (secreto)',
 };
 
 const band = (n: number, cuts: number[], names: string[]) => names[cuts.findIndex((c) => n < c) === -1 ? names.length - 1 : cuts.findIndex((c) => n < c)]!;
@@ -60,6 +62,18 @@ function townSummary(state: GameState) {
     felicidad_media: Math.round(averageHappiness(state)),
     caja_ayuntamiento: band(state.treasury, [0, 5_000, 30_000], ['en deuda', 'justa', 'normal', 'holgada']),
     servicios: ['water', 'power', 'park', 'school', 'clinic', 'shop', 'factory'].filter((k) => kinds.has(k as never)).map((k) => BUILD_NAMES[k]!.toLowerCase()),
+    ...(politicsActive(state) ? { politica: politicsView(state) } : {}),
+  };
+}
+
+/** Política como datos del motor (v1.0): quién gobierna, quién se opone y cuándo se vota. */
+function politicsView(state: GameState) {
+  const p = state.politics;
+  const rival = p.party ? `${p.party.leaderName}, de «${p.party.name}» (facción ${FACTION_TEXT[p.party.faction].toLowerCase()})` : null;
+  return {
+    gobierna: p.mayor === 'player' ? 'el alcalde actual' : rival,
+    oposicion: p.mayor === 'player' ? (rival ?? 'ninguna candidatura') : 'el antiguo alcalde',
+    elecciones_en_dias: daysToElection(state),
   };
 }
 
@@ -70,6 +84,7 @@ function citizenView(state: GameState, c: Citizen, p: Pending) {
     vecino: c.id,
     nombre: c.name,
     edad: c.age,
+    ...(politicsActive(state) ? { faccion: FACTION_TEXT[factionOf(state, c)].toLowerCase() } : {}),
     rasgos: { terquedad: c.traits.terco, ahorrador: c.traits.ahorro, sociable: c.traits.social, ambicioso: c.traits.ambicion },
     deseo: c.desire.replace('_', ' '),
     miedo: c.fear,
