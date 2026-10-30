@@ -1,5 +1,6 @@
 import { type GameState, SERVICE } from '@bitopolis/sim';
 import { PALETTE } from './palette.ts';
+import { prefs } from './prefs.ts';
 import { T } from './sprites.ts';
 
 /**
@@ -19,6 +20,15 @@ interface LayerDef {
 
 const GOOD: [number, number, number, number] = [2, 3, 4, 9];
 const BAD: [number, number, number, number] = [12, 4, 3, 1];
+/** Azul-amarillo (tritanopia): rampa de oscuro a claro sin azul ni amarillo. */
+const GOOD_TRI: [number, number, number, number] = [1, 2, 20, 12];
+const BAD_TRI: [number, number, number, number] = [12, 21, 2, 1];
+
+/** Colores del nivel según el modo de daltonismo (la trama no cambia). */
+function levelColor(colors: [number, number, number, number], lv: number): number {
+  if (prefs().colorblind !== 'azul-amarillo') return colors[lv]!;
+  return (colors === BAD ? BAD_TRI : GOOD_TRI)[lv]!;
+}
 
 export const LAYERS: LayerDef[] = [
   { id: 'none', label: 'Sin capa', colors: GOOD, legend: [] },
@@ -72,7 +82,7 @@ let cache: { key: string; canvas: HTMLCanvasElement } | null = null;
 /** Capa a escala 1 (una trama por casilla); se rehace cada día de juego. */
 export function layerCanvas(state: GameState, layer: LayerId): HTMLCanvasElement | null {
   if (layer === 'none') return null;
-  const key = `${layer}:${Math.floor(state.tick / 24)}:${state.buildings.length}`;
+  const key = `${layer}:${Math.floor(state.tick / 24)}:${state.buildings.length}:${prefs().colorblind}`;
   if (cache?.key === key) return cache.canvas;
   const def = LAYERS.find((l) => l.id === layer)!;
   const { w, h } = state.map;
@@ -88,7 +98,7 @@ export function layerCanvas(state: GameState, layer: LayerId): HTMLCanvasElement
     const lv = v < 25 ? 0 : v < 50 ? 1 : v < 75 ? 2 : 3;
     const px = (i % w) * T;
     const py = Math.floor(i / w) * T;
-    g.fillStyle = PALETTE[def.colors[lv]]!;
+    g.fillStyle = PALETTE[levelColor(def.colors, lv)]!;
     // Trama por nivel (bloques de 2×2): dispersa → media → damero → casi llena.
     for (let y = 0; y < T; y += 2) {
       for (let x = 0; x < T; x += 2) {
@@ -112,7 +122,7 @@ export function happinessMarks(state: GameState): { x: number; y: number; lv: nu
   vals.forEach((v, i) => {
     if (v === null || v === undefined) return;
     const lv = v < 25 ? 0 : v < 50 ? 1 : v < 75 ? 2 : 3;
-    out.push({ x: i % w, y: Math.floor(i / w), lv, color: GOOD[lv] });
+    out.push({ x: i % w, y: Math.floor(i / w), lv, color: levelColor(GOOD, lv) });
   });
   return out;
 }

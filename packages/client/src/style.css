@@ -19,7 +19,8 @@ html, body {
   height: 100%;
   background: var(--bg);
   color: var(--text);
-  font: 16px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.45;
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
 }
@@ -363,3 +364,47 @@ progress { width: 100%; height: 16px; accent-color: #38b764; }
 .chronicle { line-height: 1.6; }
 .person-click { list-style: none; }
 .portrait { float: right; width: 48px; height: 72px; margin: 0 0 8px 12px; image-rendering: pixelated; background: #333c57; border: 2px solid #566c86; border-radius: 4px; }
+
+/* ---------- ajustes: texto, contraste, daltonismo y movimiento (v0.5) ---------- */
+html { font-size: 100%; }
+html[data-text='150'] { font-size: 150%; }
+html[data-text='200'] { font-size: 200%; }
+html[data-contrast='alto'] {
+  --bg: #1a1c2c;
+  --panel: #1a1c2c;
+  --panel-2: #1a1c2c;
+  --line: #f4f4f4;
+  --text: #f4f4f4;
+  --muted: #dff6f5;
+  --accent: #ffcd75;
+}
+html[data-contrast='alto'] .btn, html[data-contrast='alto'] .sheet, html[data-contrast='alto'] .toast { border-width: 3px; }
+html[data-contrast='alto'] :focus-visible { outline-width: 4px; outline-color: #f4f4f4; }
+/* Rojo-verde: «bien» en azul y «mal» en naranja; azul-amarillo: verde y rojo. */
+html[data-colorblind='rojo-verde'] { --good: #41a6f6; --bad: #ef7d57; }
+html[data-colorblind='azul-amarillo'] { --good: #38b764; --bad: #b13e53; --blue: #5d275d; }
+html[data-motion='reducido'] *, html[data-motion='reducido'] *::before, html[data-motion='reducido'] *::after { animation: none !important; transition: none !important; }
+
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg-btn { min-height: 44px; padding: 6px 14px; border: 2px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--text); font-weight: 600; cursor: pointer; }
+.seg-btn[aria-checked='true'] { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.field-label { display: block; margin-bottom: 4px; }
+.check small.help { display: inline; }
+
+.coin { position: fixed; z-index: 50; width: 10px; height: 10px; pointer-events: none; background: #ffcd75; border: 2px solid #eea160; border-radius: 50%; box-shadow: inset -2px -2px 0 #bf7958; }
+html[data-colorblind='azul-amarillo'] .legend-item.lv0.good::before { background: radial-gradient(#5d275d 30%, transparent 31%) 0 0 / 8px 8px; }
+html[data-colorblind='azul-amarillo'] .legend-item.lv1.good::before { background: radial-gradient(#b13e53 35%, transparent 36%) 0 0 / 4px 4px; }
+html[data-colorblind='azul-amarillo'] .legend-item.lv2.good::before { background: repeating-conic-gradient(#eea160 0 25%, transparent 0 50%) 0 0 / 4px 4px; }
+html[data-colorblind='azul-amarillo'] .legend-item.lv3.good::before { background: repeating-linear-gradient(90deg, #f4f4f4 0 6px, transparent 6px 8px); }
+html[data-colorblind='azul-amarillo'] .legend-item.lv1.bad::before { background: radial-gradient(#f4cca1 35%, transparent 36%) 0 0 / 4px 4px; }
+html[data-colorblind='azul-amarillo'] .legend-item.lv2.bad::before { background: repeating-conic-gradient(#b13e53 0 25%, transparent 0 50%) 0 0 / 4px 4px; }
+/* Texto grande: la barra, el HUD y los botones del mapa son controles compactos con icono;
+   crecen hasta ~150 % para no desbordarse. Hojas y avisos sí llegan al 200 %. */
+html[data-text='200'] .hud, html[data-text='200'] .bottom, html[data-text='200'] .fab, html[data-text='200'] .demand, html[data-text='200'] .objectives { font-size: 75%; }
+html[data-text='150'] .bottom, html[data-text='150'] .fab { font-size: 85%; }
+.tool { overflow: hidden; }
+.tool .tool-label, .fab-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+html[data-text='150'] .tool-label { font-size: 0.7rem; }
+html[data-text='200'] .tool-label { font-size: 0.55rem; }
+html[data-text='150'] .fab-label small { font-size: 0.5rem; }
+html[data-text='200'] .fab-label small { font-size: 0.4rem; }

@@ -1,5 +1,6 @@
 import { type GameState, Tile, Zone } from '@bitopolis/sim';
 import { happinessMarks, type LayerId, layerCanvas } from './layers.ts';
+import { liveParticles, squash } from './fx.ts';
 import { C, PALETTE } from './palette.ts';
 import {
   BH,
@@ -170,7 +171,7 @@ export function render(
   ctx: CanvasRenderingContext2D,
   state: GameState,
   cam: Camera,
-  opts: { preview?: Preview | null; selected?: { x: number; y: number } | null; time: number; reducedMotion: boolean; layer?: LayerId },
+  opts: { preview?: Preview | null; selected?: { x: number; y: number } | null; cursor?: { x: number; y: number } | null; time: number; reducedMotion: boolean; layer?: LayerId },
 ): void {
   const z = cam.zoom;
   const ts = T * z;
@@ -251,7 +252,14 @@ export function render(
         ctx.fillRect(px + 4 * z, by + z, Math.round((ts - 8 * z) * frac), 2 * z);
         continue;
       }
-      ctx.drawImage(buildingSprite(b.kind, b.id, tod), px, py, ts, BH * z);
+      // Squash & stretch al terminarse (anclado abajo, en el centro).
+      const [sx, sy] = squash(b.id, opts.time);
+      if (sx === 1 && sy === 1) ctx.drawImage(buildingSprite(b.kind, b.id, tod), px, py, ts, BH * z);
+      else {
+        const dw = Math.round(ts * sx);
+        const dh = Math.round(BH * z * sy);
+        ctx.drawImage(buildingSprite(b.kind, b.id, tod), px + Math.round((ts - dw) / 2), py + BH * z - dh, dw, dh);
+      }
       // Humo de chimeneas (fábricas, central y casas): bocanadas que suben y crecen.
       const chimneys = b.kind === 'factory' ? [[27, 0]] : b.kind === 'power' ? [[23, 2]] : b.kind === 'house' ? [[23, 6]] : [];
       for (const [cx, cy] of chimneys) {
@@ -282,6 +290,10 @@ export function render(
     }
   }
 
+  for (const d of liveParticles(opts.time)) {
+    ctx.fillStyle = P(d.color);
+    ctx.fillRect(Math.round(d.x) * z - cam.x, Math.round(d.y) * z - cam.y, d.size * z, d.size * z);
+  }
   for (const f of puffs) {
     const img = puffSprite(f.size, tod);
     ctx.drawImage(img, (f.x - img.width / 2) * z - cam.x, (f.y - img.height / 2) * z - cam.y, img.width * z, img.height * z);
@@ -325,4 +337,6 @@ export function render(
     for (const t of opts.preview.tiles) corner(t.x, t.y, opts.preview.ok ? 12 : 2, 2);
   }
   if (opts.selected) corner(opts.selected.x, opts.selected.y, 4, 2);
+  // Cursor de teclado: esquinas blancas gruesas (se distingue de la selección por forma y color).
+  if (opts.cursor) corner(opts.cursor.x, opts.cursor.y, 12, 3);
 }

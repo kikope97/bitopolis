@@ -1,6 +1,10 @@
 import { randomBase62 } from './session.ts';
+import { apply as applyPrefs } from './prefs.ts';
 import { showStart } from './start.ts';
 import './style.css';
+
+applyPrefs();
+window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener?.('change', applyPrefs);
 
 /** Rutas: /p/<token> es una partida; cualquier otra crea una URL nueva. */
 const m = location.pathname.match(/^\/p\/([0-9A-Za-z]{22})\/?$/);

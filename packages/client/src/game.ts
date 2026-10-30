@@ -26,6 +26,11 @@ import { buildingSprite, letterSprite, T } from './sprites.ts';
 import { commandFor, costText, isLocked, type Tool, type ToolId, TOOLS, tilesOf, unlockPop } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
 import { $, closeSheet, confirmDialog, h, isSheetOpen, reducedMotion, sheet, toast, vibrate } from './ui.ts';
+import { sfx, startMusic, stopMusic, unlockAudio } from './audio.ts';
+import { coins, dust, pop } from './fx.ts';
+import { onPrefs, prefs } from './prefs.ts';
+import { openSettings } from './settings-ui.ts';
+import { timeOfDay } from './render.ts';
 
 const DRAG_PX = 10;
 const DESIRE_TEXT: Record<string, string> = {
@@ -61,6 +66,10 @@ export function startGame(opts: GameOptions): void {
   let preview: Preview | null = null;
   let layer: LayerId = 'none';
   let selected: { x: number; y: number } | null = null;
+  /** Primer toque de una carretera o zona (modo «toque inicio, toque fin»). */
+  let anchor: { x: number; y: number } | null = null;
+  /** Cursor de casilla para jugar con teclado (flechas + Intro). */
+  let cursor: { x: number; y: number } | null = null;
   const seenEvents = new Set(state.events.map((e) => `${e.tick}|${e.kind}|${e.text}`));
   let lost = false;
   let cmdId = 0;
@@ -153,12 +162,39 @@ export function startGame(opts: GameOptions): void {
     const id = ++cmdId;
     return new Promise((resolve) => {
       pendingResults.set(id, (ok, error) => {
-        if (!ok && error) toast(error, { kind: 'warn' });
-        if (ok) vibrate(10);
+        if (!ok && error) {
+          toast(error, { kind: 'warn' });
+          sfx.error();
+        }
+        if (ok) {
+          vibrate(10);
+          feedback(cmd);
+        }
         resolve(ok);
       });
       send({ type: 'command', cmd, id });
     });
+  }
+
+  /** Sonido y efectos de cada orden aceptada. */
+  function feedback(cmd: Command) {
+    if (cmd.type === 'Build') sfx.build();
+    else if (cmd.type === 'BuildRoad') sfx.road();
+    else if (cmd.type === 'Demolish') {
+      sfx.demolish();
+      dust(cmd.x, cmd.y);
+    } else if (cmd.type === 'Zone' || cmd.type === 'SetTax' || cmd.type === 'SetTaxes') sfx.tap();
+  }
+
+  /** Centro de una casilla en coordenadas de pantalla (CSS). */
+  function screenOf(tx: number, ty: number): [number, number] {
+    const r = canvas.getBoundingClientRect();
+    return [r.left + ((tx + 0.5) * 32 * cam.zoom - cam.x) / dpr(), r.top + ((ty + 0.2) * 32 * cam.zoom - cam.y) / dpr()];
+  }
+
+  /** Modo tranquilo: un evento importante pausa el juego. */
+  function calmPause() {
+    if (prefs().calm && speed > 0) setSpeed(0);
   }
 
   /* ---------- HUD ---------- */
@@ -170,6 +206,11 @@ export function startGame(opts: GameOptions): void {
       if (m) {
         const net = m.income - m.expenses;
         toast(`Parte del mes: ${net >= 0 ? '▲ +' : '▼ '}${money(net)}. Toca para verlo.`, { kind: net >= 0 ? 'good' : 'warn', onClick: openAccounts });
+        if (net > 0) {
+          sfx.coin();
+          const th = state.buildings.find((b) => b.kind === 'townhall');
+          if (th) coins(...screenOf(th.x, th.y), Math.ceil(Math.min(net, 6000) / 600));
+        } else sfx.warn();
       }
     }
     const d = tickToDate(state.tick);
@@ -239,9 +280,18 @@ export function startGame(opts: GameOptions): void {
     }
     for (const e of fresh) if (e.kind === 'decision' && e.ref) addBubble(e.ref, e.tick);
     const arrivals = fresh.filter((e) => e.kind === 'arrival');
+    if (arrivals.length) sfx.arrival();
     if (arrivals.length === 1) toast(arrivals[0]!.text, { kind: 'good' });
     else if (arrivals.length > 1) toast(`Llegan ${arrivals.length} vecinos nuevos`, { kind: 'good' });
     const built = fresh.filter((e) => e.kind === 'built');
+    for (const e of built) {
+      const b = e.ref ? state.buildings.find((x) => x.id === e.ref) : undefined;
+      if (b) {
+        pop(b.id);
+        dust(b.x, b.y);
+      }
+    }
+    if (built.length) sfx.done();
     const notified = built.filter((e) => e.notify);
     for (const e of notified) {
       toast(e.text, { kind: 'good', sticky: true, onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
@@ -252,6 +302,8 @@ export function startGame(opts: GameOptions): void {
     else if (plain.length > 1) toast(`${plain.length} obras terminadas`, { kind: 'good' });
     for (const e of fresh) {
       if (e.kind === 'bankrupt' || e.kind === 'warning') {
+        sfx.warn();
+        calmPause();
         toast(e.kind === 'warning' ? `${e.text}. Prueba a subir los impuestos (☰ › Impuestos) o espera antes de construir.` : e.text, {
           kind: 'warn',
           sticky: true,
@@ -259,6 +311,10 @@ export function startGame(opts: GameOptions): void {
       } else if (e.kind === 'milestone') {
         toast(e.text, { kind: 'good', sticky: true });
         vibrate(120);
+        sfx.milestone();
+        calmPause();
+        const th = state.buildings.find((b) => b.kind === 'townhall');
+        if (th) coins(...screenOf(th.x, th.y), 8);
       } else if (e.kind === 'departure' || e.kind === 'business') {
         toast(e.text, { kind: 'warn' });
       }
@@ -421,7 +477,7 @@ export function startGame(opts: GameOptions): void {
     if (!prev) {
       // Ratón sin pulsar: vista previa del tile bajo el cursor.
       const t0 = tileAt(e.clientX, e.clientY);
-      preview = t0 && tool.id !== 'inspect' ? previewFor(t0, t0) : null;
+      preview = t0 && tool.id !== 'inspect' ? previewFor(anchor ?? t0, t0) : null;
       return;
     }
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -506,8 +562,33 @@ export function startGame(opts: GameOptions): void {
       );
       if (!ok) return;
     }
+    // Carretera y zonas: además de arrastrar, se puede tocar el inicio y luego el final.
+    if (tool.shape !== 'tap') {
+      if (!anchor) {
+        anchor = tile;
+        preview = previewFor(tile, tile);
+        $('#tool-info').textContent = `${tool.label}: ahora toca dónde termina (o arrastra). Esc para cancelar.`;
+        $('#sr-live').textContent = `Inicio marcado en la casilla ${tile.x}, ${tile.y}. Elige el final.`;
+        return;
+      }
+      const start = anchor;
+      anchor = null;
+      preview = null;
+      selectTool(tool.id);
+      const line = commandFor(tool, start, tile);
+      if (line) await command(line);
+      return;
+    }
     const cmd = commandFor(tool, tile, tile);
     if (cmd) await command(cmd);
+  }
+
+  /** Qué hay en una casilla (para el lector de pantalla). */
+  function describeTile(t: { x: number; y: number }): string {
+    const b = state.buildings.find((x) => x.x === t.x && x.y === t.y);
+    const i = t.y * state.map.w + t.x;
+    const what = b ? (b.name ?? BUILD_NAMES[b.kind] ?? b.kind) : state.map.tiles[i] === Tile.Road ? 'carretera' : state.map.tiles[i] === Tile.Tree ? 'árboles' : 'solar libre';
+    return `Casilla ${t.x}, ${t.y}: ${what}`;
   }
 
   window.addEventListener('keydown', (e) => {
@@ -518,6 +599,29 @@ export function startGame(opts: GameOptions): void {
     const k = e.key;
     // Con una hoja abierta el teclado es de la hoja: el mapa no se mueve por detrás.
     if (isSheetOpen() && k !== 'Escape') return;
+    // Con el mapa enfocado, las flechas mueven un cursor de casilla e Intro actúa en él.
+    if (document.activeElement === canvas && (k.startsWith('Arrow') || k === 'Enter')) {
+      e.preventDefault();
+      if (!cursor) {
+        const th = state.buildings.find((b) => b.kind === 'townhall');
+        cursor = th ? { x: th.x, y: th.y + 1 } : { x: Math.floor(state.map.w / 2), y: Math.floor(state.map.h / 2) };
+      }
+      if (k === 'Enter') {
+        void tapTile(cursor);
+        return;
+      }
+      const dx = k === 'ArrowLeft' ? -1 : k === 'ArrowRight' ? 1 : 0;
+      const dy = k === 'ArrowUp' ? -1 : k === 'ArrowDown' ? 1 : 0;
+      cursor = { x: Math.max(0, Math.min(state.map.w - 1, cursor.x + dx)), y: Math.max(0, Math.min(state.map.h - 1, cursor.y + dy)) };
+      // La cámara sigue al cursor cuando se acerca al borde.
+      const ts = tileSize();
+      const sx = cursor.x * ts - cam.x;
+      const sy = cursor.y * ts - cam.y;
+      if (sx < ts || sy < ts || sx > canvas.width - 2 * ts || sy > canvas.height - 2 * ts) centerOn(cursor.x, cursor.y);
+      if (tool.id !== 'inspect') preview = previewFor(anchor ?? cursor, cursor);
+      $('#sr-live').textContent = describeTile(cursor);
+      return;
+    }
     if (k === 'ArrowLeft' || k === 'a') cam.x -= step;
     else if (k === 'ArrowRight' || k === 'd') cam.x += step;
     else if (k === 'ArrowUp' || k === 'w') cam.y -= step;
@@ -530,7 +634,11 @@ export function startGame(opts: GameOptions): void {
       setSpeed(speed === 0 ? 1 : 0);
     } else if (k === 'Escape') {
       if (isSheetOpen()) closeSheet();
-      else selectTool('inspect');
+      else if (anchor) {
+        anchor = null;
+        preview = null;
+        selectTool(tool.id);
+      } else selectTool('inspect');
     } else {
       const tl = TOOLS.find((x) => x.key === k);
       if (tl) selectTool(tl.id);
@@ -587,6 +695,7 @@ export function startGame(opts: GameOptions): void {
       ? `${tl.label}: se desbloquea con ${unlockPop(tl)} vecinos.`
       : `${tl.label}: ${tl.help}${costText(tl) ? ` · ${costText(tl)}` : ''}`;
     selected = null;
+    anchor = null;
     tutorial.update(state, tool.id);
   }
 
@@ -747,6 +856,7 @@ export function startGame(opts: GameOptions): void {
             item('Qué se envía a la IA', () => void openPreview(token)),
           ]
         : []),
+      item('Ajustes (sonido y accesibilidad)', openSettings),
       item('Repetir tutorial', () => {
         closeSheet();
         tutorial.start(state, true);
@@ -761,6 +871,11 @@ export function startGame(opts: GameOptions): void {
   /* ---------- velocidad y ciclo de vida ---------- */
   function setSpeed(s: number) {
     if (lost && s > 0) return;
+    // Modo tranquilo: como mucho x1.
+    if (prefs().calm && s > 1) {
+      toast('Modo tranquilo: la velocidad máxima es x1 (Ajustes).', { kind: 'info' });
+      s = 1;
+    }
     if (s === 10 && speed !== 10) {
       toast(
         state.aiMode
@@ -792,6 +907,8 @@ export function startGame(opts: GameOptions): void {
 
   function exit() {
     rememberSeen(token, state);
+    stopMusic();
+    offPrefs();
     setSpeed(0);
     send({ type: 'flush' });
     setTimeout(() => {
@@ -847,7 +964,7 @@ export function startGame(opts: GameOptions): void {
   /* ---------- bucle de pintado ---------- */
   function frame(time: number) {
     if ($('#game').hidden) return;
-    render(ctx, state, cam, { preview, selected, time, reducedMotion: reducedMotion(), layer });
+    render(ctx, state, cam, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer });
     placeBubbles();
     requestAnimationFrame(frame);
   }
@@ -866,5 +983,14 @@ export function startGame(opts: GameOptions): void {
   tutorial.start(state);
   tutorial.update(state, tool.id);
   if (!tutorial.active) toast('En pausa. Pulsa x1 para que pase el tiempo.');
+  // Sonido: se desbloquea con el primer gesto; el ambiente sigue la hora del juego.
+  const unlock = () => unlockAudio();
+  window.addEventListener('pointerdown', unlock, { once: true });
+  window.addEventListener('keydown', unlock, { once: true });
+  startMusic(() => timeOfDay(state.tick) === 'night');
+  // Al activar el modo tranquilo con x3/x10 puestos, se baja a x1.
+  const offPrefs = onPrefs((p) => {
+    if (p.calm && speed > 1) setSpeed(1);
+  });
   requestAnimationFrame(frame);
 }
