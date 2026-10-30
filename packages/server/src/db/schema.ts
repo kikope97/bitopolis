@@ -14,6 +14,10 @@ export interface GamesTable {
   format_version: number;
   /** Estado de la partida serializado (JSON). */
   state: string;
+  /** Sesión de navegador que tiene la partida abierta y hasta cuándo (ms). */
+  lease_session: string | null;
+  lease_until: Generated<number>;
+  seed: Generated<number>;
 }
 
 export interface DB {

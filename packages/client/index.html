@@ -4,24 +4,61 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#1a1c2c" />
+    <meta name="referrer" content="no-referrer" />
     <title>Bitópolis</title>
-    <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <div id="app">
-      <header class="hud" aria-label="Estado del pueblo">
-        <span id="hud-date">Año 1 · 1/1</span>
-        <span id="hud-money">0 €</span>
-        <span id="hud-pop">0 vecinos</span>
+    <div id="toasts" aria-live="polite"></div>
+
+    <main id="start" class="start" hidden>
+      <div class="start-top">
+        <button id="configure" class="btn small">⚙ Configurar</button>
+      </div>
+      <h1 class="logo">Bitópolis</h1>
+      <p class="tagline">Eres el alcalde. Los vecinos deciden por su cuenta.</p>
+      <div id="start-body"></div>
+      <div class="start-bottom">
+        <p class="link-warning">🔑 Guarda este enlace: es tu partida. No lo publiques.</p>
+        <p id="link-text" class="mono small"></p>
+        <div class="row">
+          <button id="copy-link" class="btn">Copiar enlace</button>
+          <button id="play" class="btn primary big">Jugar</button>
+        </div>
+      </div>
+    </main>
+
+    <div id="game" class="game" hidden>
+      <header class="hud" role="status" aria-label="Estado del pueblo">
+        <span id="hud-date"></span>
+        <button id="hud-money" class="hud-btn" aria-label="Caja del ayuntamiento: ver cuentas"></button>
+        <span id="hud-pop"></span>
+        <span id="hud-happy" aria-label="Felicidad media"></span>
       </header>
-      <canvas id="map" aria-label="Mapa del pueblo"></canvas>
-      <nav class="speed" aria-label="Velocidad">
-        <button data-speed="0" aria-label="Pausa">⏸</button>
-        <button data-speed="1" aria-label="Velocidad x1">x1</button>
-        <button data-speed="3" aria-label="Velocidad x3">x3</button>
-        <button data-speed="10" aria-label="Velocidad x10">x10</button>
+      <div id="demand" class="demand" aria-label="Demanda">
+        <div class="d-row" data-d="R"><b>R</b><span class="bar"><span class="bar-fill bar-r"></span></span><span class="bar-num"></span></div>
+        <div class="d-row" data-d="C"><b>C</b><span class="bar"><span class="bar-fill bar-c"></span></span><span class="bar-num"></span></div>
+        <div class="d-row" data-d="I"><b>I</b><span class="bar"><span class="bar-fill bar-i"></span></span><span class="bar-num"></span></div>
+      </div>
+      <div class="map-wrap">
+        <canvas id="map" role="img" aria-label="Mapa del pueblo" tabindex="0"></canvas>
+        <div class="float-right">
+          <button id="zoom-in" class="fab" aria-label="Acercar">+</button>
+          <button id="zoom-out" class="fab" aria-label="Alejar">−</button>
+          <button id="whatnow" class="fab" aria-label="¿Qué hago ahora?">?</button>
+        </div>
+        <span id="saved" class="saved" aria-live="off"></span>
+      </div>
+      <p id="tool-info" class="tool-info"></p>
+      <nav id="tools" class="tools" aria-label="Herramientas"></nav>
+      <nav class="bottom" aria-label="Tiempo y menú">
+        <button class="sp" data-speed="0" aria-label="Pausa">❚❚</button>
+        <button class="sp" data-speed="1" aria-label="Velocidad x1">x1</button>
+        <button class="sp" data-speed="3" aria-label="Velocidad x3">x3</button>
+        <button class="sp" data-speed="10" aria-label="Velocidad x10">x10</button>
+        <button id="menu" class="sp" aria-label="Menú">☰</button>
       </nav>
     </div>
+    <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

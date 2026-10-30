@@ -7,6 +7,8 @@ export interface Config {
   masterKey: string | undefined;
   clientDir: string;
   version: string;
+  user: string | undefined;
+  password: string | undefined;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -18,5 +20,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     masterKey: env.BITOPOLIS_MASTER_KEY,
     clientDir: env.BITOPOLIS_CLIENT_DIR ?? new URL('../../client/dist', import.meta.url).pathname,
     version: env.BITOPOLIS_VERSION ?? '0.0.0-dev',
+    user: env.BITOPOLIS_USER || undefined,
+    password: env.BITOPOLIS_PASSWORD || undefined,
   };
 }

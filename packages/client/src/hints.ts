@@ -1,0 +1,38 @@
+import { type GameState, ZONE_UNLOCK_POP, freeHomes } from '@bitopolis/sim';
+import type { ToolId } from './tools.ts';
+
+export interface Hint {
+  text: string;
+  tool?: ToolId;
+}
+
+/** "¿Qué hago ahora?": consejo por reglas a partir del estado real. */
+export function nextHint(state: GameState): Hint {
+  const has = (k: string) => state.buildings.some((b) => b.kind === k);
+  const pop = state.citizens.length;
+  const roads = state.map.tiles.filter((t) => t === 1).length;
+  if (state.bankrupt || state.treasury < 0) {
+    return { text: 'La caja está en negativo. Sube un poco los impuestos (menú ☰) y espera a que lleguen ingresos antes de construir.' };
+  }
+  if (roads <= 7) return { text: 'Alarga la calle: elige Carretera y arrastra desde la calle del ayuntamiento.', tool: 'road' };
+  if (!has('water')) return { text: 'Sin agua nadie quiere vivir aquí. Construye una bomba de agua junto a una carretera.', tool: 'water' };
+  if (!has('power')) return { text: 'Ahora la luz: pon una central eléctrica junto a una carretera conectada.', tool: 'power' };
+  const unserved = state.buildings.filter((b) => b.built && b.kind !== 'water' && b.kind !== 'power' && (!b.hasWater || !b.hasPower));
+  if (unserved.length > 0) {
+    return { text: `${unserved.length} edificio(s) sin agua o luz (icono de gota o rayo). Conéctalos con carretera a las plantas, o construye otra si están llenas.` };
+  }
+  if (pop < ZONE_UNLOCK_POP) {
+    if (freeHomes(state) === 0 && !state.projects.some((p) => p.payer === 0)) {
+      return { text: `Construye casas para que llegue gente. Con ${ZONE_UNLOCK_POP} vecinos se desbloquean las zonas.`, tool: 'house' };
+    }
+    return { text: 'Hay casas libres. Pon el tiempo a x3 y espera a que llegue gente.' };
+  }
+  const { R, C, I } = state.demand;
+  const zoned = (z: number) => state.map.zones.some((v, i) => v === z && !state.buildings.some((b) => b.y * state.map.w + b.x === i));
+  if (R > 20 && !zoned(1)) return { text: 'Hay demanda de viviendas (R). Pinta una zona residencial junto a una carretera con agua y luz.', tool: 'zoneR' };
+  if (I > 20 && !zoned(3)) return { text: 'Hay gente sin trabajo en el pueblo. Pinta una zona industrial (I), mejor lejos de las casas.', tool: 'zoneI' };
+  if (C > 20 && !zoned(2)) return { text: 'Los vecinos quieren tiendas. Pinta una zona comercial (C).', tool: 'zoneC' };
+  if (!has('park')) return { text: 'Un parque sube la felicidad de las casas cercanas.', tool: 'park' };
+  if (state.demand.R <= 0) return { text: 'La demanda de vivienda está baja: crea empleo (zonas C e I) o servicios para atraer gente.' };
+  return { text: 'Todo en orden. Amplía las calles y deja que el pueblo crezca.' };
+}

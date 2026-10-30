@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#1a1c2c" />
+    <title>Bitópolis · Entrar</title>
+  </head>
+  <body>
+    <main class="start">
+      <h1 class="logo">Bitópolis</h1>
+      <form id="login" class="login">
+        <label>Usuario <input name="user" autocomplete="username" required /></label>
+        <label>Contraseña <input name="password" type="password" autocomplete="current-password" required /></label>
+        <p id="login-error" class="error" role="alert"></p>
+        <button class="btn primary big">Entrar</button>
+      </form>
+    </main>
+    <script type="module" src="/src/login.ts"></script>
+  </body>
+</html>

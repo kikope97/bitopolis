@@ -20,6 +20,18 @@ const migrations: Record<string, Migration> = {
       await db.schema.dropTable('games').execute();
     },
   },
+  '0002_lease': {
+    async up(db: Kysely<unknown>) {
+      await db.schema.alterTable('games').addColumn('lease_session', 'varchar(64)').execute();
+      await db.schema.alterTable('games').addColumn('lease_until', 'integer', (c) => c.notNull().defaultTo(0)).execute();
+      await db.schema.alterTable('games').addColumn('seed', 'integer', (c) => c.notNull().defaultTo(0)).execute();
+    },
+    async down(db: Kysely<unknown>) {
+      await db.schema.alterTable('games').dropColumn('lease_session').execute();
+      await db.schema.alterTable('games').dropColumn('lease_until').execute();
+      await db.schema.alterTable('games').dropColumn('seed').execute();
+    },
+  },
 };
 
 class InCodeProvider implements MigrationProvider {

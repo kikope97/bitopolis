@@ -6,6 +6,9 @@ import { sql } from 'kysely';
 import type { HealthResponse } from '@bitopolis/shared';
 import type { Config } from './config.ts';
 import type { Db } from './db/index.ts';
+import { registerAuth } from './auth.ts';
+import { registerGameRoutes } from './games.ts';
+import { newGameToken } from './tokens.ts';
 
 const CSP = [
   "default-src 'self'",
@@ -22,7 +25,15 @@ const CSP = [
 ].join('; ');
 
 export async function buildApp(config: Config, db: Db): Promise<FastifyInstance> {
-  const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' }, trustProxy: true });
+  const app = Fastify({
+    logger: {
+      level: process.env.LOG_LEVEL ?? 'info',
+      // La URL de la partida es una contraseña: no se escribe en los logs.
+      serializers: { req: (req) => ({ method: req.method, url: req.url.replace(/\/p\/[^/?]+|\/api\/games\/[^/?]+/g, (m) => m.replace(/[^/]+$/, '…')) }) },
+    },
+    trustProxy: true,
+    bodyLimit: 8 * 1024 * 1024,
+  });
 
   app.addHook('onSend', async (_req, reply, payload) => {
     reply.header('Content-Security-Policy', CSP);
@@ -33,13 +44,21 @@ export async function buildApp(config: Config, db: Db): Promise<FastifyInstance>
 
   await app.register(rateLimit, { max: 300, timeWindow: '1 minute', allowList: (req) => req.url === '/healthz' });
 
+  if (config.user && config.password) {
+    await registerAuth(app, { user: config.user, password: config.password, secret: config.masterKey ?? 'bitopolis' });
+  }
+
+  // Entrar en / crea una URL nueva. La partida no se guarda hasta pulsar Jugar.
+  app.get('/', async (_req, reply) => reply.redirect(`/p/${newGameToken()}`));
+  await registerGameRoutes(app, db);
+
   app.get('/healthz', async (): Promise<HealthResponse> => {
     await sql`select 1`.execute(db);
     return { ok: true, version: config.version, db: 'ok' };
   });
 
   if (existsSync(config.clientDir)) {
-    await app.register(fastifyStatic, { root: config.clientDir, wildcard: false });
+    await app.register(fastifyStatic, { root: config.clientDir, wildcard: false, index: false });
     // SPA: cualquier ruta que no sea de la API devuelve index.html.
     app.setNotFoundHandler((req, reply) => {
       if (req.url.startsWith('/api/')) return reply.code(404).send({ error: 'no encontrado' });
