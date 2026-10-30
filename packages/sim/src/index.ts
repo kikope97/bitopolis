@@ -1,6 +1,7 @@
 export * from './prng.ts';
 export * from './hash.ts';
 export * from './state.ts';
+export * from './balance.ts';
 export * from './money.ts';
 export * from './commands.ts';
 export * from './tick.ts';

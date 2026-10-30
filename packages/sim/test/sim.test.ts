@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyCommand,
-  BUILD_COST,
+  BUILD,
+  buildCost,
   checkInvariants,
   createInitialState,
   hashState,
@@ -39,14 +40,35 @@ describe('estado', () => {
 });
 
 describe('comandos', () => {
-  it('rechaza construir sin carretera y cobra al construir', () => {
+  it('rechaza construir sin carretera y cobra los materiales al empezar la obra', () => {
     const s = createInitialState({ seed: 1 });
     expect(applyCommand(s, { type: 'Build', kind: 'house', x: 0, y: 0 }).ok).toBe(false);
     const before = s.treasury;
     const cx = s.map.w / 2;
     const r = applyCommand(s, { type: 'Build', kind: 'house', x: cx + 2, y: s.map.h / 2 + 1 });
     expect(r.ok).toBe(true);
-    expect(s.treasury).toBe(before - BUILD_COST.house);
+    expect(s.treasury).toBe(before - BUILD.house.materials);
+    expect(s.projects).toHaveLength(1);
+    expect(buildCost('house')).toBeGreaterThan(BUILD.house.materials);
+    expect(checkInvariants(s)).toEqual([]);
+  });
+  it('la obra termina aunque no haya obreros locales (se contratan fuera)', () => {
+    const s = createInitialState({ seed: 1 });
+    const cx = s.map.w / 2;
+    applyCommand(s, { type: 'Build', kind: 'water', x: cx + 2, y: s.map.h / 2 + 1 });
+    for (let i = 0; i < 24 * (BUILD.water.days + 1); i++) step(s);
+    expect(s.projects).toHaveLength(0);
+    expect(s.buildings.find((b) => b.kind === 'water')?.built).toBe(true);
+    expect(s.events.some((e) => e.kind === 'built')).toBe(true);
+  });
+  it('las zonas se desbloquean con 10 vecinos', () => {
+    const s = createInitialState({ seed: 1 });
+    expect(applyCommand(s, { type: 'Zone', zone: 'R', x: 1, y: 1, w: 2, h: 2 }).ok).toBe(false);
+  });
+  it('carretera recta en un solo comando', () => {
+    const s = createInitialState({ seed: 1 });
+    expect(applyCommand(s, { type: 'BuildRoad', x: 2, y: 2, x2: 7, y2: 2 }).ok).toBe(true);
+    expect(applyCommand(s, { type: 'BuildRoad', x: 2, y: 2, x2: 7, y2: 3 }).ok).toBe(false);
     expect(checkInvariants(s)).toEqual([]);
   });
   it('rechaza comandos mal formados', () => {
@@ -62,7 +84,7 @@ describe('comandos', () => {
 });
 
 describe('invariantes', () => {
-  for (const profile of ['casual', 'constructor', 'agresivo']) {
+  for (const profile of ['casual', 'constructor', 'agresivo', 'derrochador']) {
     it(`${profile}: el dinero se conserva 365 días`, () => {
       const { report } = runSimulation({ seed: 123, days: 365, profile, checkEveryDay: true });
       expect(report.invariantErrors).toEqual([]);
@@ -88,5 +110,30 @@ describe('rendimiento', () => {
     const t0 = performance.now();
     runSimulation({ seed: 5, days: 365, profile: 'constructor' });
     expect(performance.now() - t0).toBeLessThan(10_000);
+  });
+});
+
+describe('economía', () => {
+  it('el pueblo puede crecer', () => {
+    const { report } = runSimulation({ seed: 42, days: 365, profile: 'casual' });
+    expect(report.final.population).toBeGreaterThanOrEqual(10);
+  });
+  it('el pueblo puede quebrar', () => {
+    const { report } = runSimulation({ seed: 1, days: 365, profile: 'derrochador' });
+    expect(report.bankruptDay).not.toBeNull();
+  });
+  it('el impuesto efectivo es la media del mes (subirlo el último día no rinde)', () => {
+    const base = createInitialState({ seed: 3 });
+    const trick = createInitialState({ seed: 3 });
+    for (let i = 0; i < 24 * 30 - 2; i++) {
+      step(base);
+      step(trick);
+    }
+    applyCommand(trick, { type: 'SetTax', level: 'high' });
+    step(base);
+    step(trick);
+    step(base);
+    step(trick);
+    expect(trick.treasury - base.treasury).toBeLessThan(5);
   });
 });
