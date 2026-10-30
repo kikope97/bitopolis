@@ -91,7 +91,7 @@ for (let seed = 1; seed <= Number(values.seeds); seed++) {
   for (let d = 0; d < days; d++) {
     for (const cmd of profile.decide(state, prng)) applyCommand(state, cmd);
     for (let h = 0; h < TICKS_PER_DAY; h++) step(state);
-    const pend = state.pending.filter((p) => p.dueTick > state.tick);
+    const pend = state.pending.filter((p) => p.dueTick > state.tick).slice(0, 8);
     if (pend.length === 0) continue;
     const req = buildDecisionRequest(state, pend);
     totals.calls++;

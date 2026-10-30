@@ -2,6 +2,8 @@ import { tickToDate, type Command } from '@bitopolis/shared';
 import {
   BUILD_NAMES,
   type Building,
+  salePrice,
+  unitValue,
   type GameEvent,
   type GameState,
   happinessFactors,
@@ -11,6 +13,8 @@ import {
   ZONE_UNLOCK_POP,
 } from '@bitopolis/sim';
 import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
+import { openNeighbours, openReport, openTaxes as openTaxesSheet } from './economy-ui.ts';
+import { LAYERS, type LayerId } from './layers.ts';
 import { api, ApiError } from './api.ts';
 import { nextHint } from './hints.ts';
 import { formatDate, money, plural, t } from './i18n.ts';
@@ -54,6 +58,7 @@ export function startGame(opts: GameOptions): void {
   let tool: Tool = TOOLS[0]!;
   let speed = 0;
   let preview: Preview | null = null;
+  let layer: LayerId = 'none';
   let selected: { x: number; y: number } | null = null;
   const seenEvents = new Set(state.events.map((e) => `${e.tick}|${e.kind}|${e.text}`));
   let lost = false;
@@ -156,7 +161,16 @@ export function startGame(opts: GameOptions): void {
   }
 
   /* ---------- HUD ---------- */
+  let lastStats = state.stats.length;
   function onState() {
+    if (state.stats.length !== lastStats) {
+      lastStats = state.stats.length;
+      const m = state.stats.at(-1);
+      if (m) {
+        const net = m.income - m.expenses;
+        toast(`Parte del mes: ${net >= 0 ? '▲ +' : '▼ '}${money(net)}. Toca para verlo.`, { kind: net >= 0 ? 'good' : 'warn', onClick: openAccounts });
+      }
+    }
     const d = tickToDate(state.tick);
     $('#hud-date').textContent = formatDate(d);
     if (d.hour === 0 || dayAgoTreasury.length === 0) {
@@ -502,6 +516,7 @@ export function startGame(opts: GameOptions): void {
     else if (k === 'ArrowDown' || k === 's') cam.y += step;
     else if (k === '+' || k === '=') setZoom(cam.zoom + 1);
     else if (k === '-') setZoom(cam.zoom - 1);
+    else if (k === 'l') $('#layers').click();
     else if (k === ' ' && target.tagName !== 'BUTTON') {
       e.preventDefault();
       setSpeed(speed === 0 ? 1 : 0);
@@ -636,17 +651,36 @@ export function startGame(opts: GameOptions): void {
       if (res.length) content.push(h('h3', {}, 'Viven aquí'), citizenList(res));
       const workers = state.citizens.filter((c) => c.jobId === b.id);
       if (workers.length) content.push(h('h3', {}, 'Trabajan aquí'), citizenList(workers));
+      if (b.kind === 'house' || b.kind === 'res' || b.kind === 'shop' || b.kind === 'factory') {
+        content.push(h('p', {}, `Valor de mercado: ${money(unitValue(state, b))}${b.kind === 'house' || b.kind === 'res' ? ' por vivienda' : ''}.`));
+      }
+      if (b.kind === 'house') {
+        const sale = !!b.forSale;
+        const toggle = h('button', { class: 'btn wide' }, sale ? 'Pasar a alquiler' : 'Poner a la venta');
+        toggle.addEventListener('click', () => void command({ type: 'SetHousingMode', buildingId: b.id, mode: sale ? 'rent' : 'sale' }));
+        content.push(
+          h('p', {}, sale ? `A la venta: los inquilinos pueden comprar su vivienda (máx. ${money(salePrice(state, b))} + 4 % de gastos). El dinero va al ayuntamiento.` : 'En alquiler: cobras alquiler cada mes.'),
+          h('p', { class: 'muted' }, `Viviendas ya vendidas: ${b.privateUnits ?? 0} de 3.`),
+          toggle,
+        );
+      }
+      if (b.owner > 0) {
+        const o = state.citizens.find((c) => c.id === b.owner);
+        content.push(h('p', {}, `Negocio de ${o?.name ?? 'un antiguo vecino'}.`));
+      }
       if (b.kind === 'shop' || b.kind === 'factory') content.push(h('p', { class: 'muted' }, `Caja de la empresa: ${money(b.cash)}`));
     }
-    const owner = b.owner === 0 ? 'Municipal' : b.owner === -1 ? 'Privado' : 'De un vecino';
+    const owner = b.owner === 0 ? 'Municipal' : b.owner === -1 ? 'Privado (inversor de fuera)' : 'De un vecino';
     content.push(h('p', { class: 'muted' }, owner));
-    sheet(BUILD_NAMES[b.kind] ?? b.kind, ...content);
+    sheet(b.name ?? BUILD_NAMES[b.kind] ?? b.kind, ...content);
     const body = document.querySelector('.sheet-body');
     if (body) body.scrollTop = prevScroll;
   }
 
-  function citizenList(list: GameState['citizens']) {
+  function citizenList(all: GameState['citizens']) {
     const ul = h('ul', { class: 'people' });
+    const list = all.filter((c) => c.named);
+    const others = all.length - list.length;
     for (const c of list) {
       const factors = happinessFactors(state, c)
         .filter((f) => f.value < 0)
@@ -661,63 +695,21 @@ export function startGame(opts: GameOptions): void {
           `, ${c.age} años · ${money(c.money)}`,
           c.named ? h('span', { class: 'muted' }, ` · quiere ${DESIRE_TEXT[c.desire]}, teme ${FEAR_TEXT[c.fear]}`) : '',
           last ? h('em', { class: 'quote' }, ` «${last.motivo}»`) : '',
+          c.owns ? h('span', { class: 'muted' }, ' · propietario') : '',
           factors.length ? h('span', { class: 'muted' }, ` · le preocupa: ${factors.join(', ')}`) : '',
         ),
       );
+    }
+    if (others > 0) {
+      const avg = Math.round(all.filter((c) => !c.named).reduce((a, c) => a + c.happiness, 0) / others);
+      ul.append(h('li', { class: 'muted' }, `${list.length ? 'Y ' : ''}${others} ${others === 1 ? 'vecino' : 'vecinos'} más (felicidad media ${avg})`));
     }
     return ul;
   }
 
   /* ---------- menú, impuestos y cuentas ---------- */
-  function openTaxes() {
-    const levels = [
-      ['low', 'Bajos', 'Menos ingresos, vecinos más contentos y más demanda de vivienda.'],
-      ['medium', 'Medios', 'Equilibrio.'],
-      ['high', 'Altos', 'Más ingresos ahora, pero baja la felicidad y llega menos gente.'],
-    ] as const;
-    const box = h('div', { class: 'radio-list', role: 'radiogroup', 'aria-label': 'Nivel de impuestos' });
-    for (const [lv, name, desc] of levels) {
-      const btn = h('button', { class: 'btn choice', role: 'radio', 'aria-checked': String(state.taxLevel === lv) }, h('strong', {}, name), h('span', {}, desc));
-      btn.addEventListener('click', async () => {
-        await command({ type: 'SetTax', level: lv });
-        openTaxes();
-      });
-      box.append(btn);
-    }
-    sheet(
-      'Impuestos',
-      h('p', {}, 'Un único impuesto sobre sueldos, ventas e inmuebles. Se cobra a fin de mes según la media del mes.'),
-      box,
-      h('p', { class: 'muted' }, 'Con 50 vecinos se separarán en IBI, tasas y plusvalía.'),
-    );
-  }
-
-  function openAccounts() {
-    const last = state.stats.at(-1);
-    const cur = state.month;
-    const rows = (bd: Record<string, number>) => {
-      const ul = h('ul', { class: 'accounts' });
-      const entries = Object.entries(bd).sort((a, b) => a[1] - b[1]);
-      if (!entries.length) ul.append(h('li', {}, 'Sin movimientos todavía.'));
-      for (const [k, v] of entries) ul.append(h('li', { class: v < 0 ? 'neg' : 'pos' }, h('span', {}, k), h('span', {}, `${v > 0 ? '▲ +' : '▼ '}${money(v)}`)));
-      return ul;
-    };
-    const why = last
-      ? Object.entries(last.breakdown)
-          .filter(([, v]) => v < 0)
-          .sort((a, b) => a[1] - b[1])
-          .slice(0, 2)
-          .map(([k, v]) => `${k} (${money(v)})`)
-      : [];
-    sheet(
-      'Cuentas del ayuntamiento',
-      h('h3', {}, 'Este mes (en curso)'),
-      rows(cur.breakdown),
-      h('h3', {}, 'Mes pasado'),
-      last ? rows(last.breakdown) : h('p', {}, 'Aún no ha terminado ningún mes.'),
-      last && last.income - last.expenses < 0 && why.length ? h('p', {}, `Por qué baja tu saldo: ${why.join(' y ')}.`) : '',
-    );
-  }
+  const openTaxes = () => openTaxesSheet(() => state, command);
+  const openAccounts = () => openReport(state);
 
   function openMenu() {
     const item = (label: string, fn: () => void) => {
@@ -728,7 +720,13 @@ export function startGame(opts: GameOptions): void {
     sheet(
       'Menú',
       item('Impuestos', openTaxes),
-      item('Cuentas del ayuntamiento', openAccounts),
+      item('Parte mensual', openAccounts),
+      item('Vecinos', () =>
+        openNeighbours(state, (c) => {
+          const b = state.buildings.find((x) => x.id === (c.homeId ?? c.jobId));
+          if (b) focusBuilding(b.id);
+        }),
+      ),
       ...(state.aiMode
         ? [
             item('Gasto de la IA', () => void openUsage(token)),
@@ -797,6 +795,15 @@ export function startGame(opts: GameOptions): void {
   for (const b of document.querySelectorAll<HTMLButtonElement>('[data-speed]')) {
     b.onclick = () => setSpeed(Number(b.dataset.speed));
   }
+  $('#layers').onclick = () => {
+    const ids = LAYERS.map((l) => l.id);
+    layer = ids[(ids.indexOf(layer) + 1) % ids.length]!;
+    const def = LAYERS.find((l) => l.id === layer)!;
+    const legend = $('#legend');
+    legend.hidden = layer === 'none';
+    legend.replaceChildren(h('strong', {}, def.label), ...def.legend.map((x) => h('span', { class: `legend-item ${x.cls}` }, x.text)));
+    $('#layers').setAttribute('aria-label', `Capas de datos: ${def.label}`);
+  };
   $('#zoom-in').onclick = () => setZoom(cam.zoom + 1);
   $('#zoom-out').onclick = () => setZoom(cam.zoom - 1);
   $('#menu').onclick = openMenu;
@@ -822,7 +829,7 @@ export function startGame(opts: GameOptions): void {
   /* ---------- bucle de pintado ---------- */
   function frame(time: number) {
     if ($('#game').hidden) return;
-    render(ctx, state, cam, { preview, selected, time, reducedMotion: reducedMotion() });
+    render(ctx, state, cam, { preview, selected, time, reducedMotion: reducedMotion(), layer });
     placeBubbles();
     requestAnimationFrame(frame);
   }

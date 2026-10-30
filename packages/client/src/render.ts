@@ -1,4 +1,5 @@
 import { type GameState, Tile, Zone } from '@bitopolis/sim';
+import { happinessMarks, type LayerId, layerCanvas } from './layers.ts';
 import { PALETTE } from './palette.ts';
 import {
   BH,
@@ -93,7 +94,7 @@ export function render(
   ctx: CanvasRenderingContext2D,
   state: GameState,
   cam: Camera,
-  opts: { preview?: Preview | null; selected?: { x: number; y: number } | null; time: number; reducedMotion: boolean },
+  opts: { preview?: Preview | null; selected?: { x: number; y: number } | null; time: number; reducedMotion: boolean; layer?: LayerId },
 ): void {
   const z = cam.zoom;
   const ts = T * z;
@@ -107,6 +108,11 @@ export function render(
     groundSig = sig;
   }
   ctx.drawImage(ground, -cam.x, -cam.y, ground.width * z, ground.height * z);
+
+  // La capa va sobre el suelo y bajo los edificios, para no taparlos.
+  const layer = opts.layer ?? 'none';
+  const overlay = layer === 'happiness' ? null : layerCanvas(state, layer);
+  if (overlay) ctx.drawImage(overlay, -cam.x, -cam.y, overlay.width * z, overlay.height * z);
 
   const { w, h, tiles } = state.map;
   // Rango visible (con margen para lo que sobresale hacia arriba).
@@ -153,6 +159,25 @@ export function render(
           ix -= 12 * z;
         }
         if (!b.hasPower) ctx.drawImage(iconSprite('noPower'), ix, iy, 11 * z, 13 * z);
+      }
+    }
+  }
+
+  if (layer === 'happiness') {
+    // Marca de 10×10 con la trama del nivel sobre cada vivienda habitada.
+    for (const m of happinessMarks(state)) {
+      const px = m.x * ts - cam.x + 11 * z;
+      const py = (m.y * T - (BH - T)) * z - cam.y + 2 * z;
+      ctx.fillStyle = P(0);
+      ctx.fillRect(px - z, py - z, 12 * z, 12 * z);
+      ctx.fillStyle = P(m.color);
+      for (let y = 0; y < 10; y += 2) {
+        for (let x = 0; x < 10; x += 2) {
+          const gx = x / 2;
+          const gy = y / 2;
+          const on = m.lv === 0 ? (gx + gy) % 4 === 0 : m.lv === 1 ? (gx + gy) % 2 === 0 && gy % 2 === 0 : m.lv === 2 ? (gx + gy) % 2 === 0 : true;
+          if (on) ctx.fillRect(px + x * z, py + y * z, 2 * z, 2 * z);
+        }
       }
     }
   }

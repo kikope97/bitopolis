@@ -38,6 +38,7 @@ interface GameAiState {
 
 const TIMEOUT_MS = 20_000;
 const MAX_OUT_PER_CITIZEN = 120;
+export const MAX_BATCH = 8;
 
 const day = (d = new Date()) => d.toISOString().slice(0, 10);
 const month = (d = new Date()) => d.toISOString().slice(0, 7);
@@ -144,7 +145,8 @@ export class AiService {
     if (!state.aiMode || state.pending.length === 0) return;
     const g = this.gs(gameId);
     if (g.inflight) return;
-    const fresh = state.pending.filter((p) => !g.requested.has(`${p.citizenId}:${p.createdTick}`) && p.dueTick > state.tick);
+    // Lotes de 8 vecinos como mucho: con 20 vecinos el coste queda acotado.
+    const fresh = state.pending.filter((p) => !g.requested.has(`${p.citizenId}:${p.createdTick}`) && p.dueTick > state.tick).slice(0, MAX_BATCH);
     if (fresh.length === 0) return;
     for (const p of fresh) g.requested.add(`${p.citizenId}:${p.createdTick}`);
     if (g.requested.size > 500) g.requested = new Set([...g.requested].slice(-200));

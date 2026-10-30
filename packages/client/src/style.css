@@ -323,3 +323,20 @@ pre.prompt { white-space: pre-wrap; word-break: break-word; max-height: 40vh; ov
 .big-number { font-size: 1.2rem; font-weight: 700; }
 .saved { background: #1a1c2c; padding: 2px 6px; border-radius: 2px; font-size: 0.9rem; color: var(--text); }
 progress { width: 100%; height: 16px; accent-color: #38b764; }
+
+/* ---------- capas, tributos y vecinos ---------- */
+.legend { position: absolute; left: 8px; top: 8px; display: flex; flex-direction: column; gap: 4px; padding: 8px; background: #1a1c2c; border: 2px solid #566c86; border-radius: 4px; font-size: 0.9rem; max-width: 60%; }
+.legend-item { display: flex; align-items: center; gap: 6px; }
+.legend-item::before { content: ''; width: 16px; height: 16px; border: 1px solid #f4f4f4; image-rendering: pixelated; }
+.legend-item.lv0.good::before { background: radial-gradient(#b13e53 30%, transparent 31%) 0 0 / 8px 8px; }
+.legend-item.lv1.good::before { background: radial-gradient(#ef7d57 35%, transparent 36%) 0 0 / 4px 4px; }
+.legend-item.lv2.good::before { background: repeating-conic-gradient(#ffcd75 0 25%, transparent 0 50%) 0 0 / 4px 4px; }
+.legend-item.lv3.good::before { background: #3b5dc9; }
+.legend-item.lv0.bad::before { background: radial-gradient(#f4f4f4 30%, transparent 31%) 0 0 / 8px 8px; }
+.legend-item.lv1.bad::before { background: radial-gradient(#ffcd75 35%, transparent 36%) 0 0 / 4px 4px; }
+.legend-item.lv2.bad::before { background: repeating-conic-gradient(#ef7d57 0 25%, transparent 0 50%) 0 0 / 4px 4px; }
+.legend-item.lv3.bad::before { background: #5d275d; }
+.radio-list.compact .btn.choice { min-height: 48px; padding: 6px 12px; }
+.affects { color: var(--accent); margin: 4px 0; }
+.gloss summary { min-height: 40px; display: flex; align-items: center; cursor: pointer; color: var(--muted); }
+.person-row { width: 100%; min-height: 48px; text-align: left; background: none; border: 0; padding: 6px 0; cursor: pointer; }

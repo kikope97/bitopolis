@@ -557,6 +557,35 @@ function clinic(seed: number): Pix {
   return p;
 }
 
+function policeStation(seed: number): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 2, 16, 28, 30);
+  facade(p, 2, 18, 28, 28, MAT.white, 'plaster', seed);
+  flatRoof(p, 1, 12, 30, 7, MAT.blue, seed);
+  // Franja azul y rótulo.
+  p.rect(2, 26, 28, 4, MAT.blue[1]);
+  p.hline(2, 26, 28, MAT.blue[0]);
+  p.hline(2, 29, 28, MAT.blue[2]);
+  for (let i = 0; i < 7; i++) p.rect(7 + i * 3, 27, 2, 2, 12);
+  // Sirena en el tejado.
+  p.rect(14, 8, 4, 4, MAT.metal[2]);
+  p.rect(14, 8, 2, 2, MAT.red[1]);
+  p.rect(16, 8, 2, 2, MAT.blue[1]);
+  p.set(14, 8, 3);
+  p.set(17, 8, 11);
+  windowAt(p, 5, 20, 4, 4, { frame: 13 });
+  windowAt(p, 23, 20, 4, 4, { frame: 13 });
+  doorAt(p, 13, 35, 6, 10, MAT.blue, 12);
+  windowAt(p, 5, 35, 4, 5, { frame: 13 });
+  windowAt(p, 23, 35, 4, 5, { frame: 13 });
+  // Coche patrulla.
+  p.rect(24, 43, 7, 3, 12);
+  p.rect(25, 42, 4, 1, MAT.blue[1]);
+  p.set(24, 46, 0);
+  p.set(30, 46, 0);
+  return p;
+}
+
 function park(seed: number): Pix {
   const p = new Pix(T, BH);
   // Césped cuidado.
@@ -874,6 +903,8 @@ export function buildingSprite(kind: string, id: number): HTMLCanvasElement {
       return sprite('school', () => school(2));
     case 'clinic':
       return sprite('clinic', () => clinic(4));
+    case 'police':
+      return sprite('police', () => policeStation(6));
     case 'factory':
       return sprite(`factory${id % 4}`, () => factory(id % 4));
     case 'shop':
