@@ -90,8 +90,9 @@ export const MIGRATIONS: Record<number, Migration> = {
     politics: {
       ...s.politics,
       lastMotion: s.politics?.lastMotion ?? -1,
+      motions: s.politics?.motions ?? [],
       party: s.politics?.party ? { promises: [], ...s.politics.party } : null,
-      factions: Object.fromEntries(Object.entries(s.politics?.factions ?? {}).map(([k, v]: [string, any]) => [k, { demands: v.demand ? [v.demand] : [], ...v }])),
+      factions: Object.fromEntries(Object.entries(s.politics?.factions ?? {}).map(([k, v]: [string, any]) => [k, { demands: v.demand ? [v.demand] : [], unmet: v.demand ? [v.demand] : [], ...v }])),
     },
   }),
 };

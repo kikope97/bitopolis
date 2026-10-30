@@ -63,7 +63,8 @@ export interface Politics {
   /** Intención de voto al jugador (0–100), recalculada cada día. */
   approval: number;
   /** Satisfacción de cada facción (0–100) y su exigencia principal. */
-  factions: Record<Faction, { satisfaction: number; demand: string | null; demands: string[]; members: number }>;
+  /** `unmet`: todas las exigencias sin cumplir; `demands`: las 2 primeras (lo que se enseña). */
+  factions: Record<Faction, { satisfaction: number; demand: string | null; demands: string[]; unmet: string[]; members: number }>;
   /** Campaña del jugador por facción (0–3) y tick de la última. */
   campaign: Record<Faction, number>;
   lastCampaign: number;
@@ -71,6 +72,8 @@ export interface Politics {
   perceivedTax: { ibi: number; tasas: number; plusvalia: number };
   /** Última moción del jugador en la oposición (una al mes). */
   lastMotion: number;
+  /** Mociones presentadas (la misma exigencia no se repite en 6 meses) y su resultado. */
+  motions: { need: string; faction: Faction; tick: number; approved: boolean }[];
 }
 
 export function emptyPolitics(tick = 0): Politics {
@@ -82,11 +85,12 @@ export function emptyPolitics(tick = 0): Politics {
     history: [],
     warned: [],
     approval: 60,
-    factions: Object.fromEntries(FACTIONS.map((f) => [f, { satisfaction: 50, demand: null, demands: [] as string[], members: 0 }])) as Politics['factions'],
+    factions: Object.fromEntries(FACTIONS.map((f) => [f, { satisfaction: 50, demand: null, demands: [] as string[], unmet: [] as string[], members: 0 }])) as Politics['factions'],
     campaign: { jubilados: 0, jovenes: 0, empresarios: 0, ecologistas: 0 },
     lastCampaign: -1,
     perceivedTax: { ibi: 1, tasas: 1, plusvalia: 1 },
     lastMotion: -1,
+    motions: [],
   };
 }
 

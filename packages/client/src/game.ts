@@ -195,6 +195,10 @@ export function startGame(opts: GameOptions): void {
     } else if (cmd.type === 'Zone') {
       sfx.tap();
       say(cmd.zone === 'none' ? 'Zona quitada.' : `Zona ${cmd.zone} pintada: ${plural(cmd.w * cmd.h, 'casilla', 'casillas')}.`);
+    } else if (cmd.type === 'Motion') {
+      sfx.tap();
+      const m = state.politics.motions.at(-1);
+      if (m) say(`Moción ${m.approved ? 'aprobada' : 'rechazada'}: ${m.need}.`);
     } else if (cmd.type === 'SetTax' || cmd.type === 'SetTaxes') sfx.tap();
   }
 

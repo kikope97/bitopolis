@@ -27,7 +27,7 @@ export interface Prefs {
 }
 
 const KEY = 'bitopolis.prefs';
-const DEFAULTS: Prefs = { sfx: true, music: false, ambience: false, sfxDb: -9, musicDb: -22, ambDb: -24, vibrate: true, font: 'legible', text: 100, contrast: 'normal', colorblind: 'no', calm: false, motion: 'sistema' };
+const DEFAULTS: Prefs = { sfx: true, music: false, ambience: false, sfxDb: -9, musicDb: -22, ambDb: -28, vibrate: true, font: 'legible', text: 100, contrast: 'normal', colorblind: 'no', calm: false, motion: 'sistema' };
 
 let current: Prefs = load();
 const listeners = new Set<(p: Prefs) => void>();

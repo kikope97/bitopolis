@@ -142,7 +142,7 @@ describe('elecciones (v1.0)', () => {
     expect(r.ok).toBe(true);
     const approved = s.politics.party!.promises.length > promisesBefore;
     if (approved) expect(s.politics.party!.promises.at(-1)!.fromMotion).toBe(true);
-    else expect(s.politics.campaign[f]).toBe(Math.min(3, before + 2));
+    else expect(s.politics.campaign[f]).toBe(Math.min(6, before + 2));
     expect(applyCommand(s, { type: 'Motion', faction: f }).ok).toBe(false);
     expect(checkInvariants(s)).toEqual([]);
   });
@@ -160,7 +160,7 @@ describe('elecciones (v1.0)', () => {
     // Si al vencer seguía faltando, se rompe (y la facción se acerca); si dejó de faltar, se cumplió.
     if (s.politics.factions[f].demands.includes(need)) {
       expect(pr.status).toBe('broken');
-      expect(s.politics.campaign[f]).toBe(Math.min(3, before + 2));
+      expect(s.politics.campaign[f]).toBe(Math.min(6, before + 2));
     } else expect(['kept', 'broken']).toContain(pr.status);
   });
 
@@ -175,5 +175,27 @@ describe('elecciones (v1.0)', () => {
     expect(m.politics.lastMotion).toBe(-1);
     expect(m.politics.party!.promises).toEqual([]);
     expect(m.politics.factions.jovenes.demands).toEqual([]);
+  });
+
+  it('la misma exigencia no se lleva al pleno dos veces en 6 meses', () => {
+    const s = rivalTown();
+    const f = (Object.keys(s.politics.factions) as (keyof typeof s.politics.factions)[]).find((k) => s.politics.factions[k].demand && k !== s.politics.party!.faction);
+    if (!f) return;
+    expect(applyCommand(s, { type: 'Motion', faction: f }).ok).toBe(true);
+    for (let i = 0; i < TICKS_PER_MONTH + 1; i++) step(s);
+    const again = applyCommand(s, { type: 'Motion', faction: f });
+    if (s.politics.factions[f].demand === s.politics.motions.at(-1)!.need) expect(again.ok ? '' : again.error).toMatch(/6 meses|comprometió/);
+  });
+
+  it('el gobierno rival rechaza lo que no puede hacer (sin obra ni impuesto) si no es de su facción', () => {
+    const s = rivalTown();
+    const party = s.politics.party!;
+    const f = (['jubilados', 'jovenes', 'empresarios', 'ecologistas'] as const).find((k) => k !== party.faction)!;
+    s.politics.factions[f] = { ...s.politics.factions[f], demand: 'menos contaminación', demands: ['menos contaminación'], unmet: ['menos contaminación'] };
+    s.politics.lastMotion = -1;
+    const before = s.politics.campaign[f];
+    expect(applyCommand(s, { type: 'Motion', faction: f }).ok).toBe(true);
+    expect(s.politics.motions.at(-1)!.approved).toBe(false);
+    expect(s.politics.campaign[f]).toBe(Math.min(6, before + 2));
   });
 });

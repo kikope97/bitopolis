@@ -452,14 +452,19 @@ body.placing #toasts { bottom: calc(260px + env(safe-area-inset-bottom)); }
 .game.opposition .tool-info::before { content: 'Oposición · '; color: var(--bad); font-weight: 700; }
 .pol-fill { border-right: 2px solid var(--text); }
 .pol-bar.abst .pol-fill { background: repeating-linear-gradient(45deg, #94b0c2 0 3px, #566c86 3px 6px); }
-.btn[aria-disabled='true'] { opacity: 0.5; border-style: dashed; cursor: not-allowed; }
+.btn[aria-disabled='true'] { color: var(--muted); border-style: dashed; box-shadow: none; cursor: not-allowed; }
 body.election-night .bubbles { display: none; }
 
 /* Letra pixel (opción estética): 11 filas por em → a 22 px cada píxel mide 2 px exactos. */
 html[data-font='pixel'] body, html[data-font='pixel'] button, html[data-font='pixel'] input, html[data-font='pixel'] select { font-family: 'Bitopolis Pixel', ui-monospace, monospace; -webkit-font-smoothing: none; font-smooth: never; }
 html[data-font='pixel'] { font-size: 137.5%; }
 html[data-font='pixel'][data-text='150'] { font-size: 206.25%; }
-html[data-font='pixel'][data-text='200'] { font-size: 275%; }
+/* Al 200 % la pixel se queda en 1,5× (33 px, píxeles de 3 px): a 44 px en un móvil cabían 13 letras por línea. */
+html[data-font='pixel'][data-text='200'] { font-size: 206.25%; }
+/* Solo tamaños que caen en píxeles exactos: 1rem para todo, 0,5rem para etiquetas y 3rem para el logo. */
+html[data-font='pixel'] body *:not(.logo) { font-size: 1rem; }
+html[data-font='pixel'] body .tool-label, html[data-font='pixel'] body .fab-label small, html[data-font='pixel'] body .demand *, html[data-font='pixel'] body small, html[data-font='pixel'] body .small, html[data-font='pixel'] body .help, html[data-font='pixel'] body .lock { font-size: 0.5rem; }
+html[data-font='pixel'] .logo { font-size: 3rem; }
 html[data-font='pixel'] .sheet-head h2, html[data-font='pixel'] .sheet h3, html[data-font='pixel'] .logo { font-family: 'Bitopolis Pixel', ui-monospace, monospace; }
 .volume input[type='range'] { width: 100%; min-height: 44px; accent-color: #ffcd75; }
 .volume output { font-variant-numeric: tabular-nums; color: var(--muted); }

@@ -104,6 +104,7 @@ export function openPolitics(ctx: SocialCtx): void {
     );
   }
   items.splice(items.length - FACTIONS.length, 0, why);
+  if (opp && p.party) items.splice(items.length - FACTIONS.length, 0, motionIntro(state));
 
   if (p.party) {
     const leader = h('button', { class: 'btn small' }, `Ver la ficha de ${p.party.leaderName}`);
@@ -141,12 +142,29 @@ function motionButton(ctx: SocialCtx, f: (typeof FACTIONS)[number]): HTMLElement
   const state = ctx.state();
   const can = canMotion(state, f);
   const id = `motion-why-${f}`;
-  const btn = h('button', { class: 'btn small', ...(can.ok ? {} : { 'aria-disabled': 'true', 'aria-describedby': id }) }, `Presentar moción: ${state.politics.factions[f].demand ?? '—'}`);
+  const describedBy = !can.ok && can.error?.startsWith('Solo una moción') ? 'motion-next' : id;
+  const btn = h('button', { class: 'btn small', ...(can.ok ? {} : { 'aria-disabled': 'true', 'aria-describedby': describedBy }) }, `Presentar moción: ${state.politics.factions[f].demand ?? '—'}`);
   btn.addEventListener('click', async () => {
     if (!can.ok) return;
     if (await ctx.command({ type: 'Motion', faction: f })) openPolitics(ctx);
   });
-  return h('div', {}, btn, can.ok ? '' : h('p', { id, class: 'muted small' }, can.error ?? ''));
+  // El motivo general («una al mes») ya se dice arriba; aquí solo el particular de esta facción.
+  const own = !can.ok && can.error && !can.error.startsWith('Solo una moción');
+  return h('div', {}, btn, own ? h('p', { id, class: 'muted small' }, can.error ?? '') : '');
+}
+
+/** Cabecera de las mociones: qué hacen, cuándo toca la próxima y cómo acabó la última. */
+function motionIntro(state: GameState): HTMLElement {
+  const p = state.politics;
+  const next = p.lastMotion >= 0 ? p.lastMotion + 30 * 24 : -1;
+  const last = p.motions.at(-1);
+  return h(
+    'div',
+    { class: 'motion-intro' },
+    h('p', {}, 'Mociones: llevas al pleno lo que pide una facción. Si el gobierno la rechaza, esa facción te apoyará más; si la aprueba, tiene 6 meses para cumplirla, y si no cumple, también te apoyarán a ti.'),
+    next > state.tick ? h('p', { id: 'motion-next', class: 'muted small' }, `Una moción al mes: la próxima, el ${formatDate(tickToDate(next))}.`) : '',
+    last ? h('p', { class: last.approved ? 'pos' : 'neg' }, `Tu última moción (${last.need}): ${last.approved ? 'aprobada' : 'rechazada'}.`) : '',
+  );
 }
 
 function resultText(r: ElectionResult): string {

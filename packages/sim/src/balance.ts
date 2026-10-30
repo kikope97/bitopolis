@@ -125,6 +125,9 @@ export const VOTE_ABSTENTION_BASE = 0.18;
 /** Campaña: una al mes en los últimos 12 meses; cada una mueve el voto de la facción. */
 export const CAMPAIGN_MONTHS = 12;
 export const CAMPAIGN_EFFECT = 0.03;
+/** En la oposición la campaña pesa el doble, y mociones rechazadas y promesas rotas suben hasta 6 (ronda 07). */
+export const CAMPAIGN_EFFECT_OPP = 0.06;
+export const CAMPAIGN_MAX = 6;
 /** Gobernando, cada acto de campaña cuesta (como un pleno); en la oposición es gratis y vale todo el mandato. */
 export const CAMPAIGN_COST = 300;
 /** Las bajadas de impuestos se notan despacio (días); las subidas, al momento. */

@@ -1,5 +1,5 @@
 import { sfx, unlockAudio } from './audio.ts';
-import { type Prefs, prefs, setPrefs } from './prefs.ts';
+import { onPrefs, type Prefs, prefs, setPrefs } from './prefs.ts';
 import { h, sheet } from './ui.ts';
 
 /**
@@ -46,10 +46,16 @@ function toggle(label: string, key: 'sfx' | 'music' | 'ambience' | 'vibrate' | '
 }
 
 /** Control de volumen en decibelios (el oído es logarítmico). */
-function volume(label: string, key: 'sfxDb' | 'musicDb' | 'ambDb'): HTMLElement {
+function volume(label: string, key: 'sfxDb' | 'musicDb' | 'ambDb', bus: 'sfx' | 'music' | 'ambience'): HTMLElement {
   const text = (db: number) => (db <= -40 ? 'silencio' : `${db} dB`);
-  const out = h('output', {}, text(prefs()[key]));
-  const input = h('input', { type: 'range', min: '-40', max: '0', step: '1', value: String(prefs()[key]), 'aria-valuetext': text(prefs()[key]) }) as HTMLInputElement;
+  // El valor ya lo da aria-valuetext: el <output> visible se oculta al lector (no se repite).
+  const out = h('output', { 'aria-hidden': 'true' }, text(prefs()[key]));
+  const input = h('input', { type: 'range', min: '-40', max: '0', step: '1', value: String(prefs()[key]), 'aria-valuetext': text(prefs()[key]), ...(prefs()[bus] ? {} : { disabled: true }) }) as HTMLInputElement;
+  // Con el interruptor apagado, el volumen no se toca.
+  const off = onPrefs((p) => {
+    if (!input.isConnected) return off();
+    input.disabled = !p[bus];
+  });
   input.addEventListener('input', () => {
     const db = Number(input.value);
     out.textContent = text(db);
@@ -70,11 +76,11 @@ export function openSettings(): void {
     'Ajustes',
     h('h3', {}, 'Sonido'),
     toggle('Efectos de sonido', 'sfx'),
-    volume('Volumen de los efectos', 'sfxDb'),
+    volume('Volumen de los efectos', 'sfxDb', 'sfx'),
     toggle('Música', 'music'),
-    volume('Volumen de la música', 'musicDb'),
+    volume('Volumen de la música', 'musicDb', 'music'),
     toggle('Ambiente', 'ambience', '(pájaros de día, grillos de noche)'),
-    volume('Volumen del ambiente', 'ambDb'),
+    volume('Volumen del ambiente', 'ambDb', 'ambience'),
     toggle('Vibración', 'vibrate', '(en móviles que la admiten)'),
     h('h3', {}, 'Lectura'),
     radioGroup<Prefs['font']>(

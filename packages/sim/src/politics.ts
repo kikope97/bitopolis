@@ -5,6 +5,8 @@ import {
   MOTION_MONTHS,
   RIVAL_PROMISE_MONTHS,
   CAMPAIGN_EFFECT,
+  CAMPAIGN_EFFECT_OPP,
+  CAMPAIGN_MAX,
   CAMPAIGN_MONTHS,
   ELECTION_MONTHS,
   OPPOSITION_APPROVAL,
@@ -91,7 +93,7 @@ export function updateFactions(state: GameState): void {
     // Con un gobierno rival, las exigencias de su propia facción pesan a su favor.
     const bonus = state.politics.mayor !== 'player' && state.politics.party?.faction === f ? 10 : 0;
     const satisfaction = Math.max(0, Math.min(100, Math.round(happy * 0.6 + 40 - unmet.length * 14 + bonus)));
-    state.politics.factions[f] = { satisfaction, demand: unmet[0] ?? null, demands: unmet.slice(0, 2), members: members.length };
+    state.politics.factions[f] = { satisfaction, demand: unmet[0] ?? null, demands: unmet.slice(0, 2), unmet, members: members.length };
   }
 }
 
@@ -103,7 +105,9 @@ function govSupport(state: GameState, c: Citizen): number {
   // Los vecinos de la facción del partido rival tiran hacia él; la campaña del jugador, hacia el jugador.
   const f = factionOf(state, c);
   if (state.politics.party && f === state.politics.party.faction) p += state.politics.mayor === 'player' ? -0.12 : 0.12;
-  p += (state.politics.mayor === 'player' ? 1 : -1) * state.politics.campaign[f] * CAMPAIGN_EFFECT;
+  // En la oposición, cada punto pesa el doble (es lo único que se puede hacer).
+  const governs = state.politics.mayor === 'player';
+  p += (governs ? 1 : -1) * state.politics.campaign[f] * (governs ? CAMPAIGN_EFFECT : CAMPAIGN_EFFECT_OPP);
   // Luna de miel: el primer año tras unas elecciones, el descontento aún se achaca a quien gobernaba antes.
   const last = state.politics.history.at(-1);
   if (last) p += Math.max(0, 1 - (state.tick - last.tick) / (12 * TICKS_PER_MONTH)) * HONEYMOON;
@@ -261,6 +265,15 @@ function rivalGovern(state: GameState): void {
     else if (f === 'empresarios') governmentCommand(state, { type: 'SetTaxes', ibi: 'medium', tasas: 'low' });
     else governmentCommand(state, { type: 'SetTaxes', ibi: 'medium', tasas: 'medium' });
   } else if (state.taxLevel !== want) governmentCommand(state, { type: 'SetTax', level: want });
+  // Promesas fiscales: si no hay déficit, las cumple bajando ese impuesto.
+  const owesTax = (need: string) => p.party!.promises.some((x) => x.status === 'pending' && x.need === need);
+  if (!deficit && owesTax('bajar el IBI')) governmentCommand(state, state.taxesSplit ? { type: 'SetTaxes', ibi: 'low' } : { type: 'SetTax', level: 'low' });
+  if (!deficit && owesTax('bajar los impuestos')) governmentCommand(state, state.taxesSplit ? { type: 'SetTaxes', tasas: 'low', ibi: 'low' } : { type: 'SetTax', level: 'low' });
+  // Con deuda seria, recorta: derriba su último parque o casa municipal (como haría cualquiera).
+  if (state.treasury < -5_000) {
+    const cut = [...state.buildings].reverse().find((b) => (b.kind === 'park' || b.kind === 'house') && b.built);
+    if (cut && governmentCommand(state, { type: 'Demolish', x: cut.x, y: cut.y })) pushEvent(state, 'politics', `El alcalde ${p.party.leaderName} recorta gastos: derriba ${cut.kind === 'park' ? 'un parque' : 'una casa municipal'}`);
+  }
   // Una obra al mes si hay caja, por orden de prioridad de la facción.
   if (deficit) return;
   // Primero, lo prometido que se resuelve con una obra.
@@ -282,6 +295,9 @@ function rivalGovern(state: GameState): void {
 }
 
 /** Obra que resuelve una exigencia (para que el gobierno rival la priorice). */
+/** Exigencias que se resuelven bajando un impuesto. */
+const TAX_NEEDS = new Set(['bajar el IBI', 'bajar los impuestos']);
+
 const NEED_BUILD: Record<string, string> = {
   'un centro de salud': 'clinic',
   'un colegio': 'school',
@@ -297,13 +313,13 @@ function checkRivalPromises(state: GameState): void {
   for (const pr of p.party.promises) {
     if (pr.status !== 'pending') continue;
     const governing = p.mayor === p.party.leaderId;
-    if (!p.factions[pr.faction].demands.includes(pr.need) && governing) {
+    if (!p.factions[pr.faction].unmet.includes(pr.need) && governing) {
       pr.status = 'kept';
       pushEvent(state, 'politics', `«${p.party.name}» cumple lo prometido a ${FACTION_TEXT[pr.faction].toLowerCase()}: ${pr.need}`);
     } else if (governing && state.tick > pr.deadline) {
       pr.status = 'broken';
       // Una promesa rota es munición para la oposición: esa facción se acerca al jugador.
-      p.campaign[pr.faction] = Math.min(3, p.campaign[pr.faction] + 2);
+      p.campaign[pr.faction] = Math.min(CAMPAIGN_MAX, p.campaign[pr.faction] + 2);
       pushEvent(state, 'politics', `«${p.party.name}» incumple su promesa a ${FACTION_TEXT[pr.faction].toLowerCase()} (${pr.need}). Lo recordarán en las urnas`);
     }
   }
@@ -317,6 +333,8 @@ export function canMotion(state: GameState, f: Faction): { ok: boolean; error?: 
   if (p.lastMotion >= 0 && state.tick - p.lastMotion < TICKS_PER_MONTH) return { ok: false, error: 'Solo una moción al mes' };
   if (!p.factions[f].demand) return { ok: false, error: `${FACTION_TEXT[f]} no piden nada ahora mismo` };
   if (p.party.promises.some((x) => x.status === 'pending' && x.need === p.factions[f].demand)) return { ok: false, error: 'El gobierno ya se comprometió a eso' };
+  const need = p.factions[f].demand;
+  if (p.motions.some((m) => m.need === need && state.tick - m.tick < MOTION_MONTHS * TICKS_PER_MONTH)) return { ok: false, error: 'Ya llevaste eso al pleno hace menos de 6 meses' };
   return { ok: true };
 }
 
@@ -331,12 +349,16 @@ export function motion(state: GameState, f: Faction): void {
   const need = p.factions[f].demand!;
   p.lastMotion = state.tick;
   const buildable = NEED_BUILD[need];
-  const affordable = buildable ? state.treasury >= buildCost(buildable as never) + 5_000 : state.treasury > 15_000;
-  if (f === party.faction || affordable) {
+  // Lo que el gobierno puede hacer: una obra (si hay caja) o bajar un impuesto. Lo demás lo rechaza (salvo si es de su facción).
+  const doable = buildable ? state.treasury >= buildCost(buildable as never) + 5_000 : TAX_NEEDS.has(need);
+  const approved = f === party.faction || doable;
+  p.motions.push({ need, faction: f, tick: state.tick, approved });
+  if (p.motions.length > 24) p.motions.splice(0, p.motions.length - 24);
+  if (approved) {
     party.promises.push({ faction: f, need, deadline: state.tick + MOTION_MONTHS * TICKS_PER_MONTH, status: 'pending', fromMotion: true });
     pushEvent(state, 'politics', `El pleno aprueba tu moción: ${need} para ${FACTION_TEXT[f].toLowerCase()}. El gobierno tiene ${MOTION_MONTHS} meses para cumplirla`);
   } else {
-    p.campaign[f] = Math.min(3, p.campaign[f] + 2);
+    p.campaign[f] = Math.min(CAMPAIGN_MAX, p.campaign[f] + 2);
     pushEvent(state, 'politics', `El gobierno rechaza tu moción (${need}). ${FACTION_TEXT[f]} toman nota`);
   }
 }
@@ -356,8 +378,9 @@ export function politicsDay(state: GameState): void {
   p.approval = playerApproval(state);
   if (state.tick % TICKS_PER_MONTH === 0) {
     foundParty(state);
-    rivalGovern(state);
+    // Primero se miran las promesas (con el pueblo tal como está), luego gobierna.
     checkRivalPromises(state);
+    rivalGovern(state);
   }
   warnings(state);
   if (state.tick >= p.nextElection) holdElection(state);
@@ -379,7 +402,8 @@ export function canCampaign(state: GameState): { ok: boolean; error?: string } {
 export function campaign(state: GameState, f: Faction): void {
   const p = state.politics;
   if (p.mayor === 'player') transfer(state, TREASURY, OUTSIDE, CAMPAIGN_COST, 'actos');
-  p.campaign[f] = Math.min(3, p.campaign[f] + 1);
+  // Los actos de campaña suben hasta 3; mociones rechazadas y promesas rotas, hasta CAMPAIGN_MAX.
+  p.campaign[f] = Math.max(p.campaign[f], Math.min(3, p.campaign[f] + 1));
   p.lastCampaign = state.tick;
   pushEvent(state, 'politics', `Haces campaña entre ${FACTION_TEXT[f].toLowerCase()}: escuchas lo que piden (${p.factions[f].demand ?? 'que todo siga así'})`);
 }
