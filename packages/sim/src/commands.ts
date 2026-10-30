@@ -1,5 +1,5 @@
 import { Command, type BuildKind, type ZoneKind } from '@bitopolis/shared';
-import { BUILD, WAGE_OUTSIDE, ZONE_COST_PER_TILE, ZONE_UNLOCK_POP } from './balance.ts';
+import { BUILD, DEBT_LIMIT, WAGE_OUTSIDE, ZONE_COST_PER_TILE, ZONE_UNLOCK_POP } from './balance.ts';
 import { applyDecision, canApplyDecision } from './decisions.ts';
 import { answerPetition, canConvenePleno, closePleno, convenePleno, talkTo } from './social.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
@@ -107,7 +107,8 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       if (!inBounds(state, cmd.x, cmd.y) || !inBounds(state, cmd.x + cmd.w - 1, cmd.y + cmd.h - 1)) {
         return { ok: false, error: 'Fuera del mapa' };
       }
-      if (cmd.zone !== 'none' && state.treasury < cmd.w * cmd.h * ZONE_COST_PER_TILE) return { ok: false, error: 'No hay dinero suficiente' };
+      // Pintar zonas es la salida de una crisis: se permite con deuda hasta el límite.
+      if (cmd.zone !== 'none' && state.treasury - cmd.w * cmd.h * ZONE_COST_PER_TILE < -DEBT_LIMIT) return { ok: false, error: 'No hay dinero suficiente' };
       return { ok: true };
     }
     case 'Demolish': {

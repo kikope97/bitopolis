@@ -18,8 +18,8 @@ export const BUILD: Record<BuildKind, BuildSpec> = {
   water: { materials: 3_000, workers: 4, days: 3, unlockPop: 0 },
   power: { materials: 4_000, workers: 4, days: 3, unlockPop: 0 },
   park: { materials: 1_200, workers: 2, days: 2, unlockPop: 10 },
-  school: { materials: 5_000, workers: 5, days: 4, unlockPop: 10 },
-  clinic: { materials: 5_000, workers: 5, days: 4, unlockPop: 10 },
+  school: { materials: 5_000, workers: 5, days: 4, unlockPop: 25 },
+  clinic: { materials: 5_000, workers: 5, days: 4, unlockPop: 25 },
   police: { materials: 4_000, workers: 4, days: 3, unlockPop: 20 },
   /** Hitos: se desbloquean con objetivos (no por población). */
   plaza: { materials: 3_000, workers: 5, days: 3, unlockPop: 50 },

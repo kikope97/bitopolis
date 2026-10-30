@@ -100,7 +100,9 @@ function planner(name: string, o: PlannerOpts): Profile {
       if (built.some((b) => !b.hasPower) && !state.projects.some((p) => buildingKindOf(state, p.buildingId) === 'power')) {
         if (tryBuild('power')) return out;
       }
-      if (pop >= ZONE_UNLOCK_POP) {
+      // Un jugador razonable mira el parte: no añade servicios (y sus sueldos) con el mes en negativo.
+      const last = state.stats.at(-1);
+      if (pop >= ZONE_UNLOCK_POP && (!last || last.income >= last.expenses)) {
         const count = (k: string) => state.buildings.filter((b) => b.kind === k).length;
         const wanted = o.servicesPer ? Math.ceil(pop / o.servicesPer) : 1;
         for (const kind of o.services) if (count(kind) < wanted && tryBuild(kind)) return out;
