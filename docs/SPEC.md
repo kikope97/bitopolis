@@ -125,9 +125,10 @@ Mudarse al pueblo o no, irse y vender la casa, comprar o alquilar casa, buscar o
 ## 8. Interfaz, arte y accesibilidad
 
 ### 8.1 Arte (todo propio, generado por código)
-- **Paleta cerrada de 32 colores** en `palette.ts`, validada en el build: si aparece un color fuera de la paleta, el build falla.
+- **Paleta cerrada de 64 colores** en `palette.ts` (decisión del creador, ronda 04: antes 32), validada en el build: si aparece un color fuera de la paleta, el build falla.
 - **Alta definición** (decisión del creador, ronda 01): pixel art detallado, no "de cuadros". Casillas de 32 px y edificios de 32×48 que sobresalen hacia arriba, con texturas (ladrillo, tejas, chapa), reflejos, sombras proyectadas y tramado.
-- Sprites a partir de **plantillas modulares** (base, tejado, puerta, ventanas) en matrices de índices de paleta. Se combinan con semilla y se exportan a un atlas en el build. Luz desde arriba a la izquierda, contorno de 1 px de color (no negro), 3 tonos por material, sin degradados ni antialiasing.
+- Sprites a partir de **plantillas modulares** (base, tejado, puerta, ventanas) en matrices de índices de paleta. Se combinan con semilla y se exportan a un atlas en el build. Luz desde arriba a la izquierda, contorno de 1 px de color (no negro), 4–5 tonos por material, sin degradados ni antialiasing.
+- **Aún más definido y animado** (decisión del creador, ronda 04): más detalle por sprite y animaciones por fotogramas: vecinos caminando, agua y humo que se mueven, árboles con viento, obras con andamios, luces que se encienden de noche. Todo respeta el modo calma y `prefers-reduced-motion`.
 - Vecinos de 12×18 px con silueta propia e icono de estado encima.
 - Escala entera con `image-rendering: pixelated` y zoom en múltiplos enteros.
 - Nada de assets de terceros.
