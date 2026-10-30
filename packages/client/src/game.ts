@@ -212,12 +212,21 @@ export function startGame(opts: GameOptions): void {
     const arrivals = fresh.filter((e) => e.kind === 'arrival');
     if (arrivals.length === 1) toast(arrivals[0]!.text, { kind: 'good' });
     else if (arrivals.length > 1) toast(`Llegan ${arrivals.length} vecinos nuevos`, { kind: 'good' });
+    const built = fresh.filter((e) => e.kind === 'built');
+    const notified = built.filter((e) => e.notify);
+    for (const e of notified) {
+      toast(e.text, { kind: 'good', sticky: true, onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+      vibrate(80);
+    }
+    const plain = built.filter((e) => !e.notify);
+    if (plain.length === 1) toast(plain[0]!.text, { kind: 'good' });
+    else if (plain.length > 1) toast(`${plain.length} obras terminadas`, { kind: 'good' });
     for (const e of fresh) {
-      if (e.kind === 'built') {
-        toast(e.text, { kind: 'good', sticky: !!e.notify, onClick: e.notify && e.ref ? () => focusBuilding(e.ref!) : undefined });
-        if (e.notify) vibrate(80);
-      } else if (e.kind === 'bankrupt' || e.kind === 'warning') {
-        toast(e.text, { kind: 'warn', sticky: true });
+      if (e.kind === 'bankrupt' || e.kind === 'warning') {
+        toast(e.kind === 'warning' ? `${e.text}. Prueba a subir los impuestos (☰ › Impuestos) o espera antes de construir.` : e.text, {
+          kind: 'warn',
+          sticky: true,
+        });
       } else if (e.kind === 'departure' || e.kind === 'business') {
         toast(e.text, { kind: 'warn' });
       }

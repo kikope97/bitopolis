@@ -56,7 +56,7 @@ button, input, select { font: inherit; color: inherit; }
 .btn.wide { width: 100%; margin: 6px 0; }
 .btn.choice { flex-direction: column; align-items: flex-start; text-align: left; width: 100%; font-weight: 400; }
 .btn.choice[aria-checked='true'] { border-color: var(--accent); box-shadow: inset 4px 0 0 var(--accent); }
-.btn.choice[aria-disabled='true'] { opacity: 0.6; }
+.btn.choice[aria-disabled='true'] { border-style: dashed; }
 .btn.choice span { color: var(--muted); font-size: 0.9rem; }
 .radio-list { display: flex; flex-direction: column; gap: 8px; }
 .row { display: flex; gap: 8px; align-items: stretch; }
@@ -81,9 +81,10 @@ button, input, select { font: inherit; color: inherit; }
   text-align: center;
 }
 .tagline { text-align: center; color: var(--muted); margin: 0 0 8px; }
-#start-body { flex: 1; }
-.start-bottom { display: flex; flex-direction: column; gap: 8px; }
-.link-warning { margin: 0; font-size: 0.95rem; }
+#start-body { flex: 0 0 auto; }
+.start-actions { margin-top: 8px; }
+.link-box { margin-top: auto; padding-top: 16px; }
+.link-box summary { min-height: 48px; display: flex; align-items: center; cursor: pointer; }
 .stats-card {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -131,7 +132,7 @@ button, input, select { font: inherit; color: inherit; }
 #whatnow { background: var(--accent); color: var(--bg); border-color: #eea160; }
 .saved { position: absolute; left: 8px; bottom: 6px; font-size: 0.8rem; color: var(--muted); pointer-events: none; }
 .saved.err { color: var(--bad); }
-.tool-info { margin: 0; padding: 6px 12px; min-height: 2.6em; background: var(--panel-2); font-size: 0.9rem; }
+.tool-info { margin: 0; padding: 6px 12px; min-height: 2.6em; background: var(--panel-2); font-size: 1rem; }
 .tools {
   display: flex;
   gap: 6px;
@@ -143,8 +144,8 @@ button, input, select { font: inherit; color: inherit; }
 .tool {
   position: relative;
   flex: 0 0 auto;
-  width: 64px;
-  min-height: 60px;
+  width: 76px;
+  min-height: 64px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -157,12 +158,13 @@ button, input, select { font: inherit; color: inherit; }
   padding: 4px 2px;
 }
 .tool[aria-pressed='true'] { border-color: var(--accent); background: var(--panel-2); }
-.tool.locked { opacity: 0.55; }
+.tool.locked .tool-icon { filter: grayscale(1); }
+.tool.locked .tool-label { color: var(--muted); }
 .tool-icon { height: 36px; display: flex; align-items: flex-end; font-size: 1.4rem; overflow: hidden; }
 .tool-icon canvas { width: 32px; height: 48px; image-rendering: pixelated; margin-bottom: -6px; }
 .tool-icon canvas.letter { width: 15px; height: 21px; margin-bottom: 6px; }
-.tool-label { font-size: 0.75rem; line-height: 1.1; }
-.lock { position: absolute; top: 1px; right: 2px; font-size: 0.65rem; }
+.tool-label { font-size: 0.875rem; line-height: 1.1; }
+.lock { position: absolute; top: 1px; right: 2px; font-size: 0.75rem; font-weight: 700; color: var(--accent); }
 .bottom {
   display: flex;
   gap: 8px;
@@ -203,7 +205,11 @@ button, input, select { font: inherit; color: inherit; }
 .toast.warn { border-left-color: var(--bad); }
 .toast.clickable, .toast.sticky { pointer-events: auto; }
 .toast.clickable { cursor: pointer; }
-.toast-close { background: none; border: 0; min-width: 32px; min-height: 32px; cursor: pointer; }
+.toast-close { background: none; border: 0; min-width: 48px; min-height: 48px; margin: -12px -8px -12px 0; cursor: pointer; }
+.toast-icon { font-weight: 700; }
+.toast-text { flex: 1; }
+.toast.good .toast-icon { color: var(--good); }
+.toast.warn .toast-icon { color: var(--bad); }
 .sheet {
   position: fixed;
   left: 0;
@@ -254,8 +260,9 @@ button, input, select { font: inherit; color: inherit; }
   font-weight: 600;
   max-width: 480px;
 }
-.tut-box p { margin: 0 0 6px; }
-.tut-box .btn { color: var(--bg); background: #f4cca1; border-color: #b13e53; }
+.tut-box { display: flex; gap: 8px; align-items: center; padding: 8px 8px 8px 12px; font-size: 1rem; }
+.tut-box p { margin: 0; flex: 1; }
+.tut-skip { flex: 0 0 auto; min-height: 48px; min-width: 48px; padding: 0 12px; background: #f4cca1; color: var(--bg); border: 2px solid #b13e53; border-radius: 4px; font-weight: 700; cursor: pointer; }
 .tut-arrow {
   position: fixed;
   z-index: 36;

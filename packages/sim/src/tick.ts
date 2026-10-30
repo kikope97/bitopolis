@@ -20,6 +20,7 @@ import {
   PROPERTY_BASE,
   PUBLIC_SALARY,
   SERVICE,
+  SERVICE_SALARY,
   TAX_HAPPINESS,
   TAX_RATE,
   WAGE_LOCAL,
@@ -177,8 +178,8 @@ export function computeDemand(state: GameState): GameState['demand'] {
   const free = freeHomes(state);
   const happy = averageHappiness(state);
   const clamp = (v: number) => Math.round(Math.max(-100, Math.min(100, v)));
-  const R = 30 + vacancies(state) * 6 - Math.max(0, free - 6) * 3 + (happy - 55) + TAX_HAPPINESS[state.taxLevel] - (pop >= ZONE_UNLOCK_POP ? jobless * 2 : 0);
-  const C = pop < ZONE_UNLOCK_POP ? 0 : (pop / 9 - shops) * 25;
+  const R = 40 + vacancies(state) * 6 - Math.max(0, free - 6) * 3 + (happy - 55) + TAX_HAPPINESS[state.taxLevel] - (pop >= ZONE_UNLOCK_POP ? jobless * 2 : 0);
+  const C = pop < ZONE_UNLOCK_POP ? 0 : (pop / 14 - shops) * 25;
   const I = pop < ZONE_UNLOCK_POP ? 0 : jobless * 6 - factories * 10 + 20;
   return { R: clamp(R), C: clamp(C), I: clamp(I) };
 }
@@ -437,8 +438,9 @@ function endOfMonth(state: GameState): void {
   for (const c of state.citizens) {
     const job = c.jobId !== null ? state.buildings.find((b) => b.id === c.jobId) : undefined;
     if (job && !isBusiness(job)) {
-      transfer(state, TREASURY, c.id, PUBLIC_SALARY, 'sueldos');
-      transfer(state, c.id, TREASURY, Math.round(PUBLIC_SALARY * rate), 'impuestos');
+      const salary = SERVICE[job.kind] ? SERVICE_SALARY : PUBLIC_SALARY;
+      transfer(state, TREASURY, c.id, salary, 'sueldos');
+      transfer(state, c.id, TREASURY, Math.round(salary * rate), 'impuestos');
     }
   }
   // Alquileres.

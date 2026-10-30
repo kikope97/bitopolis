@@ -75,22 +75,24 @@ export const SERVICE: Partial<Record<BuildingKind, { radius: number; happiness: 
 export const PLANT_CAPACITY = { water: 30, power: 40 } as const;
 
 export const PUBLIC_SALARY = 900;
+/** Empleos de servicios (colegio, salud, parque). */
+export const SERVICE_SALARY = 700;
 export const PRIVATE_SALARY = 900;
 /** Lo que gana al día quien trabaja fuera del pueblo. */
-export const COMMUTER_DAILY = 28;
+export const COMMUTER_DAILY = 22;
 export const LIVING_COST = 450;
 /** Parte del gasto que va a tiendas del pueblo si las hay. */
 export const LOCAL_SPEND_SHARE = 0.45;
 export const FACTORY_REVENUE_PER_WORKER = 1_250;
-export const MUNICIPAL_RENT = 250;
+export const MUNICIPAL_RENT = 180;
 export const PRIVATE_RENT = 280;
 /** Base del impuesto sobre inmuebles privados (al mes). */
 export const PROPERTY_BASE = 500;
 export const PIE_PER_CITIZEN = 40;
 /** Impuesto único: tipo sobre sueldos, ventas e inmuebles. */
 export const TAX_RATE = { low: 0.04, medium: 0.07, high: 0.1 } as const;
-export const TAX_HAPPINESS = { low: 6, medium: 0, high: -14 } as const;
-export const BUSINESS_SEED_CASH = 2_500;
+export const TAX_HAPPINESS = { low: 6, medium: 0, high: -10 } as const;
+export const BUSINESS_SEED_CASH = 3_500;
 export const BUSINESS_CASH_CAP = 6_000;
 export const DEBT_LIMIT = 10_000;
 export const DEBT_INTEREST = 0.01;

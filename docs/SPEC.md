@@ -48,7 +48,7 @@ El diseño lo deciden agentes de IA (revisores y playtesters simulados) y Claude
 ## 5. Mecánicas de juego (alcance hasta la v1.0)
 
 ### 5.1 Mapa y construcción
-- Mapa de tiles de 16×16 en vista cenital 3/4 (no isométrica), con tamaño finito (el suelo es un recurso limitado).
+- Mapa de casillas de **32×32** (decisión del creador, ronda 01) en vista cenital 3/4 (no isométrica), con tamaño finito (el suelo es un recurso limitado).
 - **Carreteras, agua y electricidad** como redes conectadas. Los servicios cubren por radio.
 - **Zonas RCI** (residencial, comercial, industrial) con un **indicador de demanda** que guía qué construir.
 - **Externalidades**: contaminación (la industrial es persistente), ruido, delincuencia y valor del suelo, que se propagan por el mapa.
@@ -126,8 +126,9 @@ Mudarse al pueblo o no, irse y vender la casa, comprar o alquilar casa, buscar o
 
 ### 8.1 Arte (todo propio, generado por código)
 - **Paleta cerrada de 32 colores** en `palette.ts`, validada en el build: si aparece un color fuera de la paleta, el build falla.
+- **Alta definición** (decisión del creador, ronda 01): pixel art detallado, no "de cuadros". Casillas de 32 px y edificios de 32×48 que sobresalen hacia arriba, con texturas (ladrillo, tejas, chapa), reflejos, sombras proyectadas y tramado.
 - Sprites a partir de **plantillas modulares** (base, tejado, puerta, ventanas) en matrices de índices de paleta. Se combinan con semilla y se exportan a un atlas en el build. Luz desde arriba a la izquierda, contorno de 1 px de color (no negro), 3 tonos por material, sin degradados ni antialiasing.
-- Vecinos de 8×12 px con silueta propia e icono de estado encima.
+- Vecinos de 12×18 px con silueta propia e icono de estado encima.
 - Escala entera con `image-rendering: pixelated` y zoom en múltiplos enteros.
 - Nada de assets de terceros.
 

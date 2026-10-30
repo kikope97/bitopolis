@@ -19,7 +19,7 @@ const has = (s: GameState, k: string) => s.buildings.some((b) => b.kind === k);
 
 const STEPS: Step[] = [
   {
-    text: 'Bienvenido, alcalde. Toca «Carretera».',
+    text: 'Bienvenido, alcalde. El tiempo está parado. Toca «Carretera» (abajo).',
     target: () => '[data-tool="road"]',
     done: (s, tool, c) => tool === 'road' || roadCount(s) > c.roads0,
   },
@@ -29,7 +29,7 @@ const STEPS: Step[] = [
     done: (s, _t, c) => roadCount(s) > c.roads0,
   },
   {
-    text: 'Ahora el agua: toca «Agua» y luego una casilla junto a la carretera.',
+    text: 'Ahora el agua: toca «Agua» (abajo) y luego una casilla junto a la carretera.',
     target: (tool) => (tool === 'water' ? null : '[data-tool="water"]'),
     done: (s) => has(s, 'water'),
   },
@@ -44,12 +44,12 @@ const STEPS: Step[] = [
     done: (s) => has(s, 'house'),
   },
   {
-    text: 'Las obras tardan unos días. Acelera el tiempo con x3.',
+    text: 'Las obras tardan unos días. Pon el tiempo en marcha con «x3» (abajo).',
     target: () => '[data-speed="3"]',
     done: (s) => s.citizens.length >= 2,
   },
   {
-    text: '¡Ya tienes vecinos! Con 10 se desbloquean las zonas R, C e I. Si dudas, pulsa «?».',
+    text: '¡Ya tienes vecinos! Con 10 se desbloquean las zonas R, C e I. Si dudas, pulsa «?» (a la derecha).',
     target: () => '#whatnow',
     done: () => false,
   },
@@ -60,14 +60,14 @@ export class Tutorial {
   private ctx: Ctx = { roads0: 0 };
   private box: HTMLElement;
   private arrow: HTMLElement;
-  private finishedAt = 0;
+  private skip: HTMLButtonElement;
   private started = false;
 
   constructor(private storageKey: string) {
     this.arrow = h('div', { class: 'tut-arrow', 'aria-hidden': 'true' }, '▼');
-    const skip = h('button', { class: 'btn small' }, 'Saltar tutorial');
-    skip.addEventListener('click', () => this.finish());
-    this.box = h('div', { class: 'tut-box', role: 'status', 'aria-live': 'polite' }, h('p', {}), skip);
+    this.skip = h('button', { class: 'tut-skip' }, 'Saltar');
+    this.skip.addEventListener('click', () => this.finish());
+    this.box = h('div', { class: 'tut-box', role: 'status', 'aria-live': 'polite' }, h('p', {}), this.skip);
     try {
       const v = localStorage.getItem(storageKey);
       this.step = v === 'done' ? STEPS.length : Number(v ?? 0) || 0;
@@ -111,11 +111,9 @@ export class Tutorial {
       this.step++;
       this.save();
       if (!this.active) return this.finish();
-      if (this.step === STEPS.length - 1) this.finishedAt = performance.now();
     }
-    if (this.step === STEPS.length - 1 && this.finishedAt && performance.now() - this.finishedAt > 15_000) {
-      return this.finish();
-    }
+    // Último paso: sin cierre automático; se cierra con «Entendido».
+    this.skip.textContent = this.step === STEPS.length - 1 ? 'Entendido' : 'Saltar';
     const cur = STEPS[this.step]!;
     const p = this.box.querySelector('p')!;
     if (p.textContent !== cur.text) p.textContent = cur.text;

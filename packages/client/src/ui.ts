@@ -23,7 +23,13 @@ export function h<K extends keyof HTMLElementTagNameMap>(
 
 export function toast(text: string, opts: { sticky?: boolean; kind?: 'info' | 'warn' | 'good'; onClick?: () => void } = {}) {
   const box = $('#toasts');
-  const el = h('div', { class: `toast ${opts.kind ?? 'info'}`, role: opts.kind === 'warn' ? 'alert' : 'status' }, text);
+  const icon = { info: 'ℹ', warn: '⚠', good: '✔' }[opts.kind ?? 'info'];
+  const el = h(
+    'div',
+    { class: `toast ${opts.kind ?? 'info'}`, role: opts.kind === 'warn' ? 'alert' : 'status' },
+    h('span', { class: 'toast-icon', 'aria-hidden': 'true' }, icon),
+    h('span', { class: 'toast-text' }, text),
+  );
   if (opts.onClick) {
     el.classList.add('clickable');
     el.addEventListener('click', () => {
@@ -43,7 +49,11 @@ export function toast(text: string, opts: { sticky?: boolean; kind?: 'info' | 'w
     setTimeout(() => el.remove(), 6000);
   }
   box.append(el);
-  while (box.children.length > 4) box.firstElementChild?.remove();
+  // Como mucho 2 avisos a la vista; los fijos (con ✕) se conservan antes.
+  while (box.children.length > 2) {
+    const victim = [...box.children].find((c) => !c.classList.contains('sticky')) ?? box.firstElementChild;
+    victim?.remove();
+  }
 }
 
 let openSheetEl: HTMLElement | null = null;
