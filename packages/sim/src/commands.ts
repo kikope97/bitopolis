@@ -1,5 +1,6 @@
 import { Command, type BuildKind, type ZoneKind } from '@bitopolis/shared';
 import { BUILD, WAGE_OUTSIDE, ZONE_COST_PER_TILE, ZONE_UNLOCK_POP } from './balance.ts';
+import { applyDecision, canApplyDecision } from './decisions.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import {
   buildingAt,
@@ -106,6 +107,8 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
     }
     case 'NotifyProject':
       return state.projects.some((p) => p.buildingId === cmd.buildingId) ? { ok: true } : { ok: false, error: 'No hay obra' };
+    case 'CitizenAct':
+      return canApplyDecision(state, cmd.citizenId, cmd.action) ? { ok: true } : { ok: false, error: 'Decisión ya no válida' };
   }
 }
 
@@ -191,6 +194,9 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       if (p) p.notify = cmd.on;
       break;
     }
+    case 'CitizenAct':
+      applyDecision(state, cmd.citizenId, cmd.action, cmd.motivo, cmd.source);
+      break;
   }
   return { ok: true };
 }

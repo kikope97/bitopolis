@@ -1,8 +1,8 @@
 import type { TaxLevel } from '@bitopolis/shared';
-import { chance, type RngState, seedRng } from './prng.ts';
+import { chance, nextInt, type RngState, seedRng } from './prng.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
-export const FORMAT_VERSION = 2;
+export const FORMAT_VERSION = 3;
 
 export const MAP_W = 48;
 export const MAP_H = 48;
@@ -74,6 +74,49 @@ export interface Citizen {
   happiness: number;
   /** Mes en que llegó. */
   arrivedMonth: number;
+  /** Vecino con nombre: decide con IA (Modo IA) o con reglas narrativas. */
+  named: boolean;
+  /** Rasgos fijos 0–100. `terco` es la terquedad o irracionalidad. */
+  traits: Traits;
+  desire: Desire;
+  fear: Fear;
+  /** Últimas decisiones (texto del motor, nunca del jugador). */
+  memory: string[];
+  /** No se le vuelve a preguntar antes de este tick. */
+  cooldownUntil: number;
+}
+
+export interface Traits {
+  terco: number;
+  ahorro: number;
+  social: number;
+  ambicion: number;
+}
+
+export const DESIRES = ['trabajo_cerca', 'casa_propia', 'parque', 'tienda', 'tranquilidad', 'prosperar'] as const;
+export type Desire = (typeof DESIRES)[number];
+export const FEARS = ['paro', 'impuestos', 'soledad', 'ruido', 'deudas'] as const;
+export type Fear = (typeof FEARS)[number];
+
+/** Decisión pendiente de un vecino con nombre (detonante + acciones válidas). */
+export interface Pending {
+  citizenId: number;
+  trigger: Trigger;
+  actions: string[];
+  createdTick: number;
+  /** Si a este tick no ha llegado decisión (IA), decide la regla. */
+  dueTick: number;
+}
+
+export type Trigger = 'llegada' | 'sin_trabajo' | 'infeliz' | 'subida_impuestos' | 'ahorros';
+
+export interface DecisionLogEntry {
+  tick: number;
+  citizenId: number;
+  trigger: Trigger;
+  action: string;
+  motivo: string;
+  source: 'ai' | 'rule';
 }
 
 export type EventKind =
@@ -84,6 +127,7 @@ export type EventKind =
   | 'bankrupt'
   | 'business'
   | 'tax'
+  | 'decision'
   | 'warning'
   | 'info';
 
@@ -140,15 +184,25 @@ export interface GameState {
   bankrupt: boolean;
   events: GameEvent[];
   stats: MonthStat[];
+  /** Modo IA: las decisiones de los vecinos con nombre pueden venir del LLM. */
+  aiMode: boolean;
+  /** Máximo de vecinos con nombre. */
+  namedLimit: number;
+  pending: Pending[];
+  decisionLog: DecisionLogEntry[];
+  /** Nivel de impuestos al cerrar el día anterior (detonante de subidas). */
+  prevTaxLevel: TaxLevel;
 }
 
 export interface NewGameOptions {
   seed: number;
+  aiMode?: boolean;
+  namedLimit?: number;
 }
 
 export const INITIAL_SUBSIDY = 30_000;
 
-export function createInitialState({ seed }: NewGameOptions): GameState {
+export function createInitialState({ seed, aiMode = false, namedLimit = 5 }: NewGameOptions): GameState {
   const rng = seedRng(seed);
   const tiles = new Array<number>(MAP_W * MAP_H).fill(Tile.Grass);
   const zones = new Array<number>(MAP_W * MAP_H).fill(Zone.None);
@@ -171,6 +225,11 @@ export function createInitialState({ seed }: NewGameOptions): GameState {
     bankrupt: false,
     events: [],
     stats: [],
+    aiMode,
+    namedLimit,
+    pending: [],
+    decisionLog: [],
+    prevTaxLevel: 'medium',
   };
   // Árboles dispersos (se talan gratis al construir encima).
   for (let i = 0; i < tiles.length; i++) {
@@ -196,6 +255,12 @@ export function createInitialState({ seed }: NewGameOptions): GameState {
     jobId: hall.id,
     happiness: 60,
     arrivedMonth: 0,
+    named: true,
+    traits: randomTraits(rng),
+    desire: 'prosperar',
+    fear: 'paro',
+    memory: [],
+    cooldownUntil: 0,
   };
   state.citizens.push(first);
   state.treasury = INITIAL_SUBSIDY;
@@ -260,4 +325,8 @@ export function hasAdjacentRoad(state: GameState, x: number, y: number): boolean
     const ny = y + dy;
     return inBounds(state, nx, ny) && state.map.tiles[tileIndex(state, nx, ny)] === Tile.Road;
   });
+}
+
+export function randomTraits(rng: RngState): Traits {
+  return { terco: nextInt(rng, 0, 100), ahorro: nextInt(rng, 0, 100), social: nextInt(rng, 0, 100), ambicion: nextInt(rng, 0, 100) };
 }

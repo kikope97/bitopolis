@@ -35,3 +35,14 @@ describe('migraciones', () => {
     expect(() => migrate({ formatVersion: FORMAT_VERSION + 1 })).toThrow();
   });
 });
+
+describe('migración 2 → 3', () => {
+  it('añade vecinos con nombre, rasgos y decisiones', () => {
+    const v2 = { formatVersion: 2, taxLevel: 'high', citizens: [{ id: 2, name: 'Lucía' }, { id: 3, name: 'Pablo' }] };
+    const m = migrate(v2);
+    expect(m.citizens[0]).toMatchObject({ named: true, memory: [], cooldownUntil: 0 });
+    expect(m.pending).toEqual([]);
+    expect(m.prevTaxLevel).toBe('high');
+    expect(m.aiMode).toBe(false);
+  });
+});

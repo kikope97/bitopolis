@@ -24,3 +24,15 @@ export function hashString(s: string): string {
 export function hashState(state: unknown): string {
   return hashString(canonicalJson(state));
 }
+
+/** Entero de 32 bits determinista a partir de números (para reglas sin PRNG). */
+export function hash32(...n: number[]): number {
+  let h = 0x9e3779b9;
+  for (const v of n) {
+    h = Math.imul(h ^ (v | 0), 0x85ebca6b);
+    h ^= h >>> 13;
+    h = Math.imul(h, 0xc2b2ae35);
+    h ^= h >>> 16;
+  }
+  return h >>> 0;
+}

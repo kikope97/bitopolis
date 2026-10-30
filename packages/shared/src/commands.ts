@@ -22,6 +22,14 @@ export const Command = z.discriminatedUnion('type', [
   z.object({ type: z.literal('Zone'), zone: ZoneKind, x: Coord, y: Coord, w: Size, h: Size }),
   z.object({ type: z.literal('Demolish'), x: Coord, y: Coord }),
   z.object({ type: z.literal('NotifyProject'), buildingId: z.number().int().min(1), on: z.boolean() }),
+  /** Decisión de un vecino con nombre (IA o reglas) entre sus acciones válidas. */
+  z.object({
+    type: z.literal('CitizenAct'),
+    citizenId: z.number().int().min(1),
+    action: z.string().regex(/^[a-z_]+(:[a-z0-9_]+)?$/).max(40),
+    motivo: z.string().max(400),
+    source: z.enum(['ai', 'rule']),
+  }),
 ]);
 export type Command = z.infer<typeof Command>;
 

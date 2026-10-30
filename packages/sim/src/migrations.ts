@@ -28,6 +28,25 @@ export const MIGRATIONS: Record<number, Migration> = {
     demand: s.demand ?? { R: 0, C: 0, I: 0 },
     stats: (s.stats ?? []).map((m: Record<string, unknown>) => ({ breakdown: {}, ...m })),
   }),
+  // 2 → 3 (v0.2): vecinos con nombre, rasgos, decisiones pendientes y log.
+  2: (s) => ({
+    ...s,
+    formatVersion: 3,
+    citizens: (s.citizens ?? []).map((c: Record<string, unknown>, i: number) => ({
+      named: i < 5,
+      traits: { terco: 50, ahorro: 50, social: 50, ambicion: 50 },
+      desire: 'prosperar',
+      fear: 'paro',
+      memory: [],
+      cooldownUntil: 0,
+      ...c,
+    })),
+    aiMode: s.aiMode ?? false,
+    namedLimit: s.namedLimit ?? 5,
+    pending: s.pending ?? [],
+    decisionLog: s.decisionLog ?? [],
+    prevTaxLevel: s.prevTaxLevel ?? s.taxLevel ?? 'medium',
+  }),
 };
 
 export function migrate(raw: unknown): GameState {

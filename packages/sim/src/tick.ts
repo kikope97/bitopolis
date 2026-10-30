@@ -30,12 +30,16 @@ import {
 import { applyCommand, BUILD_NAMES, removeBuilding } from './commands.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance, nextInt, pick } from './prng.ts';
+import { detectTriggers, onNamedArrival, resolveDuePending } from './decisions.ts';
 import {
   type Building,
   type Citizen,
   DIRS,
+  DESIRES,
+  FEARS,
   type GameState,
   inBounds,
+  randomTraits,
   newBuilding,
   pushEvent,
   Tile,
@@ -346,6 +350,7 @@ function arrivals(state: GameState): void {
   if (free === 0 || state.demand.R <= 0) return;
   const n = Math.min(free, chance(state.rng, state.demand.R / 100) ? (state.demand.R > 60 ? 2 : 1) : 0);
   for (let k = 0; k < n; k++) {
+    const named = state.citizens.filter((x) => x.named).length < state.namedLimit;
     const c: Citizen = {
       id: state.nextId++,
       name: uniqueName(state),
@@ -355,16 +360,25 @@ function arrivals(state: GameState): void {
       jobId: null,
       happiness: 55,
       arrivedMonth: Math.floor(state.tick / TICKS_PER_MONTH),
+      named,
+      traits: named ? randomTraits(state.rng) : { terco: 50, ahorro: 50, social: 50, ambicion: 50 },
+      desire: named ? pick(state.rng, DESIRES) : 'prosperar',
+      fear: named ? pick(state.rng, FEARS) : 'paro',
+      memory: [],
+      cooldownUntil: 0,
     };
     state.citizens.push(c);
     transfer(state, OUTSIDE, c.id, nextInt(state.rng, 600, 2_500));
     pushEvent(state, 'arrival', `${c.name} se muda al pueblo`, { ref: c.id });
+    if (named) onNamedArrival(state, c);
   }
 }
 
 function departures(state: GameState): void {
   for (const c of [...state.citizens]) {
     if (state.citizens.length <= 1) break;
+    // Los vecinos con nombre deciden irse ellos mismos (detonante «infeliz»).
+    if (c.named) continue;
     const unhappy = c.happiness < 30 && chance(state.rng, 0.04);
     const broke = c.money === 0 && c.homeId === null && chance(state.rng, 0.1);
     if (unhappy || broke) {
@@ -387,6 +401,7 @@ function endOfDay(state: GameState): void {
   growZones(state, served);
   arrivals(state);
   departures(state);
+  detectTriggers(state);
   state.month.taxRateSum += TAX_RATE[state.taxLevel];
   state.month.taxDays += 1;
 }
@@ -489,6 +504,7 @@ function endOfMonth(state: GameState): void {
 /** Avanza una hora de juego. */
 export function step(state: GameState): void {
   state.tick++;
+  if (state.pending.length > 0) resolveDuePending(state);
   if (state.tick % TICKS_PER_DAY === 0) endOfDay(state);
   if (state.tick % TICKS_PER_MONTH === 0) endOfMonth(state);
 }
