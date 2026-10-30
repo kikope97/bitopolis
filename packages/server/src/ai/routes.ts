@@ -10,10 +10,10 @@ import { encryptSecret, maskKey } from './crypto.ts';
 import type { AiService, AiSettings } from './service.ts';
 
 /** Medido con `pnpm sim` (ver docs/rondas): decisiones por vecino con nombre y día. */
-export const DECISIONS_PER_CITIZEN_DAY = 0.11;
-const TOKENS_IN_BASE = 520;
-const TOKENS_IN_PER_CITIZEN = 260;
-const TOKENS_OUT_PER_CITIZEN = 70;
+export const DECISIONS_PER_CITIZEN_DAY = 0.1;
+const TOKENS_IN_BASE = 330;
+const TOKENS_IN_PER_CITIZEN = 200;
+const TOKENS_OUT_PER_CITIZEN = 40;
 
 /** Estimación de coste en €/hora real según modelo, vecinos y velocidad. */
 export function estimatePerHour(ai: AiService, provider: ProviderId, model: string, citizens: number, speed: number): number {

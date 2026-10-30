@@ -189,6 +189,14 @@ const TEMPLATES: Record<string, string[]> = {
   pedir: ['Un pueblo sin {x} no es un pueblo. ¿Para cuándo?', 'Alcalde, aquí hace falta {x}.', 'Me gusta este sitio, pero echo de menos {x}.'],
 };
 
+/** Coletillas según el rasgo dominante: la misma decisión suena distinta en cada vecino. */
+const FLAVOR: Record<keyof Citizen['traits'], string[]> = {
+  terco: ['Y no hay más que hablar.', 'Digan lo que digan.', 'Lo tengo decidido.', 'Cuando digo algo, lo cumplo.'],
+  ahorro: ['Cada euro cuenta.', 'Las cuentas mandan.', 'Hay que mirar el bolsillo.', 'Sin gastar de más.'],
+  social: ['Ya lo comentaré en el bar.', 'Seguro que más vecinos piensan igual.', 'Se lo diré a todos.', 'Aquí nos conocemos todos.'],
+  ambicion: ['Quiero llegar lejos.', 'Esto es solo el principio.', 'Aspiro a más.', 'No pienso quedarme quieto.'],
+};
+
 const NEED_TEXT: Record<string, string> = {
   parque: 'un parque',
   colegio: 'un colegio',
@@ -239,8 +247,11 @@ export function ruleDecide(state: GameState, p: Pending): { action: string; moti
   }
   const [verb, arg] = best.split(':');
   const options = TEMPLATES[verb!] ?? TEMPLATES.quedarse!;
-  const motivo = options[hash32(state.seed, c.id, state.tick) % options.length]!.replace('{x}', NEED_TEXT[arg ?? ''] ?? 'más cosas');
-  return { action: best, motivo };
+  const base = options[hash32(state.seed, c.id, state.tick) % options.length]!.replace('{x}', NEED_TEXT[arg ?? ''] ?? 'más cosas');
+  const top = (Object.entries(c.traits) as [keyof Citizen['traits'], number][]).sort((a, b) => b[1] - a[1])[0]!;
+  const flavors = FLAVOR[top[0]];
+  const motivo = top[1] >= 60 ? `${base} ${flavors[hash32(c.id, state.tick, 7) % flavors.length]}` : base;
+  return { action: best, motivo: cleanMotivo(motivo) };
 }
 
 /** En cada tick: las decisiones vencidas sin respuesta las toman las reglas. */

@@ -18,6 +18,12 @@ Monorepo pnpm + TypeScript:
 - Login opcional (`auth.ts`) si hay `BITOPOLIS_USER` y `BITOPOLIS_PASSWORD`.
 - Equilibrio del juego: todos los números en `packages/sim/src/balance.ts`.
 
+## IA de los vecinos (v0.2)
+- Motor: `sim/src/decisions.ts` (detonantes, acciones válidas, `CitizenAct`, reglas de fallback con motivos) y `sim/src/prompt.ts` (prompt con prefijo fijo, esquema con enums, validación zod). Una decisión pendiente vence a mediodía del día siguiente: si no ha llegado la de la IA, deciden las reglas.
+- Servidor: `server/src/ai/` — `crypto.ts` (AES-256-GCM), `catalog.ts` (proveedores, modelos y precios orientativos), `providers.ts` (OpenAI-compatible, Anthropic, `ReplayProvider`), `service.ts` (petición anticipada al guardar, reintento, topes y reserva), `routes.ts`.
+- `pnpm ai-eval` mide coste por mes de juego y % de válidas (simulador, `--replay` o `--live` con `BITOPOLIS_API_KEY`). El CI lo ejecuta con `e2e/fixtures/ia-replay.json`; si cambia el prompt, regenera con `--record`.
+- Playwright usa `e2e/fake-llm.mjs` (LLM falso compatible con OpenAI) para el Modo IA.
+
 ## Comandos
 ```
 pnpm install | pnpm dev | pnpm build | pnpm lint | pnpm typecheck | pnpm test
