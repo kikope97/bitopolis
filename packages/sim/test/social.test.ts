@@ -107,7 +107,7 @@ describe('memoria en 3 capas', () => {
   it('cuando un vecino se va, sus amistades lo recuerdan y la relación desaparece', () => {
     const s = createInitialState({ seed: 3 });
     const a = s.citizens[0]!;
-    const b = { ...a, id: s.nextId++, name: 'Pablo Gil', relations: [], memories: [] };
+    const b: typeof a = { ...a, id: s.nextId++, name: 'Pablo Gil', relations: [], memories: [] };
     s.citizens.push(b);
     a.relations.push({ id: b.id, kind: 'amistad', strength: 50, since: 0 });
     b.relations.push({ id: a.id, kind: 'amistad', strength: 50, since: 0 });
