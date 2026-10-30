@@ -6,6 +6,12 @@
 export interface Prefs {
   sfx: boolean;
   music: boolean;
+  /** Ambiente (pájaros de día, grillos de noche): bus propio, separado de la música. */
+  ambience: boolean;
+  /** Volumen de cada bus en decibelios (−40 a 0). */
+  sfxDb: number;
+  musicDb: number;
+  ambDb: number;
   vibrate: boolean;
   /** Letra: legible (por defecto) o la fuente pixel propia (opción estética, spec §8.4). */
   font: 'legible' | 'pixel';
@@ -21,7 +27,7 @@ export interface Prefs {
 }
 
 const KEY = 'bitopolis.prefs';
-const DEFAULTS: Prefs = { sfx: true, music: false, vibrate: true, font: 'legible', text: 100, contrast: 'normal', colorblind: 'no', calm: false, motion: 'sistema' };
+const DEFAULTS: Prefs = { sfx: true, music: false, ambience: false, sfxDb: -9, musicDb: -22, ambDb: -24, vibrate: true, font: 'legible', text: 100, contrast: 'normal', colorblind: 'no', calm: false, motion: 'sistema' };
 
 let current: Prefs = load();
 const listeners = new Set<(p: Prefs) => void>();

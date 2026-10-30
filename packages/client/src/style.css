@@ -461,3 +461,5 @@ html[data-font='pixel'] { font-size: 137.5%; }
 html[data-font='pixel'][data-text='150'] { font-size: 206.25%; }
 html[data-font='pixel'][data-text='200'] { font-size: 275%; }
 html[data-font='pixel'] .sheet-head h2, html[data-font='pixel'] .sheet h3, html[data-font='pixel'] .logo { font-family: 'Bitopolis Pixel', ui-monospace, monospace; }
+.volume input[type='range'] { width: 100%; min-height: 44px; accent-color: #ffcd75; }
+.volume output { font-variant-numeric: tabular-nums; color: var(--muted); }

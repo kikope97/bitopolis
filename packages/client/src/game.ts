@@ -28,7 +28,7 @@ import { buildingSprite, letterSprite, T } from './sprites.ts';
 import { commandFor, costText, isLocked, type Tool, type ToolId, TOOLS, tilesOf, unlockPop } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
 import { $, closeSheet, confirmDialog, h, isSheetOpen, reducedMotion, sheet, toast, vibrate } from './ui.ts';
-import { sfx, startMusic, stopMusic, unlockAudio } from './audio.ts';
+import { duck, sfx, startAmbience, startMusic, stopMusic, unlockAudio } from './audio.ts';
 import { coins, dust, pop } from './fx.ts';
 import { onPrefs, prefs } from './prefs.ts';
 import { openSettings } from './settings-ui.ts';
@@ -320,6 +320,7 @@ export function startGame(opts: GameOptions): void {
     for (const e of fresh) {
       if (e.kind === 'bankrupt' || e.kind === 'warning') {
         sfx.warn();
+        duck(1.5);
         calmPause();
         toast(e.kind === 'warning' ? `${e.text}. Prueba a subir los impuestos (☰ › Impuestos) o espera antes de construir.` : e.text, {
           kind: 'warn',
@@ -329,6 +330,7 @@ export function startGame(opts: GameOptions): void {
         toast(e.text, { kind: 'good', sticky: true });
         vibrate(120);
         sfx.milestone();
+        duck(2);
         calmPause();
         const th = state.buildings.find((b) => b.kind === 'townhall');
         if (th) coins(...screenOf(th.x, th.y), 8);
@@ -336,6 +338,7 @@ export function startGame(opts: GameOptions): void {
         const won = state.politics.history.at(-1)?.winner === 'player';
         if (won) sfx.milestone();
         else sfx.warn();
+        duck(4);
         vibrate(150);
         calmPause();
         openElectionNight(social);
@@ -1048,6 +1051,7 @@ export function startGame(opts: GameOptions): void {
   window.addEventListener('pointerdown', unlock, { once: true });
   window.addEventListener('keydown', unlock, { once: true });
   startMusic(() => timeOfDay(state.tick) === 'night');
+  startAmbience(() => timeOfDay(state.tick) === 'night');
   // Al activar el modo tranquilo con x3/x10 puestos, se baja a x1.
   const markCalm = () => {
     for (const b of document.querySelectorAll('[data-speed="3"], [data-speed="10"]')) b.setAttribute('aria-disabled', String(prefs().calm));
