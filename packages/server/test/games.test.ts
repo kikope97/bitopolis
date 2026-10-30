@@ -7,11 +7,12 @@ import { applyCommand, type GameState, hashState, step } from '@bitopolis/sim';
 import { buildApp } from '../src/app.ts';
 import { loadConfig } from '../src/config.ts';
 import { openDb } from '../src/db/index.ts';
+import { hashPassword, SettingsStore } from '../src/settings.ts';
 import { newGameToken } from '../src/tokens.ts';
 
 const dir = mkdtempSync(join(tmpdir(), 'bitopolis-games-'));
 const { db } = await openDb(join(dir, 'test.db'));
-const app = await buildApp({ ...loadConfig({}), dataDir: dir, clientDir: join(dir, 'nope') }, db);
+const app = await buildApp({ ...loadConfig({}), dataDir: dir, clientDir: join(dir, 'nope'), secret: 'secreto-de-prueba' }, db);
 afterAll(async () => {
   await app.close();
   await db.destroy();
@@ -119,13 +120,22 @@ describe('partidas', () => {
 describe('acceso común', async () => {
   const dir2 = mkdtempSync(join(tmpdir(), 'bitopolis-auth-'));
   const { db: db2 } = await openDb(join(dir2, 'a.db'));
-  const app2 = await buildApp({ ...loadConfig({}), dataDir: dir2, clientDir: join(dir2, 'x'), password: 'secreto' }, db2);
+  const store2 = await SettingsStore.open(db2);
+  await store2.update((s) => ({ ...s, access: { enabled: true, hash: '' } }));
+  const app2 = await buildApp({ ...loadConfig({}), dataDir: dir2, clientDir: join(dir2, 'x'), secret: 'otro-secreto' }, db2, { store: store2 });
   afterAll(async () => {
     await app2.close();
     await db2.destroy();
   });
 
+  it('activada sin contraseña no bloquea nada', async () => {
+    expect((await app2.inject({ method: 'GET', url: '/api/games/abc' })).statusCode).not.toBe(401);
+    await store2.update((s) => ({ ...s, access: { enabled: true, hash: '' } }));
+  });
+
   it('pide login y bloquea tras varios fallos', async () => {
+    const hash = await hashPassword('secreto');
+    await store2.update((s) => ({ ...s, access: { enabled: true, hash } }));
     expect((await app2.inject({ method: 'GET', url: '/healthz' })).statusCode).toBe(200);
     expect((await app2.inject({ method: 'GET', url: '/api/games/abc' })).statusCode).toBe(401);
     expect((await app2.inject({ method: 'GET', url: '/p/x' })).statusCode).toBe(302);

@@ -4,16 +4,18 @@ import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { scheduleBackups } from './db/backup.ts';
 import { openDb } from './db/index.ts';
+import { loadSecret, SettingsStore } from './settings.ts';
 
-const config = loadConfig();
-mkdirSync(config.dataDir, { recursive: true });
+const base = loadConfig();
+mkdirSync(base.dataDir, { recursive: true });
+const config = { ...base, secret: loadSecret(base.dataDir) };
 const { db, raw } = await openDb(join(config.dataDir, 'bitopolis.db'));
-const app = await buildApp(config, db);
-scheduleBackups(raw, config.dataDir, (m) => app.log.info(m));
+const store = await SettingsStore.open(db);
+const app = await buildApp(config, db, { store, raw });
+scheduleBackups(raw, config.dataDir, () => store.get().backups.keep, (m) => app.log.info(m));
 
-if (!config.masterKey) app.log.warn('BITOPOLIS_MASTER_KEY no está definida: no se podrán guardar API keys.');
-if (config.publicUrl.startsWith('http://') && !/localhost|127\.0\.0\.1/.test(config.publicUrl)) {
-  app.log.warn('Sirviendo por HTTP sin cifrar: la URL de la partida funciona como contraseña. Usa un proxy con HTTPS.');
+if (store.get().admin.mustChange) {
+  app.log.warn('Entra en /admin con admin / admin y cambia la contraseña: hasta entonces no se puede configurar nada.');
 }
 
 const shutdown = async () => {

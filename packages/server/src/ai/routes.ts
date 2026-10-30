@@ -15,6 +15,7 @@ import {
 } from '@bitopolis/sim';
 import type { Config } from '../config.ts';
 import type { Db } from '../db/index.ts';
+import type { SettingsStore } from '../settings.ts';
 import { newSeed } from '../tokens.ts';
 import { costEur, PROVIDER_INFO, PROVIDERS, type ProviderId } from './catalog.ts';
 import { encryptSecret, maskKey } from './crypto.ts';
@@ -57,24 +58,30 @@ const ConfigBody = z.object({
   accepted: z.boolean(),
 });
 
-export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Config, ai: AiService): Promise<void> {
+export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Config, ai: AiService, store: SettingsStore): Promise<void> {
   const bad = (reply: FastifyReply, error: string, code = 400) => reply.code(code).send({ error });
   const load = (token: string) => db.selectFrom('games').selectAll().where('token', '=', token).executeTakeFirst();
   const tokenOf = (params: unknown) => GameToken.safeParse((params as { token?: string }).token);
 
-  app.get('/api/ai/meta', async () => ({
-    providers: PROVIDERS.map((id) => ({ id, ...PROVIDER_INFO[id] })),
-    serverKey: !!config.ai.key,
-    maxCitizens: config.ai.maxCitizens,
-    canStoreKeys: !!config.masterKey,
-    prices: ai.prices,
-  }));
+  /** Lo que el cliente necesita saber del servidor (sin secretos). */
+  app.get('/api/ai/meta', async () => {
+    const s = store.get();
+    return {
+      providers: PROVIDERS.map((id) => ({ id, ...PROVIDER_INFO[id] })),
+      serverKey: !!s.ai.keyEnc || !!s.ai.baseUrl,
+      maxCitizens: s.ai.maxCitizens,
+      playerKeys: s.ai.playerKeys,
+      prices: ai.prices,
+      newGames: s.newGames,
+      publicUrl: s.publicUrl,
+    };
+  });
 
   app.get('/api/ai/estimate', async (req) => {
     const q = req.query as Record<string, string>;
     const provider = (PROVIDERS as readonly string[]).includes(q.provider ?? '') ? (q.provider as ProviderId) : 'openai';
     const model = q.model || PROVIDER_INFO[provider].cheap;
-    const citizens = Math.max(1, Math.min(20, Number(q.citizens) || config.ai.maxCitizens));
+    const citizens = Math.max(1, Math.min(20, Number(q.citizens) || store.get().ai.maxCitizens));
     const out: Record<string, number> = {};
     for (const sp of [1, 3, 10]) out[`x${sp}`] = estimatePerHour(ai, provider, model, citizens, sp);
     return { eurPerHour: out, known: model in ai.prices || provider === 'openai-compatible' };
@@ -94,12 +101,14 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
     if (!t.success || !b.success) return bad(reply, 'configuración no válida');
     const d = b.data;
     if (!d.accepted) return bad(reply, 'Hay que aceptar el aviso sobre el límite de gasto');
-    if (d.key && !config.masterKey) return bad(reply, 'El servidor no tiene BITOPOLIS_MASTER_KEY: no puede guardar keys');
+    const srv = await ai.settings(null);
+    if (!srv.configured && !store.get().ai.playerKeys) return bad(reply, 'Este servidor no permite poner una API key propia', 403);
     let row = await load(t.data);
     if (row && row.mode !== 'ai') return bad(reply, 'El modo se elige al empezar y queda fijo: esta partida es de Modo normal', 409);
     if (!row) {
+      if (!store.get().newGames) return bad(reply, 'Este servidor no admite partidas nuevas', 403);
       const seed = newSeed();
-      const state = createInitialState({ seed, aiMode: true, namedLimit: config.ai.maxCitizens });
+      const state = createInitialState({ seed, aiMode: true, namedLimit: store.get().ai.maxCitizens });
       const ts = new Date().toISOString();
       await db
         .insertInto('games')
@@ -129,7 +138,7 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
       cap_month: locked.has('capMonth') ? null : (d.capMonth ?? null),
       accepted_at: new Date().toISOString(),
     };
-    const keyValues = d.key && !locked.has('key') ? { key_enc: encryptSecret(d.key, config.masterKey!), key_mask: maskKey(d.key) } : {};
+    const keyValues = d.key && !locked.has('key') ? { key_enc: encryptSecret(d.key, config.secret), key_mask: maskKey(d.key) } : {};
     const exists = await db.selectFrom('ai_config').select('game_id').where('game_id', '=', row.id).executeTakeFirst();
     if (exists) await db.updateTable('ai_config').set({ ...values, ...keyValues }).where('game_id', '=', row.id).execute();
     else await db.insertInto('ai_config').values({ key_enc: null, key_mask: null, ...values, ...keyValues }).execute();

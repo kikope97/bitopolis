@@ -10,6 +10,7 @@ import { AiService } from '../src/ai/service.ts';
 import { buildApp } from '../src/app.ts';
 import { loadConfig } from '../src/config.ts';
 import { openDb } from '../src/db/index.ts';
+import { type ServerAi, SettingsStore } from '../src/settings.ts';
 import { newGameToken } from '../src/tokens.ts';
 
 const MASTER = 'clave-maestra-de-prueba-1234567890';
@@ -38,8 +39,9 @@ function answer(req: LLMRequest, bad = false): LLMResult {
 
 const dir = mkdtempSync(join(tmpdir(), 'bitopolis-ai-'));
 const { db } = await openDb(join(dir, 'ai.db'));
-const config = { ...loadConfig({}), dataDir: dir, clientDir: join(dir, 'x'), masterKey: MASTER };
-const ai = new AiService(db, config);
+const config = { ...loadConfig({}), dataDir: dir, clientDir: join(dir, 'x'), secret: MASTER };
+const store = await SettingsStore.open(db);
+const ai = new AiService(db, config, store);
 let calls: LLMRequest[] = [];
 let mode: 'good' | 'bad-once' | 'bad' = 'good';
 let textMode: 'ok' | 'cifras' = 'ok';
@@ -58,7 +60,7 @@ ai.providerOverride = () => ({
     return answer(req);
   },
 });
-const app = await buildApp(config, db, ai);
+const app = await buildApp(config, db, { store, ai });
 afterAll(async () => {
   await app.close();
   await db.destroy();
@@ -184,16 +186,22 @@ describe('Modo IA', () => {
 
 describe('el proveedor sale de la key', () => {
   it('sk-ant- es Anthropic, el resto OpenAI, y un endpoint propio es compatible con OpenAI', async () => {
-    const svc = (env: Record<string, string>) => new AiService(db, { ...loadConfig(env), dataDir: dir, clientDir: join(dir, 'x'), masterKey: MASTER });
-    const a = await svc({ BITOPOLIS_API_KEY: 'sk-ant-api03-abcdef' }).settings(null);
+    // Lo que se guarda en /admin: un almacén aparte para no tocar el de los demás tests.
+    const svc = async (srv: Partial<ServerAi> & { key?: string }) => {
+      const st = await SettingsStore.open(db);
+      const { key, ...rest } = srv;
+      await st.update((s) => ({ ...s, ai: { ...s.ai, ...rest, ...(key ? { keyEnc: encryptSecret(key, MASTER), keyMask: maskKey(key) } : {}) } }));
+      return new AiService(db, config, st);
+    };
+    const a = await (await svc({ key: 'sk-ant-api03-abcdef' })).settings(null);
     expect([a.provider, a.model, a.modelPremium]).toEqual(['anthropic', 'claude-haiku-5-5', 'claude-sonnet-5-5']);
     expect(a.locked).toContain('provider');
-    const o = await svc({ BITOPOLIS_API_KEY: 'sk-proj-abcdef' }).settings(null);
+    const o = await (await svc({ key: 'sk-proj-abcdef' })).settings(null);
     expect([o.provider, o.model]).toEqual(['openai', 'gpt-5.4-nano']);
     // Un modelo de otro proveedor no se usa con esta key.
-    const m = await svc({ BITOPOLIS_API_KEY: 'sk-ant-api03-abcdef', BITOPOLIS_AI_MODEL: 'gpt-5.4-nano' }).settings(null);
+    const m = await (await svc({ key: 'sk-ant-api03-abcdef', model: 'gpt-5.4-nano' })).settings(null);
     expect(m.model).toBe('claude-haiku-5-5');
-    const l = await svc({ BITOPOLIS_AI_BASE_URL: 'http://localhost:11434/v1' }).settings(null);
+    const l = await (await svc({ baseUrl: 'http://localhost:11434/v1' })).settings(null);
     expect([l.provider, l.configured]).toEqual(['openai-compatible', true]);
   });
 

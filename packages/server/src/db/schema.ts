@@ -26,7 +26,7 @@ export interface AiConfigTable {
   model: string | null;
   model_premium: string | null;
   base_url: string | null;
-  /** API key cifrada con AES-256-GCM (BITOPOLIS_MASTER_KEY). */
+  /** API key cifrada con AES-256-GCM (clave de <dataDir>/secret.key). */
   key_enc: string | null;
   key_mask: string | null;
   cap_day: number | null;
@@ -52,8 +52,15 @@ export interface AiUsageTable {
   status: string;
 }
 
+/** Ajustes del servidor (/admin): una fila 'server' con JSON. */
+export interface SettingsTable {
+  key: string;
+  value: string;
+}
+
 export interface DB {
   games: GamesTable;
   ai_config: AiConfigTable;
   ai_usage: AiUsageTable;
+  settings: SettingsTable;
 }

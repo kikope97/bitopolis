@@ -8,7 +8,7 @@ import { openDb } from '../src/db/index.ts';
 
 const dir = mkdtempSync(join(tmpdir(), 'bitopolis-'));
 const { db, raw } = await openDb(join(dir, 'test.db'));
-const app = await buildApp({ ...loadConfig({}), dataDir: dir, clientDir: join(dir, 'nope') }, db);
+const app = await buildApp({ ...loadConfig({}), dataDir: dir, clientDir: join(dir, 'nope'), secret: 'secreto-de-prueba' }, db, { raw });
 
 afterAll(async () => {
   await app.close();
