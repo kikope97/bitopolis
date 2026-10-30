@@ -55,6 +55,8 @@ export function ruleAdvice(state: GameState, q: AdvisorQuestion): string[] {
 
 /** Diario del pueblo (Modo normal): crónica a partir de los eventos. */
 export interface DiaryEntry {
+  /** Primer tick del día (el cliente la formatea igual que el HUD). */
+  tick: number;
   date: string;
   lines: string[];
 }
@@ -78,7 +80,7 @@ export function diary(state: GameState, maxDays = 12): DiaryEntry[] {
     const lines = evs.filter((e) => e.kind !== 'arrival').map((e) => e.text);
     if (arrivals === 1) lines.unshift(evs.find((e) => e.kind === 'arrival')!.text);
     else if (arrivals > 1) lines.unshift(`Llegan ${arrivals} vecinos nuevos al pueblo`);
-    return { date: `${date.day}/${date.month}, año ${date.year}`, lines };
+    return { tick: d * TICKS_PER_DAY, date: `${date.day}/${date.month}, año ${date.year}`, lines };
   });
 }
 

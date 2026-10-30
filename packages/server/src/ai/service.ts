@@ -1,4 +1,4 @@
-import { buildDecisionRequest, type GameState, parseDecisions, parseText, type Pending, recentMotivos, type TextRequest } from '@bitopolis/sim';
+import { buildDecisionRequest, type GameState, parseDecisions, parseText, type Pending, type TextRequest } from '@bitopolis/sim';
 import type { Config } from '../config.ts';
 import type { Db } from '../db/index.ts';
 import { costEur, PROVIDER_INFO, PROVIDERS, priceTable, type ProviderId } from './catalog.ts';
@@ -134,6 +134,17 @@ export class AiService {
     return null;
   }
 
+  /**
+   * Reserva antes del primer await: dos peticiones simultáneas ven la reserva
+   * de la otra y no pueden pasar juntas del tope. Si no cabe, se libera.
+   */
+  private async reserve(gameId: number, s: AiSettings, eur: number): Promise<string | null> {
+    this.reserved.set(gameId, (this.reserved.get(gameId) ?? 0) + eur);
+    const blocked = await this.budgetBlock(gameId, s, 0);
+    if (blocked) this.reserved.set(gameId, Math.max(0, (this.reserved.get(gameId) ?? 0) - eur));
+    return blocked;
+  }
+
   private gs(gameId: number): GameAiState {
     let g = this.games.get(gameId);
     if (!g) this.games.set(gameId, (g = { inflight: false, requested: new Set(), ready: [], capped: false }));
@@ -162,21 +173,20 @@ export class AiService {
     if (!s.configured) return;
     const req = buildDecisionRequest(state, pendings);
     const est = this.estimate(s, req.system, req.user, pendings.length);
-    const blocked = await this.budgetBlock(gameId, s, est);
+    const blocked = await this.reserve(gameId, s, est);
     if (blocked) {
       g.capped = true;
       g.lastError = `IA en pausa: ${blocked} alcanzado. Deciden las reglas.`;
       return;
     }
     g.capped = false;
-    this.reserved.set(gameId, (this.reserved.get(gameId) ?? 0) + est);
     const usage = { in: 0, cachedIn: 0, out: 0 };
     let status = 'ok';
     let valid = 0;
     let retried = 0;
     try {
       const provider = this.providerOverride ? this.providerOverride(s) : makeProvider(s.provider, s.key, s.baseUrl);
-      const call = async (system: string, user: string, list: Pending[], retry = false) => {
+      const call = async (system: string, user: string, list: Pending[]) => {
         const r = await provider.complete(
           { system, user, schema: buildDecisionRequest(state, list).schema, model: s.model, maxTokens: 200 + list.length * MAX_OUT_PER_CITIZEN },
           AbortSignal.timeout(TIMEOUT_MS),
@@ -184,8 +194,9 @@ export class AiService {
         usage.in += r.usage.in;
         usage.cachedIn += r.usage.cachedIn;
         usage.out += r.usage.out;
-        // En el reintento se acepta un motivo repetido (mejor que pasar a reglas).
-        return parseDecisions(r.text, list, Object.fromEntries(list.map((p) => [p.citizenId, recentMotivos(state, p.citizenId, 3)])), retry);
+        // Un motivo repetido se acepta: el modelo no ve sus motivos anteriores (no se reinyectan)
+        // y reintentar por eso solo gastaba tokens.
+        return parseDecisions(r.text, list);
       };
       let parsed = await call(req.system, req.user, pendings);
       const add = (ds: typeof parsed.decisions) => {
@@ -202,7 +213,7 @@ export class AiService {
         const r2 = buildDecisionRequest(state, again);
         // La nota va al final (parte variable) para no romper el prefijo cacheable.
         const note = `${r2.user}\n\nTu respuesta anterior no era válida (${parsed.error ?? 'acción no permitida o falta un vecino'}). Usa solo las acciones de cada vecino y un motivo nuevo, sin cifras.`;
-        parsed = await call(r2.system, note, again, true);
+        parsed = await call(r2.system, note, again);
         add(parsed.decisions);
         retried = parsed.decisions.length;
         if (parsed.invalid.length > 0) status = 'partial';
@@ -244,9 +255,8 @@ export class AiService {
     if (!s.configured) return { text: null, reason: 'IA sin configurar' };
     const model = premium ? s.modelPremium : s.model;
     const est = costEur(this.prices, model, s.provider, { in: Math.ceil((req.system.length + req.user.length) / 3.2), cachedIn: 0, out: Math.ceil(req.max / 3) + 60 }) * 1.5;
-    const blocked = await this.budgetBlock(gameId, s, est);
+    const blocked = await this.reserve(gameId, s, est);
     if (blocked) return { text: null, reason: `${blocked} alcanzado` };
-    this.reserved.set(gameId, (this.reserved.get(gameId) ?? 0) + est);
     const usage = { in: 0, cachedIn: 0, out: 0 };
     let text: string | null = null;
     let status = 'ok';

@@ -1,7 +1,7 @@
 import { Command, type BuildKind, type ZoneKind } from '@bitopolis/shared';
 import { BUILD, DEBT_LIMIT, WAGE_OUTSIDE, ZONE_COST_PER_TILE, ZONE_UNLOCK_POP } from './balance.ts';
 import { applyDecision, canApplyDecision } from './decisions.ts';
-import { answerPetition, canConvenePleno, closePleno, convenePleno, talkTo } from './social.ts';
+import { addMemory, answerPetition, canConvenePleno, closePleno, convenePleno, talkTo } from './social.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import {
   buildingAt,
@@ -145,7 +145,10 @@ export function removeBuilding(state: GameState, id: number): void {
   state.projects = state.projects.filter((p) => p.buildingId !== id);
   for (const c of state.citizens) {
     if (c.homeId === id) c.homeId = null;
-    if (c.jobId === id) c.jobId = null;
+    if (c.jobId === id) {
+      c.jobId = null;
+      if (c.named) addMemory(state, c, 'perdio_trabajo', 4, -4);
+    }
   }
 }
 

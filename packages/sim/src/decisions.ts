@@ -169,7 +169,7 @@ export function applyDecision(state: GameState, citizenId: number, action: strin
       effect = 'se queja al ayuntamiento';
       break;
     case 'pedir':
-      effect = `pide al alcalde: ${arg?.replace('_', ' ')}`;
+      effect = `pide al alcalde ${NEED_TEXT[arg ?? ''] ?? arg}`;
       break;
     case 'seguir_fuera':
       effect = 'sigue trabajando fuera';

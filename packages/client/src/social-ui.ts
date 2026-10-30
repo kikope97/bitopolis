@@ -8,6 +8,8 @@ import {
   goalDone,
   type GameState,
   happinessFactors,
+  HOOK_TEXT,
+  hookFor,
   memoryText,
   NEED_TEXT,
   PLENO_COST,
@@ -19,7 +21,7 @@ import {
 } from '@bitopolis/sim';
 import { tickToDate } from '@bitopolis/shared';
 import { api } from './api.ts';
-import { money } from './i18n.ts';
+import { formatDate, money } from './i18n.ts';
 import { $, h, sheet, toast } from './ui.ts';
 
 type Cmd = (c: Command) => Promise<boolean>;
@@ -85,11 +87,13 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
     ask.append(b);
   }
   const last = [...state.decisionLog].reverse().filter((d) => d.citizenId === c.id).slice(0, 3);
+  const hook = hookFor(state, c.id);
   sheet(
-    `★ ${c.name}`,
+    h('span', {}, h('span', { 'aria-hidden': 'true' }, '★ '), c.name),
     h('p', {}, `${c.profession || 'vecina'}, ${c.age} años · ${moodWord(c.happiness)} (${Math.round(c.happiness)}) · ${money(c.money)}`),
     h('p', {}, `${c.owns ? (c.mortgage > 0 ? `Propietario (le quedan ${money(c.mortgage)} de hipoteca)` : 'Propietario') : 'De alquiler'} · ${job ? `trabaja en ${(job.name ?? BUILD_NAMES[job.kind] ?? '').toLowerCase()}` : 'trabaja fuera'}`),
     h('p', {}, `Quiere ${DESIRE_TEXT[c.desire]}; teme ${FEAR_TEXT[c.fear]}. Meta: ${GOAL_TEXT[c.goal]} ${goalDone(state, c) ? '✓' : ''}`),
+    hook ? h('p', { class: 'hook' }, h('strong', {}, 'Ahora mismo: '), `${HOOK_TEXT[hook.kind]}.`) : '',
     h('h3', {}, 'Hablar'),
     ask,
     answer,
@@ -123,7 +127,10 @@ export function openPleno(ctx: SocialCtx): void {
   if (!state.pleno) {
     const go = h('button', { class: 'btn primary wide' }, `Convocar pleno (${money(PLENO_COST)})`);
     go.addEventListener('click', async () => {
-      if (await ctx.command({ type: 'ConvenePleno' })) reopen();
+      if (await ctx.command({ type: 'ConvenePleno' })) {
+        toast(`Pleno convocado: −${money(PLENO_COST)}`, { kind: 'info' });
+        reopen();
+      }
     });
     const needs = topNeeds(state).slice(0, 3);
     sheet(
@@ -137,39 +144,44 @@ export function openPleno(ctx: SocialCtx): void {
     return;
   }
   const list = h('div', { class: 'petitions' });
+  const close = h('button', { class: 'btn wide' }, 'Cerrar el pleno');
+  const deadline = formatDate(tickToDate(state.tick + 24 * 120));
+  const done = (a: 'promise' | 'reject') => h('p', { class: 'muted' }, a === 'promise' ? '✓ Prometido' : '✗ Rechazado');
   for (const p of state.pleno.petitions) {
     const who = state.citizens.find((c) => c.id === p.citizenId);
-    const said = [...state.decisionLog].reverse().find((d) => d.citizenId === p.citizenId);
+    const fiscal = p.need === 'bajar_tasas' || p.need === 'bajar_ibi';
+    const n = p.supporters.length;
     const card = h(
       'div',
       { class: 'petition' },
       h('p', {}, h('strong', {}, who?.name ?? 'Un vecino'), ` pide ${NEED_TEXT[p.need]}.`),
-      said ? h('p', { class: 'quote' }, `«${said.motivo}»`) : '',
       h('p', {}, `Votos: ${p.yes} a favor, ${p.no} en contra.`),
     );
-    if (p.answer) card.append(h('p', { class: 'muted' }, p.answer === 'promise' ? '✓ Prometido' : '✗ Rechazado'));
+    if (p.answer) card.append(done(p.answer));
     else {
+      const terms = h('p', { class: 'muted' }, `Si prometes: plazo hasta el ${deadline}${fiscal ? ' y hay que mantener la bajada 60 días' : ''}. Si no cumples, ${n} ${n === 1 ? 'vecino con nombre se enfada' : 'vecinos con nombre se enfadan'}.`);
       const yes = h('button', { class: 'btn primary' }, 'Prometer');
       const no = h('button', { class: 'btn' }, 'Rechazar');
-      yes.addEventListener('click', async () => {
-        await ctx.command({ type: 'AnswerPetition', petitionId: p.id, answer: 'promise' });
-        reopen();
-      });
-      no.addEventListener('click', async () => {
-        await ctx.command({ type: 'AnswerPetition', petitionId: p.id, answer: 'reject' });
-        reopen();
-      });
-      card.append(h('div', { class: 'row' }, yes, no));
+      const row = h('div', { class: 'row' }, yes, no);
+      // Se actualiza solo la tarjeta: el foco pasa a la siguiente petición (o a «Cerrar»).
+      const answer = async (a: 'promise' | 'reject') => {
+        if (!(await ctx.command({ type: 'AnswerPetition', petitionId: p.id, answer: a }))) return;
+        terms.remove();
+        row.replaceWith(done(a));
+        (list.querySelector<HTMLButtonElement>('.petition .btn.primary') ?? close).focus();
+      };
+      yes.addEventListener('click', () => answer('promise'));
+      no.addEventListener('click', () => answer('reject'));
+      card.append(terms, row);
     }
     list.append(card);
   }
-  const close = h('button', { class: 'btn wide' }, 'Cerrar el pleno');
   close.addEventListener('click', async () => {
     await ctx.command({ type: 'ClosePleno' });
     toast('Pleno cerrado. Las promesas quedan registradas.', { kind: 'good' });
     reopen();
   });
-  sheet('Pleno municipal', list, close, h('h3', {}, 'Promesas'), promiseList);
+  sheet('Pleno municipal', h('p', { class: 'muted' }, 'El pleno se cierra solo a los 2 días; lo que no respondas queda sin respuesta.'), list, close, h('h3', {}, 'Promesas'), promiseList);
 }
 
 /** Consejero (§7): reglas en Modo normal; IA premium en Modo IA. */
@@ -216,7 +228,7 @@ export function openDiary(ctx: SocialCtx): void {
     });
     items.push(b, chronicle);
   }
-  for (const e of entries) items.push(h('h3', {}, e.date), h('ul', { class: 'people' }, ...e.lines.map((l) => h('li', {}, l))));
+  for (const e of entries) items.push(h('h3', {}, formatDate(tickToDate(e.tick))), h('ul', { class: 'people' }, ...e.lines.map((l) => h('li', {}, l))));
   if (!entries.length) items.push(h('p', { class: 'muted' }, 'Todavía no ha pasado nada digno de contar.'));
   sheet('Diario del pueblo', ...items);
 }
@@ -227,6 +239,11 @@ export function renderObjectives(state: GameState): void {
   const list = activeObjectives(state);
   const sig = list.map((o) => o.id).join(',');
   if (box.dataset.sig === sig) return;
+  // Al cumplirse uno, se anuncia al lector de pantalla.
+  if (box.dataset.sig !== undefined) {
+    const gone = box.dataset.sig.split(',').filter((id) => id && !list.some((o) => o.id === id));
+    if (gone.length) $('#sr-live').textContent = `Objetivo cumplido. Nuevos objetivos: ${list.map((o) => o.text).join('; ')}`;
+  }
   box.dataset.sig = sig;
   box.replaceChildren(
     h('strong', {}, 'Objetivos'),

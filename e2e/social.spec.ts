@@ -37,9 +37,12 @@ test('v0.4: ficha y hablar, pleno con promesa, consejero, diario y objetivos', a
   await page.getByRole('button', { name: /Convocar pleno/ }).click();
   await expect(page.locator('.petition').first()).toContainText('pide');
   await expect(page.locator('.petition').first()).toContainText('Votos');
+  await expect(page.locator('.petition').first()).toContainText('Si prometes: plazo hasta');
   await shot('3-pleno');
   await page.getByRole('button', { name: 'Prometer' }).first().click();
   await expect(page.locator('.petition').first()).toContainText('Prometido');
+  // Responder no rehace la hoja: el foco pasa a la siguiente petición o a «Cerrar el pleno».
+  await expect(page.locator('.sheet :focus')).toHaveText(/Prometer|Cerrar el pleno/);
   await page.getByRole('button', { name: 'Cerrar el pleno' }).click();
   await expect(page.locator('.sheet')).toContainText('pendiente');
   await page.locator('.sheet-close').click();
@@ -53,7 +56,7 @@ test('v0.4: ficha y hablar, pleno con promesa, consejero, diario y objetivos', a
   await page.locator('.sheet-close').click();
   await page.locator('#menu').click();
   await page.getByRole('button', { name: 'Diario del pueblo' }).click();
-  await expect(page.locator('.sheet h3').first()).toContainText('año');
+  await expect(page.locator('.sheet h3').first()).toContainText('Año');
   await shot('5-diario');
   expect(errors).toEqual([]);
 });

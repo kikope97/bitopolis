@@ -17,7 +17,6 @@ import {
   type GameState,
   parseDecisions,
   PROFILES,
-  recentMotivos,
   profileRng,
   step,
 } from '@bitopolis/sim';
@@ -98,12 +97,12 @@ for (let seed = 1; seed <= Number(values.seeds); seed++) {
     const mk = `${seed}:${Math.floor(state.tick / 720)}`;
     callsByMonth.set(mk, (callsByMonth.get(mk) ?? 0) + 1);
     totals.requested += pend.length;
-    const call = async (system: string, user: string, list: typeof pend, retry = false) => {
+    const call = async (system: string, user: string, list: typeof pend) => {
       const r = await llm.complete({ system, user, schema: buildDecisionRequest(state, list).schema, model, maxTokens: 200 + list.length * 120 });
       if (values.record) recordings.set(ReplayProvider.key({ system, user }), r);
       totals.tokensIn += r.usage.in || tokens(system + user);
       totals.tokensOut += r.usage.out || tokens(r.text);
-      const parsed = parseDecisions(r.text, list, Object.fromEntries(list.map((p) => [p.citizenId, recentMotivos(state, p.citizenId, 3)])), retry);
+      const parsed = parseDecisions(r.text, list);
       for (const [k, v] of Object.entries(parsed.reasons)) reasons[k] = (reasons[k] ?? 0) + v;
       return parsed;
     };
@@ -120,7 +119,7 @@ for (let seed = 1; seed <= Number(values.seeds); seed++) {
       if (parsed.invalid.length) {
         const again = pend.filter((p) => parsed.invalid.includes(p.citizenId));
         const r2 = buildDecisionRequest(state, again);
-        parsed = await call(r2.system, `${r2.user}\n\nTu respuesta anterior no era válida (${parsed.error}).`, again, true);
+        parsed = await call(r2.system, `${r2.user}\n\nTu respuesta anterior no era válida (${parsed.error}).`, again);
         apply(parsed.decisions);
         totals.validRetry += parsed.decisions.length;
         totals.fallback += parsed.invalid.length;

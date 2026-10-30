@@ -267,8 +267,18 @@ export function parseText(raw: string, req: TextRequest): string | null {
   // eslint-disable-next-line no-control-regex
   const text = t.replace(/[\u0000-\u001f<>`*_#]/g, ' ').replace(/\s+/g, ' ').trim();
   if (text.length < 4 || text.length > req.max + 40) return null;
-  // Lista blanca: toda cifra del texto tiene que estar en los datos que se enviaron.
-  const allowed = req.user + req.system;
-  for (const n of text.match(/\d[\d.,]*/g) ?? []) if (!allowed.includes(n.replace(/[.,]$/, '').replace(/\./g, ''))) return null;
+  // Lista blanca: toda cifra del texto tiene que ser, exactamente, una de los datos enviados
+  // (no de las reglas: «220 caracteres» no autoriza a decir «20»).
+  const sent = req.user + '\n' + req.system.split('\n').filter((l) => !l.startsWith('- ') && !TEXT_SYSTEM.includes(l)).join('\n');
+  const allowed = new Set<string>();
+  for (const m of sent.match(/\d+(?:\.\d+)?/g) ?? []) {
+    const v = Number(m);
+    allowed.add(String(v)).add(String(Math.round(v))).add(String(Math.trunc(v)));
+  }
+  for (const n of text.match(/\d[\d.,]*/g) ?? []) {
+    // «5.354» es 5354 y «64,5» es 64.5.
+    const v = Number(n.replace(/[.,]$/, '').replace(/\.(?=\d{3}\b)/g, '').replace(',', '.'));
+    if (!allowed.has(String(v))) return null;
+  }
   return text;
 }

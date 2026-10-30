@@ -24,15 +24,13 @@ export function h<K extends keyof HTMLElementTagNameMap>(
 export function toast(text: string, opts: { sticky?: boolean; kind?: 'info' | 'warn' | 'good'; onClick?: () => void } = {}) {
   const box = $('#toasts');
   const icon = { info: 'ℹ', warn: '⚠', good: '✔' }[opts.kind ?? 'info'];
-  const el = h(
-    'div',
-    { class: `toast ${opts.kind ?? 'info'}`, role: opts.kind === 'warn' ? 'alert' : 'status' },
-    h('span', { class: 'toast-icon', 'aria-hidden': 'true' }, icon),
-    h('span', { class: 'toast-text' }, text),
-  );
+  // Sin role propio: el contenedor #toasts ya es aria-live (evita anuncios dobles).
+  const body = opts.onClick ? h('button', { class: 'toast-text toast-action' }, text) : h('span', { class: 'toast-text' }, text);
+  const el = h('div', { class: `toast ${opts.kind ?? 'info'}` }, h('span', { class: 'toast-icon', 'aria-hidden': 'true' }, icon), body);
   if (opts.onClick) {
     el.classList.add('clickable');
-    el.addEventListener('click', () => {
+    // Un botón de verdad: funciona con teclado (Enter/Espacio) y con lector de pantalla.
+    body.addEventListener('click', () => {
       opts.onClick!();
       el.remove();
     });
@@ -67,7 +65,7 @@ export function closeSheet() {
 }
 
 /** Hoja inferior (bottom sheet) al alcance del pulgar. */
-export function sheet(title: string, ...content: (Node | string)[]): HTMLElement {
+export function sheet(title: string | Node, ...content: (Node | string)[]): HTMLElement {
   closeSheet();
   lastFocus = document.activeElement as HTMLElement | null;
   const close = h('button', { class: 'sheet-close', 'aria-label': 'Cerrar' }, '✕');

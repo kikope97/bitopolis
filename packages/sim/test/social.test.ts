@@ -13,6 +13,7 @@ import {
   narrativeSummary,
   OBJECTIVES,
   onCitizenLeaves,
+  parseText,
   ruleAnswer,
   runSimulation,
   step,
@@ -66,6 +67,75 @@ describe('plenos y promesas', () => {
     const sup = s.citizens.find((c) => pet.supporters.includes(c.id));
     if (sup) expect(sup.memories.some((m) => m.kind === 'peticion_rechazada')).toBe(true);
     expect(applyCommand(s, { type: 'AnswerPetition', petitionId: pet.id, answer: 'promise' }).ok).toBe(false);
+  });
+});
+
+describe('plenos justos (ronda 04)', () => {
+  const lowTaxes = (s: GameState) => {
+    s.taxLevel = 'low';
+    s.taxes = { ibi: 'low', tasas: 'low', plusvalia: 'low' };
+  };
+
+  it('con los tributos en bajo nadie pide bajarlos', () => {
+    const s = town();
+    lowTaxes(s);
+    applyCommand(s, { type: 'ConvenePleno' });
+    for (const p of s.pleno!.petitions) expect(['bajar_tasas', 'bajar_ibi']).not.toContain(p.need);
+  });
+
+  it('el pleno se cierra solo a los 2 días y lo no respondido no deja recuerdo de rechazo', () => {
+    const s = town();
+    applyCommand(s, { type: 'ConvenePleno' });
+    const pet = s.pleno!.petitions[0]!;
+    for (let i = 0; i < 24 * 3; i++) step(s);
+    expect(s.pleno).toBeNull();
+    const sup = s.citizens.find((c) => pet.supporters.includes(c.id));
+    if (sup) expect(sup.memories.some((m) => m.kind === 'peticion_rechazada')).toBe(false);
+  });
+
+  it('prometer bajar las tasas obliga a mantenerlas 60 días; si se suben, se rompe', () => {
+    for (const keep of [true, false]) {
+      const s = town();
+      s.taxLevel = 'medium';
+      s.taxes = { ibi: 'medium', tasas: 'medium', plusvalia: 'medium' };
+      applyCommand(s, { type: 'ConvenePleno' });
+      // Se fuerza la petición fiscal para el test.
+      const pet = s.pleno!.petitions[0]!;
+      pet.need = 'bajar_tasas';
+      applyCommand(s, { type: 'AnswerPetition', petitionId: pet.id, answer: 'promise' });
+      applyCommand(s, { type: 'ClosePleno' });
+      const promise = s.promises.at(-1)!;
+      lowTaxes(s);
+      for (let i = 0; i < 24 * 5; i++) step(s);
+      expect(promise.status).toBe('pending');
+      if (!keep) {
+        s.taxLevel = 'high';
+        s.taxes = { ibi: 'high', tasas: 'high', plusvalia: 'high' };
+      }
+      for (let i = 0; i < 24 * 61; i++) step(s);
+      expect(promise.status).toBe(keep ? 'kept' : 'broken');
+    }
+  });
+
+  it('prometer algo que ya está en obra no cuenta como cumplido', () => {
+    const s = town();
+    applyCommand(s, { type: 'ConvenePleno' });
+    const pet = s.pleno!.petitions[0]!;
+    pet.need = 'parque';
+    applyCommand(s, { type: 'AnswerPetition', petitionId: pet.id, answer: 'promise' });
+    const promise = s.promises.at(-1)!;
+    expect(promise.baseline).toBe(s.buildings.filter((b) => b.kind === 'park').length);
+  });
+});
+
+describe('textos con IA: lista blanca de cifras', () => {
+  const req = { system: 'Reglas:\n- máx. 220 caracteres\n\nEstado: {"caja":5354,"felicidad":64.5}', user: '{"vecinos":12}', schema: {}, max: 300 };
+  it('acepta cifras exactas de los datos y rechaza las que solo aparecen dentro de otras o en las reglas', () => {
+    expect(parseText('{"texto":"Somos 12 y la caja tiene 5.354 €."}', req)).not.toBeNull();
+    expect(parseText('{"texto":"La felicidad es 64,5."}', req)).not.toBeNull();
+    expect(parseText('{"texto":"Faltan 20 casas."}', req)).toBeNull();
+    expect(parseText('{"texto":"Hay 535 vecinos."}', req)).toBeNull();
+    expect(parseText('{"texto":"Caben 220."}', req)).toBeNull();
   });
 });
 

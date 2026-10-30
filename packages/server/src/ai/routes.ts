@@ -162,6 +162,8 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
 
   /** Textos con IA (v0.4). Entrada: solo ids y enums; salida validada. Si falla, el cliente usa reglas. */
   const chronicles = new Map<string, string>();
+  const talks = new Map<string, string>();
+  const talking = new Set<number>();
   const TalkBody = z.object({ citizenId: z.number().int().min(1), question: z.enum(['como_estas', 'que_necesitas', 'me_votarias']) });
   const AdvisorBody = z.object({ question: z.enum(['como_va', 'que_cambiarias']) });
   const aiGame = async (params: unknown) => {
@@ -178,7 +180,22 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
     if (!g || !b.success) return bad(reply, 'petición no válida');
     const c = g.state.citizens.find((x) => x.id === b.data.citizenId && x.named);
     if (!c) return bad(reply, 'ese vecino no está', 404);
-    return ai.text(g.row.id, 'conversacion', buildTalkRequest(g.state, c, b.data.question), false);
+    // Una respuesta por vecino, pregunta y día de juego; y una conversación a la vez por partida.
+    const key = `${g.row.id}:${c.id}:${b.data.question}:${Math.floor(g.state.tick / 24)}`;
+    const cached = talks.get(key);
+    if (cached) return { text: cached };
+    if (talking.has(g.row.id)) return { text: null, reason: 'ya hay una conversación en curso' };
+    talking.add(g.row.id);
+    try {
+      const r = await ai.text(g.row.id, 'conversacion', buildTalkRequest(g.state, c, b.data.question), false);
+      if (r.text) {
+        talks.set(key, r.text);
+        if (talks.size > 2000) talks.delete(talks.keys().next().value!);
+      }
+      return r;
+    } finally {
+      talking.delete(g.row.id);
+    }
   });
 
   app.post('/api/games/:token/advisor', async (req, reply) => {

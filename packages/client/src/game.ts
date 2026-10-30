@@ -516,6 +516,8 @@ export function startGame(opts: GameOptions): void {
     if (target.tagName === 'INPUT' || target.tagName === 'SELECT') return;
     const step = Math.round(64 * dpr());
     const k = e.key;
+    // Con una hoja abierta el teclado es de la hoja: el mapa no se mueve por detrás.
+    if (isSheetOpen() && k !== 'Escape') return;
     if (k === 'ArrowLeft' || k === 'a') cam.x -= step;
     else if (k === 'ArrowRight' || k === 'd') cam.x += step;
     else if (k === 'ArrowUp' || k === 'w') cam.y -= step;

@@ -93,6 +93,8 @@ export interface PromiseRecord {
   /** Referencia para saber si se cumplió (p. ej. cuántos parques había). */
   baseline: number;
   status: 'pending' | 'kept' | 'broken';
+  /** Promesas fiscales: desde cuándo se mantiene la bajada. */
+  metSince?: number;
 }
 
 export const MEMORY_MAX = 5;
@@ -101,6 +103,10 @@ const RELATIONS_MAX = 5;
 export const PLENO_COST = 300;
 const PLENO_COOLDOWN = TICKS_PER_MONTH;
 const PROMISE_DAYS = 120;
+/** Una bajada de impuestos prometida tiene que mantenerse este tiempo. */
+const FISCAL_PROMISE_DAYS = 60;
+/** El pleno se cierra solo pasadas 48 horas. */
+const PLENO_OPEN_TICKS = TICKS_PER_DAY * 2;
 const HOOKS_MAX = 3;
 
 /* ---------------- memoria ---------------- */
@@ -143,7 +149,7 @@ export function memoryText(state: GameState, m: Memory): string {
     case 'subida_impuestos':
       return 'Le subieron los impuestos';
     case 'nueva_amistad':
-      return `Se hizo amigo de ${who}`;
+      return `Hizo amistad con ${who}`;
     case 'nueva_pareja':
       return `Empezó a salir con ${who}`;
     case 'le_quitaron_el_local':
@@ -302,6 +308,9 @@ function addHook(state: GameState, kind: HookKind, actors: number[]): void {
   if (state.hooks.length >= HOOKS_MAX) return;
   if (state.hooks.some((h) => h.actors.some((a) => actors.includes(a)))) return;
   state.hooks.push({ id: state.nextId++, kind, actors, createdTick: state.tick, expires: state.tick + TICKS_PER_DAY * 15 });
+  // El director se ve también en Modo normal: el gancho sale en el diario.
+  const lead = state.citizens.find((c) => c.id === actors[0]);
+  if (lead) pushEvent(state, 'info', `${lead.name} ${HOOK_TEXT[kind]}`, { ref: lead.id });
 }
 
 /** Ganchos deterministas (varían con la semilla, no compensa recargar). */
@@ -363,7 +372,8 @@ const LEVEL = { low: 0, medium: 1, high: 2 } as const;
 
 function needBaseline(state: GameState, need: Need): number {
   const kind = NEED_KIND[need];
-  if (kind) return state.buildings.filter((b) => b.kind === kind && b.built).length;
+  // Cuentan también las obras en marcha: prometer lo que ya se está construyendo no vale.
+  if (kind) return state.buildings.filter((b) => b.kind === kind).length;
   if (need === 'empleo') return state.citizens.filter((c) => c.jobId === null).length;
   if (need === 'bajar_tasas') return LEVEL[taxLevels(state).tasas];
   if (need === 'bajar_ibi') return LEVEL[taxLevels(state).ibi];
@@ -377,10 +387,18 @@ function needMet(state: GameState, p: PromiseRecord): boolean {
   return now < p.baseline;
 }
 
+const isFiscal = (n: Need) => n === 'bajar_tasas' || n === 'bajar_ibi';
+
+/** No se pide bajar lo que ya está en bajo (sería imposible de cumplir). */
+function canLower(state: GameState, n: Need): boolean {
+  const lv = taxLevels(state);
+  return n === 'bajar_tasas' ? lv.tasas !== 'low' : n === 'bajar_ibi' ? lv.ibi !== 'low' : true;
+}
+
 /** Necesidades de un vecino por orden (para que el pleno traiga peticiones distintas). */
 export function needsOf(state: GameState, c: Citizen): Need[] {
   const first = needOf(state, c);
-  const rest = NEEDS.filter((n) => n !== first && (NEED_KIND[n] ? !state.buildings.some((b) => b.kind === NEED_KIND[n] && b.built) : n === 'bajar_tasas'));
+  const rest = NEEDS.filter((n) => n !== first && (NEED_KIND[n] ? !state.buildings.some((b) => b.kind === NEED_KIND[n]) : n === 'bajar_tasas' && canLower(state, n)));
   return [first, ...rest.sort((a, b) => (hash32(c.id, a.length) % 7) - (hash32(c.id, b.length) % 7))];
 }
 
@@ -397,7 +415,8 @@ export function needOf(state: GameState, c: Citizen): Need {
   if (home && (state.fields.crime[home.y * state.map.w + home.x] ?? 0) > 30 && !has('police')) return 'policia';
   const options: Need[] = ['parque', 'colegio', 'centro_salud', 'policia'];
   const missing = options.filter((n) => !has(NEED_KIND[n]!));
-  return missing.length ? missing[hash32(c.id, state.seed) % missing.length]! : 'bajar_tasas';
+  if (missing.length) return missing[hash32(c.id, state.seed) % missing.length]!;
+  return canLower(state, 'bajar_tasas') ? 'bajar_tasas' : 'empleo';
 }
 
 function wantsNeed(state: GameState, c: Citizen, need: Need): boolean {
@@ -459,13 +478,13 @@ export function answerPetition(state: GameState, petitionId: number, answer: 'pr
       const c = state.citizens.find((x) => x.id === id);
       if (c) c.happiness = Math.min(100, c.happiness + 3);
     }
-    pushEvent(state, 'info', `El alcalde promete ${NEED_TEXT[p.need]} (${asker?.name.split(' ')[0] ?? 'un vecino'} lo pidió)`);
+    pushEvent(state, 'info', `El alcalde promete ${NEED_TEXT[p.need]} (lo pidió ${asker?.name ?? 'un vecino'})`);
   } else {
     for (const id of p.supporters) {
       const c = state.citizens.find((x) => x.id === id);
       if (c) {
-        addMemory(state, c, 'peticion_rechazada', 3, -3);
-        c.grudge = Math.min(40, c.grudge + 3);
+        addMemory(state, c, 'peticion_rechazada', 3, -2);
+        c.grudge = Math.min(40, c.grudge + 2);
       }
     }
     pushEvent(state, 'info', `El pleno rechaza ${NEED_TEXT[p.need]}`);
@@ -474,8 +493,18 @@ export function answerPetition(state: GameState, petitionId: number, answer: 'pr
 }
 
 export function closePleno(state: GameState): void {
-  // Lo que no se respondió cuenta como rechazado.
-  for (const p of state.pleno?.petitions ?? []) if (!p.answer) answerPetition(state, p.id, 'reject');
+  if (!state.pleno) return;
+  const answered = state.pleno.petitions.filter((p) => p.answer).length;
+  for (const p of state.pleno.petitions) {
+    if (p.answer) continue;
+    // Sin respuesta: molesta un poco, menos que un rechazo.
+    for (const id of p.supporters) {
+      const c = state.citizens.find((x) => x.id === id);
+      if (c) c.grudge = Math.min(40, c.grudge + 1);
+    }
+  }
+  // Sentirse escuchado: los vecinos con nombre agradecen que se respondan las peticiones.
+  if (answered > 0) for (const c of state.citizens) if (c.named) c.happiness = Math.min(100, c.happiness + answered);
   state.pleno = null;
 }
 
@@ -483,12 +512,20 @@ function checkPromises(state: GameState): void {
   for (const p of state.promises) {
     if (p.status !== 'pending') continue;
     const supporters = state.citizens.filter((c) => p.supporters.includes(c.id));
-    if (needMet(state, p)) {
+    const met = needMet(state, p);
+    if (isFiscal(p.need) && p.metSince !== undefined && !met) {
+      // Bajó el impuesto y lo volvió a subir: promesa rota.
+      p.metSince = undefined;
+      p.deadline = state.tick;
+    } else if (met && isFiscal(p.need) && p.metSince === undefined) {
+      p.metSince = state.tick;
+      continue;
+    }
+    if (met && (!isFiscal(p.need) || state.tick - p.metSince! >= TICKS_PER_DAY * FISCAL_PROMISE_DAYS)) {
       p.status = 'kept';
       for (const c of supporters) addMemory(state, c, 'promesa_cumplida', 4, 5);
       pushEvent(state, 'info', `Promesa cumplida: ${NEED_TEXT[p.need]}`);
-      if (!state.objectivesDone.includes('promesa')) completeObjective(state, 'promesa');
-    } else if (state.tick >= p.deadline) {
+    } else if (!met && state.tick >= p.deadline) {
       p.status = 'broken';
       // Castigo al grupo que la apoyó: rencor y memoria.
       for (const c of supporters) {
@@ -565,15 +602,15 @@ const has = (s: GameState, k: string) => s.buildings.some((b) => b.kind === k &&
 export const OBJECTIVES: ObjectiveDef[] = [
   { id: 'carretera', text: 'Alarga la calle del ayuntamiento', reward: 300, done: (s) => s.map.tiles.filter((t) => t === 1).length > 7 },
   { id: 'agua_luz', text: 'Pon agua y luz', reward: 500, done: (s) => has(s, 'water') && has(s, 'power') },
-  { id: 'diez', text: 'Llega a 10 vecinos', reward: 2_000, done: (s) => s.citizens.length >= 10 },
+  { id: 'diez', text: 'Llega a 10 vecinos', reward: 1_000, done: (s) => s.citizens.length >= 10 },
   { id: 'zonas', text: 'Crea zonas R, C e I', reward: 1_000, done: (s) => [1, 2, 3].every((z) => s.map.zones.includes(z)) },
   { id: 'parque', text: 'Construye un parque', reward: 800, done: (s) => has(s, 'park') },
-  { id: 'pleno', text: 'Celebra un pleno municipal', reward: 500, done: (s) => s.lastPlenoTick >= 0 },
+  { id: 'pleno', text: 'Celebra un pleno (menú ☰ › Pleno municipal)', reward: 500, done: (s) => s.lastPlenoTick >= 0 },
   { id: 'empresa', text: 'Que un vecino abra su negocio', reward: 1_000, done: (s) => s.buildings.some((b) => b.owner > 0) },
   { id: 'propietarios', text: 'Ten 5 vecinos propietarios', reward: 1_500, done: (s) => s.citizens.filter((c) => c.owns).length >= 5 },
   { id: 'cincuenta', text: 'Llega a 50 vecinos', reward: 5_000, unlock: 'plaza', done: (s) => s.citizens.length >= 50 },
   { id: 'promesa', text: 'Cumple una promesa del pleno', reward: 1_500, done: (s) => s.promises.some((p) => p.status === 'kept') },
-  { id: 'sin_deuda', text: 'Pasa 6 meses sin deuda', reward: 2_000, done: (s) => s.stats.length >= 6 && s.stats.slice(-6).every((m) => m.treasury >= 0) },
+  { id: 'sin_deuda', text: 'Cierra 6 meses seguidos con superávit (con 30 vecinos o más)', reward: 2_000, done: (s) => s.citizens.length >= 30 && s.stats.length >= 6 && s.stats.slice(-6).every((m) => m.income >= m.expenses) },
   { id: 'doscientos', text: 'Llega a 200 vecinos', reward: 10_000, unlock: 'market', done: (s) => s.citizens.length >= 200 },
 ];
 
@@ -599,6 +636,10 @@ function checkObjectives(state: GameState): void {
 /* ---------------- ciclo diario ---------------- */
 
 export function socialDay(state: GameState): void {
+  if (state.pleno && state.tick - state.pleno.tick >= PLENO_OPEN_TICKS) {
+    closePleno(state);
+    pushEvent(state, 'info', 'El pleno se cerró solo: lo que no respondiste queda sin respuesta');
+  }
   updateRelations(state);
   directStories(state);
   checkPromises(state);
