@@ -55,7 +55,7 @@ function loop() {
       if (state.tick % TICKS_PER_DAY === 0) emitSave(false);
     }
   }
-  if (state && dirty && now - lastPost > 100) {
+  if (state && dirty && now - lastPost > 150) {
     post({ type: 'state', state });
     dirty = false;
     lastPost = now;

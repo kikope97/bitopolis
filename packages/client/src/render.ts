@@ -11,6 +11,7 @@ import {
   iconSprite,
   Pix,
   puffSprite,
+  putPix,
   roadTile,
   T,
   type TimeOfDay,
@@ -128,34 +129,89 @@ function walkers(state: GameState, time: number, still: boolean, tod: TimeOfDay)
   return out;
 }
 
-/** Suelo, carreteras y solares en un canvas a escala 1 (se rehace si cambia). */
-function drawGround(state: GameState, tod: TimeOfDay): HTMLCanvasElement {
+/**
+ * Suelo, carreteras y solares: un canvas a escala 1 por momento del día. Solo
+ * se repintan las casillas que cambian (antes se rehacía el mapa entero con
+ * cada edificio nuevo y en cada cambio de hora, y eso daba tirones).
+ */
+interface Ground {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  keys: string[];
+  w: number;
+  h: number;
+}
+const grounds = new Map<TimeOfDay, Ground>();
+
+function tileKey(state: GameState, x: number, y: number, occupied: Set<number>): string {
   const { w, h, tiles, zones } = state.map;
-  const isRoad = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && tiles[y * w + x] === Tile.Road;
+  const i = y * w + x;
+  if (tiles[i] === Tile.Road) {
+    const r = (xx: number, yy: number) => xx >= 0 && yy >= 0 && xx < w && yy < h && tiles[yy * w + xx] === Tile.Road;
+    return `r${+r(x, y - 1)}${+r(x + 1, y)}${+r(x, y + 1)}${+r(x - 1, y)}`;
+  }
+  return `g${zones[i] !== Zone.None && !occupied.has(i) ? zones[i] : 0}`;
+}
+
+function tilePix(state: GameState, x: number, y: number, key: string): Pix {
+  if (key[0] === 'r') {
+    const rv = Math.floor(hash(x, y, 2) * 6);
+    const k = `${key.slice(1)}-${rv}`;
+    let tile = roadCache.get(k);
+    if (!tile) roadCache.set(k, (tile = roadTile(key[1] === '1', key[2] === '1', key[3] === '1', key[4] === '1', rv)));
+    return tile;
+  }
+  // La hierba (ruido suave, lo más caro) se calcula una vez por casilla.
+  const gi = y * 4096 + x;
+  let g = grassCache.get(gi);
+  if (!g) grassCache.set(gi, (g = grassTile(Math.floor(hash(x, y, 1) * GRASS_VARIANTS), x, y)));
+  const z = Number(key.slice(1));
+  return z ? zoneTile(ZONE_LETTER[z]!, g) : g;
+}
+
+const grassCache = new Map<number, Pix>();
+
+function groundFor(state: GameState, tod: TimeOfDay, budget = Infinity): HTMLCanvasElement {
+  const { w, h } = state.map;
+  let g = grounds.get(tod);
+  if (!g || g.w !== w || g.h !== h) {
+    const canvas = document.createElement('canvas');
+    canvas.width = w * T;
+    canvas.height = h * T;
+    g = { canvas, ctx: canvas.getContext('2d')!, keys: new Array<string>(w * h).fill(''), w, h };
+    grounds.set(tod, g);
+  }
   const occupied = new Set(state.buildings.map((b) => b.y * w + b.x));
-  const all = new Pix(w * T, h * T);
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const i = y * w + x;
-      const v = Math.floor(hash(x, y, 1) * GRASS_VARIANTS);
-      if (tiles[i] === Tile.Road) {
-        const n = isRoad(x, y - 1);
-        const e = isRoad(x + 1, y);
-        const s = isRoad(x, y + 1);
-        const o = isRoad(x - 1, y);
-        const rv = Math.floor(hash(x, y, 2) * 6);
-        const key = `${+n}${+e}${+s}${+o}-${rv}`;
-        let tile = roadCache.get(key);
-        if (!tile) roadCache.set(key, (tile = roadTile(n, e, s, o, rv)));
-        all.blit(tile, x * T, y * T);
-        continue;
-      }
-      const z = zones[i]!;
-      const g = grassTile(v, x, y);
-      all.blit(z !== Zone.None && !occupied.has(i) ? zoneTile(ZONE_LETTER[z]!, g) : g, x * T, y * T);
+  let left = budget;
+  for (let y = 0; y < h && left > 0; y++) {
+    for (let x = 0; x < w && left > 0; x++) {
+      const key = tileKey(state, x, y, occupied);
+      if (g.keys[y * w + x] === key) continue;
+      g.keys[y * w + x] = key;
+      putPix(g.ctx, tilePix(state, x, y, key), x * T, y * T, tod);
+      left--;
     }
   }
-  return toCanvas(all, tod);
+  return g.canvas;
+}
+
+/** Prepara poco a poco los suelos de los otros momentos del día (sin tirones al cambiar de hora). */
+const TODS: TimeOfDay[] = ['day', 'dusk', 'night'];
+let warmSig = '';
+let warmDone = new Set<TimeOfDay>();
+function warmGrounds(state: GameState, current: TimeOfDay, sig: string) {
+  if (sig !== warmSig) {
+    warmSig = sig;
+    warmDone = new Set();
+  }
+  const next = TODS.find((t) => t !== current && !warmDone.has(t));
+  if (!next) return;
+  const g = grounds.get(next);
+  const before = g ? g.keys.filter(Boolean).length : 0;
+  groundFor(state, next, 96);
+  const after = grounds.get(next)!.keys.filter(Boolean).length;
+  // Sin cambios pendientes en esta pasada: listo hasta que cambie el mapa.
+  if (g && after === before) warmDone.add(next);
 }
 
 const roadCache = new Map<string, Pix>();
@@ -181,10 +237,10 @@ export function render(
 
   const tod = timeOfDay(state.tick);
   const sig = mapSignature(state);
-  if (!ground || `${sig}${tod}` !== groundSig) {
-    ground = drawGround(state, tod);
+  if (`${sig}${tod}` !== groundSig) {
+    ground = groundFor(state, tod);
     groundSig = `${sig}${tod}`;
-  }
+  } else warmGrounds(state, tod, sig);
   if (runsSig !== sig) {
     runs = roadRuns(state);
     runsSig = sig;
@@ -199,12 +255,25 @@ export function render(
     byRow.set(row, list);
   }
   const puffs: { x: number; y: number; size: number }[] = [];
-  ctx.drawImage(ground, -cam.x, -cam.y, ground.width * z, ground.height * z);
+  if (ground) {
+    // Solo el trozo visible del suelo (escalar el mapa entero cada fotograma es caro).
+    const sx = Math.max(0, Math.floor(cam.x / z));
+    const sy = Math.max(0, Math.floor(cam.y / z));
+    const sw = Math.min(ground.width - sx, Math.ceil(ctx.canvas.width / z) + 2);
+    const sh = Math.min(ground.height - sy, Math.ceil(ctx.canvas.height / z) + 2);
+    if (sw > 0 && sh > 0) ctx.drawImage(ground, sx, sy, sw, sh, sx * z - cam.x, sy * z - cam.y, sw * z, sh * z);
+  }
 
   // La capa va sobre el suelo y bajo los edificios, para no taparlos.
   const layer = opts.layer ?? 'none';
   const overlay = layer === 'happiness' ? null : layerCanvas(state, layer);
-  if (overlay) ctx.drawImage(overlay, -cam.x, -cam.y, overlay.width * z, overlay.height * z);
+  if (overlay) {
+    const sx = Math.max(0, Math.floor(cam.x / z));
+    const sy = Math.max(0, Math.floor(cam.y / z));
+    const sw = Math.min(overlay.width - sx, Math.ceil(ctx.canvas.width / z) + 2);
+    const sh = Math.min(overlay.height - sy, Math.ceil(ctx.canvas.height / z) + 2);
+    if (sw > 0 && sh > 0) ctx.drawImage(overlay, sx, sy, sw, sh, sx * z - cam.x, sy * z - cam.y, sw * z, sh * z);
+  }
 
   const { w, h, tiles } = state.map;
   // Rango visible (con margen para lo que sobresale hacia arriba).

@@ -979,6 +979,22 @@ export function toCanvas(p: Pix, tod: TimeOfDay = 'day'): HTMLCanvasElement {
   return c;
 }
 
+/** Pinta un Pix opaco directamente en un contexto (sin canvas intermedio). */
+export function putPix(ctx: CanvasRenderingContext2D, p: Pix, dx: number, dy: number, tod: TimeOfDay = 'day'): void {
+  const img = ctx.createImageData(p.w, p.h);
+  const map = REMAP[tod];
+  for (let i = 0; i < p.data.length; i++) {
+    const idx = p.data[i]!;
+    if (idx === NONE) continue;
+    const [r, g, b] = RGB[map[idx]!]!;
+    img.data[i * 4] = r;
+    img.data[i * 4 + 1] = g;
+    img.data[i * 4 + 2] = b;
+    img.data[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(img, dx, dy);
+}
+
 export function sprite(key: string, make: () => Pix, tod: TimeOfDay = 'day'): HTMLCanvasElement {
   const k = `${key}@${tod}`;
   let c = cache.get(k);
