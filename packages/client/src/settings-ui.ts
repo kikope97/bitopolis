@@ -1,5 +1,5 @@
 import { sfx, unlockAudio } from './audio.ts';
-import { type Prefs, prefs, setPrefs } from './prefs.ts';
+import { onPrefs, type Prefs, prefs, setPrefs } from './prefs.ts';
 import { h, sheet } from './ui.ts';
 
 /**
@@ -35,7 +35,7 @@ export function radioGroup<T extends string | number>(label: string, options: [T
   return h('div', { class: 'field' }, h('span', { class: 'field-label' }, label), box);
 }
 
-function toggle(label: string, key: 'sfx' | 'music' | 'vibrate' | 'calm', help?: string): HTMLElement {
+function toggle(label: string, key: 'sfx' | 'music' | 'ambience' | 'vibrate' | 'calm', help?: string): HTMLElement {
   const input = h('input', { type: 'checkbox', ...(prefs()[key] ? { checked: true } : {}) }) as HTMLInputElement;
   input.addEventListener('change', () => {
     unlockAudio();
@@ -45,6 +45,30 @@ function toggle(label: string, key: 'sfx' | 'music' | 'vibrate' | 'calm', help?:
   return h('label', { class: 'check' }, input, h('span', {}, label, help ? h('small', { class: 'help' }, ` ${help}`) : ''));
 }
 
+/** Control de volumen en decibelios (el oído es logarítmico). */
+function volume(label: string, key: 'sfxDb' | 'musicDb' | 'ambDb', bus: 'sfx' | 'music' | 'ambience'): HTMLElement {
+  const text = (db: number) => (db <= -40 ? 'silencio' : `${db} dB`);
+  // El valor ya lo da aria-valuetext: el <output> visible se oculta al lector (no se repite).
+  const out = h('output', { 'aria-hidden': 'true' }, text(prefs()[key]));
+  const input = h('input', { type: 'range', min: '-40', max: '0', step: '1', value: String(prefs()[key]), 'aria-valuetext': text(prefs()[key]), ...(prefs()[bus] ? {} : { disabled: true }) }) as HTMLInputElement;
+  // Con el interruptor apagado, el volumen no se toca.
+  const off = onPrefs((p) => {
+    if (!input.isConnected) return off();
+    input.disabled = !p[bus];
+  });
+  input.addEventListener('input', () => {
+    const db = Number(input.value);
+    out.textContent = text(db);
+    input.setAttribute('aria-valuetext', text(db));
+    setPrefs({ [key]: db } as Partial<Prefs>);
+  });
+  input.addEventListener('change', () => {
+    unlockAudio();
+    if (key === 'sfxDb') sfx.tap();
+  });
+  return h('label', { class: 'field volume' }, h('span', { class: 'field-label' }, label, ' · ', out), input);
+}
+
 /** Ajustes de este dispositivo: sonido, vibración y accesibilidad (spec §8.2, §8.4). */
 export function openSettings(): void {
   const p = prefs();
@@ -52,9 +76,22 @@ export function openSettings(): void {
     'Ajustes',
     h('h3', {}, 'Sonido'),
     toggle('Efectos de sonido', 'sfx'),
-    toggle('Música y ambiente', 'music'),
+    volume('Volumen de los efectos', 'sfxDb', 'sfx'),
+    toggle('Música', 'music'),
+    volume('Volumen de la música', 'musicDb', 'music'),
+    toggle('Ambiente', 'ambience', '(pájaros de día, grillos de noche)'),
+    volume('Volumen del ambiente', 'ambDb', 'ambience'),
     toggle('Vibración', 'vibrate', '(en móviles que la admiten)'),
     h('h3', {}, 'Lectura'),
+    radioGroup<Prefs['font']>(
+      'Letra',
+      [
+        ['legible', 'Legible'],
+        ['pixel', 'Pixel (retro)'],
+      ],
+      p.font,
+      (v) => setPrefs({ font: v }),
+    ),
     radioGroup<Prefs['text']>(
       'Tamaño del texto',
       [

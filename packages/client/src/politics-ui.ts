@@ -1,5 +1,5 @@
 import { tickToDate } from '@bitopolis/shared';
-import { CAMPAIGN_COST, canCampaign, daysToElection, type ElectionResult, FACTION_TEXT, FACTIONS, type GameState, OPPOSITION_POP, politicsActive } from '@bitopolis/sim';
+import { CAMPAIGN_COST, canCampaign, canMotion, daysToElection, type ElectionResult, FACTION_TEXT, FACTIONS, type GameState, OPPOSITION_POP, politicsActive } from '@bitopolis/sim';
 import { formatDate } from './i18n.ts';
 import { lowMotion } from './prefs.ts';
 import { $, h, sheet } from './ui.ts';
@@ -97,23 +97,74 @@ export function openPolitics(ctx: SocialCtx): void {
         'div',
         { class: 'faction' },
         bar(`${FACTION_TEXT[f]} (${info.members})`, info.satisfaction),
-        h('p', { class: 'muted' }, info.demand ? `Piden: ${info.demand}.` : 'Están conformes.', p.campaign[f] ? ` Campaña: ${'●'.repeat(p.campaign[f])}` : ''),
+        h('p', { class: 'muted' }, info.demands.length ? `Piden: ${info.demands.join(' y ')}.` : 'Están conformes.', p.campaign[f] ? ` Campaña: ${'●'.repeat(p.campaign[f])}` : ''),
         btn,
+        opp ? motionButton(ctx, f) : '',
       ),
     );
   }
   items.splice(items.length - FACTIONS.length, 0, why);
+  if (opp && p.party) items.splice(items.length - FACTIONS.length, 0, motionIntro(state));
 
   if (p.party) {
     const leader = h('button', { class: 'btn small' }, `Ver la ficha de ${p.party.leaderName}`);
     leader.addEventListener('click', () => openCitizen(ctx, p.party!.leaderId));
     items.push(h('h3', {}, opp ? 'Gobierno' : 'Oposición'), h('p', {}, `«${p.party.name}», de la facción ${FACTION_TEXT[p.party.faction].toLowerCase()}. Lo lidera ${p.party.leaderName}.`), leader);
+    // Lo que ha prometido el rival (y si lo cumple): munición para la oposición.
+    if (p.party.promises.length) {
+      const status = { pending: 'pendiente', kept: '✓ cumplida', broken: '✗ incumplida' } as const;
+      items.push(
+        h('h3', {}, `Promesas de «${p.party.name}»`),
+        h(
+          'ul',
+          { class: 'accounts' },
+          ...p.party.promises.map((pr) =>
+            h(
+              'li',
+              { class: pr.status === 'broken' ? 'neg' : pr.status === 'kept' ? 'pos' : '' },
+              h('span', {}, `${pr.need} (${FACTION_TEXT[pr.faction].toLowerCase()})${pr.fromMotion ? ' · tu moción' : ''}`),
+              h('span', {}, pr.status === 'pending' && p.mayor === p.party!.leaderId ? `pendiente hasta el ${formatDate(tickToDate(pr.deadline))}` : status[pr.status]),
+            ),
+          ),
+        ),
+      );
+    }
   }
   if (p.history.length) {
     items.push(h('h3', {}, 'Elecciones anteriores'));
     items.push(h('ul', { class: 'people' }, ...[...p.history].reverse().map((r) => h('li', {}, resultText(r)))));
   }
   sheet('Política y elecciones', ...items);
+}
+
+/** Moción desde la oposición: llevar al pleno lo que pide la facción. */
+function motionButton(ctx: SocialCtx, f: (typeof FACTIONS)[number]): HTMLElement {
+  const state = ctx.state();
+  const can = canMotion(state, f);
+  const id = `motion-why-${f}`;
+  const describedBy = !can.ok && can.error?.startsWith('Solo una moción') ? 'motion-next' : id;
+  const btn = h('button', { class: 'btn small', ...(can.ok ? {} : { 'aria-disabled': 'true', 'aria-describedby': describedBy }) }, `Presentar moción: ${state.politics.factions[f].demand ?? '—'}`);
+  btn.addEventListener('click', async () => {
+    if (!can.ok) return;
+    if (await ctx.command({ type: 'Motion', faction: f })) openPolitics(ctx);
+  });
+  // El motivo general («una al mes») ya se dice arriba; aquí solo el particular de esta facción.
+  const own = !can.ok && can.error && !can.error.startsWith('Solo una moción');
+  return h('div', {}, btn, own ? h('p', { id, class: 'muted small' }, can.error ?? '') : '');
+}
+
+/** Cabecera de las mociones: qué hacen, cuándo toca la próxima y cómo acabó la última. */
+function motionIntro(state: GameState): HTMLElement {
+  const p = state.politics;
+  const next = p.lastMotion >= 0 ? p.lastMotion + 30 * 24 : -1;
+  const last = p.motions.at(-1);
+  return h(
+    'div',
+    { class: 'motion-intro' },
+    h('p', {}, 'Mociones: llevas al pleno lo que pide una facción. Si el gobierno la rechaza, esa facción te apoyará más; si la aprueba, tiene 6 meses para cumplirla, y si no cumple, también te apoyarán a ti.'),
+    next > state.tick ? h('p', { id: 'motion-next', class: 'muted small' }, `Una moción al mes: la próxima, el ${formatDate(tickToDate(next))}.`) : '',
+    last ? h('p', { class: last.approved ? 'pos' : 'neg' }, `Tu última moción (${last.need}): ${last.approved ? 'aprobada' : 'rechazada'}.`) : '',
+  );
 }
 
 function resultText(r: ElectionResult): string {

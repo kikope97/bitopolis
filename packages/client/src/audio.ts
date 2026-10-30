@@ -1,4 +1,4 @@
-import { prefs } from './prefs.ts';
+import { onPrefs, prefs } from './prefs.ts';
 
 /**
  * Sonido sintetizado propio con WebAudio (estilo jsfxr): sin archivos ni
@@ -9,19 +9,65 @@ import { prefs } from './prefs.ts';
 let ctx: AudioContext | null = null;
 let sfxBus: GainNode | null = null;
 let musicBus: GainNode | null = null;
+let ambBus: GainNode | null = null;
+/** Música y ambiente pasan por aquí para bajarlos bajo los momentos importantes (ducking). */
+let duckBus: GainNode | null = null;
+
+/** Decibelios → ganancia lineal (el oído es logarítmico: los controles van en dB). */
+export const dbToGain = (db: number) => (db <= -40 ? 0 : 10 ** (db / 20));
+
+function applyVolumes(): void {
+  if (!ctx) return;
+  const p = prefs();
+  const t = ctx.currentTime;
+  sfxBus!.gain.setTargetAtTime(dbToGain(p.sfxDb), t, 0.05);
+  musicBus!.gain.setTargetAtTime(dbToGain(p.musicDb), t, 0.05);
+  ambBus!.gain.setTargetAtTime(dbToGain(p.ambDb), t, 0.05);
+}
 
 function audio(): AudioContext | null {
   if (ctx) return ctx;
   const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!AC) return null;
   ctx = new AC();
+  // Compresor en la salida: muchos efectos a la vez (x10, carreteras largas) no saturan.
+  const master = ctx.createDynamicsCompressor();
+  master.threshold.value = -14;
+  master.ratio.value = 4;
+  master.connect(ctx.destination);
   sfxBus = ctx.createGain();
-  sfxBus.gain.value = 0.35;
-  sfxBus.connect(ctx.destination);
+  sfxBus.connect(master);
+  duckBus = ctx.createGain();
+  duckBus.connect(master);
   musicBus = ctx.createGain();
-  musicBus.gain.value = 0.08;
-  musicBus.connect(ctx.destination);
+  musicBus.connect(duckBus);
+  ambBus = ctx.createGain();
+  ambBus.connect(duckBus);
+  applyVolumes();
+  onPrefs(applyVolumes);
   return ctx;
+}
+
+/** Baja música y ambiente 12 dB durante `seconds` (noche electoral, hitos, avisos). */
+let duckUntil = 0;
+
+export function duck(seconds = 2.5): void {
+  if (!ctx || !duckBus) return;
+  const t = ctx.currentTime;
+  const g = duckBus.gain;
+  // Dos momentos seguidos no se pisan: la bajada dura hasta el final más lejano.
+  const end = Math.max(duckUntil, t + seconds);
+  const alreadyDown = t < duckUntil;
+  duckUntil = end;
+  if (typeof (g as AudioParam & { cancelAndHoldAtTime?: (t: number) => void }).cancelAndHoldAtTime === 'function') {
+    (g as AudioParam & { cancelAndHoldAtTime: (t: number) => void }).cancelAndHoldAtTime(t);
+  } else {
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(alreadyDown ? 0.25 : g.value, t);
+  }
+  if (!alreadyDown) g.linearRampToValueAtTime(0.25, t + 0.12);
+  g.setValueAtTime(0.25, end);
+  g.linearRampToValueAtTime(1, end + 0.8);
 }
 
 /** Los navegadores solo dejan sonar tras un gesto del usuario. */
@@ -50,22 +96,26 @@ interface Note {
   dur: number;
   vol?: number;
   at?: number;
+  /** Ruido con paso banda de este Q (en vez de paso bajo). */
+  band?: number;
 }
 
 /** Último instante de cada efecto: el mismo no suena dos veces en menos de 400 ms (a x10 era una ráfaga). */
 const lastPlayed = new Map<string, number>();
 
-function play(notes: Note[], bus: 'sfx' | 'music' = 'sfx', name = ''): void {
+function play(notes: Note[], bus: 'sfx' | 'music' | 'amb' = 'sfx', name = ''): void {
   const p = prefs();
-  if (bus === 'sfx' ? !p.sfx : !p.music) return;
+  if (bus === 'sfx' ? !p.sfx : bus === 'music' ? !p.music : !p.ambience) return;
   const a = audio();
   if (!a || a.state !== 'running') return;
+  // Todo efecto tiene su límite de repetición (si no se le da nombre, el de su primera nota).
+  if (!name && bus === 'sfx' && notes[0]) name = `${notes[0].wave ?? 'square'}${notes[0].from}`;
   if (name) {
     const now = a.currentTime;
     if (now - (lastPlayed.get(name) ?? -1) < 0.4) return;
     lastPlayed.set(name, now);
   }
-  const out = bus === 'sfx' ? sfxBus! : musicBus!;
+  const out = bus === 'sfx' ? sfxBus! : bus === 'music' ? musicBus! : ambBus!;
   const vary = 1 + (Math.random() - 0.5) * 0.08;
   for (const n of notes) {
     const t0 = a.currentTime + (n.at ?? 0);
@@ -78,11 +128,14 @@ function play(notes: Note[], bus: 'sfx' | 'music' = 'sfx', name = ''): void {
       const s = a.createBufferSource();
       s.buffer = noise(a);
       const f = a.createBiquadFilter();
-      f.type = 'lowpass';
+      // Paso banda estrecho para sonidos «con tono» (grillos); paso bajo para golpes y polvo.
+      f.type = n.band ? 'bandpass' : 'lowpass';
+      if (n.band) f.Q.value = n.band;
       f.frequency.setValueAtTime(n.from * vary, t0);
       if (n.to) f.frequency.exponentialRampToValueAtTime(n.to, t0 + n.dur);
       s.connect(f).connect(g);
-      s.start(t0);
+      // Cada ráfaga empieza en un punto distinto del ruido: no suenan todas idénticas.
+      s.start(t0, Math.random() * 0.4);
       s.stop(t0 + n.dur);
     } else {
       const o = a.createOscillator();
@@ -165,7 +218,6 @@ export function startMusic(isNight: () => boolean): void {
         const deg = SCALE[(step * 3 + (step >> 2) + (step >> 5)) % SCALE.length]!;
         if (Math.random() > 0.3) play([{ wave: 'triangle', from: base * 2 ** (deg / 12), dur: night ? 1.4 : 0.9, vol: 0.5 }], 'music');
         if (step % 8 === 0) play([{ wave: 'sine', from: base / 2, dur: 2.2, vol: 0.45 }], 'music');
-        if (night && step % 5 === 2) play([{ wave: 'noise', from: 5200, to: 4800, dur: 0.05, vol: 0.12 }], 'music');
         step++;
         if (step % 8 === 0) rest = 4000 + Math.random() * 4000;
       }
@@ -178,4 +230,48 @@ export function startMusic(isNight: () => boolean): void {
 export function stopMusic(): void {
   if (musicTimer !== null) window.clearTimeout(musicTimer);
   musicTimer = null;
+  if (ambTimer !== null) window.clearTimeout(ambTimer);
+  ambTimer = null;
+}
+
+/* ---------------- ambiente (bus propio) ---------------- */
+
+let ambTimer: number | null = null;
+
+/** De día, pájaros (barridos cortos agudos); de noche, grillos (ráfagas de ruido filtrado). */
+export function startAmbience(isNight: () => boolean): void {
+  if (ambTimer !== null) return;
+  // Histéresis: a x10 el día dura 2 s; el ambiente solo cambia si la hora se mantiene 3 s reales
+  // (a x1 la noche dura unos 6 s, así que se oye; a x3 y x10 no da saltos).
+  let night = isNight();
+  let since = performance.now();
+  const tick = () => {
+    const now = performance.now();
+    if (isNight() !== night) {
+      if (now - since > 3_000) {
+        night = !night;
+        since = now;
+      }
+    } else since = now;
+    if (prefs().ambience) {
+      if (night) {
+        // Grillos: trinos cortos en paso banda, con silencios (no un siseo constante).
+        if (Math.random() < 0.7) {
+          const n = 3 + Math.floor(Math.random() * 3);
+          play(Array.from({ length: n }, (_, i) => ({ wave: 'noise' as const, from: 4500, dur: 0.035, vol: 0.25, at: i * 0.07, band: 8 })), 'amb');
+        }
+      } else if (Math.random() < 0.7) {
+        const f = 2400 + Math.random() * 1200;
+        play(
+          [
+            { wave: 'sine', from: f, to: f * 1.35, dur: 0.07, vol: 0.4 },
+            { wave: 'sine', from: f * 1.1, to: f * 1.5, dur: 0.06, vol: 0.35, at: 0.11 },
+          ],
+          'amb',
+        );
+      }
+    }
+    ambTimer = window.setTimeout(tick, night ? 1200 + Math.random() * 1800 : 2500 + Math.random() * 4000);
+  };
+  tick();
 }

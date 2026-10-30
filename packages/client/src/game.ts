@@ -28,8 +28,8 @@ import { buildingSprite, letterSprite, T } from './sprites.ts';
 import { commandFor, costText, isLocked, type Tool, type ToolId, TOOLS, tilesOf, unlockPop } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
 import { $, closeSheet, confirmDialog, h, isSheetOpen, reducedMotion, sheet, toast, vibrate } from './ui.ts';
-import { sfx, startMusic, stopMusic, unlockAudio } from './audio.ts';
-import { coins, dust, pop } from './fx.ts';
+import { duck, sfx, startAmbience, startMusic, stopMusic, unlockAudio } from './audio.ts';
+import { coins, dust, pop, shake, shakeOffset } from './fx.ts';
 import { onPrefs, prefs } from './prefs.ts';
 import { openSettings } from './settings-ui.ts';
 import { openElectionNight, openPolitics, renderPollChip } from './politics-ui.ts';
@@ -190,10 +190,15 @@ export function startGame(opts: GameOptions): void {
     } else if (cmd.type === 'Demolish') {
       sfx.demolish();
       dust(cmd.x, cmd.y);
+      shake(3, 250);
       say('Derribado.');
     } else if (cmd.type === 'Zone') {
       sfx.tap();
       say(cmd.zone === 'none' ? 'Zona quitada.' : `Zona ${cmd.zone} pintada: ${plural(cmd.w * cmd.h, 'casilla', 'casillas')}.`);
+    } else if (cmd.type === 'Motion') {
+      sfx.tap();
+      const m = state.politics.motions.at(-1);
+      if (m) say(`Moción ${m.approved ? 'aprobada' : 'rechazada'}: ${m.need}.`);
     } else if (cmd.type === 'SetTax' || cmd.type === 'SetTaxes') sfx.tap();
   }
 
@@ -320,6 +325,8 @@ export function startGame(opts: GameOptions): void {
     for (const e of fresh) {
       if (e.kind === 'bankrupt' || e.kind === 'warning') {
         sfx.warn();
+        duck(1.5);
+        if (e.kind === 'bankrupt') shake(4, 400);
         calmPause();
         toast(e.kind === 'warning' ? `${e.text}. Prueba a subir los impuestos (☰ › Impuestos) o espera antes de construir.` : e.text, {
           kind: 'warn',
@@ -329,6 +336,7 @@ export function startGame(opts: GameOptions): void {
         toast(e.text, { kind: 'good', sticky: true });
         vibrate(120);
         sfx.milestone();
+        duck(2);
         calmPause();
         const th = state.buildings.find((b) => b.kind === 'townhall');
         if (th) coins(...screenOf(th.x, th.y), 8);
@@ -336,6 +344,8 @@ export function startGame(opts: GameOptions): void {
         const won = state.politics.history.at(-1)?.winner === 'player';
         if (won) sfx.milestone();
         else sfx.warn();
+        duck(4);
+        shake(6, 500);
         vibrate(150);
         calmPause();
         openElectionNight(social);
@@ -1024,7 +1034,10 @@ export function startGame(opts: GameOptions): void {
   /* ---------- bucle de pintado ---------- */
   function frame(time: number) {
     if ($('#game').hidden) return;
-    render(ctx, state, cam, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer });
+    // La sacudida se aplica a una copia de la cámara: no cambia dónde mira el jugador.
+    const [sx, sy] = shakeOffset(time);
+    const view = sx || sy ? { ...cam, x: cam.x + sx * dpr(), y: cam.y + sy * dpr() } : cam;
+    render(ctx, state, view, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer });
     placeBubbles();
     requestAnimationFrame(frame);
   }
@@ -1048,6 +1061,7 @@ export function startGame(opts: GameOptions): void {
   window.addEventListener('pointerdown', unlock, { once: true });
   window.addEventListener('keydown', unlock, { once: true });
   startMusic(() => timeOfDay(state.tick) === 'night');
+  startAmbience(() => timeOfDay(state.tick) === 'night');
   // Al activar el modo tranquilo con x3/x10 puestos, se baja a x1.
   const markCalm = () => {
     for (const b of document.querySelectorAll('[data-speed="3"], [data-speed="10"]')) b.setAttribute('aria-disabled', String(prefs().calm));

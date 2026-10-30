@@ -41,7 +41,12 @@ export function ruleAdvice(state: GameState, q: AdvisorQuestion): string[] {
     return lines;
   }
   const lines: string[] = [];
-  if (f.caja < 0) lines.push('Primero, sanear la caja: sube un poco las tasas o frena las obras.');
+  if (f.caja < 0) {
+    lines.push('Primero, sanear la caja: sube un poco las tasas o frena las obras.');
+    // Cada servicio cuesta sueldos y mantenimiento todos los meses: en deuda, lo que sobra se derriba.
+    const parks = state.buildings.filter((b) => b.kind === 'park').length;
+    if (state.bankrupt || f.caja < -5_000) lines.push(parks > Math.ceil(f.poblacion / 25) ? `Si no basta, derriba algún parque: tienes ${parks} y con ${Math.ceil(f.poblacion / 25)} llega.` : 'Si no basta, derriba lo que menos se usa: cada servicio cuesta sueldos y mantenimiento todos los meses.');
+  }
   if (f.promesas_pendientes.length) lines.push(`Cumple lo prometido antes de que venza: ${f.promesas_pendientes[0]}.`);
   const worry = f.preocupaciones[0]?.problema;
   if (worry === 'Sin agua' || worry === 'Sin luz') lines.push('Hay casas sin agua o sin luz: amplía la red o pon otra planta.');

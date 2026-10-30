@@ -83,6 +83,18 @@ export const MIGRATIONS: Record<number, Migration> = {
   }),
   // 5 → 6 (v1.0): política (elecciones cada 4 años, facciones y oposición).
   5: (s) => ({ ...s, formatVersion: 6, politics: s.politics ?? emptyPolitics(s.tick ?? 0) }),
+  // 6 → 7 (v1.1): promesas del partido rival, mociones y dos exigencias por facción.
+  6: (s) => ({
+    ...s,
+    formatVersion: 7,
+    politics: {
+      ...s.politics,
+      lastMotion: s.politics?.lastMotion ?? -1,
+      motions: s.politics?.motions ?? [],
+      party: s.politics?.party ? { promises: [], ...s.politics.party } : null,
+      factions: Object.fromEntries(Object.entries(s.politics?.factions ?? {}).map(([k, v]: [string, any]) => [k, { demands: v.demand ? [v.demand] : [], unmet: v.demand ? [v.demand] : [], ...v }])),
+    },
+  }),
 };
 
 export function migrate(raw: unknown): GameState {

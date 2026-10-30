@@ -1,7 +1,7 @@
 import { Command, tickToDate, type BuildKind, type ZoneKind } from '@bitopolis/shared';
 import { BUILD, DEBT_LIMIT, WAGE_OUTSIDE, ZONE_COST_PER_TILE, ZONE_UNLOCK_POP } from './balance.ts';
 import { applyDecision, canApplyDecision } from './decisions.ts';
-import { campaign, canCampaign } from './politics.ts';
+import { campaign, canCampaign, canMotion, motion } from './politics.ts';
 import { addMemory, answerPetition, canConvenePleno, closePleno, convenePleno, talkTo } from './social.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import {
@@ -81,7 +81,7 @@ export function governmentCommand(state: GameState, cmd: Command): boolean {
 }
 
 /** En la oposición el jugador solo puede hablar con los vecinos (y la IA decidir). */
-const OPPOSITION_ALLOWED = new Set(['TalkTo', 'NotifyProject', 'CitizenAct', 'Campaign']);
+const OPPOSITION_ALLOWED = new Set(['TalkTo', 'NotifyProject', 'CitizenAct', 'Campaign', 'Motion']);
 
 export function validateCommand(state: GameState, raw: unknown): CommandResult {
   const parsed = Command.safeParse(raw);
@@ -153,6 +153,10 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       return state.pleno?.petitions.some((p) => p.id === cmd.petitionId && !p.answer) ? { ok: true } : { ok: false, error: 'Esa petición ya está respondida' };
     case 'Campaign': {
       const r = canCampaign(state);
+      return r.ok ? { ok: true } : { ok: false, error: r.error! };
+    }
+    case 'Motion': {
+      const r = canMotion(state, cmd.faction);
       return r.ok ? { ok: true } : { ok: false, error: r.error! };
     }
     case 'ClosePleno':
@@ -274,6 +278,9 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       break;
     case 'AnswerPetition':
       answerPetition(state, cmd.petitionId, cmd.answer);
+      break;
+    case 'Motion':
+      motion(state, cmd.faction);
       break;
     case 'Campaign':
       campaign(state, cmd.faction);

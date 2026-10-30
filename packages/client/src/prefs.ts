@@ -6,7 +6,15 @@
 export interface Prefs {
   sfx: boolean;
   music: boolean;
+  /** Ambiente (pájaros de día, grillos de noche): bus propio, separado de la música. */
+  ambience: boolean;
+  /** Volumen de cada bus en decibelios (−40 a 0). */
+  sfxDb: number;
+  musicDb: number;
+  ambDb: number;
   vibrate: boolean;
+  /** Letra: legible (por defecto) o la fuente pixel propia (opción estética, spec §8.4). */
+  font: 'legible' | 'pixel';
   /** Tamaño del texto (independiente del zoom del mapa). */
   text: 100 | 150 | 200;
   contrast: 'normal' | 'alto';
@@ -19,7 +27,7 @@ export interface Prefs {
 }
 
 const KEY = 'bitopolis.prefs';
-const DEFAULTS: Prefs = { sfx: true, music: false, vibrate: true, text: 100, contrast: 'normal', colorblind: 'no', calm: false, motion: 'sistema' };
+const DEFAULTS: Prefs = { sfx: true, music: false, ambience: false, sfxDb: -9, musicDb: -22, ambDb: -28, vibrate: true, font: 'legible', text: 100, contrast: 'normal', colorblind: 'no', calm: false, motion: 'sistema' };
 
 let current: Prefs = load();
 const listeners = new Set<(p: Prefs) => void>();
@@ -63,6 +71,7 @@ export function lowMotion(): boolean {
 export function apply(): void {
   const r = document.documentElement;
   r.dataset.text = String(current.text);
+  r.dataset.font = current.font;
   r.dataset.contrast = current.contrast;
   r.dataset.colorblind = current.colorblind;
   r.dataset.motion = lowMotion() ? 'reducido' : 'normal';

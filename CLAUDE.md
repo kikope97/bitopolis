@@ -55,3 +55,4 @@ pnpm e2e                            # Playwright, viewport móvil y escritorio; 
 - Decisiones del creador (spec §2, §10, §11, §12) no se cambian.
 - Al cerrar cada versión: métricas con `pnpm sim`, capturas Playwright, ronda de 4–6 agentes, máx. 5 cambios aceptados y al menos uno quitado/aplazado; registrar en `docs/rondas/ronda-XX.md`.
 - CI: en ramas, checks + build de imagen amd64; en `main`, publica `ghcr.io/<owner>/bitopolis:test` y `:sha-*` (amd64+arm64); en tags `vX.Y.Z`, `:X.Y.Z` y `:latest`.
+- **Publicar una versión**: subir `version` en el `package.json` raíz y fusionar en `main`. Si esa versión no tiene etiqueta, el CI publica `:X.Y.Z` y `:latest` y crea la release `vX.Y.Z` en la misma ejecución (`scripts/release-check.sh`).

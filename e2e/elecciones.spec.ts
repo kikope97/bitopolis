@@ -46,6 +46,14 @@ test('v1.0: intención de voto, facciones, noche electoral y oposición', async 
     await expect(page.locator('.sheet')).toContainText('Estás en la oposición');
     await expect(page.getByRole('radio')).toHaveCount(0);
     await shot('3-oposicion');
+    await page.locator('.sheet-close').click();
+    // Moción desde la oposición: el pleno la aprueba o la rechaza, y queda registrada.
+    await page.locator('#hud-poll').click();
+    const motion = page.getByRole('button', { name: /Presentar moción/ }).first();
+    await expect(motion).toBeVisible();
+    await motion.click();
+    await expect(page.locator('#toasts')).toContainText(/moción/);
+    await shot('4-mocion');
   }
   expect(errors).toEqual([]);
 });

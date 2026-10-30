@@ -102,7 +102,8 @@ export const MUNICIPAL_RENT = 180;
 export const PRIVATE_RENT = 280;
 /** Base del impuesto sobre inmuebles privados (al mes). */
 export const PROPERTY_BASE = 500;
-export const PIE_PER_CITIZEN = 40;
+// Ronda 07: con 40, a 8 años las cajas pasaban de 600.000 € con impuestos bajos.
+export const PIE_PER_CITIZEN = 30;
 /** Impuesto único: tipo sobre sueldos, ventas e inmuebles. */
 export const TAX_RATE = { low: 0.04, medium: 0.07, high: 0.1 } as const;
 export const TAX_HAPPINESS = { low: 6, medium: 0, high: -10 } as const;
@@ -124,16 +125,25 @@ export const VOTE_ABSTENTION_BASE = 0.18;
 /** Campaña: una al mes en los últimos 12 meses; cada una mueve el voto de la facción. */
 export const CAMPAIGN_MONTHS = 12;
 export const CAMPAIGN_EFFECT = 0.03;
+/** En la oposición la campaña pesa el doble, y mociones rechazadas y promesas rotas suben hasta 6 (ronda 07). */
+export const CAMPAIGN_EFFECT_OPP = 0.06;
+export const CAMPAIGN_MAX = 6;
 /** Gobernando, cada acto de campaña cuesta (como un pleno); en la oposición es gratis y vale todo el mandato. */
 export const CAMPAIGN_COST = 300;
 /** Las bajadas de impuestos se notan despacio (días); las subidas, al momento. */
 export const TAX_RELIEF_DAYS = 90;
+/** Plazo del rival para cumplir lo prometido si gana (meses tras las elecciones). */
+export const RIVAL_PROMISE_MONTHS = 12;
+/** Plazo para cumplir una moción aprobada (meses). */
+export const MOTION_MONTHS = 6;
 /** Apoyo extra al gobierno recién elegido (se apaga en 12 meses). */
 export const HONEYMOON = 0.25;
 /** Interés mensual de la deuda: 1 % hasta 5.000 € y 3 % por encima. */
 export const DEBT_INTEREST = 0.01;
 export const DEBT_INTEREST_HIGH = 0.03;
 export const DEBT_INTEREST_STEP = 5_000;
+/** Los intereses de un mes no superan esta parte de lo ingresado ese mes (ronda 07). */
+export const DEBT_INTEREST_CAP = 0.25;
 
 /* ---------------- v0.3: tributos y vivienda ---------------- */
 

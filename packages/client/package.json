@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsx ../../scripts/check-palette.ts && tsx ../../scripts/check-contrast.ts && tsx ../../scripts/make-icons.ts && vite build",
+    "build": "tsx ../../scripts/check-palette.ts && tsx ../../scripts/check-contrast.ts && tsx ../../scripts/make-icons.ts && tsx ../../scripts/make-font.ts && vite build",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {

@@ -10,7 +10,7 @@ Simulador de alcalde en pixel art donde los vecinos son agentes de IA. Se juega 
 4. Arranca: `docker compose up -d` (o "Deploy the stack" en Portainer).
 5. Abre la URL. Los datos y las copias diarias quedan en el volumen `/data`.
 
-Imágenes: `ghcr.io/kikope97/bitopolis:latest` (versiones publicadas) y `:test` (último `main`).
+Imágenes: `ghcr.io/kikope97/bitopolis:latest` (última versión publicada), `:X.Y.Z` (cada versión) y `:test` (último `main`). Las versiones se publican solas al fusionar en `main` un cambio de `version` en `package.json`.
 
 ## Variables de entorno
 
