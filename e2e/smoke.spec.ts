@@ -73,7 +73,7 @@ test('el mapa se mueve arrastrando y hace zoom con botones', async ({ page }) =>
   await page.mouse.move(box.x + 160, box.y + 260, { steps: 5 });
   await page.mouse.up();
   const after = await page.evaluate(() => (window as any).__bitopolis.tileCenter(0, 0));
-  expect(Math.round(after.x - before.x)).toBe(60);
+  expect(Math.abs(after.x - before.x - 60)).toBeLessThanOrEqual(2);
   await page.getByRole('button', { name: 'Acercar' }).click();
   const zoomed = await page.evaluate(() => (window as any).__bitopolis.tileCenter(1, 0).x - (window as any).__bitopolis.tileCenter(0, 0).x);
   expect(zoomed).toBeGreaterThan(32);

@@ -158,9 +158,9 @@ button, input, select { font: inherit; color: inherit; }
 }
 .tool[aria-pressed='true'] { border-color: var(--accent); background: var(--panel-2); }
 .tool.locked { opacity: 0.55; }
-.tool-icon { height: 32px; display: flex; align-items: center; font-size: 1.4rem; }
-.tool-icon canvas { width: 32px; height: 32px; image-rendering: pixelated; }
-.tool-icon canvas.letter { width: 12px; height: 20px; }
+.tool-icon { height: 36px; display: flex; align-items: flex-end; font-size: 1.4rem; overflow: hidden; }
+.tool-icon canvas { width: 32px; height: 48px; image-rendering: pixelated; margin-bottom: -6px; }
+.tool-icon canvas.letter { width: 15px; height: 21px; margin-bottom: 6px; }
 .tool-label { font-size: 0.75rem; line-height: 1.1; }
 .lock { position: absolute; top: 1px; right: 2px; font-size: 0.65rem; }
 .bottom {

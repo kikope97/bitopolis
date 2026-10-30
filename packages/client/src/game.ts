@@ -16,7 +16,7 @@ import { formatDate, money, plural, t } from './i18n.ts';
 import { type Camera, type Preview, render } from './render.ts';
 import type { FromWorker, SaveBatch, ToWorker } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
-import { buildingSprite, letterSprite } from './sprites.ts';
+import { buildingSprite, letterSprite, T } from './sprites.ts';
 import { commandFor, costText, isLocked, type Tool, type ToolId, TOOLS, tilesOf, unlockPop } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
 import { $, closeSheet, confirmDialog, h, isSheetOpen, reducedMotion, sheet, toast, vibrate } from './ui.ts';
@@ -50,9 +50,9 @@ export function startGame(opts: GameOptions): void {
   let cmdId = 0;
   const dayAgoTreasury: number[] = [];
 
-  const dpr = () => Math.max(1, Math.round(window.devicePixelRatio || 1));
+  const dpr = () => Math.max(1, window.devicePixelRatio || 1);
   const cam: Camera = { x: 0, y: 0, zoom: 2 };
-  const tileSize = () => 16 * cam.zoom;
+  const tileSize = () => T * cam.zoom;
 
   const tutorial = new Tutorial(`bitopolis.tut.${token}`);
 
@@ -249,8 +249,8 @@ export function startGame(opts: GameOptions): void {
     cam.x = Math.max(-mx, Math.min(mw - mx, cam.x));
     cam.y = Math.max(-my, Math.min(mh - my, cam.y));
   }
-  const minZoom = () => dpr();
-  const maxZoom = () => dpr() * 6;
+  const minZoom = () => Math.max(1, Math.floor(dpr() / 2));
+  const maxZoom = () => Math.round(dpr() * 4);
   function setZoom(z: number, ax = canvas.width / 2, ay = canvas.height / 2) {
     const nz = Math.max(minZoom(), Math.min(maxZoom(), Math.round(z)));
     if (nz === cam.zoom) return;
@@ -369,7 +369,7 @@ export function startGame(opts: GameOptions): void {
     (e) => {
       e.preventDefault();
       const r = canvas.getBoundingClientRect();
-      setZoom(cam.zoom + (e.deltaY < 0 ? 1 : -1) * Math.max(1, Math.round(dpr() / 2)), (e.clientX - r.left) * dpr(), (e.clientY - r.top) * dpr());
+      setZoom(cam.zoom + (e.deltaY < 0 ? 1 : -1), (e.clientX - r.left) * dpr(), (e.clientY - r.top) * dpr());
     },
     { passive: false },
   );
@@ -400,7 +400,7 @@ export function startGame(opts: GameOptions): void {
     if (document.querySelector('.modal-backdrop')) return;
     const target = e.target as HTMLElement;
     if (target.tagName === 'INPUT' || target.tagName === 'SELECT') return;
-    const step = 64 * dpr();
+    const step = Math.round(64 * dpr());
     const k = e.key;
     if (k === 'ArrowLeft' || k === 'a') cam.x -= step;
     else if (k === 'ArrowRight' || k === 'd') cam.x += step;
@@ -428,15 +428,15 @@ export function startGame(opts: GameOptions): void {
     if (tl.build && tl.build !== 'road') {
       const c = buildingSprite(tl.build, 1);
       const img = document.createElement('canvas');
-      img.width = 16;
-      img.height = 16;
+      img.width = c.width;
+      img.height = c.height;
       img.getContext('2d')!.drawImage(c, 0, 0);
       wrap.append(img);
     } else if (tl.zone && tl.zone !== 'none') {
       const color = { R: 6, C: 10, I: 4 }[tl.zone];
       const img = document.createElement('canvas');
-      img.width = 3;
-      img.height = 5;
+      img.width = 5;
+      img.height = 7;
       img.getContext('2d')!.drawImage(letterSprite(tl.zone, color), 0, 0);
       img.classList.add('letter');
       wrap.append(img);
@@ -701,6 +701,7 @@ export function startGame(opts: GameOptions): void {
     get state() {
       return state;
     },
+    sprite: (kind: string, id: number) => buildingSprite(kind, id),
     tileCenter(tx: number, ty: number) {
       const r = canvas.getBoundingClientRect();
       return { x: r.left + ((tx + 0.5) * tileSize() - cam.x) / dpr(), y: r.top + ((ty + 0.5) * tileSize() - cam.y) / dpr() };
@@ -716,7 +717,8 @@ export function startGame(opts: GameOptions): void {
 
   window.addEventListener('resize', resize);
   resize();
-  cam.zoom = 2 * dpr();
+  // Un píxel del sprite ≈ 1,5 px CSS: se aprecia el detalle sin perder vista.
+  cam.zoom = Math.max(2, Math.round(dpr() * 1.5));
   const hall = state.buildings.find((b) => b.kind === 'townhall');
   centerOn(hall?.x ?? state.map.w / 2, (hall?.y ?? state.map.h / 2) + 1);
   selectTool('inspect');
