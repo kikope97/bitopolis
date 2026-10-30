@@ -69,7 +69,7 @@ export const api = {
 };
 
 export interface AiMeta {
-  providers: { id: string; label: string; cheap: string; premium: string; baseUrl: string; needsKey: boolean }[];
+  providers: { id: string; label: string; cheap: string; premium: string; baseUrl: string; needsKey: boolean; models?: string[] }[];
   serverKey: boolean;
   maxCitizens: number;
   canStoreKeys: boolean;

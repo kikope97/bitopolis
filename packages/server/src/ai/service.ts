@@ -1,7 +1,7 @@
 import { buildDecisionRequest, type GameState, parseDecisions, parseText, type Pending, type TextRequest } from '@bitopolis/sim';
 import type { Config } from '../config.ts';
 import type { Db } from '../db/index.ts';
-import { costEur, PROVIDER_INFO, PROVIDERS, priceTable, type ProviderId } from './catalog.ts';
+import { costEur, modelFor, priceTable, providerFromKey, type ProviderId } from './catalog.ts';
 import { decryptSecret } from './crypto.ts';
 import { type LLMProvider, makeProvider } from './providers.ts';
 
@@ -69,9 +69,6 @@ export class AiService {
       }
       return rowVal ?? undefined;
     };
-    const providerRaw = pick('provider', env.provider, row?.provider);
-    const provider = (PROVIDERS as readonly string[]).includes(providerRaw ?? '') ? (providerRaw as ProviderId) : 'openai';
-    const info = PROVIDER_INFO[provider];
     let key: string | undefined;
     let keyMask: string | undefined;
     if (env.key) {
@@ -86,19 +83,23 @@ export class AiService {
         key = undefined;
       }
     }
-    const model = pick('model', env.model, row?.model) ?? info.cheap;
+    const baseUrl = pick('baseUrl', env.baseUrl, row?.base_url);
+    // El proveedor no se elige: sale de la key (o del endpoint propio).
+    const provider = providerFromKey(key, baseUrl);
+    if (env.key || env.baseUrl) locked.push('provider');
+    const model = modelFor(provider, pick('model', env.model, row?.model), 'cheap');
     return {
       provider,
       model,
-      modelPremium: pick('modelPremium', env.modelPremium, row?.model_premium) ?? (env.model ? env.model : info.premium),
-      baseUrl: pick('baseUrl', env.baseUrl, row?.base_url),
+      modelPremium: modelFor(provider, pick('modelPremium', env.modelPremium, row?.model_premium) ?? env.model, 'premium'),
+      baseUrl,
       key,
       keyMask,
       capDay: pick('capDay', env.gameDaily, row?.cap_day),
       capMonth: pick('capMonth', env.gameMonthly, row?.cap_month),
       serverMonthly: env.serverMonthly,
       locked,
-      configured: !!key || (provider === 'openai-compatible' && !!(env.baseUrl || row?.base_url)),
+      configured: !!key || (provider === 'openai-compatible' && !!baseUrl),
     };
   }
 

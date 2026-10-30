@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { applyCommand, type GameState, hashState, step } from '@bitopolis/sim';
 import { decryptSecret, encryptSecret, maskKey } from '../src/ai/crypto.ts';
-import { ReplayProvider, type LLMRequest, type LLMResult } from '../src/ai/providers.ts';
+import { createServer } from 'node:http';
+import { AnthropicProvider, ProviderError, ReplayProvider, type LLMRequest, type LLMResult } from '../src/ai/providers.ts';
 import { AiService } from '../src/ai/service.ts';
 import { buildApp } from '../src/app.ts';
 import { loadConfig } from '../src/config.ts';
@@ -178,6 +179,85 @@ describe('Modo IA', () => {
   it('estimación de coste por hora', async () => {
     const r = (await app.inject({ method: 'GET', url: '/api/ai/estimate?provider=openai&citizens=5' })).json();
     expect(r.eurPerHour.x10).toBeGreaterThan(r.eurPerHour.x1);
+  });
+});
+
+describe('el proveedor sale de la key', () => {
+  it('sk-ant- es Anthropic, el resto OpenAI, y un endpoint propio es compatible con OpenAI', async () => {
+    const svc = (env: Record<string, string>) => new AiService(db, { ...loadConfig(env), dataDir: dir, clientDir: join(dir, 'x'), masterKey: MASTER });
+    const a = await svc({ BITOPOLIS_API_KEY: 'sk-ant-api03-abcdef' }).settings(null);
+    expect([a.provider, a.model, a.modelPremium]).toEqual(['anthropic', 'claude-haiku-5-5', 'claude-sonnet-5-5']);
+    expect(a.locked).toContain('provider');
+    const o = await svc({ BITOPOLIS_API_KEY: 'sk-proj-abcdef' }).settings(null);
+    expect([o.provider, o.model]).toEqual(['openai', 'gpt-5.4-nano']);
+    // Un modelo de otro proveedor no se usa con esta key.
+    const m = await svc({ BITOPOLIS_API_KEY: 'sk-ant-api03-abcdef', BITOPOLIS_AI_MODEL: 'gpt-5.4-nano' }).settings(null);
+    expect(m.model).toBe('claude-haiku-5-5');
+    const l = await svc({ BITOPOLIS_AI_BASE_URL: 'http://localhost:11434/v1' }).settings(null);
+    expect([l.provider, l.configured]).toEqual(['openai-compatible', true]);
+  });
+
+  it('desde el juego: se guarda solo la key y el proveedor se deduce', async () => {
+    const token = newGameToken();
+    const r = await app.inject({ method: 'PUT', url: `/api/games/${token}/ai-config`, payload: { sessionId: SID, key: 'sk-ant-api03-xyz123456', accepted: true } });
+    expect(r.statusCode).toBe(200);
+    const s = r.json();
+    expect([s.provider, s.model, s.keyMask]).toEqual(['anthropic', 'claude-haiku-5-5', expect.stringMatching(/^sk-ant/)]);
+    expect(JSON.stringify(s)).not.toContain('xyz123456');
+  });
+});
+
+describe('AnthropicProvider (SDK oficial)', () => {
+  it('pide salida estructurada sin forzar herramienta ni temperatura, y cuenta la caché', async () => {
+    let seen: { headers: Record<string, unknown>; body: Record<string, unknown> } | null = null;
+    let status = 200;
+    const srv = createServer((req, res) => {
+      let raw = '';
+      req.on('data', (c) => (raw += c));
+      req.on('end', () => {
+        seen = { headers: req.headers, body: JSON.parse(raw) };
+        res.writeHead(status, { 'content-type': 'application/json' });
+        res.end(
+          status === 200
+            ? JSON.stringify({
+                id: 'msg_1',
+                type: 'message',
+                role: 'assistant',
+                model: 'claude-haiku-5-5',
+                content: [{ type: 'text', text: '{"decisiones":[]}' }],
+                stop_reason: 'end_turn',
+                usage: { input_tokens: 100, cache_read_input_tokens: 900, cache_creation_input_tokens: 0, output_tokens: 40 },
+              })
+            : JSON.stringify({ type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key sk-ant-secreta' } }),
+        );
+      });
+    });
+    await new Promise<void>((r) => srv.listen(0, '127.0.0.1', r));
+    const port = (srv.address() as { port: number }).port;
+    try {
+      const p = new AnthropicProvider('sk-ant-secreta', `http://127.0.0.1:${port}`);
+      const schema = { type: 'object', additionalProperties: false, required: ['decisiones'], properties: { decisiones: { type: 'array', items: { type: 'object' } } } };
+      const r = await p.complete({ system: 'S', user: 'U', schema, model: 'claude-haiku-5-5', maxTokens: 300 });
+      expect(r.text).toBe('{"decisiones":[]}');
+      expect(r.usage).toEqual({ in: 1000, cachedIn: 900, out: 40 });
+      const body = seen!.body;
+      // El SDK manda la key (x-api-key o Bearer, según la versión de API) y fija anthropic-version.
+      const h = seen!.headers;
+      expect(h['x-api-key'] === 'sk-ant-secreta' || h.authorization === 'Bearer sk-ant-secreta').toBe(true);
+      expect(h['anthropic-version']).toBeTruthy();
+      expect(body.output_config).toEqual({ effort: 'low', format: { type: 'json_schema', schema } });
+      expect(body.tool_choice).toBeUndefined();
+      expect(body.temperature).toBeUndefined();
+      expect((body.system as { cache_control?: unknown }[])[0]!.cache_control).toEqual({ type: 'ephemeral' });
+      // Un error del proveedor nunca arrastra la key en el mensaje.
+      status = 401;
+      const err = await p.complete({ system: 'S', user: 'U', schema, model: 'claude-haiku-5-5', maxTokens: 300 }).catch((e) => e);
+      expect(err).toBeInstanceOf(ProviderError);
+      expect(String(err.message)).not.toContain('sk-ant');
+      expect(err.status).toBe(401);
+    } finally {
+      srv.close();
+    }
   });
 });
 

@@ -46,7 +46,8 @@ function publicSettings(s: AiSettings) {
 
 const ConfigBody = z.object({
   sessionId: z.string().min(8).max(64),
-  provider: z.enum(PROVIDERS),
+  /** Ya no se elige: se deduce de la key. Se acepta y se ignora (clientes antiguos). */
+  provider: z.enum(PROVIDERS).optional(),
   model: z.string().trim().min(1).max(128).optional(),
   modelPremium: z.string().trim().max(128).optional(),
   baseUrl: z.string().trim().url().max(512).optional().or(z.literal('')),
@@ -120,7 +121,7 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
     const locked = new Set(current.locked);
     const values = {
       game_id: row.id,
-      provider: locked.has('provider') ? null : d.provider,
+      provider: null,
       model: locked.has('model') ? null : (d.model ?? null),
       model_premium: locked.has('modelPremium') ? null : d.modelPremium || null,
       base_url: locked.has('baseUrl') ? null : d.baseUrl || null,

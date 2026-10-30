@@ -25,6 +25,7 @@ export function decryptSecret(blob: string, master: string): string {
 
 /** Lo único que ve el cliente: "sk-…abcd". */
 export function maskKey(key: string): string {
-  const head = key.slice(0, Math.min(3, Math.max(0, key.length - 8)));
+  // El prefijo dice el proveedor y no es secreto («sk-ant-»); del resto, solo los 4 últimos.
+  const head = key.startsWith('sk-ant-') && key.length > 15 ? 'sk-ant-' : key.slice(0, Math.min(3, Math.max(0, key.length - 8)));
   return `${head}…${key.slice(-4)}`;
 }

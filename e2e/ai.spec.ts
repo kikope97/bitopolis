@@ -8,9 +8,13 @@ test('Modo IA: configurar, jugar y ver un motivo de la IA', async ({ page }, inf
   await page.goto('/');
   await page.getByRole('radio', { name: /Modo IA/ }).click();
   await expect(page.getByRole('dialog')).toContainText('Configurar la IA');
-  await page.locator('#ai-provider').selectOption('openai-compatible');
-  await page.locator('#ai-base').fill('http://localhost:8099/v1');
+  await expect(page.getByRole('dialog')).toContainText('Se acepta API key de Anthropic (sk-ant-…) o de OpenAI (sk-…)');
+  await page.locator('#ai-key').fill('sk-ant-prueba-123456');
+  await expect(page.getByRole('dialog')).toContainText('Detectada: Anthropic');
+  await page.locator('#ai-key').fill('');
+  // En el test se usa un LLM falso local (endpoint propio, compatible con OpenAI).
   await page.locator('details.advanced summary').first().click();
+  await page.locator('#ai-base').fill('http://localhost:8099/v1');
   await page.locator('#ai-model').fill('falso');
   await page.screenshot({ path: `test-results/capturas/${info.project.name}-ia-config.png` });
   await page.getByRole('button', { name: 'Guardar y usar el Modo IA' }).click();

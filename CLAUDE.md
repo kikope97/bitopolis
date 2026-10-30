@@ -20,7 +20,8 @@ Monorepo pnpm + TypeScript:
 
 ## IA de los vecinos (v0.2)
 - Motor: `sim/src/decisions.ts` (detonantes, acciones válidas, `CitizenAct`, reglas de fallback con motivos) y `sim/src/prompt.ts` (prompt con prefijo fijo, esquema con enums, validación zod). Una decisión pendiente vence a mediodía del día siguiente: si no ha llegado la de la IA, deciden las reglas.
-- Servidor: `server/src/ai/` — `crypto.ts` (AES-256-GCM), `catalog.ts` (proveedores, modelos y precios orientativos), `providers.ts` (OpenAI-compatible, Anthropic, `ReplayProvider`), `service.ts` (petición anticipada al guardar, reintento, topes y reserva), `routes.ts`.
+- Proveedor deducido de la key (`providerFromKey`: `sk-ant-…` Anthropic, resto OpenAI; con `BITOPOLIS_AI_BASE_URL`, compatible con OpenAI). No hay variable ni selector de proveedor (decisión del creador). Variables documentadas en el README.
+- Servidor: `server/src/ai/` — `crypto.ts` (AES-256-GCM), `catalog.ts` (proveedores, modelos y precios orientativos), `providers.ts` (OpenAI-compatible, Anthropic con el SDK oficial `@anthropic-ai/sdk` y `output_config` (salida estructurada, esfuerzo bajo; sin `tool_choice` forzado ni `temperature`), `ReplayProvider`), `service.ts` (petición anticipada al guardar, reintento, topes y reserva), `routes.ts`.
 - `pnpm ai-eval` mide coste por mes de juego y % de válidas (simulador, `--replay` o `--live` con `BITOPOLIS_API_KEY`). El CI lo ejecuta con `e2e/fixtures/ia-replay.json`; si cambia el prompt, regenera con `--record`.
 - Playwright usa `e2e/fake-llm.mjs` (LLM falso compatible con OpenAI) para el Modo IA.
 

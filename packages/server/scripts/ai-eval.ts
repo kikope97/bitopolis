@@ -5,7 +5,7 @@
  *
  *   pnpm ai-eval --days 360 --seeds 3                  # simulador local, sin red
  *   pnpm ai-eval --replay e2e/fixtures/ia.json         # respuestas grabadas
- *   BITOPOLIS_AI_PROVIDER=openai BITOPOLIS_API_KEY=sk-… pnpm ai-eval --live --record grabacion.json
+ *   BITOPOLIS_API_KEY=sk-ant-… pnpm ai-eval --live --record grabacion.json   (el proveedor sale de la key)
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
@@ -20,7 +20,7 @@ import {
   profileRng,
   step,
 } from '@bitopolis/sim';
-import { costEur, DEFAULT_PRICES, PROVIDER_INFO, type ProviderId } from '../src/ai/catalog.ts';
+import { costEur, DEFAULT_PRICES, modelFor, PROVIDER_INFO, providerFromKey, type ProviderId } from '../src/ai/catalog.ts';
 import { type LLMProvider, type LLMRequest, type LLMResult, makeProvider, ReplayProvider } from '../src/ai/providers.ts';
 
 const { values } = parseArgs({
@@ -61,8 +61,8 @@ const simulated: LLMProvider = {
   },
 };
 
-const provider: ProviderId = (process.env.BITOPOLIS_AI_PROVIDER as ProviderId) || 'openai';
-const model = process.env.BITOPOLIS_AI_MODEL || PROVIDER_INFO[provider].cheap;
+const provider: ProviderId = providerFromKey(process.env.BITOPOLIS_API_KEY, process.env.BITOPOLIS_AI_BASE_URL);
+const model = modelFor(provider, process.env.BITOPOLIS_AI_MODEL, 'cheap');
 const recordings = new Map<string, LLMResult>();
 let llm: LLMProvider = simulated;
 let source = 'simulador local (sin red)';

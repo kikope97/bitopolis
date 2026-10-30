@@ -228,9 +228,8 @@ Mudarse al pueblo o no, irse y vender la casa, comprar o alquilar casa, buscar o
 | `BITOPOLIS_PUBLIC_URL` | sí | URL pública, para generar los enlaces. |
 | `PORT` | no (8080) | Puerto interno. |
 | `BITOPOLIS_USER` + `BITOPOLIS_PASSWORD` | no | Si se definen, todo el servidor pide ese usuario y contraseña al entrar (login propio, cookie `HttpOnly`/`Secure`/`SameSite`, bloqueo tras varios intentos fallidos). Es un acceso común, no son cuentas. |
-| `BITOPOLIS_API_KEY` | no | Key por defecto para **todas** las partidas: todas arrancan en Modo IA y la key no se ve ni se cambia desde el juego. |
-| `BITOPOLIS_AI_PROVIDER` | no | `openai`, `anthropic`, `gemini`, `deepseek`, `mistral`, `openrouter` u `openai-compatible`. |
-| `BITOPOLIS_AI_BASE_URL` | no | Endpoint propio (Ollama, LM Studio…). |
+| `BITOPOLIS_API_KEY` | no | Key por defecto para **todas** las partidas: todas arrancan en Modo IA y la key no se ve ni se cambia desde el juego. **El proveedor se deduce de la key** (decisión del creador, octubre de 2026): `sk-ant-…` es Anthropic y cualquier otra, OpenAI. No hay variable para elegirlo, y en Configurar solo se pide la key («se acepta API key de Anthropic o de OpenAI»). |
+| `BITOPOLIS_AI_BASE_URL` | no | Endpoint propio compatible con OpenAI (Ollama, LM Studio…); con él no hace falta key. |
 | `BITOPOLIS_AI_MODEL` | no | Modelo barato. |
 | `BITOPOLIS_AI_MODEL_PREMIUM` | no | Modelo premium (si falta, se usa el barato). |
 | `BITOPOLIS_AI_MAX_CITIZENS` | no (20) | Vecinos con IA por partida. |

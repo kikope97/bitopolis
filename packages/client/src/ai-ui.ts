@@ -18,31 +18,34 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
   const ro = (field: string): Record<string, boolean> => (locked.has(field) ? { disabled: true } : {});
   const serverNote = (field: string) => (locked.has(field) ? h('span', { class: 'muted small' }, ' · definido por el servidor') : '');
 
-  const provider = h('select', { id: 'ai-provider', ...ro('provider') }) as HTMLSelectElement;
-  for (const p of meta.providers) provider.append(h('option', { value: p.id, ...(p.id === cur.provider ? { selected: true } : {}) }, p.label));
-  const model = h('input', { id: 'ai-model', value: cur.model, autocomplete: 'off', ...ro('model') }) as HTMLInputElement;
-  const premium = h('input', { id: 'ai-premium', value: cur.modelPremium, autocomplete: 'off', ...ro('modelPremium') }) as HTMLInputElement;
+  // El proveedor no se elige: se deduce de la key («sk-ant-…» es Anthropic; el resto, OpenAI).
+  const providerOf = (k: string, base: string) => (base ? 'openai-compatible' : k.startsWith('sk-ant-') ? 'anthropic' : k ? 'openai' : cur.provider);
+  // Modelos en blanco = automáticos según la key; se puede escribir otro.
+  const models = h('datalist', { id: 'ai-models' }, ...[...new Set(meta.providers.flatMap((p) => p.models ?? []))].map((m) => h('option', { value: m })));
+  const explicit = (m: string, kind: 'cheap' | 'premium') => (meta.providers.some((p) => p[kind] === m) ? '' : m);
+  const model = h('input', { id: 'ai-model', value: explicit(cur.model, 'cheap'), placeholder: `Automático (${cur.model})`, autocomplete: 'off', list: 'ai-models', ...ro('model') }) as HTMLInputElement;
+  const premium = h('input', { id: 'ai-premium', value: explicit(cur.modelPremium, 'premium'), placeholder: `Automático (${cur.modelPremium})`, autocomplete: 'off', list: 'ai-models', ...ro('modelPremium') }) as HTMLInputElement;
   const baseUrl = h('input', { id: 'ai-base', type: 'url', value: cur.baseUrl ?? '', placeholder: 'http://ollama:11434/v1', ...ro('baseUrl') }) as HTMLInputElement;
   const key = h('input', {
     id: 'ai-key',
     type: 'password',
     autocomplete: 'off',
-    placeholder: cur.keyMask ? `Guardada: ${cur.keyMask}` : 'sk-…',
+    placeholder: cur.keyMask ? `Guardada: ${cur.keyMask}` : 'sk-ant-… o sk-…',
     ...ro('key'),
   }) as HTMLInputElement;
   const capDay = h('input', { id: 'ai-cap-day', type: 'number', min: '0', step: '0.1', value: String(cur.capDay ?? 0.5), ...ro('capDay') }) as HTMLInputElement;
   const capMonth = h('input', { id: 'ai-cap-month', type: 'number', min: '0', step: '0.5', value: String(cur.capMonth ?? 5), ...ro('capMonth') }) as HTMLInputElement;
   const accept = h('input', { type: 'checkbox', id: 'ai-accept' }) as HTMLInputElement;
   const estimate = h('p', { class: 'estimate', 'aria-live': 'polite' });
-  const baseRow = h('label', { class: 'field' }, 'Endpoint (URL base)', serverNote('baseUrl'), baseUrl);
+  const detected = h('span', { class: 'help', 'aria-live': 'polite' });
 
   const refresh = async () => {
-    const info = meta.providers.find((p) => p.id === provider.value)!;
-    if (!locked.has('model') && (!model.value || meta.providers.some((p) => p.cheap === model.value))) model.value = info.cheap;
-    if (!locked.has('modelPremium') && (!premium.value || meta.providers.some((p) => p.premium === premium.value))) premium.value = info.premium;
-    baseRow.hidden = provider.value !== 'openai-compatible' && !baseUrl.value;
+    const provider = providerOf(key.value.trim(), baseUrl.value.trim());
+    const info = meta.providers.find((p) => p.id === provider)!;
+    detected.textContent = key.value.trim() ? `Detectada: ${info.label}.` : '';
+    const m = model.value.trim() || info.cheap;
     try {
-      const e = await api.estimate(provider.value, model.value, meta.maxCitizens);
+      const e = await api.estimate(provider, m, meta.maxCitizens);
       estimate.textContent = `≈ ${eur(e.eurPerHour.x1! * 30)} al mes jugando 1 hora al día a x1 (${eur(e.eurPerHour.x10! * 30)} a x10), con ${meta.maxCitizens} vecinos con nombre.${
         e.known ? '' : ' (Modelo sin precio en la tabla: se estima con uno caro.)'
       }`;
@@ -50,8 +53,9 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
       estimate.textContent = '';
     }
   };
-  provider.addEventListener('change', refresh);
+  key.addEventListener('input', refresh);
   model.addEventListener('change', refresh);
+  baseUrl.addEventListener('change', refresh);
 
   const save = h('button', { class: 'btn primary wide' }, 'Guardar y usar el Modo IA');
   save.addEventListener('click', async () => {
@@ -62,9 +66,9 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
     }
     save.disabled = true;
     try {
-      const body: Record<string, unknown> = { sessionId, provider: provider.value, accepted: true };
-      if (!locked.has('model')) body.model = model.value.trim();
-      if (!locked.has('modelPremium')) body.modelPremium = premium.value.trim();
+      const body: Record<string, unknown> = { sessionId, accepted: true };
+      if (!locked.has('model') && model.value.trim()) body.model = model.value.trim();
+      if (!locked.has('modelPremium') && premium.value.trim()) body.modelPremium = premium.value.trim();
       if (!locked.has('baseUrl')) body.baseUrl = baseUrl.value.trim();
       if (!locked.has('capDay')) body.capDay = Number(capDay.value);
       if (!locked.has('capMonth')) body.capMonth = Number(capMonth.value);
@@ -72,7 +76,7 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
       const s = await api.saveAiConfig(token, body);
       key.value = '';
       if (!s.configured) {
-        toast('Falta la API key (o el endpoint si es un modelo local).', { kind: 'warn' });
+        toast('Falta la API key de Anthropic o de OpenAI.', { kind: 'warn' });
         return;
       }
       toast('IA configurada', { kind: 'good' });
@@ -91,17 +95,20 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
   const advanced = h(
     'details',
     { class: 'advanced' },
-    h('summary', {}, 'Opciones avanzadas (modelos, endpoint, tope diario)'),
-    h('label', { class: 'field' }, 'Modelo para decisiones diarias', serverNote('model'), model),
+    h('summary', {}, 'Opciones avanzadas (modelos, tope diario, endpoint propio)'),
+    h('label', { class: 'field' }, 'Modelo para decisiones diarias', serverNote('model'), model, h('span', { class: 'help' }, 'En blanco: Claude Haiku con key de Anthropic, GPT nano con key de OpenAI.')),
     h('label', { class: 'field' }, 'Modelo para plenos, consejero y diario', serverNote('modelPremium'), premium),
+    models,
     h('label', { class: 'field' }, 'Tope diario (€)', serverNote('capDay'), capDay),
+    h('label', { class: 'field' }, 'Endpoint propio (Ollama, LM Studio…)', serverNote('baseUrl'), baseUrl, h('span', { class: 'help' }, 'Solo si usas un modelo local compatible con OpenAI. Normalmente, en blanco.')),
   );
+  const fromServer = locked.has('key');
   sheet(
     'Configurar la IA',
     h('p', {}, 'Los vecinos con nombre decidirán con IA. Las llamadas las hace el servidor: tu key no vuelve nunca a este dispositivo.'),
-    h('label', { class: 'field' }, 'Proveedor', serverNote('provider'), provider),
-    baseRow,
-    h('label', { class: 'field' }, 'API key', serverNote('key'), key, h('span', { class: 'help' }, 'Se crea en el panel de tu proveedor, en «API keys».')),
+    fromServer
+      ? h('p', { class: 'server-ai' }, 'La API key ya la pone el servidor. Solo tienes que aceptar el aviso.')
+      : h('label', { class: 'field' }, 'API key', key, h('span', { class: 'help' }, 'Se acepta API key de Anthropic (sk-ant-…) o de OpenAI (sk-…).'), detected),
     h('label', { class: 'field' }, 'Gasto máximo al mes (€)', serverNote('capMonth'), capMonth),
     estimate,
     advanced,

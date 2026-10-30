@@ -15,7 +15,6 @@ export interface Config {
 /** Lo definido por variable queda fijo y en solo lectura en Configurar. */
 export interface EnvAi {
   key?: string;
-  provider?: string;
   baseUrl?: string;
   model?: string;
   modelPremium?: string;
@@ -41,7 +40,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     password: env.BITOPOLIS_PASSWORD || undefined,
     ai: {
       key: env.BITOPOLIS_API_KEY || undefined,
-      provider: env.BITOPOLIS_AI_PROVIDER || undefined,
       baseUrl: env.BITOPOLIS_AI_BASE_URL || undefined,
       model: env.BITOPOLIS_AI_MODEL || undefined,
       modelPremium: env.BITOPOLIS_AI_MODEL_PREMIUM || undefined,
