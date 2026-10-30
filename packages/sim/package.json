@@ -1,0 +1,9 @@
+{
+  "name": "@bitopolis/sim",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.cli.json" },
+  "dependencies": { "@bitopolis/shared": "workspace:*" }
+}

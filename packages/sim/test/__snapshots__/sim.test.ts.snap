@@ -1,0 +1,13 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`golden > snapshot del día 90 (seed 42, casual) 1`] = `
+{
+  "final": {
+    "bankrupt": false,
+    "happiness": 72,
+    "population": 2,
+    "treasury": 15,
+  },
+  "hash": "614909750bb7b6a6",
+}
+`;

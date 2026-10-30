@@ -1,0 +1,30 @@
+{
+  "name": "bitopolis",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": { "node": ">=22.12" },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @bitopolis/server --filter @bitopolis/client dev",
+    "build": "pnpm --filter @bitopolis/client build && pnpm --filter @bitopolis/server build",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "vitest run",
+    "sim": "tsx packages/sim/cli/sim-cli.ts",
+    "invariants": "tsx packages/sim/cli/invariants.ts",
+    "e2e": "playwright test",
+    "start": "node packages/server/dist/index.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.0",
+    "@playwright/test": "1.63.0",
+    "@types/node": "^22.10.0",
+    "eslint": "^10.13.0",
+    "globals": "^17.13.0",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.0.5"
+  }
+}

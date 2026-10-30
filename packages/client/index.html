@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1a1c2c" />
+    <title>Bitópolis</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="hud" aria-label="Estado del pueblo">
+        <span id="hud-date">Año 1 · 1/1</span>
+        <span id="hud-money">0 €</span>
+        <span id="hud-pop">0 vecinos</span>
+      </header>
+      <canvas id="map" aria-label="Mapa del pueblo"></canvas>
+      <nav class="speed" aria-label="Velocidad">
+        <button data-speed="0" aria-label="Pausa">⏸</button>
+        <button data-speed="1" aria-label="Velocidad x1">x1</button>
+        <button data-speed="3" aria-label="Velocidad x3">x3</button>
+        <button data-speed="10" aria-label="Velocidad x10">x10</button>
+      </nav>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
