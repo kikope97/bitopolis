@@ -1,8 +1,8 @@
 import { api, type AiMeta, type AiSettings } from './api.ts';
-import { money } from './i18n.ts';
 import { $, closeSheet, h, sheet, toast } from './ui.ts';
 
-const eur = (n: number) => (n < 0.01 ? `${(n * 100).toFixed(2)} céntimos` : `${n.toFixed(2)} €`);
+/** Un único formato de euros: «0,42 €» o «menos de 1 céntimo». */
+export const eur = (n: number) => (n > 0 && n < 0.01 ? 'menos de 1 céntimo' : `${n.toFixed(2).replace('.', ',')} €`);
 
 /** Configuración de la IA: proveedor, modelo, key y topes de gasto (spec §9.5, §11). */
 export async function openAiConfig(token: string, sessionId: string, onSaved: (s: AiSettings) => void): Promise<void> {
@@ -43,7 +43,7 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
     baseRow.hidden = provider.value !== 'openai-compatible' && !baseUrl.value;
     try {
       const e = await api.estimate(provider.value, model.value, meta.maxCitizens);
-      estimate.textContent = `Coste estimado con ${meta.maxCitizens} vecinos con nombre: ${eur(e.eurPerHour.x1!)}/hora a x1, ${eur(e.eurPerHour.x3!)} a x3 y ${eur(e.eurPerHour.x10!)} a x10.${
+      estimate.textContent = `≈ ${eur(e.eurPerHour.x1! * 30)} al mes jugando 1 hora al día a x1 (${eur(e.eurPerHour.x10! * 30)} a x10), con ${meta.maxCitizens} vecinos con nombre.${
         e.known ? '' : ' (Modelo sin precio en la tabla: se estima con uno caro.)'
       }`;
     } catch {
@@ -88,25 +88,26 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
   const previewBtn = h('button', { class: 'btn wide' }, 'Qué se envía a la IA');
   previewBtn.addEventListener('click', () => void openPreview(token));
 
+  const advanced = h(
+    'details',
+    { class: 'advanced' },
+    h('summary', {}, 'Opciones avanzadas (modelos, endpoint, tope diario)'),
+    h('label', { class: 'field' }, 'Modelo para decisiones diarias', serverNote('model'), model),
+    h('label', { class: 'field' }, 'Modelo para plenos, consejero y diario', serverNote('modelPremium'), premium),
+    h('label', { class: 'field' }, 'Tope diario (€)', serverNote('capDay'), capDay),
+  );
   sheet(
     'Configurar la IA',
-    h('p', {}, 'Los vecinos con nombre decidirán con un modelo de IA. Todas las llamadas las hace el servidor: la key no vuelve nunca a este dispositivo.'),
+    h('p', {}, 'Los vecinos con nombre decidirán con IA. Las llamadas las hace el servidor: tu key no vuelve nunca a este dispositivo.'),
     h('label', { class: 'field' }, 'Proveedor', serverNote('provider'), provider),
-    h('label', { class: 'field' }, 'Modelo barato (decisiones diarias)', serverNote('model'), model),
-    h('label', { class: 'field' }, 'Modelo premium (plenos, consejero, diario)', serverNote('modelPremium'), premium),
     baseRow,
-    h('label', { class: 'field' }, 'API key', serverNote('key'), key),
-    h('div', { class: 'row' }, h('label', { class: 'field' }, 'Tope diario (€)', serverNote('capDay'), capDay), h('label', { class: 'field' }, 'Tope mensual (€)', serverNote('capMonth'), capMonth)),
+    h('label', { class: 'field' }, 'API key', serverNote('key'), key, h('span', { class: 'help' }, 'Se crea en el panel de tu proveedor, en «API keys».')),
+    h('label', { class: 'field' }, 'Gasto máximo al mes (€)', serverNote('capMonth'), capMonth),
     estimate,
-    h(
-      'label',
-      { class: 'check warning' },
-      accept,
-      ' Pon un límite de gasto en el panel de tu proveedor. Bitópolis es un proyecto personal y no se hace responsable si la key se filtra o se usa de más.',
-    ),
+    advanced,
+    h('label', { class: 'check warning' }, accept, h('span', {}, 'Pon un límite de gasto en el panel de tu proveedor. Bitópolis es un proyecto personal y no se hace responsable si la key se filtra o se usa de más.')),
     !meta.canStoreKeys && !locked.has('key') ? h('p', { class: 'error' }, 'El servidor no tiene BITOPOLIS_MASTER_KEY: no se pueden guardar keys.') : '',
-    save,
-    previewBtn,
+    h('div', { class: 'sticky-actions' }, save, previewBtn),
   );
   void refresh();
 }
@@ -132,22 +133,26 @@ export async function openPreview(token: string): Promise<void> {
 export async function openUsage(token: string): Promise<void> {
   try {
     const u = await api.aiUsage(token);
-    const pct = (a: number, b?: number) => (b ? ` de ${money(b)} (${Math.round((100 * a) / b)} %)` : ' (sin tope)');
     const ok = u.requested ? Math.round((100 * (u.valid + u.retried)) / u.requested) : 100;
     const kinds = Object.entries(u.byKind);
+    const cap = u.caps.month;
+    const bar = cap ? h('progress', { max: String(cap), value: String(Math.min(cap, u.spend.gameMonth)), 'aria-label': 'Gasto del mes' }) : '';
+    const plural = (n: number, a: string, b: string) => `${n} ${n === 1 ? a : b}`;
     sheet(
       'Gasto de la IA',
-      h('ul', { class: 'accounts' },
-        h('li', {}, h('span', {}, 'Hoy'), h('span', {}, `${eur(u.spend.gameDay)}${pct(u.spend.gameDay, u.caps.day)}`)),
-        h('li', {}, h('span', {}, 'Este mes'), h('span', {}, `${eur(u.spend.gameMonth)}${pct(u.spend.gameMonth, u.caps.month)}`)),
-        h('li', {}, h('span', {}, 'Servidor (mes)'), h('span', {}, `${eur(u.spend.serverMonth)}${pct(u.spend.serverMonth, u.caps.server)}`)),
-        h('li', {}, h('span', {}, 'Total de la partida'), h('span', {}, eur(u.eur))),
+      h('p', { class: 'big-number' }, cap ? `Este mes: ${eur(u.spend.gameMonth)} de ${eur(cap)}` : `Este mes: ${eur(u.spend.gameMonth)} (sin tope)`),
+      bar,
+      h('p', {}, `Hoy: ${eur(u.spend.gameDay)}${u.caps.day ? ` de ${eur(u.caps.day)}` : ''}. Total de la partida: ${eur(u.eur)}.`),
+      h('p', {}, `${ok} % de las decisiones las tomó la IA; el resto, las reglas.`),
+      h(
+        'details',
+        { class: 'advanced' },
+        h('summary', {}, 'Detalle técnico'),
+        h('ul', { class: 'accounts' }, ...(kinds.length ? kinds.map(([k, v]) => h('li', {}, h('span', {}, k === 'decision' ? 'Decisiones' : k), h('span', {}, eur(v)))) : [h('li', {}, 'Sin llamadas todavía.')])),
+        h('p', {}, `${plural(u.calls, 'llamada', 'llamadas')}, ${plural(u.requested, 'decisión pedida', 'decisiones pedidas')} (${u.retried} tras reintento).`),
+        h('p', {}, `Tokens: ${u.tokensIn} de entrada y ${u.tokensOut} de salida.`),
+        u.caps.server ? h('p', {}, `Servidor (todas las partidas) este mes: ${eur(u.spend.serverMonth)} de ${eur(u.caps.server)}.`) : '',
       ),
-      h('h3', {}, 'Por uso'),
-      h('ul', { class: 'accounts' }, ...(kinds.length ? kinds.map(([k, v]) => h('li', {}, h('span', {}, k === 'decision' ? 'Decisiones' : k), h('span', {}, eur(v)))) : [h('li', {}, 'Sin llamadas todavía.')])),
-      h('h3', {}, 'Calidad'),
-      h('p', {}, `${u.calls} llamadas · ${u.requested} decisiones pedidas · ${ok} % válidas (${u.retried} tras reintento). Las que fallan las toman las reglas.`),
-      h('p', { class: 'muted' }, `Tokens: ${u.tokensIn} de entrada, ${u.tokensOut} de salida.`),
     );
   } catch (e) {
     toast((e as Error).message, { kind: 'warn' });
@@ -158,12 +163,14 @@ export async function openUsage(token: string): Promise<void> {
 export function makeBubble(name: string, motivo: string, ai: boolean): HTMLElement {
   const layer = $('#bubbles');
   const el = h(
-    'div',
-    { class: 'bubble', role: 'note' },
-    h('strong', {}, name, ai ? h('span', { class: 'ai-badge', title: 'Decidido por la IA' }, 'IA') : ''),
+    'button',
+    { class: 'bubble', type: 'button', 'aria-label': `${name}${ai ? ' (decidido por la IA)' : ''}: ${motivo}. Abrir su ficha.` },
+    h('strong', {}, name, ai ? h('span', { class: 'ai-badge' }, 'IA', h('span', { class: 'visually-hidden' }, ' (decidido por la IA)')) : ''),
     h('span', { class: 'bubble-text' }, `«${motivo}»`),
   );
   layer.append(el);
+  // Lo anuncia el lector de pantalla aunque la burbuja se mueva con el mapa.
+  $('#sr-live').textContent = `${name}${ai ? ', decidido por la IA' : ''}: ${motivo}`;
   while (layer.children.length > 3) layer.firstElementChild?.remove();
   return el;
 }

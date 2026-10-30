@@ -289,6 +289,7 @@ button, input, select { font: inherit; color: inherit; }
 .estimate { color: var(--accent); }
 pre.prompt { white-space: pre-wrap; word-break: break-word; max-height: 40vh; overflow: auto; padding: 8px; background: var(--bg); border: 1px solid var(--line); font-size: 0.85rem; }
 .bubbles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.bubble { pointer-events: auto; cursor: pointer; text-align: left; font: inherit; }
 .bubble {
   position: absolute;
   transform: translate(-50%, -100%);
@@ -312,3 +313,13 @@ pre.prompt { white-space: pre-wrap; word-break: break-word; max-height: 40vh; ov
   .bubble { animation: pop 0.25s steps(3); }
   @keyframes pop { from { transform: translate(-50%, -80%) scale(0.6); } }
 }
+
+.ai-chip { min-height: 40px; padding: 4px 10px; border: 2px solid #38b764; border-radius: 4px; background: var(--bg); color: #a7f070; font-weight: 700; cursor: pointer; }
+.ai-chip.paused { border-color: #ef7d57; color: #ef7d57; }
+.advanced { margin: 8px 0; padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px; }
+.advanced summary { min-height: 48px; display: flex; align-items: center; cursor: pointer; font-weight: 600; }
+.help { color: var(--muted); font-size: 0.9rem; }
+.sticky-actions { position: sticky; bottom: 0; padding: 8px 0; background: var(--panel); }
+.big-number { font-size: 1.2rem; font-weight: 700; }
+.saved { background: #1a1c2c; padding: 2px 6px; border-radius: 2px; font-size: 0.9rem; color: var(--text); }
+progress { width: 100%; height: 16px; accent-color: #38b764; }

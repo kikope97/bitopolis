@@ -257,10 +257,17 @@ export function startGame(opts: GameOptions): void {
     const el = makeBubble(name, entry.motivo, entry.source === 'ai');
     const b = { el, tx: where.x, ty: where.y };
     bubbles.push(b);
-    setTimeout(() => {
+    const close = () => {
       el.remove();
-      bubbles.splice(bubbles.indexOf(b), 1);
-    }, 9000);
+      const i = bubbles.indexOf(b);
+      if (i >= 0) bubbles.splice(i, 1);
+    };
+    el.addEventListener('click', () => {
+      close();
+      focusBuilding(where.id);
+    });
+    // Sin límite de tiempo con movimiento reducido; si no, según lo largo del texto.
+    if (!reducedMotion()) setTimeout(close, Math.max(9000, entry.motivo.length * 90));
   }
   function placeBubbles() {
     if (!bubbles.length) return;
@@ -286,6 +293,7 @@ export function startGame(opts: GameOptions): void {
         await command({ type: 'CitizenAct', citizenId: d.citizenId, action: d.action, motivo: d.motivo, source: 'ai' });
       }
       $('#ai-banner').hidden = !r.capped;
+      setAiChip(r.capped ? 'paused' : 'on');
       if (r.notice && !notices.has(r.notice)) {
         notices.add(r.notice);
         toast(r.notice, { kind: 'warn' });
@@ -300,6 +308,15 @@ export function startGame(opts: GameOptions): void {
     }
   }
   const decisionTimer = setInterval(() => void pollDecisions(), 1500);
+  function setAiChip(mode: 'on' | 'paused') {
+    const chip = $('#ai-chip');
+    chip.hidden = !state.aiMode;
+    chip.textContent = mode === 'on' ? 'IA ●' : 'IA en pausa';
+    chip.classList.toggle('paused', mode === 'paused');
+    chip.setAttribute('aria-label', mode === 'on' ? 'IA activa: ver gasto' : 'IA en pausa por el tope de gasto: deciden las reglas. Ver gasto');
+  }
+  setAiChip('on');
+  $('#ai-chip').onclick = () => void openUsage(token);
 
   /* ---------- cámara ---------- */
   function resize() {

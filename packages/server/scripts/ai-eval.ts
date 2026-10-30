@@ -17,6 +17,7 @@ import {
   type GameState,
   parseDecisions,
   PROFILES,
+  recentMotivos,
   profileRng,
   step,
 } from '@bitopolis/sim';
@@ -40,11 +41,21 @@ const tokens = (s: string) => Math.ceil(s.length / 3.5);
 /** Simulador sin red: elige con sentido entre las acciones y escribe un motivo variado. */
 const simulated: LLMProvider = {
   async complete(req: LLMRequest): Promise<LLMResult> {
-    const body = JSON.parse(req.user) as { vecinos: { vecino: number; nombre: string; acciones: { accion: string }[] }[] };
+    const body = JSON.parse(req.user.split('\n\n')[0]!) as { vecinos: { vecino: number; nombre: string; acciones: { accion: string }[] }[] };
+    const voces = [
+      'Aquí estoy bien y no pienso moverme.',
+      'Esto hay que decirlo alto y claro.',
+      'Mi madre siempre decía que el pueblo es lo primero.',
+      'A ver si el alcalde se entera de una vez.',
+      'Con calma, que las prisas no traen nada bueno.',
+      'Me lo he pensado mucho y lo tengo claro.',
+      'Si no lo hago ahora, no lo hago nunca.',
+      'Que nadie diga que no avisé.',
+    ];
     const decisiones = body.vecinos.map((v, i) => ({
       vecino: v.vecino,
       accion: v.acciones[(v.vecino + i) % v.acciones.length]!.accion,
-      motivo: `${v.nombre.split(' ')[0]} lo tiene claro: esto es lo que toca ahora.`,
+      motivo: voces[(v.vecino * 7 + req.user.length) % voces.length]!,
     }));
     const text = JSON.stringify({ decisiones });
     return { text, usage: { in: tokens(req.system + req.user), cachedIn: 0, out: tokens(text) } };
@@ -67,6 +78,8 @@ if (values.replay) {
   source = `${PROVIDER_INFO[provider].label} · ${model} (en vivo)`;
 }
 
+const reasons: Record<string, number> = {};
+const callsByMonth = new Map<string, number>();
 const totals = { calls: 0, requested: 0, validFirst: 0, validRetry: 0, fallback: 0, tokensIn: 0, tokensOut: 0, errors: 0 };
 const motivos: string[] = [];
 const days = Number(values.days);
@@ -82,13 +95,17 @@ for (let seed = 1; seed <= Number(values.seeds); seed++) {
     if (pend.length === 0) continue;
     const req = buildDecisionRequest(state, pend);
     totals.calls++;
+    const mk = `${seed}:${Math.floor(state.tick / 720)}`;
+    callsByMonth.set(mk, (callsByMonth.get(mk) ?? 0) + 1);
     totals.requested += pend.length;
     const call = async (system: string, user: string, list: typeof pend) => {
       const r = await llm.complete({ system, user, schema: buildDecisionRequest(state, list).schema, model, maxTokens: 200 + list.length * 120 });
       if (values.record) recordings.set(ReplayProvider.key({ system, user }), r);
       totals.tokensIn += r.usage.in || tokens(system + user);
       totals.tokensOut += r.usage.out || tokens(r.text);
-      return parseDecisions(r.text, list);
+      const parsed = parseDecisions(r.text, list, Object.fromEntries(list.map((p) => [p.citizenId, recentMotivos(state, p.citizenId, 3)])));
+      for (const [k, v] of Object.entries(parsed.reasons)) reasons[k] = (reasons[k] ?? 0) + v;
+      return parsed;
     };
     try {
       let parsed = await call(req.system, req.user, pend);
@@ -103,7 +120,7 @@ for (let seed = 1; seed <= Number(values.seeds); seed++) {
       if (parsed.invalid.length) {
         const again = pend.filter((p) => parsed.invalid.includes(p.citizenId));
         const r2 = buildDecisionRequest(state, again);
-        parsed = await call(`${r2.system}\n\nTu respuesta anterior no era válida.`, r2.user, again);
+        parsed = await call(r2.system, `${r2.user}\n\nTu respuesta anterior no era válida (${parsed.error}).`, again);
         apply(parsed.decisions);
         totals.validRetry += parsed.decisions.length;
         totals.fallback += parsed.invalid.length;
@@ -111,6 +128,7 @@ for (let seed = 1; seed <= Number(values.seeds); seed++) {
     } catch (e) {
       totals.errors++;
       totals.fallback += pend.length;
+      reasons.error_proveedor = (reasons.error_proveedor ?? 0) + 1;
       if (totals.errors <= 3) console.error('error de la IA:', (e as Error).message);
     }
   }
@@ -129,6 +147,9 @@ const report = {
   ...totals,
   validOrFallbackPct: totals.requested ? +((100 * resolved) / totals.requested).toFixed(2) : 100,
   validWithoutFallbackPct: totals.requested ? +((100 * (totals.validFirst + totals.validRetry)) / totals.requested).toFixed(2) : 100,
+  validFirstPct: totals.requested ? +((100 * totals.validFirst) / totals.requested).toFixed(2) : 100,
+  invalidReasons: reasons,
+  maxCallsInAGameMonth: Math.max(0, ...callsByMonth.values()),
   perGameMonth: perMonth,
   eurPerGameMonthByModel: costs,
   distinctMotivosPct: motivos.length ? +((100 * new Set(motivos).size) / motivos.length).toFixed(1) : 0,

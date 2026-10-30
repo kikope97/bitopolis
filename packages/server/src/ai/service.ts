@@ -1,4 +1,4 @@
-import { buildDecisionRequest, type GameState, parseDecisions, type Pending } from '@bitopolis/sim';
+import { buildDecisionRequest, type GameState, parseDecisions, type Pending, recentMotivos } from '@bitopolis/sim';
 import type { Config } from '../config.ts';
 import type { Db } from '../db/index.ts';
 import { costEur, PROVIDER_INFO, PROVIDERS, priceTable, type ProviderId } from './catalog.ts';
@@ -182,7 +182,7 @@ export class AiService {
         usage.in += r.usage.in;
         usage.cachedIn += r.usage.cachedIn;
         usage.out += r.usage.out;
-        return parseDecisions(r.text, list);
+        return parseDecisions(r.text, list, Object.fromEntries(list.map((p) => [p.citizenId, recentMotivos(state, p.citizenId, 3)])));
       };
       let parsed = await call(req.system, req.user, pendings);
       const add = (ds: typeof parsed.decisions) => {
@@ -197,8 +197,9 @@ export class AiService {
       if (parsed.invalid.length > 0) {
         const again = pendings.filter((p) => parsed.invalid.includes(p.citizenId));
         const r2 = buildDecisionRequest(state, again);
-        const note = `${r2.system}\n\nTu respuesta anterior no era válida (${parsed.error ?? 'acción no permitida o falta un vecino'}). Usa solo las acciones de cada vecino.`;
-        parsed = await call(note, r2.user, again);
+        // La nota va al final (parte variable) para no romper el prefijo cacheable.
+        const note = `${r2.user}\n\nTu respuesta anterior no era válida (${parsed.error ?? 'acción no permitida o falta un vecino'}). Usa solo las acciones de cada vecino y un motivo nuevo, sin cifras.`;
+        parsed = await call(r2.system, note, again);
         add(parsed.decisions);
         retried = parsed.decisions.length;
         if (parsed.invalid.length > 0) status = 'partial';

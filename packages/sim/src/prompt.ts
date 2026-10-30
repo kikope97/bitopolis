@@ -20,7 +20,13 @@ Reglas:
 - Para cada vecino, elige exactamente una acción de su lista "acciones". No inventes acciones.
 - Decide según su personalidad (rasgos 0-100), su deseo, su miedo, su situación y sus recuerdos. La "terquedad" alta puede llevarle a decisiones poco racionales.
 - "motivo": una frase corta (máx. ${MOTIVO_MAX} caracteres) en primera persona, en español de España, natural y con personalidad. Sin comillas, sin emojis, sin mencionar números de rasgos ni que eres una IA.
+- No repitas tus "ultimos_motivos" ni frases hechas. Nada de cifras ni euros en el motivo.
 - Responde solo con JSON que cumpla el esquema.
+
+Ejemplos de tono (no los copies):
+- "Con lo que pago de alquiler, como suba algo más me planto."
+- "Mi abuela decía que un pueblo sin parque es un pueblo triste. Pues eso."
+- "Que sí, que me quedo. Aquí al menos me saludan por la calle." 
 
 Significado de las acciones:
 ${Object.entries(ACTION_LABELS)
@@ -68,6 +74,7 @@ function citizenView(state: GameState, c: Citizen, p: Pending) {
     casa: home ? (home.kind === 'house' ? 'casa municipal de alquiler' : 'piso de alquiler') : 'sin casa',
     trabajo: job ? BUILD_NAMES[job.kind]!.toLowerCase() : 'fuera del pueblo',
     recuerdos: c.memory,
+    ultimos_motivos: recentMotivos(state, c.id),
     situacion: TRIGGER_TEXT[p.trigger],
     acciones: p.actions.map((a) => {
       const [v, arg] = a.split(':');
@@ -78,6 +85,15 @@ function citizenView(state: GameState, c: Citizen, p: Pending) {
       return { accion: a };
     }),
   };
+}
+
+export function recentMotivos(state: GameState, citizenId: number, n = 2): string[] {
+  const out: string[] = [];
+  for (let i = state.decisionLog.length - 1; i >= 0 && out.length < n; i--) {
+    const d = state.decisionLog[i]!;
+    if (d.citizenId === citizenId) out.push(d.motivo);
+  }
+  return out;
 }
 
 export interface DecisionRequest {
@@ -91,11 +107,23 @@ export function buildDecisionRequest(state: GameState, pendings: Pending[]): Dec
   const list = pendings
     .map((p) => ({ p, c: state.citizens.find((c) => c.id === p.citizenId) }))
     .filter((x): x is { p: Pending; c: Citizen } => !!x.c);
-  const actions = [...new Set(list.flatMap((x) => x.p.actions))];
   const ids = list.map((x) => x.c.id);
-  const user = JSON.stringify({ pueblo: townSummary(state), vecinos: list.map((x) => citizenView(state, x.c, x.p)) });
+  // Prefijo fijo (reglas + estado del pueblo del día) y al final lo variable.
+  const system = `${SYSTEM_PROMPT}\n\nEstado del pueblo hoy: ${JSON.stringify(townSummary(state))}`;
+  const user = JSON.stringify({ vecinos: list.map((x) => citizenView(state, x.c, x.p)) });
+  // Esquema por vecino: cada uno solo puede elegir entre SUS acciones.
+  const perCitizen = list.map((x) => ({
+    type: 'object',
+    additionalProperties: false,
+    required: ['vecino', 'accion', 'motivo'],
+    properties: {
+      vecino: { type: 'integer', enum: [x.c.id] },
+      accion: { type: 'string', enum: x.p.actions },
+      motivo: { type: 'string' },
+    },
+  }));
   return {
-    system: SYSTEM_PROMPT,
+    system,
     user,
     citizenIds: ids,
     schema: {
@@ -103,19 +131,7 @@ export function buildDecisionRequest(state: GameState, pendings: Pending[]): Dec
       additionalProperties: false,
       required: ['decisiones'],
       properties: {
-        decisiones: {
-          type: 'array',
-          items: {
-            type: 'object',
-            additionalProperties: false,
-            required: ['vecino', 'accion', 'motivo'],
-            properties: {
-              vecino: { type: 'integer', enum: ids },
-              accion: { type: 'string', enum: actions },
-              motivo: { type: 'string' },
-            },
-          },
-        },
+        decisiones: { type: 'array', items: perCitizen.length === 1 ? perCitizen[0]! : { anyOf: perCitizen } },
       },
     },
   };
@@ -130,25 +146,44 @@ export interface ParsedDecisions {
   /** Vecinos con respuesta inválida o ausente. */
   invalid: number[];
   error?: string;
+  /** Causa de cada inválido (para medir). */
+  reasons: Record<string, number>;
 }
 
+const norm = (s: string) => s.toLowerCase().replace(/[^a-záéíóúñü ]/g, '').replace(/\s+/g, ' ').trim();
+
 /** Valida la respuesta: JSON, esquema y acción permitida para cada vecino. */
-export function parseDecisions(raw: string, pendings: Pending[]): ParsedDecisions {
+export function parseDecisions(raw: string, pendings: Pending[], recent: Record<number, string[]> = {}): ParsedDecisions {
+  const all = pendings.map((p) => p.citizenId);
   let data: unknown;
   try {
     const trimmed = raw.trim().replace(/^```(?:json)?/, '').replace(/```$/, '');
     data = JSON.parse(trimmed);
   } catch {
-    return { decisions: [], invalid: pendings.map((p) => p.citizenId), error: 'JSON no válido' };
+    return { decisions: [], invalid: all, error: 'JSON no válido', reasons: { json: all.length } };
   }
   const r = Response.safeParse(data);
-  if (!r.success) return { decisions: [], invalid: pendings.map((p) => p.citizenId), error: 'no cumple el esquema' };
+  if (!r.success) return { decisions: [], invalid: all, error: 'no cumple el esquema', reasons: { esquema: all.length } };
   const decisions: ParsedDecisions['decisions'] = [];
+  const reasons: Record<string, number> = {};
+  const bad = (k: string) => (reasons[k] = (reasons[k] ?? 0) + 1);
   for (const p of pendings) {
     const d = r.data.decisiones.find((x) => x.vecino === p.citizenId);
-    const motivo = d ? cleanMotivo(d.motivo) : '';
-    if (d && p.actions.includes(d.accion) && motivo.length > 0) decisions.push({ citizenId: p.citizenId, action: d.accion, motivo });
+    if (!d) {
+      bad('falta_vecino');
+      continue;
+    }
+    if (!p.actions.includes(d.accion)) {
+      bad('accion_no_permitida');
+      continue;
+    }
+    const motivo = cleanMotivo(d.motivo);
+    if (motivo.length < 4) bad('motivo_vacio');
+    else if (/[0-9€]/.test(motivo)) bad('motivo_con_cifras');
+    else if ((recent[p.citizenId] ?? []).some((m) => norm(m) === norm(motivo))) bad('motivo_repetido');
+    else decisions.push({ citizenId: p.citizenId, action: d.accion, motivo });
   }
   const ok = new Set(decisions.map((d) => d.citizenId));
-  return { decisions, invalid: pendings.map((p) => p.citizenId).filter((id) => !ok.has(id)) };
+  const invalid = all.filter((id) => !ok.has(id));
+  return { decisions, invalid, reasons, ...(invalid.length ? { error: Object.keys(reasons).join(', ') } : {}) };
 }

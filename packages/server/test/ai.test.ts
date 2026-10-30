@@ -26,11 +26,11 @@ describe('cifrado de la key', () => {
 
 /** Respuesta "buena" que elige la primera acción de cada vecino. */
 function answer(req: LLMRequest, bad = false): LLMResult {
-  const body = JSON.parse(req.user);
+  const body = JSON.parse(req.user.split('\n\n')[0]!);
   const decisiones = body.vecinos.map((v: { vecino: number; acciones: { accion: string }[] }) => ({
     vecino: v.vecino,
     accion: bad ? 'volar' : v.acciones[0]!.accion,
-    motivo: 'Me apetece probar suerte aquí.',
+    motivo: `Me apetece probar suerte aquí, ${['de verdad', 'sin duda', 'ya veremos', 'por qué no', 'claro que sí'][Math.floor(Math.random() * 5)]}.`,
   }));
   return { text: JSON.stringify({ decisiones }), usage: { in: 900, cachedIn: 0, out: 80 } };
 }

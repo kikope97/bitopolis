@@ -12,11 +12,11 @@ createServer((req, res) => {
   req.on('data', (c) => (body += c));
   req.on('end', () => {
     const data = JSON.parse(body || '{}');
-    const user = JSON.parse(data.messages?.[1]?.content ?? '{"vecinos":[]}');
+    const user = JSON.parse((data.messages?.[1]?.content ?? '{"vecinos":[]}').split('\n\n')[0]);
     const decisiones = user.vecinos.map((v) => ({
       vecino: v.vecino,
       accion: v.acciones[0].accion,
-      motivo: `Soy ${v.nombre} y aquí me quedo, que este pueblo promete.`,
+      motivo: `Soy ${v.nombre} y aquí me quedo, que este pueblo promete ${['mucho', 'bastante', 'de verdad', 'si nos dejan'][Math.floor(Math.random() * 4)]}.`,
     }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(
