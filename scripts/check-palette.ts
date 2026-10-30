@@ -1,14 +1,14 @@
 /**
  * Valida que todo color hexadecimal del arte del cliente pertenece a la
- * paleta cerrada de 32 colores. Si aparece otro, el build falla.
+ * paleta cerrada de 64 colores. Si aparece otro, el build falla.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { PALETTE } from '../packages/client/src/palette.ts';
 
 const allowed = new Set(PALETTE.map((c) => c.toLowerCase()));
-if (allowed.size !== 32) {
-  console.error(`La paleta debe tener 32 colores distintos (tiene ${allowed.size}).`);
+if (allowed.size !== 64) {
+  console.error(`La paleta debe tener 64 colores distintos (tiene ${allowed.size}).`);
   process.exit(1);
 }
 const client = new URL('../packages/client/', import.meta.url).pathname;
