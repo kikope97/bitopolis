@@ -926,6 +926,35 @@ function iconNoPower(): Pix {
   return p;
 }
 
+/** Icono de la app (64×64): el ayuntamiento sobre un prado, con margen para iconos «maskable». */
+export function iconPix(): Pix {
+  const p = new Pix(64, 64);
+  p.rect(0, 0, 64, 64, 0);
+  p.ellipse(32, 52, 26, 9, 23);
+  p.ellipse(32, 51, 24, 7, 22);
+  p.blit(townhall(), 16, 6);
+  return p;
+}
+
+/** RGBA de un Pix (para exportar PNG en el build). */
+export function pixRGBA(p: Pix, scale = 1): Uint8Array {
+  const W = p.w * scale;
+  const out = new Uint8Array(W * p.h * scale * 4);
+  for (let y = 0; y < p.h * scale; y++) {
+    for (let x = 0; x < W; x++) {
+      const idx = p.data[Math.floor(y / scale) * p.w + Math.floor(x / scale)]!;
+      const o = (y * W + x) * 4;
+      if (idx === NONE) continue;
+      const [r, g, b] = RGB[idx]!;
+      out[o] = r;
+      out[o + 1] = g;
+      out[o + 2] = b;
+      out[o + 3] = 255;
+    }
+  }
+  return out;
+}
+
 /* ============================ caché ============================ */
 
 /** Momento del día: el arte se recolorea con tonos de la misma paleta. */

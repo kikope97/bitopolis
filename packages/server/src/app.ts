@@ -44,14 +44,20 @@ export async function buildApp(config: Config, db: Db, ai = new AiService(db, co
     return payload;
   });
 
-  await app.register(rateLimit, { max: 300, timeWindow: '1 minute', allowList: (req) => req.url === '/healthz' });
+  // El límite protege la API (y la key de IA); los archivos estáticos con hash no cuentan.
+  const STATIC = /^\/(assets|icons)\/|^\/(sw\.js|manifest\.webmanifest|healthz)$/;
+  await app.register(rateLimit, { max: 300, timeWindow: '1 minute', allowList: (req) => STATIC.test(req.url.split('?')[0]!) });
 
   if (config.password) {
     await registerAuth(app, { password: config.password, secret: config.masterKey ?? 'bitopolis' });
   }
 
   // Entrar en / crea una URL nueva. La partida no se guarda hasta pulsar Jugar.
-  app.get('/', async (_req, reply) => reply.redirect(`/p/${newGameToken()}`));
+  // Desde el icono instalado (PWA) se abre la app y ella vuelve a la última partida del dispositivo.
+  app.get('/', async (req, reply) => {
+    if ((req.query as Record<string, string>).pwa !== undefined && existsSync(config.clientDir)) return reply.type('text/html').sendFile('index.html');
+    return reply.redirect(`/p/${newGameToken()}`);
+  });
   await registerGameRoutes(app, db, config, ai);
   await registerAiRoutes(app, db, config, ai);
 

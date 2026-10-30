@@ -13,7 +13,7 @@ const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_FAILS = 5;
 const LOCK_MS = 15 * 60 * 1000;
 
-const PUBLIC = [/^\/healthz$/, /^\/login(\.html)?$/, /^\/api\/login$/, /^\/assets\//, /^\/favicon/, /^\/icon/, /^\/manifest/];
+const PUBLIC = [/^\/healthz$/, /^\/login(\.html)?$/, /^\/api\/login$/, /^\/assets\//, /^\/favicon/, /^\/icons?\//, /^\/manifest/, /^\/sw\.js$/];
 
 function safeEqual(a: string, b: string): boolean {
   const ha = createHash('sha256').update(a).digest();

@@ -17,7 +17,8 @@
     "invariants": "tsx packages/sim/cli/invariants.ts",
     "e2e": "playwright test",
     "start": "node packages/server/dist/index.js",
-    "ai-eval": "tsx packages/server/scripts/ai-eval.ts"
+    "ai-eval": "tsx packages/server/scripts/ai-eval.ts",
+    "perf": "BITOPOLIS_PERF=1 playwright test e2e/rendimiento.spec.ts --workers=1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",

@@ -4,7 +4,8 @@ import { runSimulation } from '../packages/sim/src/index.ts';
 
 /** Gama media: CPU ×4 más lenta (Chromium). Se mide el render a x3 en un pueblo grande. */
 test('rendimiento: fluido con la CPU ×4 más lenta', async ({ page, request, browserName }, info) => {
-  test.skip(browserName !== 'chromium');
+  // Se mide sola (pnpm perf): en paralelo con el resto de pruebas, la CPU compartida falsea la medida.
+  test.skip(browserName !== 'chromium' || !process.env.BITOPOLIS_PERF);
   test.setTimeout(90_000);
   const { state } = runSimulation({ seed: 1, days: 600, profile: 'constructor' });
   const data = gzipSync(JSON.stringify({ bitopolis: 1, formatVersion: state.formatVersion, exportedAt: '', mode: 'normal', state }));
