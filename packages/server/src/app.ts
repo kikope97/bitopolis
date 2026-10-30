@@ -7,6 +7,8 @@ import type { HealthResponse } from '@bitopolis/shared';
 import type { Config } from './config.ts';
 import type { Db } from './db/index.ts';
 import { registerAuth } from './auth.ts';
+import { registerAiRoutes } from './ai/routes.ts';
+import { AiService } from './ai/service.ts';
 import { registerGameRoutes } from './games.ts';
 import { newGameToken } from './tokens.ts';
 
@@ -24,7 +26,7 @@ const CSP = [
   "frame-ancestors 'none'",
 ].join('; ');
 
-export async function buildApp(config: Config, db: Db): Promise<FastifyInstance> {
+export async function buildApp(config: Config, db: Db, ai = new AiService(db, config)): Promise<FastifyInstance> {
   const app = Fastify({
     logger: {
       level: process.env.LOG_LEVEL ?? 'info',
@@ -50,7 +52,8 @@ export async function buildApp(config: Config, db: Db): Promise<FastifyInstance>
 
   // Entrar en / crea una URL nueva. La partida no se guarda hasta pulsar Jugar.
   app.get('/', async (_req, reply) => reply.redirect(`/p/${newGameToken()}`));
-  await registerGameRoutes(app, db);
+  await registerGameRoutes(app, db, config, ai);
+  await registerAiRoutes(app, db, config, ai);
 
   app.get('/healthz', async (): Promise<HealthResponse> => {
     await sql`select 1`.execute(db);

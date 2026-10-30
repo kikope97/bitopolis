@@ -35,6 +35,7 @@ const TRIGGER_TEXT: Record<string, string> = {
   infeliz: 'está descontento con la vida en el pueblo',
   subida_impuestos: 'el alcalde acaba de subir los impuestos',
   ahorros: 'ha ahorrado bastante dinero',
+  opinion: 'el alcalde pasea por el pueblo y le pregunta qué tal',
 };
 
 const band = (n: number, cuts: number[], names: string[]) => names[cuts.findIndex((c) => n < c) === -1 ? names.length - 1 : cuts.findIndex((c) => n < c)]!;

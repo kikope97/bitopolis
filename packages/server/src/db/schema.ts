@@ -20,6 +20,40 @@ export interface GamesTable {
   seed: Generated<number>;
 }
 
+export interface AiConfigTable {
+  game_id: number;
+  provider: string | null;
+  model: string | null;
+  model_premium: string | null;
+  base_url: string | null;
+  /** API key cifrada con AES-256-GCM (BITOPOLIS_MASTER_KEY). */
+  key_enc: string | null;
+  key_mask: string | null;
+  cap_day: number | null;
+  cap_month: number | null;
+  accepted_at: string | null;
+}
+
+export interface AiUsageTable {
+  id: Generated<number>;
+  game_id: number;
+  ts: number;
+  day: string;
+  month: string;
+  kind: string;
+  model: string;
+  tokens_in: number;
+  tokens_cached: number;
+  tokens_out: number;
+  eur: number;
+  requested: number;
+  valid: number;
+  retried: number;
+  status: string;
+}
+
 export interface DB {
   games: GamesTable;
+  ai_config: AiConfigTable;
+  ai_usage: AiUsageTable;
 }

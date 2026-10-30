@@ -13,6 +13,8 @@ import {
   migrate,
   step,
 } from '@bitopolis/sim';
+import type { AiService } from './ai/service.ts';
+import type { Config } from './config.ts';
 import type { Db } from './db/index.ts';
 import { newGameToken, newSeed } from './tokens.ts';
 
@@ -30,6 +32,8 @@ const SaveBody = z.object({
   toTick: z.number().int().min(0),
   commands: z.array(TimedCommand).max(5_000),
   hash: z.string().regex(/^[0-9a-f]{16}$/),
+  /** false en pausa, con la pestaña oculta o al salir: entonces no se llama a la IA. */
+  live: z.boolean().optional(),
 });
 
 export interface ExportFile {
@@ -65,7 +69,7 @@ export function replayOnto(state: GameState, commands: z.infer<typeof TimedComma
   return state;
 }
 
-export async function registerGameRoutes(app: FastifyInstance, db: Db): Promise<void> {
+export async function registerGameRoutes(app: FastifyInstance, db: Db, config: Config, ai: AiService): Promise<void> {
   const load = (token: string) => db.selectFrom('games').selectAll().where('token', '=', token).executeTakeFirst();
   const bad = (reply: FastifyReply, error: string, code = 400) => reply.code(code).send({ error });
   const now = () => Date.now();
@@ -83,10 +87,12 @@ export async function registerGameRoutes(app: FastifyInstance, db: Db): Promise<
     const p = TokenParams.safeParse(req.params);
     const b = CreateBody.safeParse(req.body);
     if (!p.success || !b.success) return bad(reply, 'petición no válida');
-    if (b.data.mode === 'ai') return bad(reply, 'El Modo IA llega en la versión 0.2');
     if (await load(p.data.token)) return bad(reply, 'la partida ya existe', 409);
+    // Con key de servidor, todas las partidas son de Modo IA.
+    const mode = config.ai.key ? 'ai' : b.data.mode;
+    if (mode === 'ai' && !(await ai.settings(null)).configured) return bad(reply, 'Configura la IA antes de jugar en Modo IA');
     const seed = newSeed();
-    const state = createInitialState({ seed });
+    const state = createInitialState({ seed, aiMode: mode === 'ai', namedLimit: config.ai.maxCitizens });
     const ts = new Date().toISOString();
     await db
       .insertInto('games')
@@ -94,7 +100,7 @@ export async function registerGameRoutes(app: FastifyInstance, db: Db): Promise<
         token: p.data.token,
         created_at: ts,
         updated_at: ts,
-        mode: b.data.mode,
+        mode,
         format_version: FORMAT_VERSION,
         state: JSON.stringify(state),
         seed,
@@ -102,7 +108,7 @@ export async function registerGameRoutes(app: FastifyInstance, db: Db): Promise<
         lease_until: now() + LEASE_MS,
       })
       .execute();
-    return { state, mode: b.data.mode };
+    return { state, mode };
   });
 
   app.post('/api/games/:token/claim', async (req, reply) => {
@@ -143,7 +149,7 @@ export async function registerGameRoutes(app: FastifyInstance, db: Db): Promise<
     const p = TokenParams.safeParse(req.params);
     const b = SaveBody.safeParse(req.body);
     if (!p.success || !b.success) return bad(reply, 'petición no válida');
-    const { sessionId, fromTick, toTick, commands, hash } = b.data;
+    const { sessionId, fromTick, toTick, commands, hash, live } = b.data;
     if (toTick < fromTick || toTick - fromTick > MAX_TICKS_PER_SAVE) return bad(reply, 'rango de ticks no válido');
     const row = await load(p.data.token);
     if (!row) return bad(reply, 'no existe', 404);
@@ -169,6 +175,8 @@ export async function registerGameRoutes(app: FastifyInstance, db: Db): Promise<
       })
       .where('id', '=', row.id)
       .execute();
+    // Petición anticipada: al cerrar el día N se piden las decisiones del N+1.
+    if (row.mode === 'ai' && live) void ai.onSaved(row.id, state);
     return { ok: true, tick: state.tick };
   });
 
@@ -234,7 +242,7 @@ export async function registerGameRoutes(app: FastifyInstance, db: Db): Promise<
         updated_at: ts,
         mode: 'normal',
         format_version: FORMAT_VERSION,
-        state: JSON.stringify(state),
+        state: JSON.stringify({ ...state, aiMode: false }),
         seed: state.seed,
         lease_session: null,
         lease_until: 0,

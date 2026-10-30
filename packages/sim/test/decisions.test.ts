@@ -10,12 +10,13 @@ import {
 } from '../src/index.ts';
 
 /** Avanza hasta que haya una decisión pendiente (la llegada de un vecino con nombre). */
-function withPending(seed = 4): GameState {
+function withPending(seed = 4, trigger = 'llegada'): GameState {
   const s = createInitialState({ seed });
   const cx = s.map.w / 2;
   const cy = s.map.h / 2;
   applyCommand(s, { type: 'Build', kind: 'house', x: cx + 2, y: cy + 1 });
-  for (let i = 0; i < 24 * 60 && s.pending.length === 0; i++) step(s);
+  for (let i = 0; i < 24 * 60 && !s.pending.some((p) => p.trigger === trigger); i++) step(s);
+  s.pending = s.pending.filter((p) => p.trigger === trigger);
   return s;
 }
 
@@ -61,6 +62,13 @@ describe('decisiones de vecinos con nombre', () => {
     const items = (req.schema as any).properties.decisiones.items.properties;
     expect(items.vecino.enum).toEqual(req.citizenIds);
     expect(items.accion.enum).toContain('quedarse');
+  });
+
+  it('cada dos días un vecino con nombre opina (solo pide lo que falta)', () => {
+    const s = withPending(4, 'opinion');
+    const p = s.pending[0]!;
+    expect(p.actions).toContain('quejarse');
+    expect(p.actions).toContain('pedir:parque');
   });
 
   it('valida la respuesta del LLM', () => {

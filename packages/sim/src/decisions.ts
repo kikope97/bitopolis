@@ -60,6 +60,12 @@ export function validActions(state: GameState, c: Citizen, trigger: Trigger): st
       return ['quedarse', 'quejarse', 'irse'];
     case 'ahorros':
       return ['gastar_ocio', 'ahorrar'];
+    case 'opinion': {
+      // Lo que le pide al alcalde: solo cosas que aún faltan.
+      const has = (k: string) => state.buildings.some((b) => b.kind === k);
+      const missing = NEEDS.filter((n) => (n === 'parque' ? !has('park') : n === 'colegio' ? !has('school') : n === 'centro_salud' ? !has('clinic') : n === 'tienda' ? !has('shop') : true));
+      return ['quedarse', 'quejarse', ...missing.map((n) => `pedir:${n}`), ...(c.money > 600 ? ['gastar_ocio'] : [])];
+    }
   }
 }
 
@@ -87,6 +93,13 @@ export function detectTriggers(state: GameState): void {
     else if (c.happiness < 35) addPending(state, c, 'infeliz');
     else if (c.jobId === null && vacantJobs(state, c).length > 0) addPending(state, c, 'sin_trabajo');
     else if (c.money > 2_500 + c.traits.ahorro * 30) addPending(state, c, 'ahorros');
+  }
+  // Cada dos días, un vecino con nombre (por turnos) opina sobre el pueblo.
+  const dayN = Math.floor(state.tick / TICKS_PER_DAY);
+  const named = state.citizens.filter((c) => c.named);
+  if (dayN % 2 === 0 && named.length > 0 && state.pending.length === 0) {
+    const c = named[(dayN / 2) % named.length]!;
+    if (c.cooldownUntil <= state.tick) addPending(state, c, 'opinion');
   }
 }
 

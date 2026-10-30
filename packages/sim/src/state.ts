@@ -108,7 +108,7 @@ export interface Pending {
   dueTick: number;
 }
 
-export type Trigger = 'llegada' | 'sin_trabajo' | 'infeliz' | 'subida_impuestos' | 'ahorros';
+export type Trigger = 'llegada' | 'sin_trabajo' | 'infeliz' | 'subida_impuestos' | 'ahorros' | 'opinion';
 
 export interface DecisionLogEntry {
   tick: number;
