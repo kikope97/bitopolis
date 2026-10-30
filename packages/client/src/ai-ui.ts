@@ -15,7 +15,7 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
     return;
   }
   const locked = new Set(cur.locked);
-  const ro = (field: string) => (locked.has(field) ? { disabled: true } : {});
+  const ro = (field: string): Record<string, boolean> => (locked.has(field) ? { disabled: true } : {});
   const serverNote = (field: string) => (locked.has(field) ? h('span', { class: 'muted small' }, ' · definido por el servidor') : '');
 
   const provider = h('select', { id: 'ai-provider', ...ro('provider') }) as HTMLSelectElement;
