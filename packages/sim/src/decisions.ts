@@ -1,6 +1,7 @@
 import { TICKS_PER_DAY } from '@bitopolis/shared';
 import { BUILD_NAMES } from './commands.ts';
-import { JOBS } from './balance.ts';
+import { JOBS, SHOP_NAMES } from './balance.ts';
+import { buyHome, canBuyHome, canFound, foundBusiness, sellOnDeparture, shopTypesFor } from './economy.ts';
 import { OUTSIDE, transfer } from './money.ts';
 import { hash32 } from './hash.ts';
 import {
@@ -32,6 +33,9 @@ export const ACTION_LABELS: Record<string, string> = {
   quejarse: 'quejarse al ayuntamiento',
   gastar_ocio: `gastar ${LEISURE_COST} € en ocio`,
   ahorrar: 'ahorrar',
+  comprar_casa: 'comprar la vivienda en la que vive (con hipoteca)',
+  seguir_alquilando: 'seguir de alquiler',
+  fundar: 'fundar su propio negocio',
   pedir: 'pedir al alcalde',
 };
 
@@ -60,6 +64,10 @@ export function validActions(state: GameState, c: Citizen, trigger: Trigger): st
       return ['quedarse', 'quejarse', 'irse'];
     case 'ahorros':
       return ['gastar_ocio', 'ahorrar'];
+    case 'comprar_casa':
+      return ['comprar_casa', 'seguir_alquilando'];
+    case 'emprender':
+      return [...shopTypesFor(state, c).map((t) => `fundar:${t}`), 'ahorrar'];
     case 'opinion': {
       // Lo que le pide al alcalde: solo cosas que aún faltan.
       const has = (k: string) => state.buildings.some((b) => b.kind === k);
@@ -92,6 +100,8 @@ export function detectTriggers(state: GameState): void {
     if (taxUp) addPending(state, c, 'subida_impuestos');
     else if (c.happiness < 35) addPending(state, c, 'infeliz');
     else if (c.jobId === null && vacantJobs(state, c).length > 0) addPending(state, c, 'sin_trabajo');
+    else if (canFound(state, c) && c.traits.ambicion > 40) addPending(state, c, 'emprender');
+    else if (canBuyHome(state, c)) addPending(state, c, 'comprar_casa');
     else if (c.money > 2_500 + c.traits.ahorro * 30) addPending(state, c, 'ahorros');
   }
   // Cada dos días, un vecino con nombre (por turnos) opina sobre el pueblo.
@@ -140,6 +150,7 @@ export function applyDecision(state: GameState, citizenId: number, action: strin
       break;
     }
     case 'irse':
+      sellOnDeparture(state, c);
       transfer(state, c.id, OUTSIDE, c.money);
       state.citizens = state.citizens.filter((x) => x !== c);
       effect = 'se va del pueblo';
@@ -160,6 +171,15 @@ export function applyDecision(state: GameState, citizenId: number, action: strin
       break;
     case 'seguir_fuera':
       effect = 'sigue trabajando fuera';
+      break;
+    case 'comprar_casa':
+      effect = buyHome(state, c) ? 'compra la vivienda en la que vive' : 'no llega a comprar la vivienda';
+      break;
+    case 'seguir_alquilando':
+      effect = 'sigue de alquiler';
+      break;
+    case 'fundar':
+      effect = foundBusiness(state, c, arg ?? 'bar') ? `abre su propio negocio (${SHOP_NAMES[arg ?? '']?.toLowerCase() ?? 'tienda'})` : 'no consigue abrir el negocio';
       break;
     default:
       effect = verb === 'ahorrar' ? 'decide ahorrar' : 'se queda';
@@ -186,6 +206,9 @@ const TEMPLATES: Record<string, string[]> = {
   seguir_fuera: ['Fuera me pagan mejor; de momento sigo allí.', 'No me convence. Sigo con mi trabajo de fuera.'],
   gastar_ocio: ['Me lo he ganado: hoy me doy un capricho.', 'Un día es un día. Voy a disfrutar un poco.'],
   ahorrar: ['Mejor guardo el dinero, nunca se sabe.', 'Ahorrar hoy es dormir tranquilo mañana.'],
+  comprar_casa: ['Pagar alquiler es tirar el dinero. Me la quedo.', 'Por fin algo mío en este pueblo.', 'Con la hipoteca pago menos que de alquiler.'],
+  seguir_alquilando: ['No me quiero atar a una hipoteca.', 'De momento, mejor de alquiler.', 'Hipotecas no, gracias.'],
+  fundar: ['Siempre quise tener mi propio negocio.', 'Este pueblo necesita {x} y la voy a abrir yo.', 'Me la juego: abro mi negocio.'],
   pedir: ['Un pueblo sin {x} no es un pueblo. ¿Para cuándo?', 'Alcalde, aquí hace falta {x}.', 'Me gusta este sitio, pero echo de menos {x}.'],
 };
 
@@ -198,6 +221,12 @@ const FLAVOR: Record<keyof Citizen['traits'], string[]> = {
 };
 
 const NEED_TEXT: Record<string, string> = {
+  panaderia: 'una panadería',
+  fruteria: 'una frutería',
+  bar: 'un bar',
+  ropa: 'una tienda de ropa',
+  ferreteria: 'una ferretería',
+  peluqueria: 'una peluquería',
   parque: 'un parque',
   colegio: 'un colegio',
   centro_salud: 'un centro de salud',
@@ -223,6 +252,12 @@ function score(c: Citizen, state: GameState, action: string): number {
       return 30 + t.social * 0.5 - t.ahorro * 0.5;
     case 'ahorrar':
       return 20 + t.ahorro * 0.6 + (c.fear === 'deudas' ? 15 : 0);
+    case 'comprar_casa':
+      return 40 + t.ahorro * 0.3 + (c.desire === 'casa_propia' ? 30 : 0) - (c.fear === 'deudas' ? 25 : 0);
+    case 'seguir_alquilando':
+      return 35 + (c.fear === 'deudas' ? 20 : 0);
+    case 'fundar':
+      return 30 + t.ambicion * 0.6 + (c.desire === 'prosperar' ? 15 : 0) - (c.fear === 'deudas' ? 20 : 0);
     case 'pedir': {
       const has = (k: string) => state.buildings.some((b) => b.kind === k);
       const missing = arg === 'parque' ? !has('park') : arg === 'colegio' ? !has('school') : arg === 'centro_salud' ? !has('clinic') : arg === 'tienda' ? !has('shop') : true;

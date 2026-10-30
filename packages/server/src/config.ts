@@ -45,7 +45,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       baseUrl: env.BITOPOLIS_AI_BASE_URL || undefined,
       model: env.BITOPOLIS_AI_MODEL || undefined,
       modelPremium: env.BITOPOLIS_AI_MODEL_PREMIUM || undefined,
-      maxCitizens: Math.max(1, Math.min(20, num(env.BITOPOLIS_AI_MAX_CITIZENS) ?? 5)),
+      maxCitizens: Math.max(1, Math.min(20, num(env.BITOPOLIS_AI_MAX_CITIZENS) ?? 20)),
       serverMonthly: num(env.BITOPOLIS_BUDGET_SERVER_MONTHLY_EUR),
       gameMonthly: num(env.BITOPOLIS_BUDGET_GAME_MONTHLY_EUR),
       gameDaily: num(env.BITOPOLIS_BUDGET_GAME_DAILY_EUR),

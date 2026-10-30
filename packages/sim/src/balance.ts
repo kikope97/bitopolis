@@ -20,6 +20,7 @@ export const BUILD: Record<BuildKind, BuildSpec> = {
   park: { materials: 1_200, workers: 2, days: 2, unlockPop: 10 },
   school: { materials: 5_000, workers: 5, days: 4, unlockPop: 10 },
   clinic: { materials: 5_000, workers: 5, days: 4, unlockPop: 10 },
+  police: { materials: 4_000, workers: 4, days: 3, unlockPop: 20 },
 };
 
 /** Obras que crecen solas sobre zonas (las paga un inversor de fuera). */
@@ -43,6 +44,7 @@ export const JOBS: Record<BuildingKind, number> = {
   park: 1,
   school: 3,
   clinic: 3,
+  police: 3,
   house: 0,
   res: 0,
   shop: 3,
@@ -58,6 +60,7 @@ export const MAINTENANCE: Record<BuildingKind, number> = {
   park: 100,
   school: 450,
   clinic: 450,
+  police: 350,
   house: 20,
   res: 0,
   shop: 0,
@@ -69,6 +72,7 @@ export const SERVICE: Partial<Record<BuildingKind, { radius: number; happiness: 
   park: { radius: 5, happiness: 6 },
   school: { radius: 8, happiness: 5 },
   clinic: { radius: 8, happiness: 5 },
+  police: { radius: 10, happiness: 3 },
 };
 
 /** Edificios a los que llega cada planta por la red. */
@@ -94,5 +98,56 @@ export const TAX_RATE = { low: 0.04, medium: 0.07, high: 0.1 } as const;
 export const TAX_HAPPINESS = { low: 6, medium: 0, high: -10 } as const;
 export const BUSINESS_SEED_CASH = 3_500;
 export const BUSINESS_CASH_CAP = 6_000;
-export const DEBT_LIMIT = 10_000;
+export const DEBT_LIMIT = 6_000;
+/** Interés mensual de la deuda: 1 % hasta 5.000 € y 3 % por encima. */
 export const DEBT_INTEREST = 0.01;
+export const DEBT_INTEREST_HIGH = 0.03;
+export const DEBT_INTEREST_STEP = 5_000;
+
+/* ---------------- v0.3: tributos y vivienda ---------------- */
+
+/** Con esta población el impuesto único se separa en IBI, tasas y plusvalía. */
+export const TAX_SPLIT_POP = 50;
+/** IBI anual sobre el valor del inmueble (escala del juego). */
+export const IBI_RATE = { low: 0.05, medium: 0.07, high: 0.1 } as const;
+/** Tasa de basuras por hogar y mes, y de terrazas por comercio y mes. */
+export const TASA_BASURAS = { low: 10, medium: 15, high: 24 } as const;
+export const TASA_TERRAZAS = { low: 40, medium: 60, high: 95 } as const;
+/** Plusvalía municipal sobre la ganancia de una compraventa. */
+export const PLUSVALIA_RATE = { low: 0.1, medium: 0.2, high: 0.3 } as const;
+/** Efecto en la felicidad por grupo afectado. */
+export const TASAS_MOOD = { low: 3, medium: 0, high: -6 } as const;
+export const IBI_MOOD_OWNER = { low: 4, medium: 0, high: -8 } as const;
+export const IBI_MOOD_RENTER = { low: 1, medium: 0, high: -3 } as const;
+export const PLUSVALIA_MOOD_OWNER = { low: 1, medium: 0, high: -3 } as const;
+/** Memoria fiscal: lo que suma una subida (por grupo) y su olvido diario. */
+export const GRUDGE_RAISE = { all: 6, ibi: 8, tasas: 5, plusvalia: 3 } as const;
+export const GRUDGE_DECAY = 0.997;
+export const GRUDGE_MAX = 40;
+
+/** Valor base de una vivienda, local o nave (antes de barrio y demanda). */
+export const PROPERTY_VALUE: Partial<Record<BuildingKind, number>> = { house: 7_000, res: 9_000, shop: 20_000, factory: 30_000 };
+/** Entrada mínima para comprar (resto con hipoteca) y cuota mensual. */
+export const DOWN_PAYMENT = 0.2;
+export const MORTGAGE_MONTHS = 100;
+/** Vivienda municipal: precio máximo y coste de transacción para el comprador. */
+export const MUNICIPAL_PRICE_CAP = 7_500;
+export const TRANSACTION_COST = 0.04;
+export const RESALE_LOCK_TICKS = 24 * 90;
+/** Probabilidad mensual de que un inquilino estadístico que puede, compre. */
+export const BUY_CHANCE = 0.08;
+
+/** Empresas de vecinos: capital que pone el fundador (obra + caja inicial). */
+export const FOUND_COST = 2_000;
+export const FOUND_SEED = 2_500;
+export const FOUND_MIN_MONEY = 5_000;
+export const FOUND_CHANCE = 0.2;
+export const SHOP_TYPES = ['panaderia', 'fruteria', 'bar', 'ropa', 'ferreteria', 'peluqueria'] as const;
+export const SHOP_NAMES: Record<string, string> = {
+  panaderia: 'Panadería',
+  fruteria: 'Frutería',
+  bar: 'Bar',
+  ropa: 'Tienda de ropa',
+  ferreteria: 'Ferretería',
+  peluqueria: 'Peluquería',
+};

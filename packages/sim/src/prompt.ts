@@ -33,7 +33,8 @@ ${Object.entries(ACTION_LABELS)
   .map(([k, v]) => `- ${k}: ${v}`)
   .join('\n')}
 - aceptar_trabajo:<id>: aceptar ese empleo concreto.
-- pedir:<cosa>: pedir al alcalde esa mejora.`;
+- pedir:<cosa>: pedir al alcalde esa mejora.
+- fundar:<tipo>: abrir ese negocio con sus ahorros.`;
 
 const TRIGGER_TEXT: Record<string, string> = {
   llegada: 'acaba de mudarse al pueblo y se presenta',
@@ -42,6 +43,8 @@ const TRIGGER_TEXT: Record<string, string> = {
   subida_impuestos: 'el alcalde acaba de subir los impuestos',
   ahorros: 'ha ahorrado bastante dinero',
   opinion: 'el alcalde pasea por el pueblo y le pregunta qué tal',
+  comprar_casa: 'podría comprar la vivienda en la que vive de alquiler',
+  emprender: 'tiene ahorros y hay un local comercial libre',
 };
 
 const band = (n: number, cuts: number[], names: string[]) => names[cuts.findIndex((c) => n < c) === -1 ? names.length - 1 : cuts.findIndex((c) => n < c)]!;
@@ -52,7 +55,7 @@ function townSummary(state: GameState) {
   return {
     fecha: `día ${d.day}, mes ${d.month}, año ${d.year}`,
     poblacion: state.citizens.length,
-    impuestos: { low: 'bajos', medium: 'medios', high: 'altos' }[state.taxLevel],
+    impuestos: state.taxesSplit ? Object.fromEntries(Object.entries(state.taxes).map(([k, v]) => [k, { low: 'bajo', medium: 'medio', high: 'alto' }[v]])) : { low: 'bajos', medium: 'medios', high: 'altos' }[state.taxLevel],
     felicidad_media: Math.round(averageHappiness(state)),
     caja_ayuntamiento: band(state.treasury, [0, 5_000, 30_000], ['en deuda', 'justa', 'normal', 'holgada']),
     servicios: ['water', 'power', 'park', 'school', 'clinic', 'shop', 'factory'].filter((k) => kinds.has(k as never)).map((k) => BUILD_NAMES[k]!.toLowerCase()),
@@ -71,7 +74,8 @@ function citizenView(state: GameState, c: Citizen, p: Pending) {
     miedo: c.fear,
     felicidad: Math.round(c.happiness),
     dinero: band(c.money, [300, 1_500, 4_000], ['casi nada', 'poco', 'algo', 'bastante']),
-    casa: home ? (home.kind === 'house' ? 'casa municipal de alquiler' : 'piso de alquiler') : 'sin casa',
+    casa: home ? (c.owns ? 'vivienda en propiedad' : home.kind === 'house' ? 'casa municipal de alquiler' : 'piso de alquiler') : 'sin casa',
+    hipoteca: c.mortgage > 0,
     trabajo: job ? BUILD_NAMES[job.kind]!.toLowerCase() : 'fuera del pueblo',
     recuerdos: c.memory,
     ultimos_motivos: recentMotivos(state, c.id),

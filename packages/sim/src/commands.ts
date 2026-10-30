@@ -70,6 +70,12 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
   switch (cmd.type) {
     case 'SetTax':
       return { ok: true };
+    case 'SetTaxes':
+      return state.taxesSplit ? { ok: true } : { ok: false, error: 'Los tributos se separan con 50 vecinos' };
+    case 'SetHousingMode': {
+      const b = buildingById(state, cmd.buildingId);
+      return b?.kind === 'house' ? { ok: true } : { ok: false, error: 'Solo las casas municipales se venden o alquilan' };
+    }
     case 'Build': {
       if (cmd.kind === 'road') return validateCommand(state, { type: 'BuildRoad', x: cmd.x, y: cmd.y, x2: cmd.x, y2: cmd.y });
       if (!inBounds(state, cmd.x, cmd.y)) return { ok: false, error: 'Fuera del mapa' };
@@ -136,7 +142,26 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
         const name = { low: 'bajos', medium: 'medios', high: 'altos' }[cmd.level];
         pushEvent(state, 'tax', `El alcalde pone los impuestos ${name}`);
       }
+      if (state.taxesSplit) state.taxes = { ibi: cmd.level, tasas: cmd.level, plusvalia: cmd.level };
       break;
+    case 'SetTaxes': {
+      const names = { ibi: 'el IBI', tasas: 'las tasas', plusvalia: 'la plusvalía' } as const;
+      const lv = { low: 'bajo', medium: 'medio', high: 'alto' } as const;
+      for (const k of ['ibi', 'tasas', 'plusvalia'] as const) {
+        const v = cmd[k];
+        if (v && state.taxes[k] !== v) {
+          state.taxes[k] = v;
+          pushEvent(state, 'tax', `El alcalde pone ${names[k]} en nivel ${lv[v]}`);
+        }
+      }
+      break;
+    }
+    case 'SetHousingMode': {
+      const b = buildingById(state, cmd.buildingId)!;
+      b.forSale = cmd.mode === 'sale';
+      pushEvent(state, 'info', b.forSale ? 'Casa municipal puesta a la venta' : 'Casa municipal en alquiler', { ref: b.id });
+      break;
+    }
     case 'Build': {
       if (cmd.kind === 'road') return applyCommand(state, { type: 'BuildRoad', x: cmd.x, y: cmd.y, x2: cmd.x, y2: cmd.y });
       const spec = BUILD[cmd.kind];

@@ -47,6 +47,23 @@ export const MIGRATIONS: Record<number, Migration> = {
     decisionLog: s.decisionLog ?? [],
     prevTaxLevel: s.prevTaxLevel ?? s.taxLevel ?? 'medium',
   }),
+  // 3 → 4 (v0.3): tributos separados, vivienda en propiedad, memoria fiscal y externalidades.
+  3: (s) => {
+    const n = (s.map?.w ?? 48) * (s.map?.h ?? 48);
+    const lvl = s.taxLevel ?? 'medium';
+    const { taxRateSum: _old, ...month } = s.month ?? {};
+    void _old;
+    return {
+      ...s,
+      formatVersion: 4,
+      citizens: (s.citizens ?? []).map((c: Record<string, unknown>) => ({ owns: false, boughtPrice: 0, mortgage: 0, boughtTick: 0, grudge: 0, ...c })),
+      taxes: s.taxes ?? { ibi: lvl, tasas: lvl, plusvalia: lvl },
+      prevTaxes: s.prevTaxes ?? { ibi: lvl, tasas: lvl, plusvalia: lvl },
+      taxesSplit: s.taxesSplit ?? false,
+      month: { income: 0, expenses: 0, breakdown: {}, taxDays: 0, ...month, rateSums: month.rateSums ?? { ibi: 0, tasas: 0, plusvalia: 0 } },
+      fields: s.fields ?? { pollution: new Array(n).fill(0), noise: new Array(n).fill(0), crime: new Array(n).fill(0), land: new Array(n).fill(50) },
+    };
+  },
 };
 
 export function migrate(raw: unknown): GameState {
