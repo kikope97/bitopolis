@@ -8,7 +8,21 @@ Monorepo pnpm + TypeScript:
 - `packages/shared` — tiempo de juego, comandos (zod), tipos de API. Puro.
 - `packages/sim` — motor determinista. **Sin DOM, red, Node ni temporizadores.** PRNG sfc32 en `state.rng`; prohibidos `Math.random`, `Date.now`, `new Date` (lo impone ESLint). 1 tick = 1 hora; 1 día = 20 s a x1. Estado = JSON plano con `formatVersion` y migraciones en `migrations.ts` (cada una con test). El dinero solo se mueve con `transfer()` (money.ts); lo externo pasa por la cuenta `OUTSIDE` y queda en `ledger`. CLI en `packages/sim/cli`.
 - `packages/server` — Fastify 5 + SQLite (better-sqlite3, WAL) con Kysely; migraciones en código (`src/db/migrations.ts`). Sirve el cliente compilado, `/healthz`, CSP estricta, rate limit, copias diarias en `/data/backups` (se guardan 7). Bundle con esbuild (`build.mjs`); deps npm externas.
-- `packages/client` — Vite + Canvas 2D; la simulación corre en un Web Worker (`sim.worker.ts`). Paleta cerrada de 32 colores en `palette.ts`; `scripts/check-palette.ts` hace fallar el build si aparece otro color.
+- `packages/client` — Vite + Canvas 2D; la simulación corre en un Web Worker (`sim.worker.ts`), que al cerrar cada día emite un lote `{fromTick,toTick,commands,hash}`. `game.ts` (pantalla de juego, entrada táctil/ratón/teclado), `start.ts` (inicio, Configurar), `sprites.ts` (sprites modulares por código), `render.ts`, `tools.ts`, `tutorial.ts`, `hints.ts`. `window.__bitopolis` es un gancho de solo lectura para Playwright. Paleta cerrada de 32 colores en `palette.ts`; `scripts/check-palette.ts` hace fallar el build si aparece otro color.
+
+## API (packages/server/src/games.ts)
+- `GET /` → 302 a `/p/<token>` nuevo (22 base62). La partida solo se crea con `POST /api/games/:token` (Jugar).
+- `POST /api/games/:token/claim` (423 si otra sesión la tiene; `force` la toma), `/release`.
+- `PUT /api/games/:token/save`: el servidor **reproduce** los comandos sobre su estado y compara el hash; si no coincide, 409 con el estado bueno.
+- `POST /api/games/:token/regenerate`, `GET /api/games/:token/export` (.bitopolis = JSON gzip sin API key), `POST /api/import`.
+- Login opcional (`auth.ts`) si hay `BITOPOLIS_USER` y `BITOPOLIS_PASSWORD`.
+- Equilibrio del juego: todos los números en `packages/sim/src/balance.ts`.
+
+## IA de los vecinos (v0.2)
+- Motor: `sim/src/decisions.ts` (detonantes, acciones válidas, `CitizenAct`, reglas de fallback con motivos) y `sim/src/prompt.ts` (prompt con prefijo fijo, esquema con enums, validación zod). Una decisión pendiente vence a mediodía del día siguiente: si no ha llegado la de la IA, deciden las reglas.
+- Servidor: `server/src/ai/` — `crypto.ts` (AES-256-GCM), `catalog.ts` (proveedores, modelos y precios orientativos), `providers.ts` (OpenAI-compatible, Anthropic, `ReplayProvider`), `service.ts` (petición anticipada al guardar, reintento, topes y reserva), `routes.ts`.
+- `pnpm ai-eval` mide coste por mes de juego y % de válidas (simulador, `--replay` o `--live` con `BITOPOLIS_API_KEY`). El CI lo ejecuta con `e2e/fixtures/ia-replay.json`; si cambia el prompt, regenera con `--record`.
+- Playwright usa `e2e/fake-llm.mjs` (LLM falso compatible con OpenAI) para el Modo IA.
 
 ## Comandos
 ```

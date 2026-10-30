@@ -2,19 +2,31 @@ import type { GameState } from './state.ts';
 
 /**
  * Único punto por el que se mueve el dinero. Las cuentas son el ayuntamiento
- * (0), los vecinos (su id) y "fuera" (-1), que representa todo lo externo:
- * región, Estado, proveedores. Lo que entra o sale de fuera se apunta en el
+ * (0), "fuera" (-1: región, Estado, proveedores, inversores), los vecinos y
+ * las empresas (por su id). Lo que entra o sale de fuera se apunta en el
  * ledger para poder comprobar que el dinero se conserva.
  */
 export const TREASURY = 0;
 export const OUTSIDE = -1;
 
+interface Holder {
+  money?: number;
+  cash?: number;
+}
+
+function holder(state: GameState, account: number): Holder {
+  const c = state.citizens.find((x) => x.id === account);
+  if (c) return c;
+  const b = state.buildings.find((x) => x.id === account);
+  if (b) return b;
+  throw new Error(`cuenta desconocida ${account}`);
+}
+
 export function balanceOf(state: GameState, account: number): number {
   if (account === TREASURY) return state.treasury;
   if (account === OUTSIDE) return Infinity;
-  const c = state.citizens.find((x) => x.id === account);
-  if (!c) throw new Error(`cuenta desconocida ${account}`);
-  return c.money;
+  const h = holder(state, account);
+  return h.money ?? h.cash ?? 0;
 }
 
 function add(state: GameState, account: number, amount: number): void {
@@ -27,30 +39,39 @@ function add(state: GameState, account: number, amount: number): void {
     else state.ledger.externalIn -= amount;
     return;
   }
-  const c = state.citizens.find((x) => x.id === account);
-  if (!c) throw new Error(`cuenta desconocida ${account}`);
-  c.money += amount;
+  const h = holder(state, account);
+  if (h.money !== undefined) h.money += amount;
+  else h.cash = (h.cash ?? 0) + amount;
 }
 
 /**
- * Transfiere `amount` (entero ≥ 0). Los vecinos nunca bajan de cero: si no
- * tienen bastante se transfiere lo que haya. El ayuntamiento sí puede
- * endeudarse (caja negativa). Devuelve lo transferido.
+ * Transfiere `amount` (entero ≥ 0). Vecinos y empresas nunca bajan de cero:
+ * si no tienen bastante se transfiere lo que haya. El ayuntamiento sí puede
+ * endeudarse (caja negativa). `concept` alimenta el parte mensual.
+ * Devuelve lo transferido.
  */
-export function transfer(state: GameState, from: number, to: number, amount: number): number {
+export function transfer(state: GameState, from: number, to: number, amount: number, concept = 'otros'): number {
   let amt = Math.floor(amount);
   if (amt <= 0 || from === to) return 0;
   if (from !== TREASURY && from !== OUTSIDE) amt = Math.min(amt, balanceOf(state, from));
   if (amt <= 0) return 0;
   add(state, from, -amt);
   add(state, to, amt);
-  if (to === TREASURY && from !== TREASURY) state.month.income += amt;
-  if (from === TREASURY && to !== TREASURY) state.month.expenses += amt;
+  const bd = state.month.breakdown;
+  if (to === TREASURY) {
+    state.month.income += amt;
+    bd[concept] = (bd[concept] ?? 0) + amt;
+  }
+  if (from === TREASURY) {
+    state.month.expenses += amt;
+    bd[concept] = (bd[concept] ?? 0) - amt;
+  }
   return amt;
 }
 
 export function totalInternalMoney(state: GameState): number {
   let total = state.treasury;
   for (const c of state.citizens) total += c.money;
+  for (const b of state.buildings) total += b.cash;
   return total;
 }

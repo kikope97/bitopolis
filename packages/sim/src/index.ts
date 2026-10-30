@@ -1,6 +1,7 @@
 export * from './prng.ts';
 export * from './hash.ts';
 export * from './state.ts';
+export * from './balance.ts';
 export * from './money.ts';
 export * from './commands.ts';
 export * from './tick.ts';
@@ -8,3 +9,5 @@ export * from './invariants.ts';
 export * from './migrations.ts';
 export * from './profiles.ts';
 export * from './runner.ts';
+export * from './decisions.ts';
+export * from './prompt.ts';

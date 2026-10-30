@@ -30,6 +30,8 @@ jobs:
       - run: pnpm test
       - name: Invariantes de la simulación (365 días, varias semillas)
         run: pnpm invariants
+      - name: IA con respuestas grabadas (ReplayProvider, sin red)
+        run: pnpm ai-eval --replay e2e/fixtures/ia-replay.json --days 360 --seeds 3 --out ai-report.json
       - name: Informe del CLI
         run: pnpm sim --seed 42 --days 365 --profile casual --out report.json
       - run: pnpm exec playwright install --with-deps chromium
@@ -44,6 +46,7 @@ jobs:
             test-results/
             playwright-report/
             report.json
+            ai-report.json
           retention-days: 14
 
   image:
