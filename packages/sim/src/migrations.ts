@@ -1,3 +1,4 @@
+import { emptyPolitics } from './politics-core.ts';
 import { FORMAT_VERSION, type GameState } from './state.ts';
 
 /**
@@ -47,6 +48,41 @@ export const MIGRATIONS: Record<number, Migration> = {
     decisionLog: s.decisionLog ?? [],
     prevTaxLevel: s.prevTaxLevel ?? s.taxLevel ?? 'medium',
   }),
+  // 3 → 4 (v0.3): tributos separados, vivienda en propiedad, memoria fiscal y externalidades.
+  3: (s) => {
+    const n = (s.map?.w ?? 48) * (s.map?.h ?? 48);
+    const lvl = s.taxLevel ?? 'medium';
+    const { taxRateSum: _old, ...month } = s.month ?? {};
+    void _old;
+    return {
+      ...s,
+      formatVersion: 4,
+      citizens: (s.citizens ?? []).map((c: Record<string, unknown>) => ({ owns: false, boughtPrice: 0, mortgage: 0, mortgageTo: -1, subsidized: false, boughtTick: 0, grudge: 0, ...c })),
+      taxes: s.taxes ?? { ibi: lvl, tasas: lvl, plusvalia: lvl },
+      prevTaxes: s.prevTaxes ?? { ibi: lvl, tasas: lvl, plusvalia: lvl },
+      taxesSplit: s.taxesSplit ?? false,
+      month: { income: 0, expenses: 0, breakdown: {}, taxDays: 0, ...month, rateSums: month.rateSums ?? { ibi: 0, tasas: 0, plusvalia: 0 } },
+      fields: s.fields ?? { pollution: new Array(n).fill(0), noise: new Array(n).fill(0), crime: new Array(n).fill(0), land: new Array(n).fill(50) },
+    };
+  },
+  // 4 → 5 (v0.4): fichas completas, memoria en 3 capas, ganchos, plenos, objetivos.
+  4: (s) => ({
+    ...s,
+    formatVersion: 5,
+    citizens: (s.citizens ?? []).map((c: Record<string, any>) => {
+      const { memory: _old, ...rest } = c;
+      void _old;
+      return { profession: c.named ? 'vecina' : '', goal: 'ahorrar', relations: [], memories: [], summary: '', ...rest };
+    }),
+    hooks: s.hooks ?? [],
+    pleno: s.pleno ?? null,
+    promises: s.promises ?? [],
+    lastPlenoTick: s.lastPlenoTick ?? -1,
+    objectivesDone: s.objectivesDone ?? [],
+    unlocked: s.unlocked ?? [],
+  }),
+  // 5 → 6 (v1.0): política (elecciones cada 4 años, facciones y oposición).
+  5: (s) => ({ ...s, formatVersion: 6, politics: s.politics ?? emptyPolitics(s.tick ?? 0) }),
 };
 
 export function migrate(raw: unknown): GameState {

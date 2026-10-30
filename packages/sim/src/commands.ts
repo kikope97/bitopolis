@@ -1,6 +1,8 @@
-import { Command, type BuildKind, type ZoneKind } from '@bitopolis/shared';
-import { BUILD, WAGE_OUTSIDE, ZONE_COST_PER_TILE, ZONE_UNLOCK_POP } from './balance.ts';
+import { Command, tickToDate, type BuildKind, type ZoneKind } from '@bitopolis/shared';
+import { BUILD, DEBT_LIMIT, WAGE_OUTSIDE, ZONE_COST_PER_TILE, ZONE_UNLOCK_POP } from './balance.ts';
 import { applyDecision, canApplyDecision } from './decisions.ts';
+import { campaign, canCampaign } from './politics.ts';
+import { addMemory, answerPetition, canConvenePleno, closePleno, convenePleno, talkTo } from './social.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import {
   buildingAt,
@@ -26,6 +28,9 @@ export const BUILD_NAMES: Record<string, string> = {
   park: 'Parque',
   school: 'Colegio',
   clinic: 'Centro de salud',
+  police: 'Comisaría',
+  plaza: 'Plaza Mayor',
+  market: 'Mercado',
   res: 'Viviendas',
   shop: 'Tienda',
   factory: 'Taller',
@@ -62,19 +67,49 @@ function roadNewTiles(state: GameState, x: number, y: number, x2: number, y2: nu
 }
 
 /** Valida sin aplicar. El motor es quien decide si un comando es legal. */
+/** Mientras gobierna el alcalde rival, sus órdenes pasan por aquí (no las del jugador). */
+let governing = false;
+
+/** Orden del gobierno rival (v1.0): misma validación, sin el bloqueo de la oposición. */
+export function governmentCommand(state: GameState, cmd: Command): boolean {
+  governing = true;
+  try {
+    return applyCommand(state, cmd).ok;
+  } finally {
+    governing = false;
+  }
+}
+
+/** En la oposición el jugador solo puede hablar con los vecinos (y la IA decidir). */
+const OPPOSITION_ALLOWED = new Set(['TalkTo', 'NotifyProject', 'CitizenAct', 'Campaign']);
+
 export function validateCommand(state: GameState, raw: unknown): CommandResult {
   const parsed = Command.safeParse(raw);
   if (!parsed.success) return { ok: false, error: 'comando mal formado' };
   const cmd = parsed.data;
   const pop = state.citizens.length;
+  const pol = state.politics;
+  if (pol && pol.mayor !== 'player' && !governing && !OPPOSITION_ALLOWED.has(cmd.type)) {
+    const year = tickToDate(pol.nextElection).year;
+    return { ok: false, error: `Estás en la oposición: gobierna ${pol.party?.leaderName ?? 'otro alcalde'} hasta las elecciones del año ${year}` };
+  }
   switch (cmd.type) {
     case 'SetTax':
       return { ok: true };
+    case 'SetTaxes':
+      return state.taxesSplit ? { ok: true } : { ok: false, error: 'Los tributos se separan con 50 vecinos' };
+    case 'SetHousingMode': {
+      const b = buildingById(state, cmd.buildingId);
+      return b?.kind === 'house' ? { ok: true } : { ok: false, error: 'Solo las casas municipales se venden o alquilan' };
+    }
     case 'Build': {
       if (cmd.kind === 'road') return validateCommand(state, { type: 'BuildRoad', x: cmd.x, y: cmd.y, x2: cmd.x, y2: cmd.y });
       if (!inBounds(state, cmd.x, cmd.y)) return { ok: false, error: 'Fuera del mapa' };
       const spec = BUILD[cmd.kind];
-      if (pop < spec.unlockPop) return { ok: false, error: `Se desbloquea con ${spec.unlockPop} vecinos` };
+      if ((cmd.kind === 'plaza' || cmd.kind === 'market') && !state.unlocked.includes(cmd.kind)) {
+        return { ok: false, error: cmd.kind === 'plaza' ? 'La Plaza Mayor se desbloquea con el hito de 50 vecinos' : 'El Mercado se desbloquea con el hito de 200 vecinos' };
+      }
+      if (pop < spec.unlockPop && cmd.kind !== 'plaza' && cmd.kind !== 'market') return { ok: false, error: `Se desbloquea con ${spec.unlockPop} vecinos` };
       const t = state.map.tiles[tileIndex(state, cmd.x, cmd.y)];
       if (t === Tile.Road || buildingAt(state, cmd.x, cmd.y)) return { ok: false, error: 'Ese sitio está ocupado' };
       if (!hasAdjacentRoad(state, cmd.x, cmd.y)) return { ok: false, error: 'Necesita una carretera al lado' };
@@ -94,7 +129,8 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       if (!inBounds(state, cmd.x, cmd.y) || !inBounds(state, cmd.x + cmd.w - 1, cmd.y + cmd.h - 1)) {
         return { ok: false, error: 'Fuera del mapa' };
       }
-      if (cmd.zone !== 'none' && state.treasury < cmd.w * cmd.h * ZONE_COST_PER_TILE) return { ok: false, error: 'No hay dinero suficiente' };
+      // Pintar zonas es la salida de una crisis: se permite con deuda hasta el límite.
+      if (cmd.zone !== 'none' && state.treasury - cmd.w * cmd.h * ZONE_COST_PER_TILE < -DEBT_LIMIT) return { ok: false, error: 'No hay dinero suficiente' };
       return { ok: true };
     }
     case 'Demolish': {
@@ -109,6 +145,20 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       return state.projects.some((p) => p.buildingId === cmd.buildingId) ? { ok: true } : { ok: false, error: 'No hay obra' };
     case 'CitizenAct':
       return canApplyDecision(state, cmd.citizenId, cmd.action) ? { ok: true } : { ok: false, error: 'Decisión ya no válida' };
+    case 'ConvenePleno': {
+      const r = canConvenePleno(state);
+      return r.ok ? { ok: true } : { ok: false, error: r.error! };
+    }
+    case 'AnswerPetition':
+      return state.pleno?.petitions.some((p) => p.id === cmd.petitionId && !p.answer) ? { ok: true } : { ok: false, error: 'Esa petición ya está respondida' };
+    case 'Campaign': {
+      const r = canCampaign(state);
+      return r.ok ? { ok: true } : { ok: false, error: r.error! };
+    }
+    case 'ClosePleno':
+      return state.pleno ? { ok: true } : { ok: false, error: 'No hay pleno abierto' };
+    case 'TalkTo':
+      return state.citizens.some((c) => c.id === cmd.citizenId && c.named) ? { ok: true } : { ok: false, error: 'Ese vecino no está' };
   }
 }
 
@@ -121,7 +171,10 @@ export function removeBuilding(state: GameState, id: number): void {
   state.projects = state.projects.filter((p) => p.buildingId !== id);
   for (const c of state.citizens) {
     if (c.homeId === id) c.homeId = null;
-    if (c.jobId === id) c.jobId = null;
+    if (c.jobId === id) {
+      c.jobId = null;
+      if (c.named) addMemory(state, c, 'perdio_trabajo', 4, -4);
+    }
   }
 }
 
@@ -136,7 +189,26 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
         const name = { low: 'bajos', medium: 'medios', high: 'altos' }[cmd.level];
         pushEvent(state, 'tax', `El alcalde pone los impuestos ${name}`);
       }
+      if (state.taxesSplit) state.taxes = { ibi: cmd.level, tasas: cmd.level, plusvalia: cmd.level };
       break;
+    case 'SetTaxes': {
+      const names = { ibi: 'el IBI', tasas: 'las tasas', plusvalia: 'la plusvalía' } as const;
+      const lv = { low: 'bajo', medium: 'medio', high: 'alto' } as const;
+      for (const k of ['ibi', 'tasas', 'plusvalia'] as const) {
+        const v = cmd[k];
+        if (v && state.taxes[k] !== v) {
+          state.taxes[k] = v;
+          pushEvent(state, 'tax', `El alcalde pone ${names[k]} en nivel ${lv[v]}`);
+        }
+      }
+      break;
+    }
+    case 'SetHousingMode': {
+      const b = buildingById(state, cmd.buildingId)!;
+      b.forSale = cmd.mode === 'sale';
+      pushEvent(state, 'info', b.forSale ? 'Casa municipal puesta a la venta' : 'Casa municipal en alquiler', { ref: b.id });
+      break;
+    }
     case 'Build': {
       if (cmd.kind === 'road') return applyCommand(state, { type: 'BuildRoad', x: cmd.x, y: cmd.y, x2: cmd.x, y2: cmd.y });
       const spec = BUILD[cmd.kind];
@@ -196,6 +268,21 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
     }
     case 'CitizenAct':
       applyDecision(state, cmd.citizenId, cmd.action, cmd.motivo, cmd.source);
+      break;
+    case 'ConvenePleno':
+      convenePleno(state);
+      break;
+    case 'AnswerPetition':
+      answerPetition(state, cmd.petitionId, cmd.answer);
+      break;
+    case 'Campaign':
+      campaign(state, cmd.faction);
+      break;
+    case 'ClosePleno':
+      closePleno(state);
+      break;
+    case 'TalkTo':
+      talkTo(state, state.citizens.find((c) => c.id === cmd.citizenId)!);
       break;
   }
   return { ok: true };

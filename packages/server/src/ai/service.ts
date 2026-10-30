@@ -1,7 +1,7 @@
-import { buildDecisionRequest, type GameState, parseDecisions, type Pending } from '@bitopolis/sim';
+import { buildDecisionRequest, type GameState, parseDecisions, parseText, type Pending, type TextRequest } from '@bitopolis/sim';
 import type { Config } from '../config.ts';
 import type { Db } from '../db/index.ts';
-import { costEur, PROVIDER_INFO, PROVIDERS, priceTable, type ProviderId } from './catalog.ts';
+import { costEur, modelFor, priceTable, providerFromKey, type ProviderId } from './catalog.ts';
 import { decryptSecret } from './crypto.ts';
 import { type LLMProvider, makeProvider } from './providers.ts';
 
@@ -38,6 +38,7 @@ interface GameAiState {
 
 const TIMEOUT_MS = 20_000;
 const MAX_OUT_PER_CITIZEN = 120;
+export const MAX_BATCH = 8;
 
 const day = (d = new Date()) => d.toISOString().slice(0, 10);
 const month = (d = new Date()) => d.toISOString().slice(0, 7);
@@ -68,9 +69,6 @@ export class AiService {
       }
       return rowVal ?? undefined;
     };
-    const providerRaw = pick('provider', env.provider, row?.provider);
-    const provider = (PROVIDERS as readonly string[]).includes(providerRaw ?? '') ? (providerRaw as ProviderId) : 'openai';
-    const info = PROVIDER_INFO[provider];
     let key: string | undefined;
     let keyMask: string | undefined;
     if (env.key) {
@@ -85,19 +83,23 @@ export class AiService {
         key = undefined;
       }
     }
-    const model = pick('model', env.model, row?.model) ?? info.cheap;
+    const baseUrl = pick('baseUrl', env.baseUrl, row?.base_url);
+    // El proveedor no se elige: sale de la key (o del endpoint propio).
+    const provider = providerFromKey(key, baseUrl);
+    if (env.key || env.baseUrl) locked.push('provider');
+    const model = modelFor(provider, pick('model', env.model, row?.model), 'cheap');
     return {
       provider,
       model,
-      modelPremium: pick('modelPremium', env.modelPremium, row?.model_premium) ?? (env.model ? env.model : info.premium),
-      baseUrl: pick('baseUrl', env.baseUrl, row?.base_url),
+      modelPremium: modelFor(provider, pick('modelPremium', env.modelPremium, row?.model_premium) ?? env.model, 'premium'),
+      baseUrl,
       key,
       keyMask,
       capDay: pick('capDay', env.gameDaily, row?.cap_day),
       capMonth: pick('capMonth', env.gameMonthly, row?.cap_month),
       serverMonthly: env.serverMonthly,
       locked,
-      configured: !!key || (provider === 'openai-compatible' && !!(env.baseUrl || row?.base_url)),
+      configured: !!key || (provider === 'openai-compatible' && !!baseUrl),
     };
   }
 
@@ -133,6 +135,17 @@ export class AiService {
     return null;
   }
 
+  /**
+   * Reserva antes del primer await: dos peticiones simultáneas ven la reserva
+   * de la otra y no pueden pasar juntas del tope. Si no cabe, se libera.
+   */
+  private async reserve(gameId: number, s: AiSettings, eur: number): Promise<string | null> {
+    this.reserved.set(gameId, (this.reserved.get(gameId) ?? 0) + eur);
+    const blocked = await this.budgetBlock(gameId, s, 0);
+    if (blocked) this.reserved.set(gameId, Math.max(0, (this.reserved.get(gameId) ?? 0) - eur));
+    return blocked;
+  }
+
   private gs(gameId: number): GameAiState {
     let g = this.games.get(gameId);
     if (!g) this.games.set(gameId, (g = { inflight: false, requested: new Set(), ready: [], capped: false }));
@@ -144,7 +157,8 @@ export class AiService {
     if (!state.aiMode || state.pending.length === 0) return;
     const g = this.gs(gameId);
     if (g.inflight) return;
-    const fresh = state.pending.filter((p) => !g.requested.has(`${p.citizenId}:${p.createdTick}`) && p.dueTick > state.tick);
+    // Lotes de 8 vecinos como mucho: con 20 vecinos el coste queda acotado.
+    const fresh = state.pending.filter((p) => !g.requested.has(`${p.citizenId}:${p.createdTick}`) && p.dueTick > state.tick).slice(0, MAX_BATCH);
     if (fresh.length === 0) return;
     for (const p of fresh) g.requested.add(`${p.citizenId}:${p.createdTick}`);
     if (g.requested.size > 500) g.requested = new Set([...g.requested].slice(-200));
@@ -160,14 +174,13 @@ export class AiService {
     if (!s.configured) return;
     const req = buildDecisionRequest(state, pendings);
     const est = this.estimate(s, req.system, req.user, pendings.length);
-    const blocked = await this.budgetBlock(gameId, s, est);
+    const blocked = await this.reserve(gameId, s, est);
     if (blocked) {
       g.capped = true;
       g.lastError = `IA en pausa: ${blocked} alcanzado. Deciden las reglas.`;
       return;
     }
     g.capped = false;
-    this.reserved.set(gameId, (this.reserved.get(gameId) ?? 0) + est);
     const usage = { in: 0, cachedIn: 0, out: 0 };
     let status = 'ok';
     let valid = 0;
@@ -182,6 +195,8 @@ export class AiService {
         usage.in += r.usage.in;
         usage.cachedIn += r.usage.cachedIn;
         usage.out += r.usage.out;
+        // Un motivo repetido se acepta: el modelo no ve sus motivos anteriores (no se reinyectan)
+        // y reintentar por eso solo gastaba tokens.
         return parseDecisions(r.text, list);
       };
       let parsed = await call(req.system, req.user, pendings);
@@ -197,8 +212,9 @@ export class AiService {
       if (parsed.invalid.length > 0) {
         const again = pendings.filter((p) => parsed.invalid.includes(p.citizenId));
         const r2 = buildDecisionRequest(state, again);
-        const note = `${r2.system}\n\nTu respuesta anterior no era válida (${parsed.error ?? 'acción no permitida o falta un vecino'}). Usa solo las acciones de cada vecino.`;
-        parsed = await call(note, r2.user, again);
+        // La nota va al final (parte variable) para no romper el prefijo cacheable.
+        const note = `${r2.user}\n\nTu respuesta anterior no era válida (${parsed.error ?? 'acción no permitida o falta un vecino'}). Usa solo las acciones de cada vecino y un motivo nuevo, sin cifras.`;
+        parsed = await call(r2.system, note, again);
         add(parsed.decisions);
         retried = parsed.decisions.length;
         if (parsed.invalid.length > 0) status = 'partial';
@@ -229,6 +245,56 @@ export class AiService {
         status,
       })
       .execute();
+  }
+
+  /**
+   * Texto con el modelo premium (consejero, diario) o el barato (conversación).
+   * Reserva el presupuesto antes de empezar: si no alcanza, no empieza (spec §9.5).
+   */
+  async text(gameId: number, kind: 'consejero' | 'diario' | 'conversacion', req: TextRequest, premium: boolean): Promise<{ text: string | null; reason?: string }> {
+    const s = await this.settings(gameId);
+    if (!s.configured) return { text: null, reason: 'IA sin configurar' };
+    const model = premium ? s.modelPremium : s.model;
+    const est = costEur(this.prices, model, s.provider, { in: Math.ceil((req.system.length + req.user.length) / 3.2), cachedIn: 0, out: Math.ceil(req.max / 3) + 60 }) * 1.5;
+    const blocked = await this.reserve(gameId, s, est);
+    if (blocked) return { text: null, reason: `${blocked} alcanzado` };
+    const usage = { in: 0, cachedIn: 0, out: 0 };
+    let text: string | null = null;
+    let status = 'ok';
+    try {
+      const provider = this.providerOverride ? this.providerOverride(s) : makeProvider(s.provider, s.key, s.baseUrl);
+      const r = await provider.complete({ system: req.system, user: req.user, schema: req.schema, model, maxTokens: Math.ceil(req.max / 2) + 120 }, AbortSignal.timeout(TIMEOUT_MS));
+      usage.in = r.usage.in;
+      usage.cachedIn = r.usage.cachedIn;
+      usage.out = r.usage.out;
+      text = parseText(r.text, req);
+      if (!text) status = 'invalid';
+    } catch (e) {
+      status = (e as Error).name === 'TimeoutError' ? 'timeout' : 'error';
+    } finally {
+      this.reserved.set(gameId, Math.max(0, (this.reserved.get(gameId) ?? 0) - est));
+    }
+    const now = new Date();
+    await this.db
+      .insertInto('ai_usage')
+      .values({
+        game_id: gameId,
+        ts: now.getTime(),
+        day: day(now),
+        month: month(now),
+        kind,
+        model,
+        tokens_in: usage.in,
+        tokens_cached: usage.cachedIn,
+        tokens_out: usage.out,
+        eur: costEur(this.prices, model, s.provider, usage),
+        requested: 1,
+        valid: text ? 1 : 0,
+        retried: 0,
+        status,
+      })
+      .execute();
+    return text ? { text } : { text: null, reason: status };
   }
 
   /** Decisiones listas para el cliente (se entregan una sola vez). */

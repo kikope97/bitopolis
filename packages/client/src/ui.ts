@@ -1,4 +1,5 @@
 /** Utilidades de interfaz: toasts, hojas inferiores y confirmaciones. */
+import { lowMotion, prefs } from './prefs.ts';
 
 export function $(sel: string): HTMLElement {
   const el = document.querySelector<HTMLElement>(sel);
@@ -24,20 +25,27 @@ export function h<K extends keyof HTMLElementTagNameMap>(
 export function toast(text: string, opts: { sticky?: boolean; kind?: 'info' | 'warn' | 'good'; onClick?: () => void } = {}) {
   const box = $('#toasts');
   const icon = { info: 'ℹ', warn: '⚠', good: '✔' }[opts.kind ?? 'info'];
-  const el = h(
-    'div',
-    { class: `toast ${opts.kind ?? 'info'}`, role: opts.kind === 'warn' ? 'alert' : 'status' },
-    h('span', { class: 'toast-icon', 'aria-hidden': 'true' }, icon),
-    h('span', { class: 'toast-text' }, text),
-  );
+  // Sin role propio: el contenedor #toasts ya es aria-live (evita anuncios dobles).
+  const body = opts.onClick ? h('button', { class: 'toast-text toast-action' }, text) : h('span', { class: 'toast-text' }, text);
+  const el = h('div', { class: `toast ${opts.kind ?? 'info'}` }, h('span', { class: 'toast-icon', 'aria-hidden': 'true' }, icon), body);
   if (opts.onClick) {
     el.classList.add('clickable');
-    el.addEventListener('click', () => {
+    // Un botón de verdad: funciona con teclado (Enter/Espacio) y con lector de pantalla.
+    body.addEventListener('click', () => {
       opts.onClick!();
       el.remove();
     });
   }
   if (opts.sticky) {
+    el.classList.add('sticky');
+    const x = h('button', { class: 'toast-close', 'aria-label': 'Cerrar aviso' }, '✕');
+    x.addEventListener('click', (e) => {
+      e.stopPropagation();
+      el.remove();
+    });
+    el.append(x);
+  } else if (prefs().calm) {
+    // Modo tranquilo: los avisos no caducan; se cierran a mano.
     el.classList.add('sticky');
     const x = h('button', { class: 'toast-close', 'aria-label': 'Cerrar aviso' }, '✕');
     x.addEventListener('click', (e) => {
@@ -61,23 +69,63 @@ let lastFocus: HTMLElement | null = null;
 
 export function closeSheet() {
   if (!openSheetEl) return;
+  document.body.classList.remove('election-night');
   openSheetEl.remove();
   openSheetEl = null;
-  lastFocus?.focus();
+  // Si lo que tenía el foco ya no existe (p. ej. el aviso que abrió la hoja), al mapa.
+  (lastFocus?.isConnected ? lastFocus : document.querySelector<HTMLElement>('#map'))?.focus();
+}
+
+function focusables(el: HTMLElement): HTMLElement[] {
+  return [...el.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])')].filter(
+    (x) => !x.hasAttribute('disabled') && x.tabIndex >= 0 && x.offsetParent !== null,
+  );
 }
 
 /** Hoja inferior (bottom sheet) al alcance del pulgar. */
-export function sheet(title: string, ...content: (Node | string)[]): HTMLElement {
-  closeSheet();
-  lastFocus = document.activeElement as HTMLElement | null;
+export function sheet(title: string | Node, ...content: (Node | string)[]): HTMLElement {
+  // Refresco de la misma hoja (p. ej. la ficha mientras el juego avanza): se cambia
+  // solo el contenido y se conservan el foco y el scroll, sin volver a anunciarla.
+  const titleText = typeof title === 'string' ? title : (title.textContent ?? '');
+  if (openSheetEl && openSheetEl.querySelector('#sheet-title')?.textContent === titleText) {
+    const body = openSheetEl.querySelector<HTMLElement>('.sheet-body')!;
+    const items = focusables(openSheetEl);
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    const scroll = body.scrollTop;
+    body.replaceChildren(...content);
+    body.scrollTop = scroll;
+    if (at >= 0) (focusables(openSheetEl)[at] ?? openSheetEl.querySelector<HTMLElement>('.sheet-close'))?.focus();
+    return openSheetEl;
+  }
+  const keepFocus = openSheetEl ? lastFocus : (document.activeElement as HTMLElement | null);
+  if (openSheetEl) {
+    openSheetEl.remove();
+    openSheetEl = null;
+  }
+  lastFocus = keepFocus;
   const close = h('button', { class: 'sheet-close', 'aria-label': 'Cerrar' }, '✕');
   close.addEventListener('click', closeSheet);
   const el = h(
     'section',
-    { class: 'sheet', role: 'dialog', 'aria-modal': 'false', 'aria-labelledby': 'sheet-title' },
+    { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'sheet-title' },
     h('header', { class: 'sheet-head' }, h('h2', { id: 'sheet-title' }, title), close),
     h('div', { class: 'sheet-body' }, ...content),
   );
+  // Trampa de foco: con el teclado, Tab no sale de la hoja hasta cerrarla (Esc o ✕).
+  el.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab') return;
+    const items = [...el.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])')].filter((x) => !x.hasAttribute('disabled') && x.tabIndex >= 0 && x.offsetParent !== null);
+    if (!items.length) return;
+    const first = items[0]!;
+    const last = items.at(-1)!;
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  });
   document.body.append(el);
   openSheetEl = el;
   close.focus();
@@ -117,12 +165,9 @@ export function confirmDialog(title: string, text: string, yes: string): Promise
 }
 
 export function vibrate(ms: number) {
-  try {
-    if (localStorage.getItem('bitopolis.vibrate') === 'off') return;
-  } catch {
-    /* sin almacenamiento */
-  }
+  if (!prefs().vibrate) return;
   navigator.vibrate?.(ms);
 }
 
-export const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+/** Movimiento reducido: sistema, preferencia o modo tranquilo. */
+export const reducedMotion = lowMotion;

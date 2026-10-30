@@ -5,7 +5,7 @@
  * precios (las fuentes no coinciden entre sí). Revísalos en la página de cada
  * proveedor y sustitúyelos con BITOPOLIS_AI_PRICES_JSON si cambian.
  */
-export const PROVIDERS = ['openai', 'anthropic', 'gemini', 'deepseek', 'mistral', 'openrouter', 'openai-compatible'] as const;
+export const PROVIDERS = ['anthropic', 'openai', 'gemini', 'deepseek', 'mistral', 'openrouter', 'openai-compatible'] as const;
 export type ProviderId = (typeof PROVIDERS)[number];
 
 export interface ProviderInfo {
@@ -17,11 +17,29 @@ export interface ProviderInfo {
   /** Admite response_format json_schema estricto. */
   jsonSchema: boolean;
   needsKey: boolean;
+  /** Modelos sugeridos en Configurar (se puede escribir otro). */
+  models?: string[];
 }
 
 export const PROVIDER_INFO: Record<ProviderId, ProviderInfo> = {
-  openai: { label: 'OpenAI', baseUrl: 'https://api.openai.com/v1', cheap: 'gpt-5.4-nano', premium: 'gpt-5.4-mini', jsonSchema: true, needsKey: true },
-  anthropic: { label: 'Anthropic', baseUrl: 'https://api.anthropic.com', cheap: 'claude-haiku-5-5', premium: 'claude-sonnet-5-5', jsonSchema: true, needsKey: true },
+  openai: {
+    label: 'OpenAI',
+    baseUrl: 'https://api.openai.com/v1',
+    cheap: 'gpt-5.4-nano',
+    premium: 'gpt-5.4-mini',
+    jsonSchema: true,
+    needsKey: true,
+    models: ['gpt-5.4-nano', 'gpt-5.4-mini'],
+  },
+  anthropic: {
+    label: 'Anthropic (Claude)',
+    baseUrl: 'https://api.anthropic.com',
+    cheap: 'claude-haiku-5-5',
+    premium: 'claude-sonnet-5-5',
+    jsonSchema: true,
+    needsKey: true,
+    models: ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'],
+  },
   gemini: {
     label: 'Google Gemini',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
@@ -36,6 +54,22 @@ export const PROVIDER_INFO: Record<ProviderId, ProviderInfo> = {
   'openai-compatible': { label: 'Compatible con OpenAI (Ollama, LM Studio…)', baseUrl: 'http://localhost:11434/v1', cheap: 'llama3.2', premium: 'llama3.2', jsonSchema: false, needsKey: false },
 };
 
+/**
+ * El proveedor se deduce de la key (no se elige a mano): «sk-ant-…» es
+ * Anthropic y cualquier otra, OpenAI. Con un endpoint propio, compatible con OpenAI.
+ */
+export function providerFromKey(key: string | undefined, baseUrl?: string | null): ProviderId {
+  if (baseUrl) return 'openai-compatible';
+  return key?.startsWith('sk-ant-') ? 'anthropic' : 'openai';
+}
+
+/** Un modelo sugerido para otro proveedor no vale: se usa el de serie del actual. */
+export function modelFor(provider: ProviderId, model: string | undefined, kind: 'cheap' | 'premium'): string {
+  const info = PROVIDER_INFO[provider];
+  const foreign = (m: string) => PROVIDERS.some((p) => p !== provider && (PROVIDER_INFO[p].cheap === m || PROVIDER_INFO[p].premium === m || PROVIDER_INFO[p].models?.includes(m)));
+  return model && !foreign(model) ? model : info[kind];
+}
+
 export interface Price {
   /** € por millón de tokens de entrada, de entrada en caché y de salida. */
   in: number;
@@ -47,8 +81,10 @@ export interface Price {
 export const DEFAULT_PRICES: Record<string, Price> = {
   'gpt-5.4-nano': { in: 0.19, cachedIn: 0.02, out: 1.15 },
   'gpt-5.4-mini': { in: 0.7, cachedIn: 0.07, out: 4.2 },
-  'claude-haiku-5-5': { in: 0.92, cachedIn: 0.09, out: 4.6 },
-  'claude-sonnet-5-5': { in: 2.76, cachedIn: 0.28, out: 13.8 },
+  // Anthropic: precios oficiales en USD (Haiku 5.5 $0,10/$0,50; Sonnet 5.5 $2/$10; Opus 5.5 $4/$20 por millón).
+  'claude-haiku-5-5': { in: 0.092, cachedIn: 0.0092, out: 0.46 },
+  'claude-sonnet-5-5': { in: 1.84, cachedIn: 0.18, out: 9.2 },
+  'claude-opus-5-5': { in: 3.68, cachedIn: 0.18, out: 18.4 },
   'gemini-2.5-flash-lite': { in: 0.09, cachedIn: 0.02, out: 0.37 },
   'gemini-2.5-flash': { in: 0.28, cachedIn: 0.07, out: 2.3 },
   'deepseek-chat': { in: 0.26, cachedIn: 0.03, out: 0.39 },

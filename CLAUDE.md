@@ -15,14 +15,31 @@ Monorepo pnpm + TypeScript:
 - `POST /api/games/:token/claim` (423 si otra sesión la tiene; `force` la toma), `/release`.
 - `PUT /api/games/:token/save`: el servidor **reproduce** los comandos sobre su estado y compara el hash; si no coincide, 409 con el estado bueno.
 - `POST /api/games/:token/regenerate`, `GET /api/games/:token/export` (.bitopolis = JSON gzip sin API key), `POST /api/import`.
-- Login opcional (`auth.ts`) si hay `BITOPOLIS_USER` y `BITOPOLIS_PASSWORD`.
+- Acceso con contraseña opcional (`auth.ts`) si hay `BITOPOLIS_PASSWORD` (solo contraseña, sin usuario: decisión del creador).
 - Equilibrio del juego: todos los números en `packages/sim/src/balance.ts`.
 
 ## IA de los vecinos (v0.2)
 - Motor: `sim/src/decisions.ts` (detonantes, acciones válidas, `CitizenAct`, reglas de fallback con motivos) y `sim/src/prompt.ts` (prompt con prefijo fijo, esquema con enums, validación zod). Una decisión pendiente vence a mediodía del día siguiente: si no ha llegado la de la IA, deciden las reglas.
-- Servidor: `server/src/ai/` — `crypto.ts` (AES-256-GCM), `catalog.ts` (proveedores, modelos y precios orientativos), `providers.ts` (OpenAI-compatible, Anthropic, `ReplayProvider`), `service.ts` (petición anticipada al guardar, reintento, topes y reserva), `routes.ts`.
+- Proveedor deducido de la key (`providerFromKey`: `sk-ant-…` Anthropic, resto OpenAI; con `BITOPOLIS_AI_BASE_URL`, compatible con OpenAI). No hay variable ni selector de proveedor (decisión del creador). Variables documentadas en el README.
+- Servidor: `server/src/ai/` — `crypto.ts` (AES-256-GCM), `catalog.ts` (proveedores, modelos y precios orientativos), `providers.ts` (OpenAI-compatible, Anthropic con el SDK oficial `@anthropic-ai/sdk` y `output_config` (salida estructurada, esfuerzo bajo; sin `tool_choice` forzado ni `temperature`), `ReplayProvider`), `service.ts` (petición anticipada al guardar, reintento, topes y reserva), `routes.ts`.
 - `pnpm ai-eval` mide coste por mes de juego y % de válidas (simulador, `--replay` o `--live` con `BITOPOLIS_API_KEY`). El CI lo ejecuta con `e2e/fixtures/ia-replay.json`; si cambia el prompt, regenera con `--record`.
 - Playwright usa `e2e/fake-llm.mjs` (LLM falso compatible con OpenAI) para el Modo IA.
+
+## Economía (v0.3)
+- `sim/src/economy.ts`: IBI, tasas y plusvalía con el nivel medio del mes (un solo control hasta `TAX_SPLIT_POP` vecinos), memoria fiscal (`grudge`) por grupo, vivienda en propiedad con hipoteca, venta de vivienda municipal en cuotas al ayuntamiento, empresas fundadas por vecinos.
+- `sim/src/fields.ts`: campos de contaminación, ruido, delincuencia (la policía la baja) y valor del suelo; el cliente los dibuja como capas (`client/src/layers.ts`).
+- Cliente: `economy-ui.ts` (tributos con glosario y «a quién afecta», parte mensual, lista de vecinos).
+
+## Vida social (v0.4)
+- `sim/src/social.ts`: relaciones simétricas (máx. 5), memoria en 3 capas (recuerdos como datos, resumen narrativo, rasgos), director de historias (ganchos, máx. 3), plenos con peticiones y promesas (`PLENO_COST`, uno al mes), «Hablar» por reglas, `OBJECTIVES` con recompensas e hitos (Plaza Mayor a 50, Mercado a 200).
+- `sim/src/narrative.ts`: consejero y diario por reglas (Modo normal). En `prompt.ts`, `buildTalkRequest`, `buildAdvisorRequest`, `buildChronicleRequest` y `parseText` (solo admite números que estén en los datos).
+- Servidor: `POST /api/games/:token/talk`, `/advisor` y `/chronicle` (crónica en caché), con reserva de gasto en `service.text()`.
+- Cliente: `social-ui.ts` (ficha con «Hablar», pleno, consejero, diario, objetivos, «Desde tu última visita»).
+
+## Elecciones (v1.0)
+- `sim/src/politics.ts` (+ `politics-core.ts`, sin dependencias, para evitar ciclos con `state.ts`): facciones (`factionOf`) con exigencias medidas en el pueblo, intención de voto determinista (`tally`, sin azar), avisos a 12/6/3/1 meses, oposición emergente (`OPPOSITION_APPROVAL`), elecciones cada `ELECTION_MONTHS`, gobierno rival (`rivalGovern` vía `governmentCommand`) y la oposición del jugador (solo `TalkTo`, `Campaign`, `NotifyProject` y `CitizenAct`). Luna de miel de 12 meses. Activa desde `OPPOSITION_POP` vecinos.
+- Detonante `elecciones` en `decisions.ts`: los vecinos con nombre eligen `votar_gobierno`, `votar_oposicion` o `abstenerse` (IA o reglas); el prompt recibe la política como datos.
+- Cliente: `politics-ui.ts` (indicador 🗳, hoja de política, noche electoral).
 
 ## Comandos
 ```

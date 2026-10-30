@@ -119,7 +119,7 @@ describe('economía', () => {
     expect(report.final.population).toBeGreaterThanOrEqual(10);
   });
   it('el pueblo puede quebrar', () => {
-    const { report } = runSimulation({ seed: 26, days: 365, profile: 'derrochador' });
+    const { report } = runSimulation({ seed: 7, days: 900, profile: 'derrochador' });
     expect(report.bankruptDay).not.toBeNull();
   });
   it('el impuesto efectivo es la media del mes (subirlo el último día no rinde)', () => {

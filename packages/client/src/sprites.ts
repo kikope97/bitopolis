@@ -1,4 +1,4 @@
-import { PALETTE } from './palette.ts';
+import { C, PALETTE } from './palette.ts';
 
 /**
  * Pixel art generado por código, en alta definición: casillas de 32×32 y
@@ -198,11 +198,19 @@ function flatRoof(p: Pix, x: number, y: number, w: number, h: number, m: Mat, se
   p.hline(x, y + h - 1, w, m[3]);
 }
 
+/** Mientras se dibuja la variante de noche, la mayoría de ventanas están encendidas. */
+let nightLights = false;
+
 function windowAt(p: Pix, x: number, y: number, w: number, h: number, opts: { frame?: number; shutters?: Mat; flowers?: boolean; lit?: boolean } = {}) {
   const f = opts.frame ?? 12;
+  const lit = opts.lit || (nightLights && hash(x, y, w, 13) > 0.3);
   p.rect(x - 1, y - 1, w + 2, h + 2, f);
-  p.rect(x, y, w, h, opts.lit ? 4 : MAT.glass[2]);
-  if (!opts.lit) {
+  p.rect(x, y, w, h, lit ? (nightLights ? C.lampWarm : 4) : MAT.glass[2]);
+  if (lit && nightLights) {
+    p.rect(x, y, w, Math.ceil(h / 2), C.lamp);
+    p.set(x, y, 12);
+  }
+  if (!lit) {
     p.rect(x, y, w, Math.ceil(h / 2), MAT.glass[1]);
     p.set(x, y, MAT.glass[0]);
     p.set(x + 1, y, MAT.glass[0]);
@@ -255,9 +263,9 @@ function castShadow(p: Pix, x: number, y: number, w: number, h: number) {
 }
 
 function person(p: Pix, x: number, y: number, shirt: number, hat?: number) {
-  p.set(x + 1, y, hat ?? 21);
-  p.set(x + 2, y, hat ?? 21);
-  p.rect(x + 1, y + 1, 2, 1, 21);
+  p.set(x + 1, y, hat ?? C.hairDark);
+  p.set(x + 2, y, hat ?? C.hairDark);
+  p.rect(x + 1, y + 1, 2, 1, C.skin);
   p.rect(x, y + 2, 4, 3, shirt);
   p.set(x, y + 2, MAT.metal[0]);
   p.rect(x + 1, y + 5, 1, 2, 8);
@@ -557,6 +565,98 @@ function clinic(seed: number): Pix {
   return p;
 }
 
+function policeStation(seed: number): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 2, 16, 28, 30);
+  facade(p, 2, 18, 28, 28, MAT.white, 'plaster', seed);
+  flatRoof(p, 1, 12, 30, 7, MAT.blue, seed);
+  // Franja azul y rótulo.
+  p.rect(2, 26, 28, 4, MAT.blue[1]);
+  p.hline(2, 26, 28, MAT.blue[0]);
+  p.hline(2, 29, 28, MAT.blue[2]);
+  for (let i = 0; i < 7; i++) p.rect(7 + i * 3, 27, 2, 2, 12);
+  // Sirena en el tejado.
+  p.rect(14, 8, 4, 4, MAT.metal[2]);
+  p.rect(14, 8, 2, 2, MAT.red[1]);
+  p.rect(16, 8, 2, 2, MAT.blue[1]);
+  p.set(14, 8, 3);
+  p.set(17, 8, 11);
+  windowAt(p, 5, 20, 4, 4, { frame: 13 });
+  windowAt(p, 23, 20, 4, 4, { frame: 13 });
+  doorAt(p, 13, 35, 6, 10, MAT.blue, 12);
+  windowAt(p, 5, 35, 4, 5, { frame: 13 });
+  windowAt(p, 23, 35, 4, 5, { frame: 13 });
+  // Coche patrulla.
+  p.rect(24, 43, 7, 3, 12);
+  p.rect(25, 42, 4, 1, MAT.blue[1]);
+  p.set(24, 46, 0);
+  p.set(30, 46, 0);
+  return p;
+}
+
+function plaza(seed: number): Pix {
+  const p = new Pix(T, BH);
+  // Adoquinado.
+  p.rect(0, 16, 32, 32, MAT.stone[1]);
+  for (let y = 16; y < 48; y += 4) for (let x = (y / 4) % 2 ? 2 : 0; x < 32; x += 4) p.rect(x, y, 3, 3, MAT.stone[0]);
+  p.frame(0, 16, 32, 32, MAT.stone[3]);
+  // Fuente central de piedra.
+  p.ellipse(16, 33, 9, 6, MAT.stone[3]);
+  p.ellipse(16, 32.5, 8, 5, MAT.stone[0]);
+  p.ellipse(16, 33, 6.5, 3.8, MAT.blue[1]);
+  p.ellipse(15, 32, 3, 1.5, MAT.blue[0]);
+  p.rect(15, 24, 3, 9, MAT.stone[1]);
+  p.vline(15, 24, 9, MAT.stone[0]);
+  p.ellipse(16, 23, 4, 1.6, MAT.stone[0]);
+  for (const [x, y] of [[14, 20], [18, 20], [16, 18], [12, 22], [20, 22]] as const) p.set(x, y, 11);
+  p.set(16, 21, 31);
+  // Farolas y bancos.
+  for (const x of [3, 28]) {
+    p.vline(x, 18, 12, MAT.metal[3]);
+    p.rect(x - 1, 16, 3, 3, MAT.yellow[0]);
+    p.set(x, 17, 12);
+  }
+  p.rect(3, 43, 7, 2, MAT.wood[1]);
+  p.hline(3, 42, 7, MAT.wood[2]);
+  p.rect(22, 43, 7, 2, MAT.wood[1]);
+  p.hline(22, 42, 7, MAT.wood[2]);
+  bush(p, 4, 37, 2.5, seed, true);
+  bush(p, 28, 37, 2.5, seed + 2, true);
+  // Bandera en el mástil.
+  p.vline(30, 2, 16, MAT.metal[2]);
+  p.rect(24, 2, 6, 2, MAT.red[1]);
+  p.rect(24, 4, 6, 2, MAT.yellow[0]);
+  p.rect(24, 6, 6, 2, MAT.red[1]);
+  return p;
+}
+
+function market(seed: number): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 1, 14, 30, 32);
+  facade(p, 1, 20, 30, 26, MAT.cream, 'brick', seed);
+  // Tejado de hierro y cristal en arco.
+  for (let j = 0; j < 9; j++) {
+    const inset = Math.round(Math.sqrt(Math.max(0, 81 - (9 - j) * (9 - j))) / 2);
+    p.hline(0 + (4 - inset), 11 + j, 32 - 2 * (4 - inset), j % 3 === 0 ? MAT.metal[2] : MAT.glass[1]);
+  }
+  p.hline(0, 19, 32, MAT.metal[3]);
+  for (let x = 2; x < 32; x += 5) p.vline(x, 11, 9, MAT.metal[2]);
+  p.rect(10, 7, 12, 5, MAT.wood[3]);
+  p.rect(11, 8, 10, 3, MAT.yellow[0]);
+  for (let i = 0; i < 4; i++) p.rect(12 + i * 2, 9, 1, 1, MAT.wood[3]);
+  // Puestos con toldos de colores.
+  const awn = [MAT.red, MAT.moss, MAT.blue, MAT.yellow];
+  for (let k = 0; k < 4; k++) {
+    const x = 2 + k * 7;
+    for (let i = 0; i < 6; i++) p.vline(x + i, 30, 2, i % 2 ? 12 : awn[k]![1]);
+    p.hline(x, 32, 6, awn[k]![2]);
+    p.rect(x, 33, 6, 4, MAT.wood[1]);
+    for (let i = 0; i < 3; i++) p.set(x + 1 + i * 2, 33, [2, 4, 6, 3][(k + i) % 4]!);
+  }
+  doorAt(p, 13, 38, 6, 8, MAT.wood);
+  return p;
+}
+
 function park(seed: number): Pix {
   const p = new Pix(T, BH);
   // Césped cuidado.
@@ -681,7 +781,8 @@ export function grassTile(v: number, tx = v, ty = v * 7): Pix {
       const gx = tx * T + x;
       const gy = ty * T + y;
       const n = smooth(gx, gy, 11, 5) * 0.75 + smooth(gx, gy, 4, 9) * 0.25;
-      p.set(x, y, n > 0.77 ? 22 : n < 0.17 ? 24 : 23);
+      // Pocas manchas y suaves: la hierba no debe competir con los edificios.
+      p.set(x, y, n > 0.82 ? 22 : n < 0.13 ? 24 : 23);
     }
   }
   // Briznas: trazo claro arriba y sombra abajo.
@@ -826,68 +927,286 @@ function iconNoPower(): Pix {
   return p;
 }
 
+/** Icono de la app (64×64): el ayuntamiento sobre un prado, con margen para iconos «maskable». */
+export function iconPix(): Pix {
+  const p = new Pix(64, 64);
+  p.rect(0, 0, 64, 64, 0);
+  p.ellipse(32, 52, 26, 9, 23);
+  p.ellipse(32, 51, 24, 7, 22);
+  p.blit(townhall(), 16, 6);
+  return p;
+}
+
+/** RGBA de un Pix (para exportar PNG en el build). */
+export function pixRGBA(p: Pix, scale = 1): Uint8Array {
+  const W = p.w * scale;
+  const out = new Uint8Array(W * p.h * scale * 4);
+  for (let y = 0; y < p.h * scale; y++) {
+    for (let x = 0; x < W; x++) {
+      const idx = p.data[Math.floor(y / scale) * p.w + Math.floor(x / scale)]!;
+      const o = (y * W + x) * 4;
+      if (idx === NONE) continue;
+      const [r, g, b] = RGB[idx]!;
+      out[o] = r;
+      out[o + 1] = g;
+      out[o + 2] = b;
+      out[o + 3] = 255;
+    }
+  }
+  return out;
+}
+
 /* ============================ caché ============================ */
+
+/** Momento del día: el arte se recolorea con tonos de la misma paleta. */
+export type TimeOfDay = 'day' | 'dusk' | 'night';
+
+const RGB = PALETTE.map((hex) => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)] as const);
+/** Luces: no se oscurecen nunca. */
+const LIGHTS = new Set<number>([C.lamp, C.lampWarm]);
+
+function nearest(r: number, g: number, b: number): number {
+  let best = 0;
+  let bd = Infinity;
+  for (let i = 0; i < RGB.length; i++) {
+    if (LIGHTS.has(i)) continue;
+    const [R, G, B] = RGB[i]!;
+    const d = (r - R) ** 2 * 0.3 + (g - G) ** 2 * 0.59 + (b - B) ** 2 * 0.11;
+    if (d < bd) {
+      bd = d;
+      best = i;
+    }
+  }
+  return best;
+}
+
+/** Tabla índice → índice para cada momento del día (siempre dentro de la paleta). */
+const REMAP: Record<TimeOfDay, number[]> = {
+  day: RGB.map((_, i) => i),
+  dusk: RGB.map(([r, g, b], i) => (LIGHTS.has(i) ? i : nearest(r * 0.9 + 10, g * 0.8 + 2, b * 0.72 + 12))),
+  night: RGB.map(([r, g, b], i) => (LIGHTS.has(i) ? i : nearest(r * 0.34 + 8, g * 0.44 + 8, b * 0.6 + 28))),
+};
 
 const cache = new Map<string, HTMLCanvasElement>();
 
-export function toCanvas(p: Pix): HTMLCanvasElement {
+export function toCanvas(p: Pix, tod: TimeOfDay = 'day'): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = p.w;
   c.height = p.h;
   const ctx = c.getContext('2d')!;
   const img = ctx.createImageData(p.w, p.h);
-  const rgb = PALETTE.map((hex) => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)]);
+  const map = REMAP[tod];
   for (let i = 0; i < p.data.length; i++) {
     const idx = p.data[i]!;
     if (idx === NONE) continue;
-    const [r, g, b] = rgb[idx]!;
-    img.data[i * 4] = r!;
-    img.data[i * 4 + 1] = g!;
-    img.data[i * 4 + 2] = b!;
+    const [r, g, b] = RGB[map[idx]!]!;
+    img.data[i * 4] = r;
+    img.data[i * 4 + 1] = g;
+    img.data[i * 4 + 2] = b;
     img.data[i * 4 + 3] = 255;
   }
   ctx.putImageData(img, 0, 0);
   return c;
 }
 
-export function sprite(key: string, make: () => Pix): HTMLCanvasElement {
-  let c = cache.get(key);
+/** Pinta un Pix opaco directamente en un contexto (sin canvas intermedio). */
+export function putPix(ctx: CanvasRenderingContext2D, p: Pix, dx: number, dy: number, tod: TimeOfDay = 'day'): void {
+  const img = ctx.createImageData(p.w, p.h);
+  const map = REMAP[tod];
+  for (let i = 0; i < p.data.length; i++) {
+    const idx = p.data[i]!;
+    if (idx === NONE) continue;
+    const [r, g, b] = RGB[map[idx]!]!;
+    img.data[i * 4] = r;
+    img.data[i * 4 + 1] = g;
+    img.data[i * 4 + 2] = b;
+    img.data[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(img, dx, dy);
+}
+
+export function sprite(key: string, make: () => Pix, tod: TimeOfDay = 'day'): HTMLCanvasElement {
+  const k = `${key}@${tod}`;
+  let c = cache.get(k);
   if (!c) {
-    c = toCanvas(make());
-    cache.set(key, c);
+    nightLights = tod === 'night';
+    try {
+      c = toCanvas(make(), tod);
+    } finally {
+      nightLights = false;
+    }
+    cache.set(k, c);
   }
   return c;
 }
 
 /** Sprite de 32×48 de un edificio. Las viviendas y tiendas varían con su id. */
-export function buildingSprite(kind: string, id: number): HTMLCanvasElement {
+export function buildingSprite(kind: string, id: number, tod: TimeOfDay = 'day'): HTMLCanvasElement {
+  const s = (key: string, make: () => Pix) => sprite(key, make, tod);
   switch (kind) {
     case 'townhall':
-      return sprite('townhall', townhall);
+      return s('townhall', townhall);
     case 'water':
-      return sprite('water', () => waterTower(3));
+      return s('water', () => waterTower(3));
     case 'power':
-      return sprite('power', () => powerPlant(5));
+      return s('power', () => powerPlant(5));
     case 'park':
-      return sprite('park', () => park(11));
+      return s('park', () => park(11));
     case 'school':
-      return sprite('school', () => school(2));
+      return s('school', () => school(2));
     case 'clinic':
-      return sprite('clinic', () => clinic(4));
+      return s('clinic', () => clinic(4));
+    case 'police':
+      return s('police', () => policeStation(6));
+    case 'plaza':
+      return s('plaza', () => plaza(8));
+    case 'market':
+      return s('market', () => market(9));
     case 'factory':
-      return sprite(`factory${id % 4}`, () => factory(id % 4));
+      return s(`factory${id % 4}`, () => factory(id % 4));
     case 'shop':
-      return sprite(`shop${id % 16}`, () => shop(id % 16));
+      return s(`shop${id % 16}`, () => shop(id % 16));
     case 'house':
-      return sprite(`house${id % 4}`, () => cottage(id % 4));
+      return s(`house${id % 4}`, () => cottage(id % 4));
     case 'res':
-      return sprite(`res${id % 256}`, () => apartment(Math.floor(hash(id, 77) * 256)));
+      return s(`res${id % 256}`, () => apartment(Math.floor(hash(id, 77) * 256)));
     default:
-      return constructionSprite(0, id);
+      return constructionSprite(0, id, tod);
   }
 }
 
-export const constructionSprite = (stage: number, id: number) => sprite(`obra${stage}-${id % 3}`, () => construction(stage, id % 3));
-export const treeSprite = (v: number) => sprite(`tree${v}`, () => treeTile(v));
+export const constructionSprite = (stage: number, id: number, tod: TimeOfDay = 'day') => sprite(`obra${stage}-${id % 3}`, () => construction(stage, id % 3), tod);
+/** Árbol con dos fotogramas de viento (la copa se mece 1 px). */
+export const treeSprite = (v: number, frame = 0, tod: TimeOfDay = 'day') => sprite(`tree${v}-${frame}`, () => (frame ? sway(treeTile(v), 30) : treeTile(v)), tod);
 export const iconSprite = (k: 'noWater' | 'noPower') => sprite(`icon-${k}`, k === 'noWater' ? iconNoWater : iconNoPower);
 export const letterSprite = (ch: 'R' | 'C' | 'I', color: number) => sprite(`L${ch}${color}`, () => letter(ch, color));
+
+/** Desplaza 1 px a la derecha las filas por encima de `rows` (la copa, no el tronco). */
+function sway(p: Pix, rows: number): Pix {
+  const out = new Pix(p.w, p.h);
+  for (let y = 0; y < p.h; y++) {
+    const dx = y < rows - 8 ? 1 : 0;
+    for (let x = 0; x < p.w; x++) {
+      const c = p.data[y * p.w + x]!;
+      if (c !== NONE) out.set(x + dx, y, c);
+    }
+  }
+  return out;
+}
+
+/* ============================ vecinos ============================ */
+
+const SKINS = [C.skin, C.skinTan, C.skinBrown, C.skinDark];
+const HAIRS = [C.hairDark, C.hairBlond, C.hairRed, C.hairGray, 36, 17];
+const SHIRTS: Mat[] = [MAT.red, MAT.blue, MAT.moss, MAT.yellow, MAT.plum, MAT.teal, MAT.terracotta];
+const TROUSERS = [8, 15, 26, 35, 25];
+
+/**
+ * Vecino caminando, 7×12 px a la escala del mapa (4 fotogramas). Mira a la
+ * derecha (dir 1) o a la izquierda (dir −1). El retrato de la ficha usa el
+ * mismo diseño a 12×18.
+ */
+export function walker(variant: number, frame: number, dir: 1 | -1): Pix {
+  const p = new Pix(7, 12);
+  const skin = SKINS[variant % SKINS.length]!;
+  const hair = HAIRS[Math.floor(variant / 4) % HAIRS.length]!;
+  const shirt = SHIRTS[Math.floor(variant / 3) % SHIRTS.length]!;
+  const trousers = TROUSERS[Math.floor(variant / 7) % TROUSERS.length]!;
+  const longHair = hash(variant, 3) > 0.5;
+  const fx = (x: number) => (dir === 1 ? x : 6 - x);
+  const set = (x: number, y: number, c: number) => p.set(fx(x), y, c);
+  // Sombra en el suelo.
+  for (let x = 1; x < 6; x++) set(x, 11, 24);
+  // Cabeza.
+  for (const [x, y] of [[2, 1], [3, 1], [4, 1], [2, 2], [3, 2], [4, 2], [3, 3]]) set(x!, y!, skin);
+  set(4, 2, 0); // ojo
+  for (let x = 2; x <= 4; x++) set(x, 0, hair);
+  set(1, 1, hair);
+  if (longHair) {
+    set(1, 2, hair);
+    set(1, 3, hair);
+  }
+  // Tronco con luz a la izquierda.
+  for (let y = 4; y <= 7; y++) for (let x = 2; x <= 4; x++) set(x, y, shirt[1]);
+  for (let y = 4; y <= 7; y++) set(4, y, shirt[2]);
+  set(2, 4, shirt[0]);
+  // Brazos (balanceo).
+  const swing = [0, 1, 0, -1][frame % 4]!;
+  set(1, 5 + Math.max(0, swing), shirt[2]);
+  set(5, 5 + Math.max(0, -swing), shirt[2]);
+  set(1, 6 + Math.max(0, swing), skin);
+  set(5, 6 + Math.max(0, -swing), skin);
+  // Piernas (4 fotogramas).
+  const legs = [
+    [[2, 3], [4, 3]],
+    [[2, 2], [4, 4]],
+    [[3, 3], [3, 3]],
+    [[2, 4], [4, 2]],
+  ][frame % 4]!;
+  const [[lx, ly], [rx, ry]] = legs as [[number, number], [number, number]];
+  set(3, 8, trousers);
+  for (let y = 8; y < 8 + ly; y++) set(lx, y, trousers);
+  for (let y = 8; y < 8 + ry; y++) set(rx, y, trousers);
+  set(lx, 8 + ly, 0);
+  set(rx, 8 + ry, 0);
+  return p;
+}
+
+/** Retrato de la ficha: vecino de frente, 12×18 px (spec §8.1). */
+export function portrait(variant: number): Pix {
+  const p = new Pix(12, 18);
+  const skin = SKINS[variant % SKINS.length]!;
+  const hair = HAIRS[Math.floor(variant / 4) % HAIRS.length]!;
+  const shirt = SHIRTS[Math.floor(variant / 3) % SHIRTS.length]!;
+  const trousers = TROUSERS[Math.floor(variant / 7) % TROUSERS.length]!;
+  const longHair = hash(variant, 3) > 0.5;
+  // Cabeza (5×5) con luz a la izquierda.
+  p.rect(4, 2, 4, 5, skin);
+  p.vline(3, 3, 3, skin);
+  p.vline(8, 3, 3, skin);
+  p.vline(7, 2, 5, SKINS[Math.min(3, SKINS.indexOf(skin) + 1)]!);
+  p.set(5, 4, 0);
+  p.set(7, 4, 0);
+  p.hline(5, 6, 2, MAT.red[2]);
+  // Pelo.
+  p.hline(4, 0, 4, hair);
+  p.hline(3, 1, 6, hair);
+  p.set(3, 2, hair);
+  p.set(8, 2, hair);
+  if (longHair) {
+    p.vline(2, 2, 6, hair);
+    p.vline(9, 2, 6, hair);
+  }
+  // Cuello y tronco.
+  p.hline(5, 7, 2, skin);
+  p.rect(2, 8, 8, 5, shirt[1]);
+  p.vline(2, 8, 5, shirt[0]);
+  p.vline(9, 8, 5, shirt[2]);
+  p.hline(3, 8, 6, shirt[0]);
+  p.vline(1, 9, 3, shirt[1]);
+  p.vline(10, 9, 3, shirt[2]);
+  p.set(1, 12, skin);
+  p.set(10, 12, skin);
+  // Piernas y zapatos.
+  p.rect(3, 13, 6, 1, trousers);
+  p.rect(3, 14, 2, 3, trousers);
+  p.rect(7, 14, 2, 3, trousers);
+  p.hline(3, 17, 2, 0);
+  p.hline(7, 17, 2, 0);
+  return p;
+}
+
+export const portraitSprite = (variant: number) => sprite(`portrait${variant}`, () => portrait(variant));
+
+export const walkerSprite = (variant: number, frame: number, dir: 1 | -1, tod: TimeOfDay = 'day') =>
+  sprite(`walker${variant}-${frame}-${dir}`, () => walker(variant, frame, dir), tod);
+
+/** Bocanada de humo (3 tamaños). */
+export function puff(size: number): Pix {
+  const r = 1.2 + size * 0.9;
+  const d = Math.ceil(r * 2) + 2;
+  const p = new Pix(d, d);
+  p.ball(d / 2, d / 2, r, [12, C.smoke, C.smokeMid, C.smokeDark], size);
+  return p;
+}
+export const puffSprite = (size: number, tod: TimeOfDay = 'day') => sprite(`puff${size}`, () => puff(size), tod);

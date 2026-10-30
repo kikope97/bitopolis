@@ -90,6 +90,8 @@ Cada uno tiene: coste de construcción, mantenimiento mensual, empleados necesar
 | 50–200 | tributos separados, más servicios, plenos, consejero | felicidad y facciones |
 | 200+ | facciones, elecciones, oposición | elecciones |
 
+*Ronda 06:* facciones y oposición se activan con **50** vecinos (con 200 casi ningún pueblo llegaba a tenerlas en 4 años); las elecciones son cada 4 años desde el principio.
+
 - Siempre hay 1–3 **objetivos** visibles con recompensa ("llega a 10 vecinos"), y cada fase tiene un hito con recompensa tangible (un edificio o una herramienta).
 - **Parte mensual**: ingresos y gastos con flechas, y un "por qué baja tu saldo" con nombres.
 
@@ -125,9 +127,10 @@ Mudarse al pueblo o no, irse y vender la casa, comprar o alquilar casa, buscar o
 ## 8. Interfaz, arte y accesibilidad
 
 ### 8.1 Arte (todo propio, generado por código)
-- **Paleta cerrada de 32 colores** en `palette.ts`, validada en el build: si aparece un color fuera de la paleta, el build falla.
+- **Paleta cerrada de 64 colores** en `palette.ts` (decisión del creador, ronda 04: antes 32), validada en el build: si aparece un color fuera de la paleta, el build falla.
 - **Alta definición** (decisión del creador, ronda 01): pixel art detallado, no "de cuadros". Casillas de 32 px y edificios de 32×48 que sobresalen hacia arriba, con texturas (ladrillo, tejas, chapa), reflejos, sombras proyectadas y tramado.
-- Sprites a partir de **plantillas modulares** (base, tejado, puerta, ventanas) en matrices de índices de paleta. Se combinan con semilla y se exportan a un atlas en el build. Luz desde arriba a la izquierda, contorno de 1 px de color (no negro), 3 tonos por material, sin degradados ni antialiasing.
+- Sprites a partir de **plantillas modulares** (base, tejado, puerta, ventanas) en matrices de índices de paleta. Se combinan con semilla y se exportan a un atlas en el build. Luz desde arriba a la izquierda, contorno de 1 px de color (no negro), 4–5 tonos por material, sin degradados ni antialiasing.
+- **Aún más definido y animado** (decisión del creador, ronda 04): más detalle por sprite y animaciones por fotogramas: vecinos caminando, agua y humo que se mueven, árboles con viento, obras con andamios, luces que se encienden de noche. Todo respeta el modo calma y `prefers-reduced-motion`.
 - Vecinos de 12×18 px con silueta propia e icono de estado encima.
 - Escala entera con `image-rendering: pixelated` y zoom en múltiplos enteros.
 - Nada de assets de terceros.
@@ -226,10 +229,9 @@ Mudarse al pueblo o no, irse y vender la casa, comprar o alquilar casa, buscar o
 | `BITOPOLIS_MASTER_KEY` | sí | Cifra las API keys guardadas. Si se pierde, se pierden las keys. |
 | `BITOPOLIS_PUBLIC_URL` | sí | URL pública, para generar los enlaces. |
 | `PORT` | no (8080) | Puerto interno. |
-| `BITOPOLIS_USER` + `BITOPOLIS_PASSWORD` | no | Si se definen, todo el servidor pide ese usuario y contraseña al entrar (login propio, cookie `HttpOnly`/`Secure`/`SameSite`, bloqueo tras varios intentos fallidos). Es un acceso común, no son cuentas. |
-| `BITOPOLIS_API_KEY` | no | Key por defecto para **todas** las partidas: todas arrancan en Modo IA y la key no se ve ni se cambia desde el juego. |
-| `BITOPOLIS_AI_PROVIDER` | no | `openai`, `anthropic`, `gemini`, `deepseek`, `mistral`, `openrouter` u `openai-compatible`. |
-| `BITOPOLIS_AI_BASE_URL` | no | Endpoint propio (Ollama, LM Studio…). |
+| `BITOPOLIS_PASSWORD` | no | Si se define, todo el servidor pide esa contraseña al entrar (login propio, cookie `HttpOnly`/`Secure`/`SameSite`, bloqueo tras varios intentos fallidos). Es un acceso común, no son cuentas: **solo contraseña, sin usuario** (decisión del creador, octubre de 2026; antes `BITOPOLIS_USER` + `BITOPOLIS_PASSWORD`). |
+| `BITOPOLIS_API_KEY` | no | Key por defecto para **todas** las partidas: todas arrancan en Modo IA y la key no se ve ni se cambia desde el juego. **El proveedor se deduce de la key** (decisión del creador, octubre de 2026): `sk-ant-…` es Anthropic y cualquier otra, OpenAI. No hay variable para elegirlo, y en Configurar solo se pide la key («se acepta API key de Anthropic o de OpenAI»). |
+| `BITOPOLIS_AI_BASE_URL` | no | Endpoint propio compatible con OpenAI (Ollama, LM Studio…); con él no hace falta key. |
 | `BITOPOLIS_AI_MODEL` | no | Modelo barato. |
 | `BITOPOLIS_AI_MODEL_PREMIUM` | no | Modelo premium (si falta, se usa el barato). |
 | `BITOPOLIS_AI_MAX_CITIZENS` | no (20) | Vecinos con IA por partida. |
@@ -263,7 +265,7 @@ El alcance está congelado hasta la v1.0. Todo lo de la sección 15 solo entra s
 
 - **v0.0 — Esqueleto**: monorepo, lint de fronteras, `sim` con PRNG, ticks y comandos, `pnpm sim`, invariantes, Fastify sirviendo el cliente, SQLite con migraciones, Dockerfile, compose de ejemplo, GitHub Actions publicando `:test`, Playwright en viewport móvil, `CLAUDE.md`.
   *Hecho cuando:* el CI está en verde, 365 días simulados tardan menos de 10 s, y `docker compose up` arranca y responde en `/healthz`.
-- **v0.1 — Pueblo jugable (Modo normal)**: pantalla de inicio, partida por URL, guardado en el servidor, exportar/importar, mapa, carreteras, agua y luz, zonas RCI con demanda, impuesto único, 3 servicios, obras con obreros, tutorial, controles táctiles y de escritorio, `BITOPOLIS_USER`/`PASSWORD`.
+- **v0.1 — Pueblo jugable (Modo normal)**: pantalla de inicio, partida por URL, guardado en el servidor, exportar/importar, mapa, carreteras, agua y luz, zonas RCI con demanda, impuesto único, 3 servicios, obras con obreros, tutorial, controles táctiles y de escritorio, `BITOPOLIS_PASSWORD`.
   *Hecho cuando:* se juega 15 minutos en el móvil sin quedarse bloqueado, y el CLI muestra que el pueblo puede crecer y también quebrar.
 - **v0.2 — Prueba de la IA**: configuración de la IA, key cifrada, variables de IA, proveedores, 5 vecinos con nombre, detonantes, enums y zod, petición anticipada, fallback, topes y estimación de coste, `ReplayProvider`, burbujas con `motivo`.
   *Hecho cuando:* el coste por mes de juego está medido, ≥98% de las respuestas son válidas o se resuelven con fallback, y los `motivo` tienen personalidad. **Si no se cumple, se replantea la IA antes de seguir.**

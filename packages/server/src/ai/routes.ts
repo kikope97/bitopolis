@@ -1,7 +1,18 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { GameToken } from '@bitopolis/shared';
-import { buildDecisionRequest, createInitialState, FORMAT_VERSION, type GameState, migrate, validActions } from '@bitopolis/sim';
+import {
+  buildAdvisorRequest,
+  buildChronicleRequest,
+  buildDecisionRequest,
+  buildTalkRequest,
+  createInitialState,
+  FORMAT_VERSION,
+  type GameState,
+  migrate,
+  townFacts,
+  validActions,
+} from '@bitopolis/sim';
 import type { Config } from '../config.ts';
 import type { Db } from '../db/index.ts';
 import { newSeed } from '../tokens.ts';
@@ -35,7 +46,8 @@ function publicSettings(s: AiSettings) {
 
 const ConfigBody = z.object({
   sessionId: z.string().min(8).max(64),
-  provider: z.enum(PROVIDERS),
+  /** Ya no se elige: se deduce de la key. Se acepta y se ignora (clientes antiguos). */
+  provider: z.enum(PROVIDERS).optional(),
   model: z.string().trim().min(1).max(128).optional(),
   modelPremium: z.string().trim().max(128).optional(),
   baseUrl: z.string().trim().url().max(512).optional().or(z.literal('')),
@@ -109,7 +121,7 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
     const locked = new Set(current.locked);
     const values = {
       game_id: row.id,
-      provider: locked.has('provider') ? null : d.provider,
+      provider: null,
       model: locked.has('model') ? null : (d.model ?? null),
       model_premium: locked.has('modelPremium') ? null : d.modelPremium || null,
       base_url: locked.has('baseUrl') ? null : d.baseUrl || null,
@@ -147,6 +159,68 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
     if (!row) return bad(reply, 'no existe', 404);
     const s = await ai.settings(row.id);
     return { ...(await ai.report(row.id)), caps: { day: s.capDay, month: s.capMonth, server: s.serverMonthly } };
+  });
+
+  /** Textos con IA (v0.4). Entrada: solo ids y enums; salida validada. Si falla, el cliente usa reglas. */
+  const chronicles = new Map<string, string>();
+  const talks = new Map<string, string>();
+  const talking = new Set<number>();
+  const TalkBody = z.object({ citizenId: z.number().int().min(1), question: z.enum(['como_estas', 'que_necesitas', 'me_votarias']) });
+  const AdvisorBody = z.object({ question: z.enum(['como_va', 'que_cambiarias']) });
+  const aiGame = async (params: unknown) => {
+    const t = tokenOf(params);
+    if (!t.success) return null;
+    const row = await load(t.data);
+    if (!row || row.mode !== 'ai') return null;
+    return { row, state: migrate(JSON.parse(row.state)) as GameState };
+  };
+
+  app.post('/api/games/:token/talk', async (req, reply) => {
+    const g = await aiGame(req.params);
+    const b = TalkBody.safeParse(req.body);
+    if (!g || !b.success) return bad(reply, 'petición no válida');
+    const c = g.state.citizens.find((x) => x.id === b.data.citizenId && x.named);
+    if (!c) return bad(reply, 'ese vecino no está', 404);
+    // Una respuesta por vecino, pregunta y día de juego; y una conversación a la vez por partida.
+    const key = `${g.row.id}:${c.id}:${b.data.question}:${Math.floor(g.state.tick / 24)}`;
+    const cached = talks.get(key);
+    if (cached) return { text: cached };
+    if (talking.has(g.row.id)) return { text: null, reason: 'ya hay una conversación en curso' };
+    talking.add(g.row.id);
+    try {
+      const r = await ai.text(g.row.id, 'conversacion', buildTalkRequest(g.state, c, b.data.question), false);
+      if (r.text) {
+        talks.set(key, r.text);
+        if (talks.size > 2000) talks.delete(talks.keys().next().value!);
+      }
+      return r;
+    } finally {
+      talking.delete(g.row.id);
+    }
+  });
+
+  app.post('/api/games/:token/advisor', async (req, reply) => {
+    const g = await aiGame(req.params);
+    const b = AdvisorBody.safeParse(req.body);
+    if (!g || !b.success) return bad(reply, 'petición no válida');
+    return ai.text(g.row.id, 'consejero', buildAdvisorRequest(g.state, townFacts(g.state), b.data.question), true);
+  });
+
+  app.post('/api/games/:token/chronicle', async (req, reply) => {
+    const g = await aiGame(req.params);
+    if (!g) return bad(reply, 'petición no válida');
+    const monthIdx = Math.floor(g.state.tick / (24 * 30));
+    const key = `${g.row.id}:${monthIdx}`;
+    const cached = chronicles.get(key);
+    if (cached) return { text: cached };
+    // Sucesos del motor; los motivos del LLM no se reinyectan.
+    const events = g.state.events
+      .filter((e) => e.kind !== 'decision' && e.kind !== 'tax')
+      .map((e) => e.text)
+      .slice(-25);
+    const r = await ai.text(g.row.id, 'diario', buildChronicleRequest(g.state, townFacts(g.state), events), true);
+    if (r.text) chronicles.set(key, r.text);
+    return r;
   });
 
   /** «Qué se envía»: un ejemplo real del prompt con el estado de esta partida. */

@@ -1,9 +1,11 @@
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import {
-  BUSINESS_CASH_CAP,
   BUSINESS_SEED_CASH,
   COMMUTER_DAILY,
   DEBT_INTEREST,
+  FOUND_MIN_MONEY,
+  DEBT_INTEREST_HIGH,
+  DEBT_INTEREST_STEP,
   DEBT_LIMIT,
   FACTORY_REVENUE_PER_WORKER,
   GROWTH,
@@ -12,17 +14,12 @@ import {
   LIVING_COST,
   LOCAL_SPEND_SHARE,
   MAINTENANCE,
-  MUNICIPAL_RENT,
   PIE_PER_CITIZEN,
   PLANT_CAPACITY,
-  PRIVATE_RENT,
   PRIVATE_SALARY,
-  PROPERTY_BASE,
   PUBLIC_SALARY,
   SERVICE,
   SERVICE_SALARY,
-  TAX_HAPPINESS,
-  TAX_RATE,
   WAGE_LOCAL,
   WAGE_OUTSIDE,
   ZONE_UNLOCK_POP,
@@ -31,6 +28,22 @@ import { applyCommand, BUILD_NAMES, removeBuilding } from './commands.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance, nextInt, pick } from './prng.ts';
 import { detectTriggers, onNamedArrival, resolveDuePending } from './decisions.ts';
+import {
+  accumulateRates,
+  averageTaxMood,
+  businessTaxes,
+  maybeSplitTaxes,
+  monthlyHousing,
+  monthlyMarket,
+  monthRates,
+  payDividends,
+  sellOnDeparture,
+  taxMood,
+  updateGrudges,
+} from './economy.ts';
+import { updateFields } from './fields.ts';
+import { goalFor, memoryMood, onCitizenLeaves, PROFESSIONS, relationMood, socialDay } from './social.ts';
+import { politicsDay } from './politics.ts';
 import {
   type Building,
   type Citizen,
@@ -41,6 +54,7 @@ import {
   inBounds,
   randomTraits,
   newBuilding,
+  NO_PROPERTY,
   pushEvent,
   Tile,
   tileIndex,
@@ -182,8 +196,8 @@ export function computeDemand(state: GameState): GameState['demand'] {
   const free = freeHomes(state);
   const happy = averageHappiness(state);
   const clamp = (v: number) => Math.round(Math.max(-100, Math.min(100, v)));
-  const R = 40 + vacancies(state) * 6 - Math.max(0, free - 6) * 3 + (happy - 55) + TAX_HAPPINESS[state.taxLevel] - (pop >= ZONE_UNLOCK_POP ? jobless * 2 : 0);
-  const C = pop < ZONE_UNLOCK_POP ? 0 : (pop / 14 - shops) * 25;
+  const R = 40 + vacancies(state) * 5 - Math.max(0, free - 8) * 1.5 + (happy - 55) + averageTaxMood(state) - (pop >= ZONE_UNLOCK_POP ? jobless * 2 : 0);
+  const C = pop < ZONE_UNLOCK_POP ? 0 : (pop / 12 - shops) * 25;
   const I = pop < ZONE_UNLOCK_POP ? 0 : jobless * 6 - factories * 10 + 20;
   return { R: clamp(R), C: clamp(C), I: clamp(I) };
 }
@@ -195,30 +209,43 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
   const home = c.homeId !== null ? state.buildings.find((b) => b.id === c.homeId) : undefined;
   if (!home) f.push({ label: 'Sin casa', value: -20 });
   else {
-    f.push({ label: 'Tiene casa', value: 8 });
+    f.push({ label: c.owns ? 'Casa en propiedad' : 'Tiene casa', value: c.owns ? 11 : 8 });
     f.push(home.hasWater ? { label: 'Agua', value: 8 } : { label: 'Sin agua', value: -12 });
     f.push(home.hasPower ? { label: 'Luz', value: 8 } : { label: 'Sin luz', value: -12 });
+    // Servicios con rendimiento decreciente: no se acumulan sin límite.
+    let services = 0;
+    const seen = new Set<string>();
     for (const b of state.buildings) {
       const s = SERVICE[b.kind];
-      if (s && b.built && dist(b, home) <= s.radius && !f.some((x) => x.label === BUILD_NAMES[b.kind])) {
-        f.push({ label: BUILD_NAMES[b.kind]!, value: s.happiness });
-      }
-      if (b.kind === 'factory' && b.built && dist(b, home) <= 3 && !f.some((x) => x.label === 'Contaminación')) {
-        f.push({ label: 'Contaminación', value: -8 });
-      }
-      if (b.kind === 'shop' && b.built && dist(b, home) <= 6 && !f.some((x) => x.label === 'Tienda cerca')) {
-        f.push({ label: 'Tienda cerca', value: 4 });
-      }
+      if (!s || !b.built || dist(b, home) > s.radius) continue;
+      services += seen.has(b.kind) ? s.happiness / 2 : s.happiness;
+      seen.add(b.kind);
     }
+    if (services > 0) {
+      const v = Math.round(10 * (1 - Math.exp(-services / 10)) * (state.bankrupt ? 0.5 : 1));
+      if (v > 0) f.push({ label: `Servicios cerca (${[...seen].map((k) => BUILD_NAMES[k]!.toLowerCase()).join(', ')})`, value: v });
+    }
+    if (state.buildings.some((b) => b.kind === 'shop' && b.built && dist(b, home) <= 6)) f.push({ label: 'Tienda cerca', value: 4 });
+    const i = home.y * state.map.w + home.x;
+    const pol = state.fields.pollution[i] ?? 0;
+    const noise = state.fields.noise[i] ?? 0;
+    const crime = state.fields.crime[i] ?? 0;
+    if (pol > 20) f.push({ label: 'Contaminación', value: -Math.round((pol - 20) / 5) });
+    if (noise > 25) f.push({ label: 'Ruido', value: -Math.round((noise - 25) / 6) });
+    if (crime > 20) f.push({ label: 'Inseguridad', value: -Math.round((crime - 20) / 5) });
   }
   f.push(c.jobId !== null ? { label: 'Trabaja en el pueblo', value: 8 } : { label: 'Trabaja fuera', value: -4 });
-  const tax = TAX_HAPPINESS[state.taxLevel];
-  if (tax !== 0) f.push({ label: tax > 0 ? 'Impuestos bajos' : 'Impuestos altos', value: tax });
+  if (c.mortgage > 0 && c.money < 300) f.push({ label: 'Le cuesta pagar la hipoteca', value: -6 });
+  f.push(...taxMood(state, c));
+  f.push(...relationMood(c));
+  const mem = memoryMood(state, c);
+  if (mem) f.push({ label: mem > 0 ? 'Buenos recuerdos recientes' : 'Malos recuerdos recientes', value: mem });
+  if (state.bankrupt) f.push({ label: 'Ayuntamiento en quiebra', value: -8 });
   return f;
 }
 
 function targetHappiness(state: GameState, c: Citizen): number {
-  const t = 50 + happinessFactors(state, c).reduce((s, x) => s + x.value, 0);
+  const t = 38 + happinessFactors(state, c).reduce((s, x) => s + x.value, 0);
   return Math.max(0, Math.min(100, t));
 }
 
@@ -264,8 +291,13 @@ function growZones(state: GameState, served: { water: Set<number>; power: Set<nu
     [Zone.C, 'shop', state.demand.C],
     [Zone.I, 'factory', state.demand.I],
   ] as const;
+  // Los locales comerciales se reservan para vecinos que quieren emprender.
+  const localFounders = state.citizens.some((c) => c.money >= FOUND_MIN_MONEY);
   for (const [zone, kind, demand] of kinds) {
     if (demand <= 15) continue;
+    if (kind === 'shop' && localFounders && chance(state.rng, 0.8)) continue;
+    // No se construyen más viviendas si ya sobran.
+    if (kind === 'res' && freeHomes(state) >= 6) continue;
     if (!chance(state.rng, Math.min(0.9, demand / 80))) continue;
     // Solares válidos: zona correcta, libre, junto a carretera con agua y luz.
     const spots: number[] = [];
@@ -364,9 +396,18 @@ function arrivals(state: GameState): void {
       traits: named ? randomTraits(state.rng) : { terco: 50, ahorro: 50, social: 50, ambicion: 50 },
       desire: named ? pick(state.rng, DESIRES) : 'prosperar',
       fear: named ? pick(state.rng, FEARS) : 'paro',
-      memory: [],
       cooldownUntil: 0,
+      ...NO_PROPERTY,
+      profession: named ? pick(state.rng, PROFESSIONS) : '',
+      goal: 'ahorrar',
+      relations: [],
+      memories: [],
+      summary: '',
     };
+    if (named) {
+      c.goal = goalFor(c.desire);
+      c.memories.push({ tick: state.tick, kind: 'llego', about: [], importance: 2, valence: 1 });
+    }
     state.citizens.push(c);
     transfer(state, OUTSIDE, c.id, nextInt(state.rng, 600, 2_500));
     pushEvent(state, 'arrival', `${c.name} se muda al pueblo`, { ref: c.id });
@@ -379,9 +420,11 @@ function departures(state: GameState): void {
     if (state.citizens.length <= 1) break;
     // Los vecinos con nombre deciden irse ellos mismos (detonante «infeliz»).
     if (c.named) continue;
-    const unhappy = c.happiness < 30 && chance(state.rng, 0.04);
+    const unhappy = c.happiness < 35 && chance(state.rng, 0.04);
     const broke = c.money === 0 && c.homeId === null && chance(state.rng, 0.1);
     if (unhappy || broke) {
+      sellOnDeparture(state, c);
+      onCitizenLeaves(state, c);
       transfer(state, c.id, OUTSIDE, c.money);
       state.citizens = state.citizens.filter((x) => x !== c);
       const why = broke ? 'sin casa ni dinero' : 'descontento';
@@ -395,83 +438,71 @@ function departures(state: GameState): void {
 function endOfDay(state: GameState): void {
   progressProjects(state);
   const served = updateNetworks(state);
+  updateFields(state);
   assignHomesAndJobs(state);
-  for (const c of state.citizens) c.happiness += (targetHappiness(state, c) - c.happiness) * 0.08;
+  // Inercia: la felicidad baja más rápido de lo que sube.
+  for (const c of state.citizens) {
+    const t = targetHappiness(state, c);
+    c.happiness += (t - c.happiness) * (t < c.happiness ? 0.12 : 0.06);
+  }
   state.demand = computeDemand(state);
   growZones(state, served);
   arrivals(state);
   departures(state);
+  maybeSplitTaxes(state);
+  updateGrudges(state);
   detectTriggers(state);
-  state.month.taxRateSum += TAX_RATE[state.taxLevel];
-  state.month.taxDays += 1;
+  socialDay(state);
+  politicsDay(state);
+  accumulateRates(state);
 }
 
-function payBusinesses(state: GameState, rate: number): void {
+function payBusinesses(state: GameState, r: ReturnType<typeof monthRates>): void {
   const shops = state.buildings.filter((b) => b.kind === 'shop' && b.built);
   // Gasto de los vecinos: una parte a tiendas del pueblo, el resto fuera.
   for (const c of state.citizens) {
     const spend = Math.min(c.money, LIVING_COST);
     const local = shops.length > 0 ? Math.floor(spend * LOCAL_SPEND_SHARE) : 0;
-    if (local > 0) {
-      const shop = shops[c.id % shops.length]!;
-      transfer(state, c.id, shop.id, local);
-      transfer(state, shop.id, TREASURY, Math.round(local * rate * 0.5), 'impuestos');
-    }
+    if (local > 0) transfer(state, c.id, shops[c.id % shops.length]!.id, local);
     transfer(state, c.id, OUTSIDE, spend - local);
   }
   for (const b of state.buildings) {
     if (!isBusiness(b) || !b.built) continue;
     const workers = state.citizens.filter((c) => c.jobId === b.id);
-    if (b.kind === 'factory') {
-      const revenue = workers.length * FACTORY_REVENUE_PER_WORKER;
-      transfer(state, OUTSIDE, b.id, revenue);
-      transfer(state, b.id, TREASURY, Math.round(revenue * rate * 0.5), 'impuestos');
-    }
+    if (b.kind === 'factory') transfer(state, OUTSIDE, b.id, workers.length * FACTORY_REVENUE_PER_WORKER);
     let paidAll = true;
-    for (const c of workers) {
-      const paid = transfer(state, b.id, c.id, PRIVATE_SALARY);
-      if (paid < PRIVATE_SALARY) paidAll = false;
-      transfer(state, c.id, TREASURY, Math.round(paid * rate), 'impuestos');
-    }
+    for (const c of workers) if (transfer(state, b.id, c.id, PRIVATE_SALARY) < PRIVATE_SALARY) paidAll = false;
+    businessTaxes(state, b, r);
     b.unpaidMonths = paidAll ? 0 : b.unpaidMonths + 1;
-    // Beneficios por encima del colchón: dividendos al inversor de fuera.
-    if (b.cash > BUSINESS_CASH_CAP) transfer(state, b.id, OUTSIDE, b.cash - BUSINESS_CASH_CAP);
-    // Impuesto sobre el inmueble (lo paga el propietario de fuera).
-    transfer(state, OUTSIDE, TREASURY, Math.round(PROPERTY_BASE * rate), 'impuestos');
+    payDividends(state, b);
   }
   for (const b of [...state.buildings]) {
     if (isBusiness(b) && b.unpaidMonths >= 2) {
-      pushEvent(state, 'business', `Cierra ${BUILD_NAMES[b.kind]?.toLowerCase()}: no puede pagar las nóminas`, { ref: b.id });
+      pushEvent(state, 'business', `Cierra ${b.name ?? BUILD_NAMES[b.kind]?.toLowerCase()}: no puede pagar las nóminas`, { ref: b.id });
       removeBuilding(state, b.id);
     }
   }
 }
 
 function endOfMonth(state: GameState): void {
-  const rate = state.month.taxDays > 0 ? state.month.taxRateSum / state.month.taxDays : TAX_RATE[state.taxLevel];
-  // Nóminas municipales.
+  const r = monthRates(state);
+  // Nóminas municipales (los sueldos no pagan impuesto municipal).
   for (const c of state.citizens) {
     const job = c.jobId !== null ? state.buildings.find((b) => b.id === c.jobId) : undefined;
-    if (job && !isBusiness(job)) {
-      const salary = SERVICE[job.kind] ? SERVICE_SALARY : PUBLIC_SALARY;
-      transfer(state, TREASURY, c.id, salary, 'sueldos');
-      transfer(state, c.id, TREASURY, Math.round(salary * rate), 'impuestos');
-    }
+    if (job && !isBusiness(job)) transfer(state, TREASURY, c.id, SERVICE[job.kind] ? SERVICE_SALARY : PUBLIC_SALARY, 'sueldos');
   }
-  // Alquileres.
-  for (const c of state.citizens) {
-    const home = c.homeId !== null ? state.buildings.find((b) => b.id === c.homeId) : undefined;
-    if (!home) continue;
-    if (home.kind === 'house') transfer(state, c.id, TREASURY, MUNICIPAL_RENT, 'alquileres');
-    else transfer(state, c.id, OUTSIDE, PRIVATE_RENT);
-  }
-  payBusinesses(state, rate);
-  for (const b of state.buildings) {
-    if (b.kind === 'res' && b.built) transfer(state, OUTSIDE, TREASURY, Math.round(PROPERTY_BASE * rate), 'impuestos');
-  }
-  transfer(state, OUTSIDE, TREASURY, PIE_PER_CITIZEN * state.citizens.length, 'PIE');
+  monthlyHousing(state, r);
+  payBusinesses(state, r);
+  // PIE: el Estado paga por vecino empadronado, más si el pueblo está contento.
+  const pie = Math.round(PIE_PER_CITIZEN * state.citizens.length * Math.max(0.6, Math.min(1.2, averageHappiness(state) / 60)));
+  transfer(state, OUTSIDE, TREASURY, pie, 'PIE');
   for (const b of state.buildings) if (b.built) transfer(state, TREASURY, OUTSIDE, MAINTENANCE[b.kind], 'mantenimiento');
-  if (state.treasury < 0) transfer(state, TREASURY, OUTSIDE, Math.ceil(-state.treasury * DEBT_INTEREST), 'intereses');
+  if (state.treasury < 0) {
+    const debt = -state.treasury;
+    const interest = Math.min(debt, DEBT_INTEREST_STEP) * DEBT_INTEREST + Math.max(0, debt - DEBT_INTEREST_STEP) * DEBT_INTEREST_HIGH;
+    transfer(state, TREASURY, OUTSIDE, Math.ceil(interest), 'intereses');
+  }
+  monthlyMarket(state);
 
   if (state.treasury < -DEBT_LIMIT) state.debtMonths++;
   else state.debtMonths = 0;
@@ -498,7 +529,7 @@ function endOfMonth(state: GameState): void {
     breakdown: state.month.breakdown,
   });
   if (state.stats.length > 120) state.stats.splice(0, state.stats.length - 120);
-  state.month = { income: 0, expenses: 0, breakdown: {}, taxRateSum: 0, taxDays: 0 };
+  state.month = { income: 0, expenses: 0, breakdown: {}, rateSums: { ibi: 0, tasas: 0, plusvalia: 0 }, taxDays: 0 };
 }
 
 /** Avanza una hora de juego. */

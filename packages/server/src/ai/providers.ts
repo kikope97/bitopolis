@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import Anthropic from '@anthropic-ai/sdk';
 import { PROVIDER_INFO, type ProviderId } from './catalog.ts';
 
 export interface LLMRequest {
@@ -80,35 +81,47 @@ export class OpenAICompatProvider implements LLMProvider {
   }
 }
 
-/** Anthropic Messages API: salida estructurada con una herramienta obligatoria. */
+/**
+ * Anthropic Messages API con el SDK oficial. La salida estructurada va por
+ * `output_config.format` (los modelos 5.5 no admiten forzar una herramienta ni
+ * cambiar la temperatura) y el esfuerzo de razonamiento al mínimo: decidir
+ * entre unas pocas acciones no necesita pensar mucho y así se gasta menos.
+ */
 export class AnthropicProvider implements LLMProvider {
-  constructor(
-    private key: string,
-    private baseUrl = PROVIDER_INFO.anthropic.baseUrl,
-  ) {}
+  private client: Anthropic;
+
+  constructor(key: string, baseUrl?: string) {
+    // Los reintentos los decide el servicio (con su presupuesto), no el SDK.
+    this.client = new Anthropic({ apiKey: key, baseURL: baseUrl || undefined, maxRetries: 0 });
+  }
 
   async complete(req: LLMRequest, signal?: AbortSignal): Promise<LLMResult> {
-    const data = await post(
-      `${this.baseUrl.replace(/\/$/, '')}/v1/messages`,
-      { 'x-api-key': this.key, 'anthropic-version': '2023-06-01' },
-      {
-        model: req.model,
-        max_tokens: req.maxTokens,
-        temperature: 0.3,
-        system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
-        messages: [{ role: 'user', content: req.user }],
-        tools: [{ name: 'decidir', description: 'Devuelve las decisiones de los vecinos.', input_schema: req.schema }],
-        tool_choice: { type: 'tool', name: 'decidir' },
-      },
-      signal,
-    );
-    const block = (data?.content ?? []).find((b: { type: string }) => b.type === 'tool_use');
-    if (!block) throw new ProviderError('respuesta sin decisiones');
-    const u = data.usage ?? {};
+    let msg: Anthropic.Message;
+    try {
+      msg = await this.client.messages.create(
+        {
+          model: req.model,
+          // Margen para el razonamiento (cuenta como salida).
+          max_tokens: req.maxTokens + 1024,
+          system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
+          messages: [{ role: 'user', content: req.user }],
+          output_config: { effort: 'low', format: { type: 'json_schema', schema: req.schema } },
+        },
+        { signal },
+      );
+    } catch (e) {
+      // Solo el código de estado: nunca el mensaje completo (no debe acabar la key en un log).
+      if (e instanceof Anthropic.APIError) throw new ProviderError(`el proveedor respondió ${e.status ?? 'sin estado'}`, e.status);
+      throw e;
+    }
+    if (msg.stop_reason === 'refusal') throw new ProviderError('el modelo rechazó la petición');
+    const text = msg.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text;
+    if (!text) throw new ProviderError('respuesta sin contenido');
+    const u = msg.usage;
     const cached = u.cache_read_input_tokens ?? 0;
     return {
-      text: JSON.stringify(block.input),
-      usage: { in: (u.input_tokens ?? 0) + cached + (u.cache_creation_input_tokens ?? 0), cachedIn: cached, out: u.output_tokens ?? 0 },
+      text,
+      usage: { in: u.input_tokens + cached + (u.cache_creation_input_tokens ?? 0), cachedIn: cached, out: u.output_tokens },
     };
   }
 }

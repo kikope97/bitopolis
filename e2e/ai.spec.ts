@@ -8,7 +8,12 @@ test('Modo IA: configurar, jugar y ver un motivo de la IA', async ({ page }, inf
   await page.goto('/');
   await page.getByRole('radio', { name: /Modo IA/ }).click();
   await expect(page.getByRole('dialog')).toContainText('Configurar la IA');
-  await page.locator('#ai-provider').selectOption('openai-compatible');
+  await expect(page.getByRole('dialog')).toContainText('Se acepta API key de Anthropic (sk-ant-…) o de OpenAI (sk-…)');
+  await page.locator('#ai-key').fill('sk-ant-prueba-123456');
+  await expect(page.getByRole('dialog')).toContainText('Detectada: Anthropic');
+  await page.locator('#ai-key').fill('');
+  // En el test se usa un LLM falso local (endpoint propio, compatible con OpenAI).
+  await page.locator('details.advanced summary').first().click();
   await page.locator('#ai-base').fill('http://localhost:8099/v1');
   await page.locator('#ai-model').fill('falso');
   await page.screenshot({ path: `test-results/capturas/${info.project.name}-ia-config.png` });
@@ -32,13 +37,21 @@ test('Modo IA: configurar, jugar y ver un motivo de la IA', async ({ page }, inf
   await expect(page.locator('.bubble .ai-badge').first()).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('.bubble').first()).toContainText('promete');
   await page.screenshot({ path: `test-results/capturas/${info.project.name}-ia-burbuja.png` });
+  await expect(page.locator('#ai-chip')).toHaveText('IA ●');
   const s1 = await state(page);
   expect(s1.decisionLog.some((d: { source: string }) => d.source === 'ai')).toBe(true);
 
   await page.locator('[data-speed="0"]').click();
+  // Consejero con IA (modelo premium) en Modo IA.
+  await page.locator('#menu').click();
+  await page.getByRole('button', { name: 'Consejero' }).click();
+  await page.getByRole('button', { name: '¿Cómo va el pueblo?' }).click();
+  await expect(page.locator('.advice')).toContainText('alcalde', { timeout: 10_000 });
+  await expect(page.locator('.advice .ai-badge')).toBeVisible();
+  await page.locator('.sheet-close').click();
   await page.locator('#menu').click();
   await page.getByRole('button', { name: 'Gasto de la IA' }).click();
-  await expect(page.locator('.sheet')).toContainText('100 % válidas');
+  await expect(page.locator('.sheet')).toContainText('las tomó la IA');
   await page.screenshot({ path: `test-results/capturas/${info.project.name}-ia-gasto.png` });
   expect(errors).toEqual([]);
 });

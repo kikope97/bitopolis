@@ -1,5 +1,5 @@
 import type { BuildKind, Command, TaxLevel } from '@bitopolis/shared';
-import { ZONE_UNLOCK_POP } from './balance.ts';
+import { PLANT_CAPACITY, ZONE_UNLOCK_POP } from './balance.ts';
 import { buildCost, validateCommand } from './commands.ts';
 import { chance, type RngState, seedRng } from './prng.ts';
 import { buildingAt, type GameState, hasAdjacentRoad, Tile, tileIndex, Zone } from './state.ts';
@@ -74,7 +74,17 @@ function planner(name: string, o: PlannerOpts): Profile {
     name,
     decide(state, rng) {
       const out: Command[] = [];
-      if (state.taxLevel !== o.tax) out.push({ type: 'SetTax', level: o.tax });
+      // Un jugador razonable sube impuestos si el mes cierra en negativo y la caja baja.
+      const lastMonth = state.stats.at(-1);
+      const deficit = !!lastMonth && lastMonth.income < lastMonth.expenses && state.treasury < 10_000;
+      const order: TaxLevel[] = ['low', 'medium', 'high'];
+      const cur = order.indexOf(state.taxLevel);
+      const pref = order.indexOf(o.tax);
+      // Con déficit sube un nivel; con la caja sana (o por debajo de su preferencia) vuelve a su nivel.
+      let target = cur;
+      if (deficit) target = Math.min(2, Math.max(cur, pref) + 1);
+      else if (state.treasury > 20_000 || cur < pref) target = pref;
+      if (target !== cur) out.push({ type: 'SetTax', level: order[target]! });
       if (!chance(rng, o.activity)) return out;
       const pop = state.citizens.length;
       const has = (k: string) => state.buildings.some((b) => b.kind === k);
@@ -94,13 +104,17 @@ function planner(name: string, o: PlannerOpts): Profile {
       if (!has("power")) { tryBuild("power"); return out; }
       // Ampliar la red si algún edificio terminado se queda sin agua o luz.
       const built = state.buildings.filter((b) => b.built && b.kind !== 'water' && b.kind !== 'power');
-      if (built.some((b) => !b.hasWater) && !state.projects.some((p) => buildingKindOf(state, p.buildingId) === 'water')) {
+      // No más plantas de las que el pueblo necesita (una nueva mal conectada no arregla nada).
+      const enough = (k: 'water' | 'power') => state.buildings.filter((b) => b.kind === k).length >= Math.ceil(built.length / (PLANT_CAPACITY[k] * 0.75)) + 1;
+      if (built.some((b) => !b.hasWater) && !enough('water') && !state.projects.some((p) => buildingKindOf(state, p.buildingId) === 'water')) {
         if (tryBuild('water')) return out;
       }
-      if (built.some((b) => !b.hasPower) && !state.projects.some((p) => buildingKindOf(state, p.buildingId) === 'power')) {
+      if (built.some((b) => !b.hasPower) && !enough('power') && !state.projects.some((p) => buildingKindOf(state, p.buildingId) === 'power')) {
         if (tryBuild('power')) return out;
       }
-      if (pop >= ZONE_UNLOCK_POP) {
+      // Un jugador razonable mira el parte: no añade servicios (y sus sueldos) con el mes en negativo.
+      const last = state.stats.at(-1);
+      if (pop >= ZONE_UNLOCK_POP && (!last || last.income >= last.expenses)) {
         const count = (k: string) => state.buildings.filter((b) => b.kind === k).length;
         const wanted = o.servicesPer ? Math.ceil(pop / o.servicesPer) : 1;
         for (const kind of o.services) if (count(kind) < wanted && tryBuild(kind)) return out;
@@ -141,8 +155,8 @@ function planner(name: string, o: PlannerOpts): Profile {
 export const PROFILES: Record<string, Profile> = {
   pasivo: { name: 'pasivo', decide: () => [] },
   casual: planner('casual', { tax: 'medium', reserve: 3_000, activity: 0.3, services: ['park'], municipalHousing: false }),
-  ahorrador: planner('ahorrador', { tax: 'low', reserve: 6_000, activity: 0.5, services: ['park'], municipalHousing: false }),
-  agresivo: planner('agresivo', { tax: 'high', reserve: 2_000, activity: 0.6, services: [], municipalHousing: false }),
+  ahorrador: planner('ahorrador', { tax: 'low', reserve: 4_000, activity: 0.5, services: ['park'], municipalHousing: false }),
+  agresivo: planner('agresivo', { tax: 'high', reserve: 2_000, activity: 0.6, services: ['park'], municipalHousing: false }),
   derrochador: planner('derrochador', {
     tax: 'low',
     reserve: 0,

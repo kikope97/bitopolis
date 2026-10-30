@@ -1,3 +1,4 @@
+import { openSettings } from './settings-ui.ts';
 import { openAiConfig } from './ai-ui.ts';
 import { type AiMeta, api, ApiError, type Summary } from './api.ts';
 import { startGame } from './game.ts';
@@ -153,6 +154,9 @@ export async function showStart(token: string): Promise<void> {
       aiBtn.onclick = () => void openAiConfig(token, sid, () => void showStart(token));
       items.push(aiBtn);
     }
+    const settings = h('button', { class: 'btn wide' }, 'Ajustes (sonido y accesibilidad)');
+    settings.onclick = () => openSettings();
+    items.push(h('h3', {}, 'Este dispositivo'), settings);
     sheet(t('configure'), ...items);
   }
 }

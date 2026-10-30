@@ -13,13 +13,12 @@ services:
       BITOPOLIS_PUBLIC_URL: "https://bitopolis.example.com"              # URL pública para generar los enlaces
       # Opcionales
       # PORT: "8080"
-      # BITOPOLIS_USER: "familia"                 # con PASSWORD, pide usuario y contraseña a todo el servidor
-      # BITOPOLIS_PASSWORD: "una-contraseña"
-      # BITOPOLIS_API_KEY: "sk-..."               # key por defecto: todas las partidas en Modo IA
-      # BITOPOLIS_AI_PROVIDER: "openai"           # openai | anthropic | gemini | deepseek | mistral | openrouter | openai-compatible
-      # BITOPOLIS_AI_BASE_URL: "http://ollama:11434/v1"
-      # BITOPOLIS_AI_MODEL: ""                    # modelo barato
-      # BITOPOLIS_AI_MODEL_PREMIUM: ""            # modelo premium (si falta, el barato)
+      # BITOPOLIS_PASSWORD: "una-contraseña"      # si la pones, el servidor pide esta contraseña (sin usuario) para entrar
+      # --- IA (si no pones la key, cada partida la pone en Configurar) ---
+      # BITOPOLIS_API_KEY: "sk-ant-..."           # Anthropic (sk-ant-…) u OpenAI (sk-…): el proveedor se deduce de la key
+      # BITOPOLIS_AI_MODEL: ""                    # opcional; por defecto claude-haiku-5-5 (Anthropic) o gpt-5.4-nano (OpenAI)
+      # BITOPOLIS_AI_MODEL_PREMIUM: ""            # opcional; por defecto claude-sonnet-5-5 o gpt-5.4-mini
+      # BITOPOLIS_AI_BASE_URL: "http://ollama:11434/v1"  # solo para un modelo local compatible con OpenAI
       # BITOPOLIS_AI_MAX_CITIZENS: "20"
       # BITOPOLIS_BUDGET_SERVER_MONTHLY_EUR: "10"
       # BITOPOLIS_BUDGET_GAME_MONTHLY_EUR: "5"

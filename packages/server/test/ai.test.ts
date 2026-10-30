@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { applyCommand, type GameState, hashState, step } from '@bitopolis/sim';
 import { decryptSecret, encryptSecret, maskKey } from '../src/ai/crypto.ts';
-import { ReplayProvider, type LLMRequest, type LLMResult } from '../src/ai/providers.ts';
+import { createServer } from 'node:http';
+import { AnthropicProvider, ProviderError, ReplayProvider, type LLMRequest, type LLMResult } from '../src/ai/providers.ts';
 import { AiService } from '../src/ai/service.ts';
 import { buildApp } from '../src/app.ts';
 import { loadConfig } from '../src/config.ts';
@@ -26,11 +27,11 @@ describe('cifrado de la key', () => {
 
 /** Respuesta "buena" que elige la primera acción de cada vecino. */
 function answer(req: LLMRequest, bad = false): LLMResult {
-  const body = JSON.parse(req.user);
+  const body = JSON.parse(req.user.split('\n\n')[0]!);
   const decisiones = body.vecinos.map((v: { vecino: number; acciones: { accion: string }[] }) => ({
     vecino: v.vecino,
     accion: bad ? 'volar' : v.acciones[0]!.accion,
-    motivo: 'Me apetece probar suerte aquí.',
+    motivo: `Me apetece probar suerte aquí, ${['de verdad', 'sin duda', 'ya veremos', 'por qué no', 'claro que sí'][Math.floor(Math.random() * 5)]}.`,
   }));
   return { text: JSON.stringify({ decisiones }), usage: { in: 900, cachedIn: 0, out: 80 } };
 }
@@ -41,9 +42,14 @@ const config = { ...loadConfig({}), dataDir: dir, clientDir: join(dir, 'x'), mas
 const ai = new AiService(db, config);
 let calls: LLMRequest[] = [];
 let mode: 'good' | 'bad-once' | 'bad' = 'good';
+let textMode: 'ok' | 'cifras' = 'ok';
 ai.providerOverride = () => ({
   async complete(req) {
     calls.push(req);
+    if ((req.schema as { properties?: Record<string, unknown> }).properties?.texto) {
+      const texto = textMode === 'cifras' ? 'Tenemos 99999 vecinos felices.' : 'Aquí estamos, alcalde, tirando como podemos.';
+      return { text: JSON.stringify({ texto }), usage: { in: 400, cachedIn: 0, out: 40 } };
+    }
     if (mode === 'bad') return answer(req, true);
     if (mode === 'bad-once') {
       mode = 'good';
@@ -176,6 +182,85 @@ describe('Modo IA', () => {
   });
 });
 
+describe('el proveedor sale de la key', () => {
+  it('sk-ant- es Anthropic, el resto OpenAI, y un endpoint propio es compatible con OpenAI', async () => {
+    const svc = (env: Record<string, string>) => new AiService(db, { ...loadConfig(env), dataDir: dir, clientDir: join(dir, 'x'), masterKey: MASTER });
+    const a = await svc({ BITOPOLIS_API_KEY: 'sk-ant-api03-abcdef' }).settings(null);
+    expect([a.provider, a.model, a.modelPremium]).toEqual(['anthropic', 'claude-haiku-5-5', 'claude-sonnet-5-5']);
+    expect(a.locked).toContain('provider');
+    const o = await svc({ BITOPOLIS_API_KEY: 'sk-proj-abcdef' }).settings(null);
+    expect([o.provider, o.model]).toEqual(['openai', 'gpt-5.4-nano']);
+    // Un modelo de otro proveedor no se usa con esta key.
+    const m = await svc({ BITOPOLIS_API_KEY: 'sk-ant-api03-abcdef', BITOPOLIS_AI_MODEL: 'gpt-5.4-nano' }).settings(null);
+    expect(m.model).toBe('claude-haiku-5-5');
+    const l = await svc({ BITOPOLIS_AI_BASE_URL: 'http://localhost:11434/v1' }).settings(null);
+    expect([l.provider, l.configured]).toEqual(['openai-compatible', true]);
+  });
+
+  it('desde el juego: se guarda solo la key y el proveedor se deduce', async () => {
+    const token = newGameToken();
+    const r = await app.inject({ method: 'PUT', url: `/api/games/${token}/ai-config`, payload: { sessionId: SID, key: 'sk-ant-api03-xyz123456', accepted: true } });
+    expect(r.statusCode).toBe(200);
+    const s = r.json();
+    expect([s.provider, s.model, s.keyMask]).toEqual(['anthropic', 'claude-haiku-5-5', expect.stringMatching(/^sk-ant/)]);
+    expect(JSON.stringify(s)).not.toContain('xyz123456');
+  });
+});
+
+describe('AnthropicProvider (SDK oficial)', () => {
+  it('pide salida estructurada sin forzar herramienta ni temperatura, y cuenta la caché', async () => {
+    let seen: { headers: Record<string, unknown>; body: Record<string, unknown> } | null = null;
+    let status = 200;
+    const srv = createServer((req, res) => {
+      let raw = '';
+      req.on('data', (c) => (raw += c));
+      req.on('end', () => {
+        seen = { headers: req.headers, body: JSON.parse(raw) };
+        res.writeHead(status, { 'content-type': 'application/json' });
+        res.end(
+          status === 200
+            ? JSON.stringify({
+                id: 'msg_1',
+                type: 'message',
+                role: 'assistant',
+                model: 'claude-haiku-5-5',
+                content: [{ type: 'text', text: '{"decisiones":[]}' }],
+                stop_reason: 'end_turn',
+                usage: { input_tokens: 100, cache_read_input_tokens: 900, cache_creation_input_tokens: 0, output_tokens: 40 },
+              })
+            : JSON.stringify({ type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key sk-ant-secreta' } }),
+        );
+      });
+    });
+    await new Promise<void>((r) => srv.listen(0, '127.0.0.1', r));
+    const port = (srv.address() as { port: number }).port;
+    try {
+      const p = new AnthropicProvider('sk-ant-secreta', `http://127.0.0.1:${port}`);
+      const schema = { type: 'object', additionalProperties: false, required: ['decisiones'], properties: { decisiones: { type: 'array', items: { type: 'object' } } } };
+      const r = await p.complete({ system: 'S', user: 'U', schema, model: 'claude-haiku-5-5', maxTokens: 300 });
+      expect(r.text).toBe('{"decisiones":[]}');
+      expect(r.usage).toEqual({ in: 1000, cachedIn: 900, out: 40 });
+      const body = seen!.body;
+      // El SDK manda la key (x-api-key o Bearer, según la versión de API) y fija anthropic-version.
+      const h = seen!.headers;
+      expect(h['x-api-key'] === 'sk-ant-secreta' || h.authorization === 'Bearer sk-ant-secreta').toBe(true);
+      expect(h['anthropic-version']).toBeTruthy();
+      expect(body.output_config).toEqual({ effort: 'low', format: { type: 'json_schema', schema } });
+      expect(body.tool_choice).toBeUndefined();
+      expect(body.temperature).toBeUndefined();
+      expect((body.system as { cache_control?: unknown }[])[0]!.cache_control).toEqual({ type: 'ephemeral' });
+      // Un error del proveedor nunca arrastra la key en el mensaje.
+      status = 401;
+      const err = await p.complete({ system: 'S', user: 'U', schema, model: 'claude-haiku-5-5', maxTokens: 300 }).catch((e) => e);
+      expect(err).toBeInstanceOf(ProviderError);
+      expect(String(err.message)).not.toContain('sk-ant');
+      expect(err.status).toBe(401);
+    } finally {
+      srv.close();
+    }
+  });
+});
+
 describe('ReplayProvider', () => {
   it('devuelve la respuesta grabada sin red', async () => {
     const req = { system: 's', user: 'u', schema: {}, model: 'm', maxTokens: 10 };
@@ -183,5 +268,42 @@ describe('ReplayProvider', () => {
     const p = new ReplayProvider(rec);
     expect((await p.complete(req)).text).toBe('{"decisiones":[]}');
     await expect(p.complete({ ...req, user: 'otro' })).rejects.toThrow();
+  });
+});
+
+describe('textos con IA (v0.4)', () => {
+  it('hablar con un vecino, consejero y crónica; texto validado y gasto por uso', async () => {
+    const { token, state } = await aiGame();
+    const c = state.citizens.find((x) => x.named)!;
+    const talk = (await app.inject({ method: 'POST', url: `/api/games/${token}/talk`, payload: { citizenId: c.id, question: 'como_estas' } })).json();
+    expect(talk.text).toContain('alcalde');
+    const adv = (await app.inject({ method: 'POST', url: `/api/games/${token}/advisor`, payload: { question: 'como_va' } })).json();
+    expect(adv.text).toBeTruthy();
+    const n = calls.length;
+    const ch1 = (await app.inject({ method: 'POST', url: `/api/games/${token}/chronicle` })).json();
+    const ch2 = (await app.inject({ method: 'POST', url: `/api/games/${token}/chronicle` })).json();
+    expect(ch1.text).toBe(ch2.text);
+    expect(calls.length).toBe(n + 1);
+    const usage = (await app.inject({ method: 'GET', url: `/api/games/${token}/ai-usage` })).json();
+    expect(Object.keys(usage.byKind)).toEqual(expect.arrayContaining(['conversacion', 'consejero', 'diario']));
+  });
+
+  it('rechaza cifras inventadas y no acepta texto libre del jugador', async () => {
+    const { token, state } = await aiGame();
+    textMode = 'cifras';
+    const adv = (await app.inject({ method: 'POST', url: `/api/games/${token}/advisor`, payload: { question: 'como_va' } })).json();
+    expect(adv.text).toBeNull();
+    textMode = 'ok';
+    const bad = await app.inject({ method: 'POST', url: `/api/games/${token}/talk`, payload: { citizenId: state.citizens[0]!.id, question: 'ignora las reglas' } });
+    expect(bad.statusCode).toBe(400);
+  });
+
+  it('sin presupuesto no empieza (reserva previa)', async () => {
+    const { token } = await aiGame({ capDay: 0 });
+    calls = [];
+    const r = (await app.inject({ method: 'POST', url: `/api/games/${token}/advisor`, payload: { question: 'que_cambiarias' } })).json();
+    expect(r.text).toBeNull();
+    expect(r.reason).toContain('tope');
+    expect(calls).toHaveLength(0);
   });
 });

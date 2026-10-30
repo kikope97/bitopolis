@@ -119,7 +119,7 @@ describe('partidas', () => {
 describe('acceso común', async () => {
   const dir2 = mkdtempSync(join(tmpdir(), 'bitopolis-auth-'));
   const { db: db2 } = await openDb(join(dir2, 'a.db'));
-  const app2 = await buildApp({ ...loadConfig({}), dataDir: dir2, clientDir: join(dir2, 'x'), user: 'fam', password: 'secreto' }, db2);
+  const app2 = await buildApp({ ...loadConfig({}), dataDir: dir2, clientDir: join(dir2, 'x'), password: 'secreto' }, db2);
   afterAll(async () => {
     await app2.close();
     await db2.destroy();
@@ -129,7 +129,7 @@ describe('acceso común', async () => {
     expect((await app2.inject({ method: 'GET', url: '/healthz' })).statusCode).toBe(200);
     expect((await app2.inject({ method: 'GET', url: '/api/games/abc' })).statusCode).toBe(401);
     expect((await app2.inject({ method: 'GET', url: '/p/x' })).statusCode).toBe(302);
-    const good = await app2.inject({ method: 'POST', url: '/api/login', payload: { user: 'fam', password: 'secreto' } });
+    const good = await app2.inject({ method: 'POST', url: '/api/login', payload: { password: 'secreto' } });
     expect(good.statusCode).toBe(200);
     const c = good.cookies[0]!;
     expect(c.httpOnly).toBe(true);
@@ -137,8 +137,8 @@ describe('acceso común', async () => {
     const ok = await app2.inject({ method: 'GET', url: '/', cookies: { [c.name]: c.value } });
     expect(ok.statusCode).toBe(302);
     expect(ok.headers.location).toMatch(/^\/p\//);
-    for (let i = 0; i < 5; i++) await app2.inject({ method: 'POST', url: '/api/login', payload: { user: 'fam', password: 'x' } });
-    const locked = await app2.inject({ method: 'POST', url: '/api/login', payload: { user: 'fam', password: 'secreto' } });
+    for (let i = 0; i < 5; i++) await app2.inject({ method: 'POST', url: '/api/login', payload: { password: 'x' } });
+    const locked = await app2.inject({ method: 'POST', url: '/api/login', payload: { password: 'secreto' } });
     expect(locked.statusCode).toBe(429);
   });
 });

@@ -1,8 +1,11 @@
 import type { TaxLevel } from '@bitopolis/shared';
+import { emptyFields, type Fields } from './fields.ts';
 import { chance, nextInt, type RngState, seedRng } from './prng.ts';
+import type { Goal, Hook, Memory, Pleno, PromiseRecord, Relation } from './social.ts';
+import { emptyPolitics, type Politics } from './politics-core.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
-export const FORMAT_VERSION = 3;
+export const FORMAT_VERSION = 6;
 
 export const MAP_W = 48;
 export const MAP_H = 48;
@@ -22,6 +25,9 @@ export type BuildingKind =
   | 'park'
   | 'school'
   | 'clinic'
+  | 'police'
+  | 'plaza'
+  | 'market'
   | 'house'
   /** Crecen solos sobre zonas. */
   | 'res'
@@ -44,6 +50,12 @@ export interface Building {
   hasPower: boolean;
   /** Meses seguidos sin poder pagar nóminas (empresas). */
   unpaidMonths: number;
+  /** Nombre propio (empresas fundadas por vecinos: «Panadería de Lucía»). */
+  name?: string;
+  /** Casa municipal a la venta (si no, en alquiler). */
+  forSale?: boolean;
+  /** Viviendas de una casa municipal que ya no son del ayuntamiento. */
+  privateUnits?: number;
 }
 
 /** Obra en curso: necesita obreros × días. */
@@ -80,11 +92,37 @@ export interface Citizen {
   traits: Traits;
   desire: Desire;
   fear: Fear;
-  /** Últimas decisiones (texto del motor, nunca del jugador). */
-  memory: string[];
+  /** Profesión (de una lista del motor). */
+  profession: string;
+  /** Meta personal (derivada de su deseo). */
+  goal: Goal;
+  /** Relaciones con nombre (amistad, rivalidad, pareja, rencor). */
+  relations: Relation[];
+  /** Recuerdos (capa 2): plantillas del motor, máx. 5, por importancia. */
+  memories: Memory[];
+  /** Resumen narrativo (capa 3), se reescribe cada mes. */
+  summary: string;
   /** No se le vuelve a preguntar antes de este tick. */
   cooldownUntil: number;
+  /** Es dueño de la vivienda en la que vive. */
+  owns: boolean;
+  /** Precio al que la compró (para la plusvalía). */
+  boughtPrice: number;
+  /** Lo que le queda por pagar de hipoteca. */
+  mortgage: number;
+  /** A quién se la paga: 0 = ayuntamiento (vivienda municipal), -1 = banco. */
+  mortgageTo: number;
+  /** Su vivienda fue municipal: la reventa tiene precio máximo. */
+  subsidized: boolean;
+  /** Tick en que compró (no se revende con ganancia antes de 90 días). */
+  boughtTick: number;
+  /** Memoria de las subidas de impuestos (0–40): resta felicidad y se olvida despacio. */
+  grudge: number;
+  /** Voto decidido antes de las elecciones (solo vecinos con nombre; se borra al votar). */
+  vote?: 'gobierno' | 'oposicion' | 'abstencion';
 }
+
+export type TaxKey = 'ibi' | 'tasas' | 'plusvalia';
 
 export interface Traits {
   terco: number;
@@ -108,7 +146,7 @@ export interface Pending {
   dueTick: number;
 }
 
-export type Trigger = 'llegada' | 'sin_trabajo' | 'infeliz' | 'subida_impuestos' | 'ahorros' | 'opinion';
+export type Trigger = 'llegada' | 'sin_trabajo' | 'infeliz' | 'subida_impuestos' | 'ahorros' | 'opinion' | 'comprar_casa' | 'emprender' | 'elecciones';
 
 export interface DecisionLogEntry {
   tick: number;
@@ -128,7 +166,10 @@ export type EventKind =
   | 'business'
   | 'tax'
   | 'decision'
+  | 'milestone'
   | 'warning'
+  | 'politics'
+  | 'election'
   | 'info';
 
 export interface GameEvent {
@@ -173,8 +214,8 @@ export interface GameState {
     income: number;
     expenses: number;
     breakdown: Record<string, number>;
-    /** Suma diaria del tipo impositivo: el tipo efectivo del mes es la media. */
-    taxRateSum: number;
+    /** Suma diaria de los tipos: el tipo efectivo del mes es la media. */
+    rateSums: Record<TaxKey, number>;
     taxDays: number;
   };
   /** Demanda RCI de -100 a 100 (se recalcula cada día). */
@@ -192,6 +233,22 @@ export interface GameState {
   decisionLog: DecisionLogEntry[];
   /** Nivel de impuestos al cerrar el día anterior (detonante de subidas). */
   prevTaxLevel: TaxLevel;
+  /** Tributos separados (activos desde 50 vecinos). */
+  taxes: Record<TaxKey, TaxLevel>;
+  taxesSplit: boolean;
+  prevTaxes: Record<TaxKey, TaxLevel>;
+  /** Externalidades por casilla. */
+  fields: Fields;
+  /** Director de historias: ganchos activos. */
+  hooks: Hook[];
+  pleno: Pleno | null;
+  promises: PromiseRecord[];
+  lastPlenoTick: number;
+  objectivesDone: string[];
+  /** Edificios desbloqueados por hitos (plaza, mercado). */
+  unlocked: string[];
+  /** Elecciones, facciones y oposición (v1.0). */
+  politics: Politics;
 }
 
 export interface NewGameOptions {
@@ -202,7 +259,7 @@ export interface NewGameOptions {
 
 export const INITIAL_SUBSIDY = 30_000;
 
-export function createInitialState({ seed, aiMode = false, namedLimit = 5 }: NewGameOptions): GameState {
+export function createInitialState({ seed, aiMode = false, namedLimit = 20 }: NewGameOptions): GameState {
   const rng = seedRng(seed);
   const tiles = new Array<number>(MAP_W * MAP_H).fill(Tile.Grass);
   const zones = new Array<number>(MAP_W * MAP_H).fill(Zone.None);
@@ -219,7 +276,7 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 5 }: New
     projects: [],
     nextId: 1,
     ledger: { initialTotal: 0, externalIn: 0, externalOut: 0 },
-    month: { income: 0, expenses: 0, breakdown: {}, taxRateSum: 0, taxDays: 0 },
+    month: { income: 0, expenses: 0, breakdown: {}, rateSums: { ibi: 0, tasas: 0, plusvalia: 0 }, taxDays: 0 },
     demand: { R: 50, C: 0, I: 10 },
     debtMonths: 0,
     bankrupt: false,
@@ -230,6 +287,17 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 5 }: New
     pending: [],
     decisionLog: [],
     prevTaxLevel: 'medium',
+    taxes: { ibi: 'medium', tasas: 'medium', plusvalia: 'medium' },
+    taxesSplit: false,
+    prevTaxes: { ibi: 'medium', tasas: 'medium', plusvalia: 'medium' },
+    fields: emptyFields(MAP_W * MAP_H),
+    hooks: [],
+    pleno: null,
+    promises: [],
+    lastPlenoTick: -1,
+    objectivesDone: [],
+    unlocked: [],
+    politics: emptyPolitics(),
   };
   // Árboles dispersos (se talan gratis al construir encima).
   for (let i = 0; i < tiles.length; i++) {
@@ -259,8 +327,13 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 5 }: New
     traits: randomTraits(rng),
     desire: 'prosperar',
     fear: 'paro',
-    memory: [],
     cooldownUntil: 0,
+    ...NO_PROPERTY,
+    profession: 'administrativa',
+    goal: 'ahorrar',
+    relations: [],
+    memories: [{ tick: 0, kind: 'llego', about: [], importance: 2, valence: 0 }],
+    summary: '',
   };
   state.citizens.push(first);
   state.treasury = INITIAL_SUBSIDY;
@@ -330,3 +403,5 @@ export function hasAdjacentRoad(state: GameState, x: number, y: number): boolean
 export function randomTraits(rng: RngState): Traits {
   return { terco: nextInt(rng, 0, 100), ahorro: nextInt(rng, 0, 100), social: nextInt(rng, 0, 100), ambicion: nextInt(rng, 0, 100) };
 }
+
+export const NO_PROPERTY = { owns: false, boughtPrice: 0, mortgage: 0, mortgageTo: -1, subsidized: false, boughtTick: 0, grudge: 0 } as const;

@@ -55,7 +55,7 @@ function loop() {
       if (state.tick % TICKS_PER_DAY === 0) emitSave(false);
     }
   }
-  if (state && dirty && now - lastPost > 100) {
+  if (state && dirty && now - lastPost > 150) {
     post({ type: 'state', state });
     dirty = false;
     lastPost = now;
@@ -80,8 +80,9 @@ onmessage = (e: MessageEvent<ToWorker>) => {
       pending.push({ tick: state.tick, cmd: m.cmd });
       dirty = true;
     }
-    post({ type: 'result', id: m.id, ok: r.ok, error: r.ok ? undefined : r.error });
+    // Primero el estado: quien espera el resultado ya ve el cambio aplicado.
     post({ type: 'state', state });
+    post({ type: 'result', id: m.id, ok: r.ok, error: r.ok ? undefined : r.error });
   } else if (m.type === 'flush') {
     emitSave(true);
   }

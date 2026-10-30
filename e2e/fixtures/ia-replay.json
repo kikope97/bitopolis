@@ -1,4298 +1,1794 @@
 {
- "317eb0923a8255e15e16231ebc00c607": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "6624770b1d0bc59ef2b879f52b11df97": {
+  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 492,
+   "in": 741,
    "cachedIn": 0,
-   "out": 33
+   "out": 29
   }
  },
- "2360546e23d79797919253c7e5fab899": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "288c7d4682119ac66c2e07f27b159588": {
+  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 506,
+   "in": 745,
    "cachedIn": 0,
-   "out": 33
+   "out": 29
   }
  },
- "46e45c5fbda3481e97d645f67146f292": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "3fd6916779b8796df896b45fe73d3ef7": {
+  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"irse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
   "usage": {
-   "in": 517,
+   "in": 701,
    "cachedIn": 0,
-   "out": 33
+   "out": 28
   }
  },
- "c6608a8068128b52b1619cec65303601": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "3dc3653654985d8b57833f2e07457f56": {
+  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 741,
    "cachedIn": 0,
-   "out": 33
+   "out": 29
   }
  },
- "80e1b7551e1aca9c3c62fe736b3f3d79": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "315c57a4b632fa888ee4f9aef2cd1f80": {
+  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 751,
    "cachedIn": 0,
-   "out": 33
+   "out": 29
   }
  },
- "8865ca1a18640369b2938c8b94d6c069": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "d7de9b01b676bc00f2188648171cb091": {
+  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
   "usage": {
-   "in": 490,
+   "in": 735,
    "cachedIn": 0,
-   "out": 32
+   "out": 29
   }
  },
- "a53eab19bc9be0aa16aa101213585cd6": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "797a4fb3e1a62f825fe4842fe530aa14": {
+  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
   "usage": {
-   "in": 491,
+   "in": 736,
    "cachedIn": 0,
-   "out": 33
+   "out": 31
   }
  },
- "d0e3be130077ade7e714f3f183b33f97": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "acf5736fa335101fd0a94708bb920147": {
+  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 490,
+   "in": 779,
    "cachedIn": 0,
    "out": 34
   }
  },
- "664a79ed3d0fa7931e13e1d7b9734411": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "8d241867218e7202d348be00a542e626": {
+  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"pedir:empleo\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 538,
+   "in": 780,
    "cachedIn": 0,
-   "out": 33
+   "out": 29
   }
  },
- "a0a3f2eddf5725cdf86f5acfa39fff43": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:tienda\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "a07c056c2ca0bc42f95ea38d1ffed680": {
+  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
   "usage": {
-   "in": 490,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "84ddd6951bfad5de4c9851640fdbef53": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"quejarse\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 524,
+   "in": 736,
    "cachedIn": 0,
    "out": 32
   }
  },
- "453b7e455b414150f22042bbb1b54312": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "dc9d90a1f8253e87df8ff327c250f49c": {
+  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"pedir:empleo\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 537,
+   "in": 780,
    "cachedIn": 0,
-   "out": 33
+   "out": 29
   }
  },
- "f614d9aea8f30c73b8cff18cca050c4c": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"pedir:empleo\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "ee3ea119895024a86b64fd2fba282f28": {
+  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"quedarse\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
   "usage": {
-   "in": 517,
+   "in": 779,
    "cachedIn": 0,
-   "out": 33
+   "out": 31
   }
  },
- "1de7dad27e1bf27e553959161f5a91ba": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"quedarse\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "61bed0df2b3c01945738a7671518877c": {
+  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"quejarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 522,
+   "in": 758,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "bfe79bf7df14690c116c56ce4b6821bc": {
+  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 802,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "bfe02ee16deb0fb58d88a4a32da1d259": {
+  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"pedir:empleo\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 803,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "1c64f6841904adb418a4d722e76d0f84": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"pedir:empleo\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 738,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "ead85d00a62b58f2709ada26a08100cf": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"quedarse\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 734,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "2bb2d1ffaf9c177eeaa0d574561070ea": {
+  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"pedir:parque\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 737,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "5eb2024f7dfcbaf0a8dca844f5231898": {
+  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"irse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":6,\"accion\":\"quejarse\",\"motivo\":\"Que nadie diga que no avisé.\"},{\"vecino\":8,\"accion\":\"quejarse\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":9,\"accion\":\"quedarse\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":11,\"accion\":\"quedarse\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 1537,
+   "cachedIn": 0,
+   "out": 127
+  }
+ },
+ "b3013b41bba9f7746e8145ef813f98e2": {
+  "text": "{\"decisiones\":[{\"vecino\":15,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
+  "usage": {
+   "in": 733,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "1a7d5332f5935b51a249d0ba939665e8": {
+  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"pedir:empleo\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+  "usage": {
+   "in": 736,
+   "cachedIn": 0,
+   "out": 27
+  }
+ },
+ "2bb1e14f76a5a47ff7685208dd3488ee": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"pedir:colegio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 804,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "19deaf655974e7f67e5e7fe8bb1b8e57": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 801,
    "cachedIn": 0,
    "out": 32
   }
  },
- "23a4afabf3c367dfe18d52aecd740b6d": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:colegio\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "51d12dd55d30d60fd82c7ef3e2334bed": {
+  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"pedir:tienda\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
   "usage": {
-   "in": 526,
+   "in": 789,
+   "cachedIn": 0,
+   "out": 32
+  }
+ },
+ "526d2dc2cf1c984dd3abeccd15af3d8c": {
+  "text": "{\"decisiones\":[{\"vecino\":18,\"accion\":\"quedarse\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 736,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "ac5ff3f9f0e3653e55f82f478f19a5fb": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+  "usage": {
+   "in": 801,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "dc98d3e414483fd42ff456f5bb0c2bb6": {
+  "text": "{\"decisiones\":[{\"vecino\":19,\"accion\":\"pedir:parque\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 736,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "e454732e0cf51c3bb217efe4f1ed3a14": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
+  "usage": {
+   "in": 802,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "43208b04ae448caa7d3f01186a0cc362": {
+  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 782,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "2d33e60628622c5418b9d98fdc149462": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"quedarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 741,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "4c38cc5726d1d7939a985daf6f7e563b": {
+  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"pedir:parque\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
+  "usage": {
+   "in": 744,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "9764a86773937f1e1e03512866171580": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 800,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "d3b1652006a2426297dce0b95c85896e": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"pedir:empleo\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 796,
+   "cachedIn": 0,
+   "out": 32
+  }
+ },
+ "f121d1c25461a9e19a36f6a64b8339db": {
+  "text": "{\"decisiones\":[{\"vecino\":28,\"accion\":\"pedir:tienda\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":29,\"accion\":\"quedarse\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
+  "usage": {
+   "in": 917,
+   "cachedIn": 0,
+   "out": 52
+  }
+ },
+ "a39d6ca735ddad8d1397ba7a48c35082": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"pedir:parque\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":32,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 918,
+   "cachedIn": 0,
+   "out": 62
+  }
+ },
+ "a43811294f802c574543c18d94e7ec2d": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"comprar_casa\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 715,
+   "cachedIn": 0,
+   "out": 32
+  }
+ },
+ "530106110cc2e2780f977d53ca348b43": {
+  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"pedir:tienda\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 740,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "06ba9f75a38649249886dc3dd0031e7d": {
+  "text": "{\"decisiones\":[{\"vecino\":35,\"accion\":\"pedir:empleo\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 742,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "798004d43d4c5064fcafa6af60e6c48d": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+  "usage": {
+   "in": 757,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "71e2f8afacacf70aca6a64f6c57224b4": {
+  "text": "{\"decisiones\":[{\"vecino\":36,\"accion\":\"quedarse\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":34,\"accion\":\"seguir_alquilando\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 914,
+   "cachedIn": 0,
+   "out": 55
+  }
+ },
+ "e4706926cac864c6ff965e7e6f0381b7": {
+  "text": "{\"decisiones\":[{\"vecino\":37,\"accion\":\"pedir:parque\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 742,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "a4e245fea6d4cb7a7e452466c82b751b": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
+  "usage": {
+   "in": 794,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "6783b4fdded17243e9fb8cccf822f3cd": {
+  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"comprar_casa\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 737,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "4aecfeef53868a822f2614189818e1b5": {
+  "text": "{\"decisiones\":[{\"vecino\":35,\"accion\":\"quedarse\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 773,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "c4a8c480f357e288351ec60820ca9b06": {
+  "text": "{\"decisiones\":[{\"vecino\":36,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 795,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "350cc67f4238562b31eb10271210343d": {
+  "text": "{\"decisiones\":[{\"vecino\":37,\"accion\":\"pedir:parque\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 826,
+   "cachedIn": 0,
+   "out": 32
+  }
+ },
+ "d841cdf3daf94670803d637cbfc74556": {
+  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"gastar_ocio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 811,
+   "cachedIn": 0,
+   "out": 32
+  }
+ },
+ "83fae1e0ceab46df97336f6a4c142e1a": {
+  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"quejarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+  "usage": {
+   "in": 810,
+   "cachedIn": 0,
+   "out": 26
+  }
+ },
+ "3d61ac6019758f7a9248209ffa36077b": {
+  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:parque\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 800,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "7a53aeece6f5a122efd24bfebfb5ae05": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 816,
+   "cachedIn": 0,
+   "out": 36
+  }
+ },
+ "072dd505fbb9aa9b27b3827e455780ed": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"pedir:empleo\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 813,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "9089bd1cfc0feb56550bf93df91b12ab": {
+  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"gastar_ocio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 815,
+   "cachedIn": 0,
+   "out": 32
+  }
+ },
+ "d67fdec7ee0eabeba01fdfe727a9cc88": {
+  "text": "{\"decisiones\":[{\"vecino\":15,\"accion\":\"pedir:centro_salud\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 822,
    "cachedIn": 0,
    "out": 33
   }
  },
- "1d2b6faa1edef3bd050fb3399714b07a": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "03e57d490ca135078c89e7a1494cc683": {
+  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"gastar_ocio\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
   "usage": {
-   "in": 517,
+   "in": 824,
+   "cachedIn": 0,
+   "out": 27
+  }
+ },
+ "62fc2c6d81c56eae86c54ccae45bc19b": {
+  "text": "{\"decisiones\":[{\"vecino\":18,\"accion\":\"quedarse\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 807,
+   "cachedIn": 0,
+   "out": 33
+  }
+ },
+ "b127aa5d41df2b26454e72b471feaee9": {
+  "text": "{\"decisiones\":[{\"vecino\":19,\"accion\":\"quejarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+  "usage": {
+   "in": 806,
+   "cachedIn": 0,
+   "out": 26
+  }
+ },
+ "58744eb19538c144f3b45f9c21bdc0fd": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"quedarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 809,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "5b7c48570eb1fa3e830034ccd6baea4a": {
+  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"quejarse\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 845,
+   "cachedIn": 0,
+   "out": 28
+  }
+ },
+ "3dae79dee9d62cd05afa5f5369b5b4b0": {
+  "text": "{\"decisiones\":[{\"vecino\":28,\"accion\":\"pedir:empleo\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 837,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "a638be303bbdddc693737157b48d46be": {
+  "text": "{\"decisiones\":[{\"vecino\":29,\"accion\":\"gastar_ocio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 821,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "5ef181a0e3307ef97df7b68a839510fd": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 807,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "3a6a5aaae8197cd98047131f04f8243c": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:colegio\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 807,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "45e26715c5d929b52bacd6d90f392da4": {
+  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"pedir:empleo\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 838,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "80a7ce8e5705c78d106edb9339754f90": {
+  "text": "{\"decisiones\":[{\"vecino\":35,\"accion\":\"gastar_ocio\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 824,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "6867693a70ac86626f57eabc4f4962b2": {
+  "text": "{\"decisiones\":[{\"vecino\":36,\"accion\":\"quedarse\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 840,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "01218af33f461a20a03401e09ad581c8": {
+  "text": "{\"decisiones\":[{\"vecino\":37,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 841,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "6c96b2c419bb2b9b609a0bd2dbe6270f": {
+  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 806,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "d18b724c3b772b77d53989b6b8aacb98": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
+  "usage": {
+   "in": 780,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "9890d54072bf3cb914e3b0d64e30ceb2": {
+  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 804,
+   "cachedIn": 0,
+   "out": 32
+  }
+ },
+ "1919cb8f029a9dc1e8c3ec405ce51b0f": {
+  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 795,
    "cachedIn": 0,
    "out": 35
   }
  },
- "525e5aaae79db36ab0d7fd9ee9ca4f85": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "b71c855140adaab9f0e5b9cf7036bb29": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 533,
+   "in": 780,
    "cachedIn": 0,
-   "out": 33
+   "out": 30
   }
  },
- "5563e604e0a8991d1914f0d684613d91": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "853fb18278060b6c0aef54fe2096434a": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"gastar_ocio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 515,
+   "in": 814,
    "cachedIn": 0,
-   "out": 32
+   "out": 29
   }
  },
- "b6bf74868a5af63ec780eaa936a6c0ca": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "5a77d6e0a4ba1f8947b82206f0195990": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"quedarse\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
   "usage": {
-   "in": 518,
+   "in": 808,
    "cachedIn": 0,
-   "out": 33
+   "out": 31
   }
  },
- "4e9a751c65495c79951f8ba1034a99ef": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "d5cb6f964712b92dd81aa7e80287c376": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 781,
    "cachedIn": 0,
-   "out": 34
-  }
- },
- "6f3aea98bed7475eb2f95bc514c7fcf7": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 521,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "160c8d8468a57de253264f31d074e79a": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 528,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "77170cd197533989e723c3cf4b82763b": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 523,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "2e520eb3b89b90158be45394347b3985": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 528,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "24d050f7e9615bc288b8fb28ee4f6e9b": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "a0fcdd02f70c887555f9ad4ed231b7fe": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 531,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "c96284ef93801a9d7a3ef6982e43929e": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 528,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "c974ea998c16fa4ad70cd6fceb34e969": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 523,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "431286783bbf5bd38a3a682d8a954f92": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 528,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "e092e75513bd490ae2bc179559ca9a68": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "2c0ff77f46f9651f92a58a79b4c7a563": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 531,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "978796f6e1a84d63bd020819cb1e7d83": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 529,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "afead918d1ad89583ff06275449ac550": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 519,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "dbfd4456dd8df9251ef365d0bea75a0a": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "09d60632ac588d3a9deb3169235f5bd2": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "065b7ee04f112e7b0237eff3caaeb5d4": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 530,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "63be901e015fcfe506d5dc03d4fd8714": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 529,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "8f6274d93494af8d2dc6af1fda0fcba2": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 519,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "7bd965561da964f7d3af0c5cc752fab4": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "f28a3dc169ead6128f69090f80e0638a": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "fad0ceca1102ba66f3f43bec60e93740": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 530,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "0ee4c4fbb638339e0fd3444bfc6a4794": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 528,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "03f2e1e47c1e4bdcd31737b83d829886": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 519,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "de38cf66db45d38fb612b45a18bcb604": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "f3c1cc8946056ca58dfecf2d2efbe1e0": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "224147eb24cc64158e299cc58209cafa": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 529,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "69219e59131bfaef5609bac298d2b603": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 529,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "ddae73c3408478a79c5c973b58938dc2": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 519,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "dd382b255c8c4c6dd97ef86eaafd1b11": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "07743f093abdaf5c38b907c81b5f3396": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "ec1166ce604e52a0d12b3be316381ae9": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 530,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "3f2002e9b7804c2dd05687ee9b8ea382": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 529,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "8efbebf2fa215cba010c84dac4ea2a1a": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 519,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "1dd2ffafbbc2376ecfef9cb94fcb9b9f": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "12479677a6a720603c45298ae830db50": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "e5ac08748555a9d19ccbecd0d4aad00d": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 530,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "e8c1a9dee42a1a86a20b4c5ca94b0bf5": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 528,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "89acd374694eb7864d329ece81e7f7c1": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 519,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "d1386362128e27d7f98cdce30b9f3067": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "f0baf43206709c008ecaa0205ee36cea": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "3b90e2119502e572fefa1201942df98b": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 529,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "fbb7d2f1f4565d35176115a7e6f8e28b": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 529,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "303f9e398027c1795098bdf57473f7c1": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 519,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "5b0326b9938ea50924f023d285aba698": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "8adb3866d12530f3921def9eeb98fd51": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "50d02615b1311a7fb80acc55e60145cb": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 530,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "b2654de271f7445c940f9dd91c30e457": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 529,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "cdb4eb84cdf3708945ff53e5210a1782": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 519,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "5b6a806cd1cf1329881f23acca8f353a": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "5cb9d20dee79f9ef429bc8da57d43345": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "6915c708ed1eb111884bc385b02f8207": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 530,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "ec8335fc17ef26ece5c0eea2c83f8942": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 528,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "6309b3c2b04c4360234c6ef747e5116e": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 519,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "a94262e818a1d6f58b8e0578fcba818e": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "bc30765affbbb935d30991d6c1223efd": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "c19762c9be1d017896187caa14275f0b": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 529,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "0fca06ca78acfeec4fdbb56c8670b9f2": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 529,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "0a1e558849658f996fe2388bbe49c5fd": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 519,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "407c0606804545805685b20a2b677bba": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "f6ccacd35ac6235d32b60434da99d7c1": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "0b10ed644d42a50d6029260b017726e8": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 530,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "711b53d5384b5ac0b3e3fd1040edb5c1": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 529,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "a010cfc9e233e311c2561b0c291f2e4a": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 519,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "a450702612d4078351224614cb687270": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "ebd01c29ddc7cfa3b5484a398e890042": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "8d1963b7ad96af0ba1e176dc566f8263": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 530,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "59325e0699ac98537bbe91f70f04ab4d": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 528,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "1f596db535d462da5794bcb90ad185dd": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"gastar_ocio\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 481,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "ffa4caeab4485ac1aac47b8ce6213cdd": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"gastar_ocio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 490,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "9edcaf9c6cd732e53c95181562ae9890": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"gastar_ocio\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 490,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "2eb449cfd933c0a6ce15277cfb7ff58b": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "df718b1fa9ebbe625c2b8d46e4b1e580": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 529,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "3b088b155c8832fc64b71c431f81a0f1": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "fc42508f65eaac834a8e66b9e724164c": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "273e8313a24cff64857bdd84866ffb98": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "6521ed7af6d706366be510d5222c21e5": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "deb25d76588deb0496988f063d880447": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 530,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "7feff2fad1d133939b3cf71413b4fec7": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "1b8c7f4845df442b7d35aafa4ce2b899": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "0290c43e4b16963beeaa3aa065eeea0f": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "22e6956cffce6ec84a5a8aac99883ea4": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "faea97177e7fb5fcba7f71d984da7fcd": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 530,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "5c129ce909aa643d2ac438d40d5acbd7": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "3a4615e75cefc367adf426591e3a9f76": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"gastar_ocio\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 490,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "afd3ed76cf24a372e664e25cd38025fe": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"gastar_ocio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 490,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "5f222c2f31a76547ca19d7c3344e05f5": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"gastar_ocio\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 490,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "7e5edd32f1f9d54230491860377b8bcf": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "d88308b252b5c10b6ee7efbaffa402fd": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 529,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "4c4e16494cf571536a8380567b62ddc4": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "51af94c4e677346c021b0f1d990cb2c4": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "8bb6d2baa9d8ff991326060f241832c5": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "67173524502a9209128f64aebabb1493": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "a92d60a4cf4f8c1815340fe2f3526ea2": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 530,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "504da576a310578d8265b6015070a5b1": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "c3803763ef6ac5796ec5706b6aae6871": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "972ff6db4aa91a3364f99438733b7965": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "25188d71c2b1e324541a8851b267ed3d": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "9bfaba7436dfe4a3e90d0b25f8871e5e": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 530,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "72ceb90a0292dd7df605b935be8319b3": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "537adddb564b3c3188e35f66c9d70b3d": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"gastar_ocio\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 490,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "c2b0147f2cccf4044ddfd4b5015e4db5": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"gastar_ocio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 490,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "a314157bbc01c8ab41b82ea179da45b1": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"gastar_ocio\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 490,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "add656f428324920869c8e63778e2f4d": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "e44d3bb122fcd8345e79d2f4c4592646": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"gastar_ocio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 496,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "e2dfe6b28f2cf7b5ecb36eae7b6bbebc": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "79b5b3be6ae507a5cbbcf91d7e90e65d": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "d828b6ab26ac5ab97d8f0cf63629704d": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "1f307e060fd61e8aacedde14c38c6c9f": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 530,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "eb9c7abc28757f156f2d41c88a9afa91": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 539,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "fa33de5db846c481f197261f32d2a9fc": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "76dc1edf0ef770b2728fc255230bed3b": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "33d3165b3ee58dc5dcdda2133c5471c1": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "ebd9a20c38b4c8a1b272891ee00a36a1": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 530,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "b4a5100a3a33deee80dd66244c7c7d6b": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 539,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "c913bd843a0b6614fb3a31493ab6bc6a": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"gastar_ocio\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 491,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "200ae233faa2e4cee03d430c1c8f0476": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"gastar_ocio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 496,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "94fc5e062dcbb6c25076ce3bdbd9f687": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "a66633d93565085422d11ca43353f176": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"gastar_ocio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 496,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "2b2d5f7c01089f66f9ea82eef02247ae": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 529,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "407e6f26225180c0c6d079cd5e169a18": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "0b21d92abe12dbe730a74c689d813304": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "b2396110de56de66fa3deb7a9cec967d": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 530,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "51c90490988de32eedfe712caa3344a1": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 540,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "063cc53727ef4065f288dc199b2d7022": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 529,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "fcf440320197d8f41bbda2e284effd3c": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "b8023c30492232b5ea2527f46841e0a5": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "e1c419012a578880d5fe9bca0f05cc57": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 530,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "926a18f8cf5dee3a6e677fdaac9ca2b3": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 539,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "d361880fcc54ccdc702d30d7e4115756": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"gastar_ocio\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 491,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "9f06b960b241c50e2d23edc1fd98b601": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"gastar_ocio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 496,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "4a9e62cf62b141cc84bf6173c7d644dd": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"gastar_ocio\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 491,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "05e67dfff2655f771b465b5e70f68eb8": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "3427216cd28eaa86a4b0050bdfb433ed": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"gastar_ocio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 496,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "61765a4e75921dd0a6c1719ba40fe9bd": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 539,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "e4940ba3260104da0a9201fb07178712": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "b325ec047d173298ea108df2a8bdcbfe": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "27bc341845f803e4aa0fca3f68a17c91": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 530,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "142c140589110908878fab740d7d3fc9": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 540,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "ec60319a45fea896497c3992ac2e32fa": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 539,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "95efc5e767a2798ce5282e2d10479049": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "26b9aa068328fe4d0e123e074428a050": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "aca4fa42c6a9fa23056d812dc9fc894f": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 530,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "f5e60963a3b2c2e499285fc9184cab73": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 539,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "9df1bf7076cab856448bb8d976032028": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"gastar_ocio\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 491,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "5029fff3e8615e08fb7d9826bacd3f32": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"gastar_ocio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 496,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "ef588fa870fba8ab018ddcc5c78e99b1": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"gastar_ocio\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 491,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "9286e92f63d268c4c89ecd26f5834363": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "c110169965f070db0496bdc547723f82": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 530,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "c9ac37f6dbb1e9cb6116ebf7462c50b4": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "ab024a75d0ac3ac00d3e6a4873f79b7c": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 539,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "d57df503f5aa8b7675b31f76d22d2bb0": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "60573d4ec0112788a05d6e30587ffd71": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "6c07e8c9bb181b697ac262a36e108d17": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 530,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "12d14a6f323dc6615b88d2002021c951": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "eca6e49dde38b7380a0f3d56ff52d2d1": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mario lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 539,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "0c1573237dfac6c347457a9bd9315366": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "098f86b65d85e98fc532b3fc95f5ee03": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Clara lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "603836ee653ea781d1f37cba6e944432": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Carmen lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 530,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "8e42985e754d6bf1308fa29224e95684": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 534,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "74bf840ba88edbd013807630634c1709": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 492,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "bb45fcd7784c46c75fd88acbc6864d20": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 512,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "99575762d0027b4539d533233af62a7f": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 489,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "6c103ae79a69c8e43755e5c0a0f450ed": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 490,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "4d31c0cd31a41adb6756259213d283c9": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 528,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "753a335e67c5df2885ac37458748121a": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 491,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "a68bd80519128b5081b1baf000484960": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:tienda\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 491,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "4434c6eb2103e2030fa0aab30346735a": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:parque\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 522,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "01f62f7076eed887a3b8848c39bd6bda": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "b21c5ada8639ec0887688292eaecd6be": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"pedir:empleo\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 517,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "5884638aadd2669c15fb5d06b0599b1a": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"quedarse\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 522,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "6d5bdfee62cd26d297dfcef2a38517fe": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:colegio\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 518,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "96603fa9bec9d842a425178df74402ac": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 520,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "4fddc07c8dcec8fc5019d0c26978e4b7": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 528,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "17e339ed741d4045a421cc53e4b9170a": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 517,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "75b003d69024b719ea7baad89321fc90": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 517,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "a679f9a9d251cb4d17438574d8a2aa91": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 522,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "f006278a18b6ae801d3d8ade3b2b32ec": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "7045ca25a3b618b89ef89bb298181a42": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 531,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "600f7ea2958d297dbc7eee53e404e424": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 525,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "6fb5679dd305d3764a65cece165d6e6b": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 530,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "a87460984db7f26059e6e8cd75c59c5a": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 537,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "eba1ac3ffb4cefb352296b4d783ded4f": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "191976e67e946e4cc4d5177cf908b109": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 531,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "3ccade3064c59830ec87643df609aaaf": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 525,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "33d8547969f27899d5a527b260b35f61": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 530,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "078e6dd3747fc121eb836011c3e74dc2": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 537,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "5fef179b12075d35e02ef7b7b1495de1": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "a4ad1c57a56d87e562db3175fd47d764": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 531,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "a064d3eba5ee851b8af60e50914e4bd0": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 521,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "125b5e37ece658a31c7f53690355cc4f": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "04063c88d878f1f85d3e34a7d2379c70": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "2a2263228a1db4a1c51360aead4ed200": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "e22c7bc2e6111b20b9c1b1b1efacbffa": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "f5fe15598b2fdbc0eb004bcf6e8a8b68": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 521,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "fbe423a737ba23bd0c4ca40a7f48615c": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "b6fa0673586946129c705ad489aa9a2e": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "a0dfb88e9770640d50f3d39ad41735c0": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "9537792380404fec7175bbe6ffd7b739": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "51a5734791f099f18714ef9064011c49": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 521,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "26d038ba0606faa262ab33b1f06ca697": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "a5e5067a50a566a8159a72978cd73118": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "9109417bb25e5d78fd9860e117904f8b": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "01309ab0c90e72599882250c3c6168d2": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 531,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "d0f13657a20f512cc2729c3b493eea40": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 521,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "54c92673260e121758fad582a26af874": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "faeaadf0a48313f340599c23655cb35b": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "566ac43f99112a4c487dd785dabf9eaa": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "c9d670471f595253e99faf6fca521c38": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "58c605d0daf33a330570dafb1dbc05e7": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 521,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "10fb81a585985c0a6e0f595580cd962d": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "71488dab15b9abd3c985f88987d32d14": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "47e84419e07e152b4b55d9d2fee65cfb": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "f9831c2ba73228b0dc4b80b443556cb3": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "8dd67a0f765c9e90b4c34eec0ba461fd": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 521,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "5e338c4674037c9199820c5ec1d9a4eb": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "87b2b66dcad49ce7aa9fa9aa053f661a": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "0fbee64d93f283760452627afe752b85": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "0019fbf6caa3d9cc8a27f28db6c9eb69": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 531,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "646377bfea254844ee41dd18889cac23": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 521,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "a540fb6ac0e0cb5f47111c0d5352af79": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "8a6ef0d3337fdfcd79713516015b0ec0": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "3f2862a1999c96e5570651eb2984a27d": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "a2a45441a8cb96dce51ca6cd7b790ed5": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "95c68a3e587657c65bf025aafb18b2c0": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 521,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "aac96cfe4c6c0c69910dc77c14158da0": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "eac625eef4a3b0b1a08afe60b54b1189": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "2944c083c2e9ba461b77ea5624bfc4a3": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "31e2969a749324df7cb55737c9416288": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "8a607165570a0d6bb30bd6849d41b8bc": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 521,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "e7d0c338ebf0e23466ca2fe88419be93": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "1a530beb6970d72bd04f0f716aff9272": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "b0ab7930c76bd3b93a306fff103aa283": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "8a895ab05e05805816aa45f9b5258528": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 531,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "45ed7957f989e6eea7739a9a0ac0d739": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 521,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "64b1312f928c6fc52eb88d3eb2ff1dae": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "87edfad0c0ef0f076aa08193d8b4566a": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "3a504931776e059e9f3b7396e16d9890": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "9ec46545b78a1c64dce42e0863b2cb35": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "b338dbfa3d7c47cb8c237b9e26df09b8": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 521,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "793d9435e7c72dfbd7b6cc92e774e20f": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "c8a9cde2ac473a839dbdac22c55bb4f4": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "35a0b48059c8a98c813699f2cddf4bbb": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "683bad8146e0b571c61d7612f3c2941e": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "d4fd01aa4c8762b6852c9c6b0f6e6f6e": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 521,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "0e1b082aad74f07fd3bfe9b67dc44fd1": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "62f5b733de9cc89a800327146b07fc83": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "b5e9952cc21065f5f34b57385ea17214": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "7d63ae2d2211ccbfe6cb22dea1e8d423": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 531,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "bff23b9f3975831d6fc4523623c0f030": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 521,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "4fd115e15119ef0479ef540bd2ef5592": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "da5f9804245aec437b103362ff00ba64": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "81f3391fd8bced47ddc21b833734191e": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "56e2a949bac56a106899f5cdccd3e217": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "879ead51728bc5750299a0fea12cef2e": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 521,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "d9b35550b140b9ace006bf53aabbab0d": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "caf23ec4636e2fbdca49cb7c5aef9677": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "cf16f0d6bf4e8e417091e3d58cf2e9f2": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "a52d8e67d6b150e155540bfc2e6f0f93": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "32c74fa268a90520aa2337b3d3eca059": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 521,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "b51a34556778d75e52211ec922268577": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "9c79eddb6f91f222e319ad42ad62a3f6": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "0e3cc38af141f0e090d0ff474b06ad4f": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "f36e139cc472566dfb9ce2b08815e510": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 531,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "4b1b9258fa8a7ec513174555915fa683": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"gastar_ocio\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 494,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "55eac78e2ee93993c1f7f15988c38d38": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "379d8df9f14371f98b57e91f17b03c72": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "54bbb9a81e69c94ba24c41f3183ced39": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "e639c5af6afcf0fef254e864281f54b4": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "234ccd4eaae9f0ad8b414f8e702489f0": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 521,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "93777583cc68bc48f55f621a1c317917": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "19e990c8ed9a43e7ddafbedc5aca1859": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "490d20fb1b62d06c92d4d0c37be1b37b": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "51a49a86921608b7feaf3433a17bac4b": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "2460301fc7a96f5a553653f7557506fe": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 521,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "50ffdd6820afe4ac4383a6bcd7ceba17": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "a40a201b35a256af1ec96ea93fcbf5f1": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "7fe7a6d7d698f0580ab9f3ea5c1b4229": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "c00d882ac9f68360b633ad0a17c8a853": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 531,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "4c856bd381e25f180f3b5d0e7d085bea": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"gastar_ocio\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 494,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "f7e8ba783b900bfd8dbec19337047524": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "b9ce9a14e62097c25c33caa0516314e1": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "5ca4fed55c15bdf713ab896e7c325521": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "b7c92a7cd4e82c7068e02092764b7485": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "f56fb2273821d1f6ff5114cbad64d5f1": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 521,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "8cedfe521eebc79f45f7ea26ad2cb3fc": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "3388701d4211f6948afaf1ae8bd6848b": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "e60a1c9e98607a7973a39718a6036934": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "dd74010126afe444696f7d8b5c2a1464": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "6780e7d195c0c763030b06e028cf5d07": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 521,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "59ba4ff8f6fbfe4bd4950db4eadf9cb1": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "b164993692de45a5c2e0c6c2f1c2f421": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "0efae2452a135bf765bb67c0a926848c": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "0e67324e5df2566adeb5ab5d8dea5251": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "ff4efddaa0c32672e02fb1fcffde8441": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"gastar_ocio\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 495,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "df0bed853caa8acf989aa790a398e308": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
+   "out": 30
   }
  },
- "c5ea79a776fd09f30e297d049353c822": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"gastar_ocio\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "1cbf105b152bd117bef981c4c878ce70": {
+  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"quejarse\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
   "usage": {
-   "in": 500,
+   "in": 828,
    "cachedIn": 0,
-   "out": 33
+   "out": 28
   }
  },
- "97886222ab49cf53961276deaad552e7": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "f99561a6202de0e6b88a30008615f839": {
+  "text": "{\"decisiones\":[{\"vecino\":15,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 840,
    "cachedIn": 0,
-   "out": 33
+   "out": 36
   }
  },
- "6c52f18553d84653666fcd1eaf5e22c6": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "2d71dec678e900064a265481a323a27a": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 522,
+   "in": 781,
    "cachedIn": 0,
-   "out": 32
+   "out": 30
   }
  },
- "7770f326f39f12110a66c695d3e911d8": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "6aadb3b1c2cecbbe7addadf1374daf6f": {
+  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 536,
+   "in": 825,
    "cachedIn": 0,
-   "out": 33
-  }
- },
- "a6f6fcf861233502962ed093d8585f6c": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 539,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "4a23d76e5e6d4bbfc8406a2a418bae21": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 544,
-   "cachedIn": 0,
    "out": 34
-  }
- },
- "917e0dc3b88f16d97c8aa7c4e2832997": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "42a3e6424723b4c8525a77f5d486a09c": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 522,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "313ab5181129c257f2217e3f746f5a66": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 536,
-   "cachedIn": 0,
-   "out": 33
   }
  },
- "78f6e426f06da5e529bee28726a41fc8": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "116913317a1e4f4c5f81b69e60d0567c": {
+  "text": "{\"decisiones\":[{\"vecino\":18,\"accion\":\"quedarse\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
   "usage": {
-   "in": 539,
+   "in": 824,
    "cachedIn": 0,
-   "out": 34
+   "out": 31
   }
  },
- "c67092d55d005ac1cbb3f579f2b1f923": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "ab911868f0fc675b7884e5c58485d24b": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 544,
+   "in": 781,
    "cachedIn": 0,
-   "out": 34
+   "out": 30
   }
  },
- "7fe53f6287ed538af493779316e89d67": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "d4c410b20e653b16a34be0ec5ad9a9ec": {
+  "text": "{\"decisiones\":[{\"vecino\":19,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 824,
    "cachedIn": 0,
-   "out": 33
+   "out": 29
   }
  },
- "32736ec29c7090e899cd0eee0bfc1e2c": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"gastar_ocio\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "8dca8cb137acd0668496b26b4dcbc8e6": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"quedarse\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
   "usage": {
-   "in": 500,
+   "in": 844,
    "cachedIn": 0,
-   "out": 33
+   "out": 30
   }
  },
- "30f684d0523925ff1da1837e96524dbd": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"gastar_ocio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "2fa291db7063a1dbee152b32112c7178": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 494,
+   "in": 781,
    "cachedIn": 0,
-   "out": 32
+   "out": 30
   }
  },
- "5a2b5c8cfa170276be02b8ddd939d788": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"gastar_ocio\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "d7a6b897b8803fa7cf79a05ae7621da4": {
+  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
   "usage": {
-   "in": 500,
+   "in": 847,
    "cachedIn": 0,
-   "out": 33
+   "out": 29
   }
  },
- "d044b040ce7b6dad1c5f6487e63f78d9": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "df65feada1a66ca3e70be50c26b9f341": {
+  "text": "{\"decisiones\":[{\"vecino\":28,\"accion\":\"pedir:empleo\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
   "usage": {
-   "in": 537,
+   "in": 838,
    "cachedIn": 0,
-   "out": 33
+   "out": 30
   }
  },
- "69f267a7db706eacfe22ea92c6965112": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "2dbcde6b63c0bf702279fa61830dd057": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 522,
+   "in": 781,
    "cachedIn": 0,
-   "out": 32
+   "out": 30
   }
  },
- "b5680996c2e3cd38c16b449c34b1b4c9": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "6bf842de32766d2cd05ef26a7a8a0925": {
+  "text": "{\"decisiones\":[{\"vecino\":29,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 536,
+   "in": 824,
    "cachedIn": 0,
-   "out": 33
+   "out": 31
   }
  },
- "f93062c20daa1e5d15601707772c314a": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "2673fcca37519209440914dbdf55270e": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
   "usage": {
-   "in": 539,
+   "in": 766,
    "cachedIn": 0,
    "out": 34
   }
  },
- "5e94fa76bac42298fd77fc8de537d02a": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "58054b9729cb20666316e1fed6c857d0": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:colegio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 544,
+   "in": 822,
    "cachedIn": 0,
    "out": 34
-  }
- },
- "cab0ffff58127883f6b7b2738641444c": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 537,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "3b5c7930cfecbfd5809a20b81e6ff107": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 522,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "e94a2a08b20c8d95e9bdc65921ac8e15": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 536,
-   "cachedIn": 0,
-   "out": 33
   }
  },
- "48d521249b2d2f84651a8109edc859e7": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "926984ba36aebbbc3f2ef7b1de22799a": {
+  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"pedir:empleo\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 539,
+   "in": 839,
    "cachedIn": 0,
    "out": 34
   }
  },
- "85ab1f0a3d0139763a55915deef79de3": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "256b0ba415808e366b9ec271413724b6": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
   "usage": {
-   "in": 544,
+   "in": 765,
    "cachedIn": 0,
    "out": 34
-  }
- },
- "53534466e770eab454fa6392e4ea9aeb": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 537,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "0e58908ea0a9857f052b054426ce3722": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"gastar_ocio\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 500,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "21ef143992bca909fe6cf2e3fb9fe367": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"gastar_ocio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 494,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "290fe12f7fed461118581235e0f5e3ce": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"gastar_ocio\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 500,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "0fce25fa7795a1e445b2731544206591": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"gastar_ocio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 499,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "806f89a0d72d37d095387bb0b1952773": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 522,
-   "cachedIn": 0,
-   "out": 32
   }
  },
- "22b139c99a6edd16bf0335d403c1bf61": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "b2c15a1cb8642c53130a6a1a4ae620db": {
+  "text": "{\"decisiones\":[{\"vecino\":35,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 536,
+   "in": 839,
    "cachedIn": 0,
-   "out": 33
+   "out": 31
   }
  },
- "eac1e904057c09e2dc83eb821184c87f": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "658a429e8a373e9073d0189360055eaf": {
+  "text": "{\"decisiones\":[{\"vecino\":36,\"accion\":\"quedarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
   "usage": {
-   "in": 539,
+   "in": 841,
    "cachedIn": 0,
-   "out": 34
+   "out": 26
   }
  },
- "f4edc5e9ad8b4ee87efe9f3dbc0ea4dc": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "dab67a51e5f8ba51f7e1f3643c5781da": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
   "usage": {
-   "in": 544,
+   "in": 765,
    "cachedIn": 0,
    "out": 34
-  }
- },
- "5973ed86b26b386509c43b52ab85d06b": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 542,
-   "cachedIn": 0,
-   "out": 33
   }
  },
- "7c09c6e2bb61e53e7244f5fe080a82ce": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Adrián lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "2532c5c6d948183b7b6c2c9d29046fb9": {
+  "text": "{\"decisiones\":[{\"vecino\":37,\"accion\":\"quejarse\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
   "usage": {
-   "in": 522,
+   "in": 840,
    "cachedIn": 0,
-   "out": 32
+   "out": 30
   }
  },
- "42338b8f4632043cef097348fade0a7c": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Marta lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "57949a8540a626d524659bd94b6fdfc7": {
+  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 536,
+   "in": 806,
    "cachedIn": 0,
-   "out": 33
+   "out": 30
   }
  },
- "4a88313973a72d7259624166950f5d7f": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Félix lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "c69b75974cfda0207e9d274e916a618d": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
   "usage": {
-   "in": 539,
+   "in": 766,
    "cachedIn": 0,
    "out": 34
-  }
- },
- "a258f804fe13db3f140ca0256a906035": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Gonzalo lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 544,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "89a9756dcc0b099a5236287026ab7daa": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 542,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "67786b180680abdde1a822fd3f938353": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 493,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "41c08f043d87fa590d46f3c716917a35": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 502,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "b231bddb574502696b5b36d0ffaea291": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 523,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "9f598e13ec17739c8615e99db2d3c017": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 533,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "34f5209326b9f7dcf685a5019c1135e6": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 490,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "d5143ce575473e01bf6c4d3f36fd1135": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 490,
-   "cachedIn": 0,
-   "out": 33
   }
  },
- "5b34c455f9cf6fbf3d3a507fc0953ce8": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "3e8010dc75b18b45924c97bc7c10bc9f": {
+  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
   "usage": {
-   "in": 538,
+   "in": 796,
    "cachedIn": 0,
-   "out": 33
+   "out": 27
   }
  },
- "0e3798f052061f1b5e7ef041fb0be4b5": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "abc2ec34418dc3227376c4b822a3a7ff": {
+  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 490,
+   "in": 795,
    "cachedIn": 0,
    "out": 35
   }
  },
- "33eb881330933852590524559f5d5bda": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:tienda\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "6eb69bc5f3aef340e29c0b20fcd03a2a": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
   "usage": {
-   "in": 490,
+   "in": 766,
    "cachedIn": 0,
-   "out": 33
+   "out": 34
   }
  },
- "c007c46eae9f97b0bccde89f4c94deb2": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"pedir:empleo\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "46a7207349c9817af24e6f009318982a": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"gastar_ocio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 518,
+   "in": 814,
    "cachedIn": 0,
-   "out": 33
+   "out": 29
   }
  },
- "ceadeb1593409fdd0320b6a14c550c94": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"quedarse\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "50c821ed628e7fa3d04b90b3f0d330ff": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"quedarse\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
   "usage": {
-   "in": 522,
+   "in": 811,
    "cachedIn": 0,
-   "out": 32
+   "out": 30
   }
  },
- "27db393170025873003c25294ca6ae18": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"quejarse\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "34cdafc230910ca1dca448ca16ffa503": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
   "usage": {
-   "in": 523,
+   "in": 766,
    "cachedIn": 0,
-   "out": 32
+   "out": 34
   }
  },
- "a2afa5a799d7e4be70eb6e4047fc3208": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:parque\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "bae0861f845d5a288c07e2314aa6ad7b": {
+  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"quejarse\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 522,
+   "in": 828,
    "cachedIn": 0,
-   "out": 33
+   "out": 28
   }
  },
- "0a8f40df63ba3bc35ea5ed8cfebacf87": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "82c237926c4c8ba4fa9c257163d13c80": {
+  "text": "{\"decisiones\":[{\"vecino\":15,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
   "usage": {
-   "in": 538,
+   "in": 840,
    "cachedIn": 0,
-   "out": 33
+   "out": 31
   }
  },
- "df052a97c86a6a89a438e49ff4909745": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"pedir:empleo\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "260c9ed83e9d6e29aff8284b0a238d68": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 528,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "2742aba936aa11c33353899cdd487436": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"quedarse\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 527,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "bcc3284c47aebc1d5b6831a6b78d17e6": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 518,
+   "in": 795,
    "cachedIn": 0,
    "out": 35
   }
  },
- "663413f51319bef8d62275e6666cbae6": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "1283a28c2aee12909b10764dc35ae6a2": {
+  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 519,
+   "in": 827,
    "cachedIn": 0,
-   "out": 33
+   "out": 34
   }
  },
- "a3c3e969ae3c8e2502deda09814deab1": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "f90fdc454f352d9772f7b0594a353103": {
+  "text": "{\"decisiones\":[{\"vecino\":18,\"accion\":\"quedarse\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
   "usage": {
-   "in": 528,
+   "in": 826,
    "cachedIn": 0,
-   "out": 33
+   "out": 30
   }
  },
- "d76ffc1e5c89861cacb2ae976687cc5a": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "ed2a9b9bb7b791e5a1b213552fcdf4ac": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 528,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "a73e32d3090ac0e67475d329d2de3a34": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 523,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "3f06f5595c5a25981367b3f0c0e99801": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
+   "in": 795,
    "cachedIn": 0,
    "out": 35
   }
  },
- "64493ea62eb7af57b23831f2c4bfe911": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "5ab4f7e4d023a7d2af9acbc26d014735": {
+  "text": "{\"decisiones\":[{\"vecino\":19,\"accion\":\"quejarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 825,
+   "cachedIn": 0,
+   "out": 26
+  }
+ },
+ "6bc5049cbfd154a45dd2b58f3c11d12d": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"quedarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+  "usage": {
+   "in": 844,
+   "cachedIn": 0,
+   "out": 26
+  }
+ },
+ "4b28fc9357e0d6042bb5700fd3822301": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"gastar_ocio\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":31,\"accion\":\"comprar_casa\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 985,
+   "cachedIn": 0,
+   "out": 55
+  }
+ },
+ "dda3adab40fefef2e049ef886a00f146": {
+  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 846,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "a604d5bbc38b12daef00797876dc84a7": {
+  "text": "{\"decisiones\":[{\"vecino\":28,\"accion\":\"pedir:empleo\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 838,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "cd0f5384a9f60a91b512889f2bb6a5eb": {
+  "text": "{\"decisiones\":[{\"vecino\":29,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 824,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "8840ea721654b97c9963487e858a03ad": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"quejarse\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 785,
    "cachedIn": 0,
    "out": 33
   }
  },
- "709867e00b08b4c77f088f1e234a4f96": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "02118f94b1f6dca08ed7e1bd30189da5": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:colegio\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
   "usage": {
-   "in": 531,
+   "in": 808,
    "cachedIn": 0,
-   "out": 33
+   "out": 30
   }
  },
- "628e190b844181f086a75cde73b21d23": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "527fd3a68da27589b4c4b0352318f470": {
+  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"pedir:empleo\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 531,
+   "in": 839,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "ae639d0fd5a23cabd4a956c2838a3425": {
+  "text": "{\"decisiones\":[{\"vecino\":35,\"accion\":\"gastar_ocio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 840,
    "cachedIn": 0,
    "out": 32
   }
  },
- "e223329305d1046976123ec727cfaa06": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "f7621b3fc01d12ca958eb0c5ab40ef72": {
+  "text": "{\"decisiones\":[{\"vecino\":36,\"accion\":\"quedarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
   "usage": {
-   "in": 526,
+   "in": 841,
    "cachedIn": 0,
-   "out": 33
+   "out": 26
   }
  },
- "f4c0e81356eb024af5719fa348e9b931": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "2743248b492b824b16037e59ea1f90a7": {
+  "text": "{\"decisiones\":[{\"vecino\":37,\"accion\":\"quejarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
   "usage": {
-   "in": 535,
+   "in": 841,
+   "cachedIn": 0,
+   "out": 26
+  }
+ },
+ "177f5d59a7f7ca7a3c45fcd557ca21a4": {
+  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 806,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "105157e6a2bd6a137f418161aa08cea4": {
+  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 782,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "45957866c01e0f019262b3816c2b4fc8": {
+  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 795,
    "cachedIn": 0,
    "out": 35
   }
  },
- "8d390e64d3d8c4faeae63645f4099354": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "5a4d3552c042e3edca84e315b7987050": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"gastar_ocio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 814,
    "cachedIn": 0,
-   "out": 33
+   "out": 29
   }
  },
- "015721be191bc79d85c814566bdbd39f": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "9350f95767d79a656cfa165a02d62f50": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"quedarse\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
   "usage": {
-   "in": 531,
+   "in": 811,
    "cachedIn": 0,
-   "out": 33
+   "out": 30
   }
  },
- "1a2670168b749f285d3ec64ad4ecad71": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "75709311d1c0d51e10031b7795f81bd3": {
+  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"quejarse\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 526,
+   "in": 828,
    "cachedIn": 0,
-   "out": 32
+   "out": 28
   }
  },
- "6fa3376ef1ea91b31ca6dc4fa3f7edd6": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "f06e408a8de3c25cf01f2072977a32df": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":36,\"accion\":\"seguir_alquilando\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
   "usage": {
-   "in": 530,
+   "in": 1053,
    "cachedIn": 0,
-   "out": 33
+   "out": 58
   }
  },
- "2948c92e13c0c09cffe3e446afcc3db7": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "f01eb10a888a7a3aa7d6e011b2a256bd": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"gastar_ocio\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
   "usage": {
-   "in": 536,
+   "in": 773,
    "cachedIn": 0,
-   "out": 35
+   "out": 29
   }
  },
- "378d3060bb1c81ad72825a333701acd5": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "64c5bc382639d650e896f15cb510c8a0": {
+  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 827,
    "cachedIn": 0,
-   "out": 33
+   "out": 34
   }
  },
- "c942578726d6696eecf1ed5e312153e3": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "56d026178cbb28b0d23ae9ced7af68a4": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":36,\"accion\":\"seguir_alquilando\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 1053,
    "cachedIn": 0,
-   "out": 33
+   "out": 58
   }
  },
- "1dfca98bc5375dcb4fdad866305500db": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "59fb79be44501920cb96355428656d43": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"gastar_ocio\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
   "usage": {
-   "in": 522,
+   "in": 773,
    "cachedIn": 0,
-   "out": 32
+   "out": 29
   }
  },
- "2213a4c9838a9ff28c0f8d8337062727": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "b37fa57f73336402adfd27946d193bd0": {
+  "text": "{\"decisiones\":[{\"vecino\":19,\"accion\":\"quejarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
   "usage": {
-   "in": 535,
+   "in": 825,
    "cachedIn": 0,
-   "out": 33
+   "out": 26
   }
  },
- "2af2e68c148646faf8849305fba15632": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "b0da290b063d8fc6bee41f7b6a10962d": {
+  "text": "{\"decisiones\":[{\"vecino\":36,\"accion\":\"comprar_casa\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
   "usage": {
-   "in": 537,
+   "in": 814,
    "cachedIn": 0,
-   "out": 35
+   "out": 27
   }
  },
- "747387abcf9da48554420574838353ec": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "2036dbf25ead037eea14d9874e752d21": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"quedarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 845,
    "cachedIn": 0,
-   "out": 33
+   "out": 26
   }
  },
- "47c8c88df8cbbb8d9e6a722fb1e3d12a": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "41d79272557c2416e9c7393350b134be": {
+  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 847,
    "cachedIn": 0,
-   "out": 33
+   "out": 29
   }
  },
- "55ed61eb1a6760447e098163085e2309": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "3d830773c6cd8b0e838d92352510b95d": {
+  "text": "{\"decisiones\":[{\"vecino\":28,\"accion\":\"pedir:empleo\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
   "usage": {
-   "in": 522,
+   "in": 839,
    "cachedIn": 0,
-   "out": 32
+   "out": 30
   }
  },
- "bd354cb7b251f05e6f67faa9eb04eae3": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "936fa7b980a329f7d80f304cfb44fa51": {
+  "text": "{\"decisiones\":[{\"vecino\":29,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 535,
+   "in": 824,
    "cachedIn": 0,
-   "out": 33
+   "out": 31
   }
  },
- "1a100133da59c754f4759e4f25350852": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "8873b15c73354985f5ad6bc937bd83f8": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"quejarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 537,
+   "in": 793,
    "cachedIn": 0,
-   "out": 35
+   "out": 30
   }
  },
- "99cd33fdf78b800e98596a7d86745203": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "f0cacda0582b2df2b5853ef4ceb973bc": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:colegio\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 808,
    "cachedIn": 0,
-   "out": 33
+   "out": 30
   }
  },
- "83d1fabf78ab5a891062b54a32f8fd91": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "52f071fa7b35c7bd61e1d6fa45be26e6": {
+  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"pedir:empleo\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 839,
    "cachedIn": 0,
-   "out": 33
+   "out": 34
   }
  },
- "f6d13fb722c15433e2b23f384b53faad": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "378df42dab9f60131b9b0b74b50eb50f": {
+  "text": "{\"decisiones\":[{\"vecino\":35,\"accion\":\"gastar_ocio\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
   "usage": {
-   "in": 522,
+   "in": 825,
    "cachedIn": 0,
-   "out": 32
+   "out": 27
   }
  },
- "2100c43f449270041bf911f008f560a9": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "48383e94807491e001616066b8485a29": {
+  "text": "{\"decisiones\":[{\"vecino\":36,\"accion\":\"quejarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
   "usage": {
-   "in": 535,
+   "in": 834,
    "cachedIn": 0,
-   "out": 33
+   "out": 26
   }
  },
- "5ba7ed07eadd3c6e474fcaa92f197052": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "2885ff0a62059380e849a8b40a81630d": {
+  "text": "{\"decisiones\":[{\"vecino\":37,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
   "usage": {
-   "in": 537,
+   "in": 841,
    "cachedIn": 0,
-   "out": 35
+   "out": 29
   }
  },
- "4b893536e4e3d4f5b42e996f08a983d5": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "1f97c3a667119d9df7b8017f2ea0b5a3": {
+  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 806,
    "cachedIn": 0,
-   "out": 33
+   "out": 30
   }
  },
- "ce923a8caaaa4b91ce555606a45b1cc9": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "b1169939d70443519ef69daa5c250f4b": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"gastar_ocio\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":24,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 1012,
    "cachedIn": 0,
-   "out": 33
+   "out": 53
   }
  },
- "63917273b3a383e216616df7dada7338": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "e30d8fe663d59ea7ca52de7905c9475f": {
+  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
   "usage": {
-   "in": 522,
+   "in": 797,
    "cachedIn": 0,
-   "out": 32
+   "out": 30
   }
  },
- "244c89ff1332150860d2f30a67544f9a": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "2d524a13055f553af6dd5d2639808316": {
+  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "bad09ec759675aed7fe1174ff682530e": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 537,
+   "in": 795,
    "cachedIn": 0,
    "out": 35
   }
  },
- "9e478b57111cf1c6bc46545b4444c759": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "642f8a72be0d5f8706622ef14ff8372c": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"gastar_ocio\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":24,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 1012,
    "cachedIn": 0,
-   "out": 33
+   "out": 53
   }
  },
- "8fe192060386966e3336532d7a0fa5fb": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "76d6cb35df217a0a92521e4e77b36099": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"gastar_ocio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 814,
    "cachedIn": 0,
-   "out": 33
+   "out": 29
   }
  },
- "322bc49b5216a7ace04b8645c3d8ef5d": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "50ea1357d5713f4ae1b2d01c3f98719f": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 522,
+   "in": 807,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "7fa59ec9eac4b31335820f5c10677188": {
+  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"quejarse\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 828,
+   "cachedIn": 0,
+   "out": 28
+  }
+ },
+ "d3a14f8902a3b9c4aebc51bb11236e9e": {
+  "text": "{\"decisiones\":[{\"vecino\":15,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 840,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "66ba3a4a80e59ac3a07ccb86f2d850f0": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 807,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "4db4a9acccff87727cf527c7ded47e4c": {
+  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 828,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "7796da95397928fbdc5306e2100cbf71": {
+  "text": "{\"decisiones\":[{\"vecino\":18,\"accion\":\"quedarse\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 826,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "ac134febd12b45e7607b230c15441987": {
+  "text": "{\"decisiones\":[{\"vecino\":19,\"accion\":\"quejarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+  "usage": {
+   "in": 825,
+   "cachedIn": 0,
+   "out": 26
+  }
+ },
+ "0a43fe590b1037259119bed61f519d2e": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"quedarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+  "usage": {
+   "in": 845,
+   "cachedIn": 0,
+   "out": 26
+  }
+ },
+ "ae4d649c7cb5f996cff79e89bc5826b7": {
+  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 847,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "473d0890b276f9ade73d866120f86728": {
+  "text": "{\"decisiones\":[{\"vecino\":28,\"accion\":\"pedir:empleo\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 838,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "766fadbc88f6777a31b8e2ecd1a4974b": {
+  "text": "{\"decisiones\":[{\"vecino\":29,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 824,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "b6613bd88de9aaa4fdde84074d238f3b": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"quejarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 793,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "acc6f51e8ae47c7ec7e008b94c1d5c07": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:colegio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 809,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "7ac8531c8260d28781b2b66672b7b111": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
+  "usage": {
+   "in": 1677,
+   "cachedIn": 0,
+   "out": 126
+  }
+ },
+ "7ba7612a821873be6269aef88c356a30": {
+  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"pedir:empleo\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 839,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "2dfde9fb29cd2840f38d65fd21354176": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"gastar_ocio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 771,
    "cachedIn": 0,
    "out": 32
   }
  },
- "edd5978c97eb3b6b6b65a6f85414a658": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "351989568b448d4f74196ca35c68f40f": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Que nadie diga que no avisé.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
   "usage": {
-   "in": 535,
+   "in": 1676,
    "cachedIn": 0,
-   "out": 33
+   "out": 129
   }
  },
- "dd7c317197c47b2bb9bd97ad197a1f79": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "b2ae19d3e91a0bf57144a2bd70911944": {
+  "text": "{\"decisiones\":[{\"vecino\":36,\"accion\":\"quedarse\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
   "usage": {
-   "in": 537,
+   "in": 842,
+   "cachedIn": 0,
+   "out": 28
+  }
+ },
+ "c7336190515a9c790240763d2f6c76e2": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"gastar_ocio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 771,
+   "cachedIn": 0,
+   "out": 32
+  }
+ },
+ "bec6aab073e714c33a444e3177f0bc0b": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+  "usage": {
+   "in": 1438,
+   "cachedIn": 0,
+   "out": 101
+  }
+ },
+ "ce3a8aab748e4b7e29dc71bb8d7d5556": {
+  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 807,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "29a7e0e30fbd8a5afab1d3ba066adab0": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"gastar_ocio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 771,
+   "cachedIn": 0,
+   "out": 32
+  }
+ },
+ "8ea2fd1ab88b52a0694d0ffa03230e33": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 1439,
+   "cachedIn": 0,
+   "out": 103
+  }
+ },
+ "7edf8a90d103b069acfb62e31ce4bcab": {
+  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 796,
    "cachedIn": 0,
    "out": 35
   }
  },
- "67fd67a02d1e1f140ffd5c0041bd09e6": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "71a1ce01c21c5d88a52aa67d62008ef7": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 1439,
    "cachedIn": 0,
-   "out": 33
+   "out": 103
   }
  },
- "82b35ec16ae7de8627c70b1864b91460": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "23cc0ef7b1c521dc4058fb03803609b4": {
+  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"quejarse\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 829,
    "cachedIn": 0,
-   "out": 33
+   "out": 28
   }
  },
- "9f4245af9c4724f26fbfe70a3c53f836": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "a0aaa44b3ddd1107f5621bf0d0573bc0": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
   "usage": {
-   "in": 522,
+   "in": 1423,
    "cachedIn": 0,
-   "out": 32
+   "out": 103
   }
  },
- "deb8eedc724f24d8aa1c1007dc02cf03": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "9f01df99f10048db5a59e2a84548cf23": {
+  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 535,
+   "in": 828,
    "cachedIn": 0,
-   "out": 33
+   "out": 34
   }
  },
- "d89aadc8f16801aa2c1bc43b8ce99889": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "b0caf6ed6606d74bd1505422e6d5b3ff": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
   "usage": {
-   "in": 537,
+   "in": 1423,
    "cachedIn": 0,
-   "out": 35
+   "out": 103
   }
  },
- "563670cbeefb3ae1d1be071fdc538329": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "4fea57478f2c9a3318721ef196676d1e": {
+  "text": "{\"decisiones\":[{\"vecino\":19,\"accion\":\"quejarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 826,
    "cachedIn": 0,
-   "out": 33
+   "out": 30
   }
  },
- "13f1035dc29ab058f66ea742912cba05": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "a7eeb79bfa277a0f4effca7911cca606": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 1439,
    "cachedIn": 0,
-   "out": 33
+   "out": 103
   }
  },
- "e0e89e10e49a7709df13975d56c72479": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "64c6e34602c097fa539767507b78b260": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"quedarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
   "usage": {
-   "in": 522,
+   "in": 845,
    "cachedIn": 0,
-   "out": 32
+   "out": 26
   }
  },
- "b9d6f22b843929a0955f37342f44b173": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "ba335fd7e741c88b9e7d85e1ee3b393e": {
+  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"fundar:ropa\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":28,\"accion\":\"seguir_alquilando\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":32,\"accion\":\"fundar:ropa\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":35,\"accion\":\"comprar_casa\",\"motivo\":\"Que nadie diga que no avisé.\"},{\"vecino\":37,\"accion\":\"seguir_alquilando\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
   "usage": {
-   "in": 535,
+   "in": 1755,
    "cachedIn": 0,
-   "out": 33
+   "out": 135
   }
  },
- "bcd39a4ab5ddfd14b53b8c60ccd957bc": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "1cc0ca27c8605d41850c2dcee308f15f": {
+  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
   "usage": {
-   "in": 537,
+   "in": 847,
    "cachedIn": 0,
-   "out": 35
+   "out": 29
   }
  },
- "423e909af4de44492b90241d0c51ecec": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "e75d14a4554053fd68f70a9d4e47be5d": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Que nadie diga que no avisé.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 1438,
    "cachedIn": 0,
-   "out": 33
+   "out": 98
   }
  },
- "5f48e8eada582dd3c2791b7c74e31d7c": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "d4eb0d84e09383d5e49d269ebbd4c17e": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 807,
    "cachedIn": 0,
-   "out": 33
+   "out": 34
   }
  },
- "d89f1b869fec88697ed42b94f6e0ed68": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "9274d7ddb6484340f6440f9e20006820": {
+  "text": "{\"decisiones\":[{\"vecino\":29,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 522,
+   "in": 824,
    "cachedIn": 0,
-   "out": 32
+   "out": 31
   }
  },
- "504a6c64abda7ba8dcdd0eba8caaea7a": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "5f00b58b8f37b1a5e975f6d87dc82816": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
   "usage": {
-   "in": 535,
+   "in": 1423,
    "cachedIn": 0,
-   "out": 33
+   "out": 103
   }
  },
- "423e3410d7152bbd7878ee459289d1c5": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "134060bec618619cd4f4adceeb75b2d4": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 537,
+   "in": 807,
    "cachedIn": 0,
-   "out": 35
+   "out": 34
   }
  },
- "8b2c71ab6413b9274fa30bac543ae96f": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "af61dd02d58dbb01ee80a2deaa6db77a": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:colegio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 819,
    "cachedIn": 0,
-   "out": 33
+   "out": 31
   }
  },
- "19096e899f81bc4ceadfefe962e30938": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "bc03668525259145734d2d5a40f19da2": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 1423,
    "cachedIn": 0,
-   "out": 33
+   "out": 103
   }
  },
- "72270e9c7979d53a4fe060aaa4299fc0": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "73897015ad55c9e9499ff826ecbf6364": {
+  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"pedir:empleo\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 522,
+   "in": 840,
    "cachedIn": 0,
-   "out": 32
+   "out": 34
   }
  },
- "309611d47ba1ef4fedc2e3ea23946ad1": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "65d642ec9762c8111fd2a38f77e892b9": {
+  "text": "{\"decisiones\":[{\"vecino\":35,\"accion\":\"quedarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 535,
+   "in": 833,
    "cachedIn": 0,
-   "out": 33
+   "out": 30
   }
  },
- "f067bfb5a8342e55b3f40017d9d1b403": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "940b4c21c903390bf9ca8834ee9c3301": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Que nadie diga que no avisé.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 537,
+   "in": 1438,
    "cachedIn": 0,
-   "out": 35
+   "out": 98
   }
  },
- "03145369fedf5efc5a5960d235d974c9": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "6f9f396d7878bf6e3588171b144e5dc6": {
+  "text": "{\"decisiones\":[{\"vecino\":36,\"accion\":\"quedarse\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 842,
    "cachedIn": 0,
-   "out": 33
+   "out": 28
   }
  },
- "78ee1fb5aef9abf1eb0bc4e0bbfa67aa": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "8a4d1cf58dbe6a8c2d50ba95d4aad723": {
+  "text": "{\"decisiones\":[{\"vecino\":37,\"accion\":\"quejarse\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 842,
    "cachedIn": 0,
-   "out": 33
+   "out": 28
   }
  },
- "eab94e24978e93b4376a4ad00e47aebe": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "d93ae7446891de4b5469e5a3f18feacb": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 522,
+   "in": 1439,
    "cachedIn": 0,
-   "out": 32
+   "out": 103
   }
  },
- "52466a897ac90bf3134f31f41ab84d28": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "7b154aa5f4484a57f3a26b1dc18e7b1a": {
+  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 535,
+   "in": 807,
    "cachedIn": 0,
-   "out": 33
+   "out": 30
   }
  },
- "728af417ec4477ee1eed48727c42a8ba": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "7f13943836123cdab4ead3b3afa56c13": {
+  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 537,
+   "in": 796,
    "cachedIn": 0,
-   "out": 35
+   "out": 31
   }
  },
- "c50012f2358a8334416966223f0fb10f": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "2fe3e9ba8c5ddc5e408b424a488367b3": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 1439,
    "cachedIn": 0,
-   "out": 33
+   "out": 103
   }
  },
- "486b20cd80d648a41eca99e21fcf0242": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "78aa9c332e923cc47eebd3f941f3863c": {
+  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "c1f5ac0c587c17cb66a92d7bd351d3a1": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 522,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "37cb9965e6041ed5ba355f8632dcfdcd": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "7d7f829c13e61675ded841b1692aab71": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 537,
+   "in": 796,
    "cachedIn": 0,
    "out": 35
   }
  },
- "bc76b2a82382f1a9c8c89d5a70aa6f6f": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "1d2f6e4fab0cd5cc035719bd7854d91d": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 1439,
    "cachedIn": 0,
-   "out": 33
+   "out": 103
   }
  },
- "fb0ecfa14abd36cec26bbf51fb4408e0": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "c086552d0fdc14155ba3594666fc090d": {
+  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 822,
    "cachedIn": 0,
-   "out": 33
+   "out": 36
   }
  },
- "cd1cd008d747de2b4d59866bc424015a": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "35555c0b78377d21a3dfbd729c449c58": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Que nadie diga que no avisé.\"},{\"vecino\":17,\"accion\":\"gastar_ocio\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":18,\"accion\":\"gastar_ocio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":24,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":28,\"accion\":\"comprar_casa\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":34,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
   "usage": {
-   "in": 522,
+   "in": 2378,
    "cachedIn": 0,
-   "out": 32
+   "out": 209
   }
  },
- "65ad95f298fbaeec968e1f6dc0cd5556": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "25f6509e0686cafb49209b2e39700eda": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Que nadie diga que no avisé.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":34,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":37,\"accion\":\"seguir_alquilando\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
   "usage": {
-   "in": 535,
+   "in": 2158,
    "cachedIn": 0,
-   "out": 33
+   "out": 176
   }
  },
- "eb2da4cb4bd40f9ec29641e8ade9dd00": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "294bdc0d297b77e9502325f5f866b8b5": {
+  "text": "{\"decisiones\":[{\"vecino\":19,\"accion\":\"quejarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 537,
+   "in": 826,
    "cachedIn": 0,
-   "out": 35
+   "out": 30
   }
  },
- "8e4b81d999648dac297794e024736fae": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "1d2a9fe57b5ad375b9fa765cca3cd4ab": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Que nadie diga que no avisé.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":34,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":37,\"accion\":\"seguir_alquilando\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 2158,
    "cachedIn": 0,
-   "out": 33
+   "out": 176
   }
  },
- "ea5a10ce97ed276a5c6ea9ebd12df8cb": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "68d32ad060eb69dc0ef67d452d340685": {
+  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 848,
    "cachedIn": 0,
-   "out": 33
+   "out": 29
   }
  },
- "b0c952c17ad8da5f24ae2299d6aab00d": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "cdf1601f7f0c2bbe36ac27704a2f57f5": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Que nadie diga que no avisé.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":34,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":37,\"accion\":\"seguir_alquilando\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
   "usage": {
-   "in": 522,
+   "in": 2158,
    "cachedIn": 0,
-   "out": 32
+   "out": 176
   }
  },
- "a9b64c54cee68cb804b681cc721e97ad": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "c7da21a36b818761556a7fab218cf926": {
+  "text": "{\"decisiones\":[{\"vecino\":28,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
   "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "3ad694d53767a6b65a5fb86817c86033": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 537,
-   "cachedIn": 0,
-   "out": 35
-  }
- },
- "9e4d42dbaeeb8b4b5b5c5b395869d266": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "879d3ce66b4b1ab1dfde933b29fda55a": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "88619e189babb4e9d42ceaac767f1140": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 522,
+   "in": 832,
    "cachedIn": 0,
    "out": 32
   }
  },
- "1cff3d7081a5e0fd32aa6783ac789451": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "5ceb3fae21f1dae449f0a3d97bea4839": {
+  "text": "{\"decisiones\":[{\"vecino\":29,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 535,
+   "in": 825,
    "cachedIn": 0,
-   "out": 33
+   "out": 31
   }
  },
- "5a5486b864078fb03e7f5f43ea4b5381": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "4815f8a8179d2bb744cc24d406073777": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Que nadie diga que no avisé.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":34,\"accion\":\"gastar_ocio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":37,\"accion\":\"comprar_casa\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 537,
+   "in": 1919,
    "cachedIn": 0,
-   "out": 35
+   "out": 155
   }
  },
- "4b42e9c4fc5cd92c35ab06f638faa73b": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "c3fc2ee749d7d640772bf252455a458d": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"quejarse\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 809,
    "cachedIn": 0,
-   "out": 33
+   "out": 28
   }
  },
- "9cc74f71f26adc1855400be565692ff3": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "43a79d3ede4602956715be2b538d8ead": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:colegio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 810,
    "cachedIn": 0,
-   "out": 33
+   "out": 31
   }
  },
- "4a07e99f5ecd02f3004fc7a860fbc5b4": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "c38ab9f4e4a1edc45d9ffe96e553ecb2": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":34,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 522,
+   "in": 1672,
    "cachedIn": 0,
-   "out": 32
+   "out": 129
   }
  },
- "62e57a099de73c763da8ec81dd96a27e": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "baf2e6579ae9fb613b1620f9d9318cd1": {
+  "text": "{\"decisiones\":[{\"vecino\":35,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 535,
+   "in": 840,
    "cachedIn": 0,
-   "out": 33
+   "out": 31
   }
  },
- "35377128261eabd747e1754257a28753": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "b708a3c520ace20774f7b102ae302f2f": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
   "usage": {
-   "in": 537,
+   "in": 1440,
    "cachedIn": 0,
-   "out": 35
+   "out": 103
   }
  },
- "4606c24ded2d16a86a1cd8a1498cda2a": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "7c9f8814fcc5be24b48ea88ca6128a1b": {
+  "text": "{\"decisiones\":[{\"vecino\":36,\"accion\":\"quedarse\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 842,
    "cachedIn": 0,
-   "out": 33
+   "out": 28
   }
  },
- "52d41bb674553d257106886f5b08eeda": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "da0333f9546633e4d44320a14a1c01ee": {
+  "text": "{\"decisiones\":[{\"vecino\":37,\"accion\":\"pedir:colegio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 834,
    "cachedIn": 0,
-   "out": 33
+   "out": 31
   }
  },
- "55a3d818674d767b52703fa499d15f52": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "e5e16eed67f6b61c1312578672b51485": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
   "usage": {
-   "in": 522,
+   "in": 1440,
    "cachedIn": 0,
-   "out": 32
+   "out": 103
   }
  },
- "b27f01ddc167b927b34f2fa9458cc5c1": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "c4f09d48f6f4304af4c847e348299b06": {
+  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 535,
+   "in": 806,
    "cachedIn": 0,
-   "out": 33
+   "out": 30
   }
  },
- "6c5e5af730e6190037539772585eaebb": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "7040c9d8174ebcd4d1b51470e8c9262c": {
+  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 537,
+   "in": 741,
    "cachedIn": 0,
-   "out": 35
+   "out": 34
   }
  },
- "84eb3eb0da02aaf7f81eb98e9f6e0aba": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "97f444fd2086eea081075650f72044d1": {
+  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 741,
    "cachedIn": 0,
-   "out": 33
+   "out": 34
   }
  },
- "f650495a7ef08305a01a3f7077174dc9": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
+ "4426d43695e408285a8fd8a5c45ba3c5": {
+  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"irse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
   "usage": {
-   "in": 532,
+   "in": 707,
    "cachedIn": 0,
-   "out": 33
-  }
- },
- "be1cc1e79137fe88bba1a7b3a1231b52": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 522,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "de7f81056edfbca75220d679eb4a244d": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 535,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "63d614f7bdee04d511ca4ef6d1898bc1": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 537,
-   "cachedIn": 0,
-   "out": 35
-  }
- },
- "1f62ab956d925f3e11305ab23f1d2ab2": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "497a6aa81b96858b002251b6adba0df3": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "471c757dc0c78a7874b9a7d6047e5f6d": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"gastar_ocio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 497,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "58d8e7d8936afa1846caccbdf45e7e05": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 522,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "90d524ccdcd06d7f9b692caf82a787da": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"gastar_ocio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 502,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "6cb0586216c3823c258cf9192c770308": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 537,
-   "cachedIn": 0,
-   "out": 35
-  }
- },
- "365b33c93b9372cb219dbaac959bb110": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "fc044312ae39e0ef73639bf88a45d0da": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "744a6cbb2aef61964d897b3d6999d95d": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 522,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "25cd4d5e1eab41a21e278a45a6338e2d": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 546,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "b0bd363d3bb76b25e9fd1f8fa932c08f": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 537,
-   "cachedIn": 0,
-   "out": 35
-  }
- },
- "4bbdc4893c3983d7ccab30f46f49dde4": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "2149fe29b831591ca569b00f4328def2": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "9ea4250411a708367836361fb345d9a1": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 522,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "70724593b2e2bf541afbcbcea78031a4": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 546,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "60bf6fa88312cf101126d892ff1c88ec": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 537,
-   "cachedIn": 0,
-   "out": 35
-  }
- },
- "62c86be08ac5c19b4d213a009022039a": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "54ff7b0306f94d782cd76b6a77a38a9e": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "9875cf6298a4e217892905aa4b1260d6": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"gastar_ocio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 502,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "eaedc854d343cb19ba3fadaed5123a6f": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 522,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "cb07592bb76941d793920566a6aa2a78": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"gastar_ocio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 502,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "e4107468b502c5d1e60fc73850ef4d8c": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 537,
-   "cachedIn": 0,
-   "out": 35
-  }
- },
- "f674585c8422adfaf3ea06a0e2f66b38": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "8f1a9f6b50773df6017cb7031ba1f99a": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "0299bb6271bf8184138a231b6da25229": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 523,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "c10045a60f213caa38f36d74dacfbf88": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 546,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "f6a47a3e1e23be47ce3a073a3cf64658": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 537,
-   "cachedIn": 0,
-   "out": 35
-  }
- },
- "2c4598f91ec3572894f7be9758e99775": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "559268c159ccf712f40d8df22f2f9577": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "41c11d8ac14c8d9e418529c9be666688": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 523,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "de46b72527b76831470b1940599d0b43": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 546,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "8498b76056463b735d1b7ad633c173fb": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 537,
-   "cachedIn": 0,
-   "out": 35
-  }
- },
- "b684a77a4498a3142e29e1de3cfe2db6": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "eb53d19e4d356026d99abb06d509fff7": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "ffbf3b37b4c6e4d49e0865d1541abfe0": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"gastar_ocio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 502,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "92f7bbffd717deccae573919d4982c9d": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 522,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "1057f99c0003ec92d84c465a83eb9e43": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"gastar_ocio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 502,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "863881dcd06d5ee9bf158a029b4b97e3": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 537,
-   "cachedIn": 0,
-   "out": 35
-  }
- },
- "b88d4b678c711a9e1f9c1d57f444bd95": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "7e2b393dc87c9168f7c727f1c97b9209": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "a67bddb353640383b1694b756fc76c41": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 523,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "3230bc93b124be71d1917fc721fb1ec7": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 546,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "cec10b9132d8a457c416a91ed90db7ff": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 537,
-   "cachedIn": 0,
-   "out": 35
-  }
- },
- "51fe67f693b6131e3d1e219fa61ed4b7": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "5187ae5d75361169808732516c629742": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "ff1283f9066aa4233e1e831de082bf84": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 523,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "7263f386d5e87b7cadf7132965fb6bbb": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 546,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "1e5a0ba607e27385bac92115b230bdc8": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 537,
-   "cachedIn": 0,
-   "out": 35
-  }
- },
- "46be83bd85fafbd57acdd012f5456535": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "bf91c40e49eb403a02a7a1303acbcc70": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "19c6f24427b32c3aeb0cd6f440231e87": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"gastar_ocio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 502,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "19cd78b5cc5d62c03a1852122bbb5dd5": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"gastar_ocio\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 494,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "964d4e795d785484adc9f93d6526b51a": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 537,
-   "cachedIn": 0,
-   "out": 35
-  }
- },
- "d07867a57f9e6fb4dad91f50ddfc539d": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "38aa067c0ce90b5c31cfd0d9f0a8d47f": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "12ad8504d2aca09c1bd614695d3065d7": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 523,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "8b9e808c8d369d8fe02f72dc318c4dbe": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 541,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "89298cfeb4133b0f6347d3a6864f3b2a": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 537,
-   "cachedIn": 0,
-   "out": 35
-  }
- },
- "14835dac4b1143e08185ce9aa212f997": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "dbc252d108015108169ff8f8293fce6c": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "0484f8bda948b5c622bc30800df8a8f4": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Andrés lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 523,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "069c2598ebd118c6d04e7098ceea9b0e": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Jaime lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 541,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "4d157f5ed6fd3f8c4a6705eca5895f02": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Álvaro lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 537,
-   "cachedIn": 0,
-   "out": 35
-  }
- },
- "0a7e64ccc685ec79b8c75b911e12ac3d": {
-  "text": "{\"decisiones\":[{\"vecino\":10,\"accion\":\"pedir:empleo\",\"motivo\":\"Elena lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 538,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "b6790fc6347f9e045b89e07c28b75893": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Lucía lo tiene claro: esto es lo que toca ahora.\"}]}",
-  "usage": {
-   "in": 532,
-   "cachedIn": 0,
-   "out": 33
+   "out": 25
   }
  }
 }

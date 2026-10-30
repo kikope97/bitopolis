@@ -11,3 +11,8 @@ export * from './profiles.ts';
 export * from './runner.ts';
 export * from './decisions.ts';
 export * from './prompt.ts';
+export * from './economy.ts';
+export * from './fields.ts';
+export * from './social.ts';
+export * from './narrative.ts';
+export * from './politics.ts';

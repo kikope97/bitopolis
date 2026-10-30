@@ -1,5 +1,7 @@
 import { type GameState, Tile, Zone } from '@bitopolis/sim';
-import { PALETTE } from './palette.ts';
+import { happinessMarks, type LayerId, layerCanvas } from './layers.ts';
+import { liveParticles, squash } from './fx.ts';
+import { C, PALETTE } from './palette.ts';
 import {
   BH,
   buildingSprite,
@@ -8,10 +10,14 @@ import {
   hash,
   iconSprite,
   Pix,
+  puffSprite,
+  putPix,
   roadTile,
   T,
+  type TimeOfDay,
   toCanvas,
   treeSprite,
+  walkerSprite,
   zoneTile,
 } from './sprites.ts';
 
@@ -50,34 +56,162 @@ function mapSignature(state: GameState): string {
 }
 
 
-/** Suelo, carreteras y solares en un canvas a escala 1 (se rehace si cambia). */
-function drawGround(state: GameState): HTMLCanvasElement {
-  const { w, h, tiles, zones } = state.map;
-  const isRoad = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && tiles[y * w + x] === Tile.Road;
-  const occupied = new Set(state.buildings.map((b) => b.y * w + b.x));
-  const all = new Pix(w * T, h * T);
+/** Hora del juego → momento del día (1 tick = 1 hora; el día empieza a las 8:00). */
+export function timeOfDay(tick: number): TimeOfDay {
+  const hour = (tick + 8) % 24;
+  if (hour >= 22 || hour < 5) return 'night';
+  if (hour === 5 || hour === 6 || hour === 20 || hour === 21) return 'dusk';
+  return 'day';
+}
+
+interface Run {
+  x: number;
+  y: number;
+  len: number;
+  horizontal: boolean;
+}
+let runs: Run[] = [];
+let runsSig = '';
+
+/** Tramos rectos de carretera (para que los vecinos paseen por las aceras). */
+function roadRuns(state: GameState): Run[] {
+  const { w, h, tiles } = state.map;
+  const road = (x: number, y: number) => tiles[y * w + x] === Tile.Road;
+  const out: Run[] = [];
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const i = y * w + x;
-      const v = Math.floor(hash(x, y, 1) * GRASS_VARIANTS);
-      if (tiles[i] === Tile.Road) {
-        const n = isRoad(x, y - 1);
-        const e = isRoad(x + 1, y);
-        const s = isRoad(x, y + 1);
-        const o = isRoad(x - 1, y);
-        const rv = Math.floor(hash(x, y, 2) * 6);
-        const key = `${+n}${+e}${+s}${+o}-${rv}`;
-        let tile = roadCache.get(key);
-        if (!tile) roadCache.set(key, (tile = roadTile(n, e, s, o, rv)));
-        all.blit(tile, x * T, y * T);
-        continue;
-      }
-      const z = zones[i]!;
-      const g = grassTile(v, x, y);
-      all.blit(z !== Zone.None && !occupied.has(i) ? zoneTile(ZONE_LETTER[z]!, g) : g, x * T, y * T);
+      if (!road(x, y) || (x > 0 && road(x - 1, y))) continue;
+      let len = 1;
+      while (x + len < w && road(x + len, y)) len++;
+      if (len >= 2) out.push({ x, y, len, horizontal: true });
     }
   }
-  return toCanvas(all);
+  for (let x = 0; x < w; x++) {
+    for (let y = 0; y < h; y++) {
+      if (!road(x, y) || (y > 0 && road(x, y - 1))) continue;
+      let len = 1;
+      while (y + len < h && road(x, y + len)) len++;
+      if (len >= 2) out.push({ x, y, len, horizontal: false });
+    }
+  }
+  return out;
+}
+
+interface Walker {
+  /** Posición de los pies en píxeles de sprite (escala 1). */
+  fx: number;
+  fy: number;
+  dir: 1 | -1;
+  frame: number;
+  variant: number;
+}
+
+/** Vecinos paseando: posición determinista a partir del tiempo (ida y vuelta por un tramo). */
+function walkers(state: GameState, time: number, still: boolean, tod: TimeOfDay): Walker[] {
+  if (!runs.length) return [];
+  const pop = state.citizens.length;
+  const n = Math.min(60, Math.ceil(pop / 2), runs.length * 3);
+  const count = tod === 'night' ? Math.ceil(n * 0.25) : n;
+  const out: Walker[] = [];
+  for (let i = 0; i < count; i++) {
+    const run = runs[Math.floor(hash(i, 1, runs.length) * runs.length)]!;
+    const span = (run.len - 1) * T;
+    const speed = 9 + hash(i, 2) * 8; // px de sprite por segundo
+    const t = still ? hash(i, 5) * 2 * span : (time / 1000) * speed + hash(i, 3) * 2 * span;
+    const u = t % (2 * span || 1);
+    const forward = u < span;
+    const along = forward ? u : 2 * span - u;
+    const lane = hash(i, 4) > 0.5;
+    const fx = run.horizontal ? run.x * T + along + 16 : run.x * T + (lane ? 3 : 29);
+    const fy = run.horizontal ? run.y * T + (lane ? 4 : 30) : run.y * T + along + 16;
+    out.push({ fx, fy, dir: forward === lane ? 1 : -1, frame: still ? 0 : Math.floor(time / 170 + i) % 4, variant: Math.floor(hash(i, 6) * 64) });
+  }
+  return out;
+}
+
+/**
+ * Suelo, carreteras y solares: un canvas a escala 1 por momento del día. Solo
+ * se repintan las casillas que cambian (antes se rehacía el mapa entero con
+ * cada edificio nuevo y en cada cambio de hora, y eso daba tirones).
+ */
+interface Ground {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  keys: string[];
+  w: number;
+  h: number;
+}
+const grounds = new Map<TimeOfDay, Ground>();
+
+function tileKey(state: GameState, x: number, y: number, occupied: Set<number>): string {
+  const { w, h, tiles, zones } = state.map;
+  const i = y * w + x;
+  if (tiles[i] === Tile.Road) {
+    const r = (xx: number, yy: number) => xx >= 0 && yy >= 0 && xx < w && yy < h && tiles[yy * w + xx] === Tile.Road;
+    return `r${+r(x, y - 1)}${+r(x + 1, y)}${+r(x, y + 1)}${+r(x - 1, y)}`;
+  }
+  return `g${zones[i] !== Zone.None && !occupied.has(i) ? zones[i] : 0}`;
+}
+
+function tilePix(state: GameState, x: number, y: number, key: string): Pix {
+  if (key[0] === 'r') {
+    const rv = Math.floor(hash(x, y, 2) * 6);
+    const k = `${key.slice(1)}-${rv}`;
+    let tile = roadCache.get(k);
+    if (!tile) roadCache.set(k, (tile = roadTile(key[1] === '1', key[2] === '1', key[3] === '1', key[4] === '1', rv)));
+    return tile;
+  }
+  // La hierba (ruido suave, lo más caro) se calcula una vez por casilla.
+  const gi = y * 4096 + x;
+  let g = grassCache.get(gi);
+  if (!g) grassCache.set(gi, (g = grassTile(Math.floor(hash(x, y, 1) * GRASS_VARIANTS), x, y)));
+  const z = Number(key.slice(1));
+  return z ? zoneTile(ZONE_LETTER[z]!, g) : g;
+}
+
+const grassCache = new Map<number, Pix>();
+
+function groundFor(state: GameState, tod: TimeOfDay, budget = Infinity): HTMLCanvasElement {
+  const { w, h } = state.map;
+  let g = grounds.get(tod);
+  if (!g || g.w !== w || g.h !== h) {
+    const canvas = document.createElement('canvas');
+    canvas.width = w * T;
+    canvas.height = h * T;
+    g = { canvas, ctx: canvas.getContext('2d')!, keys: new Array<string>(w * h).fill(''), w, h };
+    grounds.set(tod, g);
+  }
+  const occupied = new Set(state.buildings.map((b) => b.y * w + b.x));
+  let left = budget;
+  for (let y = 0; y < h && left > 0; y++) {
+    for (let x = 0; x < w && left > 0; x++) {
+      const key = tileKey(state, x, y, occupied);
+      if (g.keys[y * w + x] === key) continue;
+      g.keys[y * w + x] = key;
+      putPix(g.ctx, tilePix(state, x, y, key), x * T, y * T, tod);
+      left--;
+    }
+  }
+  return g.canvas;
+}
+
+/** Prepara poco a poco los suelos de los otros momentos del día (sin tirones al cambiar de hora). */
+const TODS: TimeOfDay[] = ['day', 'dusk', 'night'];
+let warmSig = '';
+let warmDone = new Set<TimeOfDay>();
+function warmGrounds(state: GameState, current: TimeOfDay, sig: string) {
+  if (sig !== warmSig) {
+    warmSig = sig;
+    warmDone = new Set();
+  }
+  const next = TODS.find((t) => t !== current && !warmDone.has(t));
+  if (!next) return;
+  const g = grounds.get(next);
+  const before = g ? g.keys.filter(Boolean).length : 0;
+  groundFor(state, next, 96);
+  const after = grounds.get(next)!.keys.filter(Boolean).length;
+  // Sin cambios pendientes en esta pasada: listo hasta que cambie el mapa.
+  if (g && after === before) warmDone.add(next);
 }
 
 const roadCache = new Map<string, Pix>();
@@ -93,7 +227,7 @@ export function render(
   ctx: CanvasRenderingContext2D,
   state: GameState,
   cam: Camera,
-  opts: { preview?: Preview | null; selected?: { x: number; y: number } | null; time: number; reducedMotion: boolean },
+  opts: { preview?: Preview | null; selected?: { x: number; y: number } | null; cursor?: { x: number; y: number } | null; time: number; reducedMotion: boolean; layer?: LayerId },
 ): void {
   const z = cam.zoom;
   const ts = T * z;
@@ -101,12 +235,45 @@ export function render(
   ctx.fillStyle = P(25);
   ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
+  const tod = timeOfDay(state.tick);
   const sig = mapSignature(state);
-  if (!ground || sig !== groundSig) {
-    ground = drawGround(state);
-    groundSig = sig;
+  if (`${sig}${tod}` !== groundSig) {
+    ground = groundFor(state, tod);
+    groundSig = `${sig}${tod}`;
+  } else warmGrounds(state, tod, sig);
+  if (runsSig !== sig) {
+    runs = roadRuns(state);
+    runsSig = sig;
   }
-  ctx.drawImage(ground, -cam.x, -cam.y, ground.width * z, ground.height * z);
+  const still = opts.reducedMotion;
+  const people = walkers(state, opts.time, still, tod);
+  const byRow = new Map<number, Walker[]>();
+  for (const p of people) {
+    const row = Math.floor((p.fy - 1) / T);
+    const list = byRow.get(row) ?? [];
+    list.push(p);
+    byRow.set(row, list);
+  }
+  const puffs: { x: number; y: number; size: number }[] = [];
+  if (ground) {
+    // Solo el trozo visible del suelo (escalar el mapa entero cada fotograma es caro).
+    const sx = Math.max(0, Math.floor(cam.x / z));
+    const sy = Math.max(0, Math.floor(cam.y / z));
+    const sw = Math.min(ground.width - sx, Math.ceil(ctx.canvas.width / z) + 2);
+    const sh = Math.min(ground.height - sy, Math.ceil(ctx.canvas.height / z) + 2);
+    if (sw > 0 && sh > 0) ctx.drawImage(ground, sx, sy, sw, sh, sx * z - cam.x, sy * z - cam.y, sw * z, sh * z);
+  }
+
+  // La capa va sobre el suelo y bajo los edificios, para no taparlos.
+  const layer = opts.layer ?? 'none';
+  const overlay = layer === 'happiness' ? null : layerCanvas(state, layer);
+  if (overlay) {
+    const sx = Math.max(0, Math.floor(cam.x / z));
+    const sy = Math.max(0, Math.floor(cam.y / z));
+    const sw = Math.min(overlay.width - sx, Math.ceil(ctx.canvas.width / z) + 2);
+    const sh = Math.min(overlay.height - sy, Math.ceil(ctx.canvas.height / z) + 2);
+    if (sw > 0 && sh > 0) ctx.drawImage(overlay, sx, sy, sw, sh, sx * z - cam.x, sy * z - cam.y, sw * z, sh * z);
+  }
 
   const { w, h, tiles } = state.map;
   // Rango visible (con margen para lo que sobresale hacia arriba).
@@ -120,22 +287,32 @@ export function render(
   const projects = new Map(state.projects.map((p) => [p.buildingId, p]));
   const blink = opts.reducedMotion || Math.floor(opts.time / 600) % 2 === 0;
 
+  const drawWalkers = (row: number) => {
+    for (const p of byRow.get(row) ?? []) {
+      const img = walkerSprite(p.variant, p.frame, p.dir, tod);
+      ctx.drawImage(img, (p.fx - 3) * z - cam.x, (p.fy - 11) * z - cam.y, 7 * z, 12 * z);
+    }
+  };
+  for (let row = y0 - 2; row < y0; row++) drawWalkers(row);
   // Objetos de atrás hacia delante: fila a fila.
   for (let y = y0; y <= y1; y++) {
+    drawWalkers(y);
     for (let x = x0; x <= x1; x++) {
       const px = x * ts - cam.x;
       const py = (y * T - (BH - T)) * z - cam.y;
       const b = byTile.get(y * w + x);
       if (!b) {
         if (tiles[y * w + x] === Tile.Tree) {
-          ctx.drawImage(treeSprite(Math.floor(hash(x, y, 3) * TREE_VARIANTS)), px, py, ts, BH * z);
+          // Viento: la copa se mece con un desfase por árbol.
+          const frame = still ? 0 : Math.floor(opts.time / 900 + hash(x, y, 4) * 4) % 2;
+          ctx.drawImage(treeSprite(Math.floor(hash(x, y, 3) * TREE_VARIANTS), frame, tod), px, py, ts, BH * z);
         }
         continue;
       }
       if (!b.built) {
         const p = projects.get(b.id);
         const frac = p ? Math.min(1, p.workerDaysDone / p.workerDaysNeeded) : 0;
-        ctx.drawImage(constructionSprite(frac < 0.34 ? 0 : frac < 0.67 ? 1 : 2, b.id), px, py, ts, BH * z);
+        ctx.drawImage(constructionSprite(frac < 0.34 ? 0 : frac < 0.67 ? 1 : 2, b.id, tod), px, py, ts, BH * z);
         // Barra de progreso.
         const by = y * ts - cam.y + ts - 5 * z;
         ctx.fillStyle = P(0);
@@ -144,7 +321,34 @@ export function render(
         ctx.fillRect(px + 4 * z, by + z, Math.round((ts - 8 * z) * frac), 2 * z);
         continue;
       }
-      ctx.drawImage(buildingSprite(b.kind, b.id), px, py, ts, BH * z);
+      // Squash & stretch al terminarse (anclado abajo, en el centro).
+      const [sx, sy] = squash(b.id, opts.time);
+      if (sx === 1 && sy === 1) ctx.drawImage(buildingSprite(b.kind, b.id, tod), px, py, ts, BH * z);
+      else {
+        const dw = Math.round(ts * sx);
+        const dh = Math.round(BH * z * sy);
+        ctx.drawImage(buildingSprite(b.kind, b.id, tod), px + Math.round((ts - dw) / 2), py + BH * z - dh, dw, dh);
+      }
+      // Humo de chimeneas (fábricas, central y casas): bocanadas que suben y crecen.
+      // En casas solo alguna chimenea y una bocanada: que no parezca contaminación.
+      const homeSmoke = b.kind === 'house' && hash(b.id, 9) < 0.2;
+      const chimneys = b.kind === 'factory' ? [[27, 0]] : b.kind === 'power' ? [[23, 2]] : homeSmoke ? [[23, 6]] : [];
+      for (const [cx, cy] of chimneys) {
+        for (let k = 0; k < (homeSmoke ? 1 : 3); k++) {
+          const life = still ? (k + 0.5) / 3 : ((opts.time / 2600 + k / 3 + hash(b.id, k) * 0.2) % 1);
+          puffs.push({ x: x * T + cx! + Math.round(life * 4 + Math.sin(life * 6 + b.id) * 1.5), y: y * T - (BH - T) + cy! - Math.round(life * 14), size: Math.min(2, Math.floor(life * 3)) });
+        }
+      }
+      // Agua de la fuente (parque y plaza): el chorro sube y baja.
+      if ((b.kind === 'park' || b.kind === 'plaza') && !still) {
+        const jet = Math.floor(opts.time / 220) % 3;
+        const fxp = px + 16 * z;
+        const fyp = py + (b.kind === 'park' ? 26 : 22) * z;
+        ctx.fillStyle = P(C.waterLight);
+        ctx.fillRect(fxp, fyp - jet * z, z, (2 + jet) * z);
+        ctx.fillStyle = P(12);
+        ctx.fillRect(fxp + (jet - 1) * 2 * z, fyp - (jet + 1) * z, z, z);
+      }
       if (b.kind !== 'water' && b.kind !== 'power' && b.kind !== 'park' && blink) {
         let ix = px + ts - 12 * z;
         const iy = py + 2 * z;
@@ -153,6 +357,34 @@ export function render(
           ix -= 12 * z;
         }
         if (!b.hasPower) ctx.drawImage(iconSprite('noPower'), ix, iy, 11 * z, 13 * z);
+      }
+    }
+  }
+
+  for (const d of liveParticles(opts.time)) {
+    ctx.fillStyle = P(d.color);
+    ctx.fillRect(Math.round(d.x) * z - cam.x, Math.round(d.y) * z - cam.y, d.size * z, d.size * z);
+  }
+  for (const f of puffs) {
+    const img = puffSprite(f.size, tod);
+    ctx.drawImage(img, (f.x - img.width / 2) * z - cam.x, (f.y - img.height / 2) * z - cam.y, img.width * z, img.height * z);
+  }
+
+  if (layer === 'happiness') {
+    // Marca de 10×10 con la trama del nivel sobre cada vivienda habitada.
+    for (const m of happinessMarks(state)) {
+      const px = m.x * ts - cam.x + 11 * z;
+      const py = (m.y * T - (BH - T)) * z - cam.y + 2 * z;
+      ctx.fillStyle = P(0);
+      ctx.fillRect(px - z, py - z, 12 * z, 12 * z);
+      ctx.fillStyle = P(m.color);
+      for (let y = 0; y < 10; y += 2) {
+        for (let x = 0; x < 10; x += 2) {
+          const gx = x / 2;
+          const gy = y / 2;
+          const on = m.lv === 0 ? (gx + gy) % 4 === 0 : m.lv === 1 ? (gx + gy) % 2 === 0 && gy % 2 === 0 : m.lv === 2 ? (gx + gy) % 2 === 0 : true;
+          if (on) ctx.fillRect(px + x * z, py + y * z, 2 * z, 2 * z);
+        }
       }
     }
   }
@@ -176,4 +408,6 @@ export function render(
     for (const t of opts.preview.tiles) corner(t.x, t.y, opts.preview.ok ? 12 : 2, 2);
   }
   if (opts.selected) corner(opts.selected.x, opts.selected.y, 4, 2);
+  // Cursor de teclado: esquinas blancas gruesas (se distingue de la selección por forma y color).
+  if (opts.cursor) corner(opts.cursor.x, opts.cursor.y, 12, 3);
 }
