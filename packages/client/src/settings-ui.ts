@@ -55,6 +55,15 @@ export function openSettings(): void {
     toggle('Música y ambiente', 'music'),
     toggle('Vibración', 'vibrate', '(en móviles que la admiten)'),
     h('h3', {}, 'Lectura'),
+    radioGroup<Prefs['font']>(
+      'Letra',
+      [
+        ['legible', 'Legible'],
+        ['pixel', 'Pixel (retro)'],
+      ],
+      p.font,
+      (v) => setPrefs({ font: v }),
+    ),
     radioGroup<Prefs['text']>(
       'Tamaño del texto',
       [

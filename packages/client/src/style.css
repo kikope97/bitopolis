@@ -1,3 +1,8 @@
+@font-face {
+  font-family: 'Bitopolis Pixel';
+  src: url('/fonts/bitopolis-pixel.otf') format('opentype');
+  font-display: swap;
+}
 /* Solo colores de la paleta (palette.ts); el build lo comprueba. */
 :root {
   --bg: #1a1c2c;
@@ -449,3 +454,10 @@ body.placing #toasts { bottom: calc(260px + env(safe-area-inset-bottom)); }
 .pol-bar.abst .pol-fill { background: repeating-linear-gradient(45deg, #94b0c2 0 3px, #566c86 3px 6px); }
 .btn[aria-disabled='true'] { opacity: 0.5; border-style: dashed; cursor: not-allowed; }
 body.election-night .bubbles { display: none; }
+
+/* Letra pixel (opción estética): 11 filas por em → a 22 px cada píxel mide 2 px exactos. */
+html[data-font='pixel'] body, html[data-font='pixel'] button, html[data-font='pixel'] input, html[data-font='pixel'] select { font-family: 'Bitopolis Pixel', ui-monospace, monospace; -webkit-font-smoothing: none; font-smooth: never; }
+html[data-font='pixel'] { font-size: 137.5%; }
+html[data-font='pixel'][data-text='150'] { font-size: 206.25%; }
+html[data-font='pixel'][data-text='200'] { font-size: 275%; }
+html[data-font='pixel'] .sheet-head h2, html[data-font='pixel'] .sheet h3, html[data-font='pixel'] .logo { font-family: 'Bitopolis Pixel', ui-monospace, monospace; }
