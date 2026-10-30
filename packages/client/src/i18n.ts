@@ -8,7 +8,6 @@ const es = {
   configure: 'Configurar',
   modeNormal: 'Modo normal',
   modeAi: 'Modo IA',
-  modeAiSoon: 'Llega en la versión 0.2',
   saveLink: 'Guarda este enlace: es tu partida. No lo publiques: quien lo tenga puede jugarla.',
   copyLink: 'Copiar enlace',
   copied: 'Enlace copiado',

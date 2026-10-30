@@ -12,7 +12,9 @@ export default defineConfig({
     { name: 'movil', use: { ...devices['Pixel 7'], browserName: 'chromium' } },
     { name: 'escritorio', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } },
   ],
-  webServer: {
+  webServer: [
+    { command: 'node e2e/fake-llm.mjs', url: 'http://localhost:8099/', reuseExistingServer: !process.env.CI },
+    {
     command: `pnpm build && node packages/server/dist/index.js`,
     url: `http://localhost:${PORT}/healthz`,
     reuseExistingServer: !process.env.CI,
@@ -24,5 +26,6 @@ export default defineConfig({
       BITOPOLIS_PUBLIC_URL: `http://localhost:${PORT}`,
       LOG_LEVEL: 'warn',
     },
-  },
+    },
+  ],
 });

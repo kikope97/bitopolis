@@ -1,4 +1,5 @@
-import { api, ApiError, type Summary } from './api.ts';
+import { openAiConfig } from './ai-ui.ts';
+import { type AiMeta, api, ApiError, type Summary } from './api.ts';
 import { startGame } from './game.ts';
 import { formatDate, money, plural, t } from './i18n.ts';
 import { sessionId } from './session.ts';
@@ -13,17 +14,20 @@ export async function showStart(token: string): Promise<void> {
   const url = `${location.origin}/p/${token}`;
 
   let info: Awaited<ReturnType<typeof api.get>>;
+  let meta: AiMeta;
   try {
-    info = await api.get(token);
+    [info, meta] = await Promise.all([api.get(token), api.aiMeta()]);
   } catch (e) {
     root.replaceChildren(h('p', { class: 'error' }, (e as Error).message));
     return;
   }
 
+  // Con key de servidor solo existe el Modo IA (spec §10.2).
+  let mode: 'normal' | 'ai' = meta.serverKey ? 'ai' : 'normal';
   const body = $('#start-body');
   body.replaceChildren();
   if (info.exists) {
-    body.append(statsCard(info.summary));
+    body.append(statsCard(info.summary, info.mode));
   } else {
     body.append(modePicker());
   }
@@ -34,7 +38,11 @@ export async function showStart(token: string): Promise<void> {
     playBtn.disabled = true;
     try {
       if (!info.exists) {
-        const r = await api.create(token, 'normal', sid);
+        if (mode === 'ai' && !meta.serverKey) {
+          await openAiConfig(token, sid, () => void showStart(token));
+          return;
+        }
+        const r = await api.create(token, mode, sid);
         startGame({ token, sessionId: sid, state: r.state, onExit: () => location.reload() });
       } else {
         await claimAndPlay(false);
@@ -62,10 +70,12 @@ export async function showStart(token: string): Promise<void> {
   ($('#copy-link') as HTMLButtonElement).onclick = () => copy(url);
   ($('#configure') as HTMLButtonElement).onclick = () => openConfig(info.exists);
 
-  function statsCard(s: Summary) {
+  function statsCard(s: Summary, gameMode: string) {
     return h(
       'dl',
       { class: 'stats-card', 'aria-label': 'Estado de la partida' },
+      h('dt', {}, 'Modo'),
+      h('dd', {}, gameMode === 'ai' ? t('modeAi') : t('modeNormal')),
       h('dt', {}, 'Población'),
       h('dd', {}, plural(s.population, 'vecino', 'vecinos')),
       h('dt', {}, 'Fecha'),
@@ -80,20 +90,29 @@ export async function showStart(token: string): Promise<void> {
   }
 
   function modePicker() {
-    const normal = h('button', { class: 'btn choice', role: 'radio', 'aria-checked': 'true' }, h('strong', {}, t('modeNormal')), h('span', {}, 'Los vecinos deciden con reglas. Sin coste.'));
-    const ai = h(
-      'button',
-      { class: 'btn choice', role: 'radio', 'aria-checked': 'false', 'aria-disabled': 'true' },
-      h('strong', {}, t('modeAi')),
-      h('span', {}, t('modeAiSoon')),
+    const radios: HTMLElement[] = [];
+    const choice = (m: 'normal' | 'ai', title: string, desc: string) => {
+      const b = h('button', { class: 'btn choice', role: 'radio', 'aria-checked': String(mode === m) }, h('strong', {}, title), h('span', {}, desc));
+      b.addEventListener('click', () => {
+        mode = m;
+        for (const r of radios) r.setAttribute('aria-checked', String(r === b));
+        if (m === 'ai' && !meta.serverKey) void openAiConfig(token, sid, () => void showStart(token));
+      });
+      radios.push(b);
+      return b;
+    };
+    const list = h('div', { class: 'radio-list', role: 'radiogroup', 'aria-label': 'Modo de juego' });
+    if (!meta.serverKey) list.append(choice('normal', t('modeNormal'), 'Los vecinos deciden con reglas. Sin coste.'));
+    list.append(
+      choice(
+        'ai',
+        t('modeAi'),
+        meta.serverKey
+          ? `Los vecinos con nombre deciden con IA. Configurada por el servidor.`
+          : 'Los vecinos con nombre deciden con IA. Necesita una API key y tiene coste.',
+      ),
     );
-    ai.addEventListener('click', () => toast(`${t('modeAi')}: ${t('modeAiSoon')}.`));
-    return h(
-      'div',
-      { class: 'mode-picker' },
-      h('p', { class: 'muted' }, 'El modo se elige ahora y queda fijo para toda la partida.'),
-      h('div', { class: 'radio-list', role: 'radiogroup', 'aria-label': 'Modo de juego' }, normal, ai),
-    );
+    return h('div', { class: 'mode-picker' }, h('p', { class: 'muted' }, 'El modo se elige ahora y queda fijo para toda la partida.'), list);
   }
 
   function openConfig(exists: boolean) {
@@ -127,7 +146,13 @@ export async function showStart(token: string): Promise<void> {
       }
     };
     items.push(input, label, h('p', { class: 'muted' }, 'Importar crea una partida nueva con otro enlace. Las copias nunca incluyen la API key.'));
-    items.push(h('h3', {}, 'Modo'), h('p', {}, exists ? `${t('modeNormal')} (fijo en esta partida)` : `${t('modeNormal')}. ${t('modeAi')}: ${t('modeAiSoon')}.`));
+    const gameMode = info.exists ? info.mode : null;
+    items.push(h('h3', {}, 'Modo'), h('p', {}, gameMode ? `${gameMode === 'ai' ? t('modeAi') : t('modeNormal')} (fijo en esta partida)` : 'Se elige en la pantalla de inicio.'));
+    if (gameMode === 'ai' || (!gameMode && !meta.serverKey)) {
+      const aiBtn = h('button', { class: 'btn wide' }, gameMode === 'ai' ? 'Ajustes de la IA (modelo, key y topes)' : 'Configurar la IA');
+      aiBtn.onclick = () => void openAiConfig(token, sid, () => void showStart(token));
+      items.push(aiBtn);
+    }
     sheet(t('configure'), ...items);
   }
 }

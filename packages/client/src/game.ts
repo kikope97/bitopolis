@@ -10,6 +10,7 @@ import {
   validateCommand,
   ZONE_UNLOCK_POP,
 } from '@bitopolis/sim';
+import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
 import { api, ApiError } from './api.ts';
 import { nextHint } from './hints.ts';
 import { formatDate, money, plural, t } from './i18n.ts';
@@ -22,6 +23,15 @@ import { Tutorial } from './tutorial.ts';
 import { $, closeSheet, confirmDialog, h, isSheetOpen, reducedMotion, sheet, toast, vibrate } from './ui.ts';
 
 const DRAG_PX = 10;
+const DESIRE_TEXT: Record<string, string> = {
+  trabajo_cerca: 'trabajar cerca de casa',
+  casa_propia: 'tener casa propia',
+  parque: 'un parque',
+  tienda: 'tiendas cerca',
+  tranquilidad: 'tranquilidad',
+  prosperar: 'prosperar',
+};
+const FEAR_TEXT: Record<string, string> = { paro: 'el paro', impuestos: 'los impuestos', soledad: 'la soledad', ruido: 'el ruido', deudas: 'las deudas' };
 
 export interface GameOptions {
   token: string;
@@ -57,16 +67,18 @@ export function startGame(opts: GameOptions): void {
   const tutorial = new Tutorial(`bitopolis.tut.${token}`);
 
   /* ---------- guardado ---------- */
-  const queue: SaveBatch[] = [];
+  const queue: (SaveBatch & { live: boolean })[] = [];
   let saving = false;
   async function flushQueue(keepalive = false) {
     if (saving || queue.length === 0 || lost) return;
     saving = true;
-    const merged: SaveBatch = {
+    const merged = {
       fromTick: queue[0]!.fromTick,
       toTick: queue.at(-1)!.toTick,
       commands: queue.flatMap((b) => b.commands),
       hash: queue.at(-1)!.hash,
+      // Solo se pide a la IA si se está jugando (no en pausa ni oculto).
+      live: queue.some((b) => b.live) && speed > 0 && !document.hidden,
     };
     const n = queue.length;
     try {
@@ -125,7 +137,7 @@ export function startGame(opts: GameOptions): void {
       pendingResults.get(m.id)?.(m.ok, m.error);
       pendingResults.delete(m.id);
     } else if (m.type === 'save') {
-      queue.push(m.batch);
+      queue.push({ ...m.batch, live: !m.flush && speed > 0 && !document.hidden });
       void flushQueue();
     }
   };
@@ -209,6 +221,7 @@ export function startGame(opts: GameOptions): void {
       seenEvents.clear();
       for (const k of keep) seenEvents.add(k);
     }
+    for (const e of fresh) if (e.kind === 'decision' && e.ref) addBubble(e.ref, e.tick);
     const arrivals = fresh.filter((e) => e.kind === 'arrival');
     if (arrivals.length === 1) toast(arrivals[0]!.text, { kind: 'good' });
     else if (arrivals.length > 1) toast(`Llegan ${arrivals.length} vecinos nuevos`, { kind: 'good' });
@@ -232,6 +245,61 @@ export function startGame(opts: GameOptions): void {
       }
     }
   }
+
+  /* ---------- burbujas con el motivo ---------- */
+  const bubbles: { el: HTMLElement; tx: number; ty: number }[] = [];
+  function addBubble(citizenId: number, tick: number) {
+    const entry = [...state.decisionLog].reverse().find((d) => d.citizenId === citizenId && d.tick === tick);
+    const c = state.citizens.find((x) => x.id === citizenId);
+    const name = c?.name ?? 'Un vecino';
+    const where = state.buildings.find((b) => b.id === (c?.homeId ?? c?.jobId)) ?? state.buildings.find((b) => b.kind === 'townhall');
+    if (!entry || !where) return;
+    const el = makeBubble(name, entry.motivo, entry.source === 'ai');
+    const b = { el, tx: where.x, ty: where.y };
+    bubbles.push(b);
+    setTimeout(() => {
+      el.remove();
+      bubbles.splice(bubbles.indexOf(b), 1);
+    }, 9000);
+  }
+  function placeBubbles() {
+    if (!bubbles.length) return;
+    const wrap = canvas.getBoundingClientRect();
+    for (const b of bubbles) {
+      const r = canvas.getBoundingClientRect();
+      const x = r.left + ((b.tx + 0.5) * tileSize() - cam.x) / dpr() - wrap.left;
+      const y = r.top + (b.ty * tileSize() - 16 * cam.zoom - cam.y) / dpr() - wrap.top;
+      b.el.style.left = `${Math.round(x)}px`;
+      b.el.style.top = `${Math.round(y)}px`;
+    }
+  }
+
+  /* ---------- decisiones de la IA (petición anticipada) ---------- */
+  let budgetWarned = 0;
+  const notices = new Set<string>();
+  async function pollDecisions() {
+    if (!state.aiMode || speed === 0 || document.hidden || lost || state.pending.length === 0) return;
+    try {
+      const r = await api.decisions(token);
+      for (const d of r.decisions) {
+        if (!state.pending.some((p) => p.citizenId === d.citizenId && p.createdTick === d.createdTick)) continue;
+        await command({ type: 'CitizenAct', citizenId: d.citizenId, action: d.action, motivo: d.motivo, source: 'ai' });
+      }
+      $('#ai-banner').hidden = !r.capped;
+      if (r.notice && !notices.has(r.notice)) {
+        notices.add(r.notice);
+        toast(r.notice, { kind: 'warn' });
+      }
+      const level = r.budgetFraction >= 0.8 ? 80 : r.budgetFraction >= 0.5 ? 50 : 0;
+      if (level > budgetWarned) {
+        budgetWarned = level;
+        toast(`Has gastado el ${level} % del tope de la IA.`, { kind: 'warn', sticky: true });
+      }
+    } catch {
+      /* sin conexión: deciden las reglas */
+    }
+  }
+  const decisionTimer = setInterval(() => void pollDecisions(), 1500);
 
   /* ---------- cámara ---------- */
   function resize() {
@@ -567,12 +635,15 @@ export function startGame(opts: GameOptions): void {
         .filter((f) => f.value < 0)
         .map((f) => f.label.toLowerCase());
       const mood = c.happiness >= 65 ? '😊' : c.happiness >= 40 ? '😐' : '☹️';
+      const last = [...state.decisionLog].reverse().find((d) => d.citizenId === c.id);
       ul.append(
         h(
           'li',
           {},
-          h('strong', {}, `${mood} ${c.name}`),
+          h('strong', {}, `${mood} ${c.named ? '★ ' : ''}${c.name}`),
           `, ${c.age} años · ${money(c.money)}`,
+          c.named ? h('span', { class: 'muted' }, ` · quiere ${DESIRE_TEXT[c.desire]}, teme ${FEAR_TEXT[c.fear]}`) : '',
+          last ? h('em', { class: 'quote' }, ` «${last.motivo}»`) : '',
           factors.length ? h('span', { class: 'muted' }, ` · le preocupa: ${factors.join(', ')}`) : '',
         ),
       );
@@ -641,6 +712,12 @@ export function startGame(opts: GameOptions): void {
       'Menú',
       item('Impuestos', openTaxes),
       item('Cuentas del ayuntamiento', openAccounts),
+      ...(state.aiMode
+        ? [
+            item('Gasto de la IA', () => void openUsage(token)),
+            item('Qué se envía a la IA', () => void openPreview(token)),
+          ]
+        : []),
       item('Repetir tutorial', () => {
         closeSheet();
         tutorial.start(state, true);
@@ -655,7 +732,14 @@ export function startGame(opts: GameOptions): void {
   /* ---------- velocidad y ciclo de vida ---------- */
   function setSpeed(s: number) {
     if (lost && s > 0) return;
-    if (s === 10 && speed !== 10) toast('x10 avanza un mes cada minuto: vigila la caja.');
+    if (s === 10 && speed !== 10) {
+      toast(
+        state.aiMode
+          ? 'x10 con la IA activa: gasta más por hora y muchas decisiones no llegarán a tiempo (las tomarán las reglas).'
+          : 'x10 avanza un mes cada minuto: vigila la caja.',
+        { kind: state.aiMode ? 'warn' : 'info' },
+      );
+    }
     speed = s;
     send({ type: 'speed', speed: s });
     for (const b of document.querySelectorAll('[data-speed]')) b.setAttribute('aria-pressed', String(Number(b.getAttribute('data-speed')) === s));
@@ -683,6 +767,7 @@ export function startGame(opts: GameOptions): void {
       void flushQueue().then(() => {
         worker.terminate();
         clearInterval(heartbeat);
+        clearInterval(decisionTimer);
         document.removeEventListener('visibilitychange', onVisibility);
         window.removeEventListener('pagehide', onPageHide);
         void api.release(token, sessionId);
@@ -721,6 +806,7 @@ export function startGame(opts: GameOptions): void {
   function frame(time: number) {
     if ($('#game').hidden) return;
     render(ctx, state, cam, { preview, selected, time, reducedMotion: reducedMotion() });
+    placeBubbles();
     requestAnimationFrame(frame);
   }
 

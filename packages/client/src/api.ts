@@ -42,8 +42,20 @@ export const api = {
     call<{ state: GameState; mode: string }>('POST', `/api/games/${token}/claim`, { sessionId, force }),
   release: (token: string, sessionId: string) =>
     call<{ ok: boolean }>('POST', `/api/games/${token}/release`, { sessionId }, true).catch(() => null),
-  save: (token: string, sessionId: string, b: SaveBatch, keepalive = false) =>
+  save: (token: string, sessionId: string, b: SaveBatch & { live?: boolean }, keepalive = false) =>
     call<{ ok: true; tick: number }>('PUT', `/api/games/${token}/save`, { sessionId, ...b }, keepalive),
+  aiMeta: () => call<AiMeta>('GET', '/api/ai/meta'),
+  aiConfig: (token: string) => call<AiSettings>('GET', `/api/games/${token}/ai-config`),
+  saveAiConfig: (token: string, body: Record<string, unknown>) => call<AiSettings>('PUT', `/api/games/${token}/ai-config`, body),
+  estimate: (provider: string, model: string, citizens: number) =>
+    call<{ eurPerHour: Record<string, number>; known: boolean }>('GET', `/api/ai/estimate?provider=${encodeURIComponent(provider)}&model=${encodeURIComponent(model)}&citizens=${citizens}`),
+  decisions: (token: string) =>
+    call<{ decisions: { citizenId: number; createdTick: number; action: string; motivo: string }[]; capped: boolean; notice?: string; budgetFraction: number }>(
+      'GET',
+      `/api/games/${token}/decisions`,
+    ),
+  aiUsage: (token: string) => call<AiUsage>('GET', `/api/games/${token}/ai-usage`),
+  aiPreview: (token: string) => call<{ system: string; user: string }>('GET', `/api/games/${token}/ai-preview`),
   regenerate: (token: string, sessionId: string) => call<{ token: string }>('POST', `/api/games/${token}/regenerate`, { sessionId }),
   async import(file: File): Promise<{ token: string }> {
     const r = await fetch('/api/import', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file });
@@ -52,3 +64,36 @@ export const api = {
     return data;
   },
 };
+
+export interface AiMeta {
+  providers: { id: string; label: string; cheap: string; premium: string; baseUrl: string; needsKey: boolean }[];
+  serverKey: boolean;
+  maxCitizens: number;
+  canStoreKeys: boolean;
+}
+
+export interface AiSettings {
+  provider: string;
+  model: string;
+  modelPremium: string;
+  baseUrl?: string;
+  keyMask?: string;
+  capDay?: number;
+  capMonth?: number;
+  serverMonthly?: number;
+  locked: string[];
+  configured: boolean;
+}
+
+export interface AiUsage {
+  eur: number;
+  calls: number;
+  requested: number;
+  valid: number;
+  retried: number;
+  tokensIn: number;
+  tokensOut: number;
+  byKind: Record<string, number>;
+  spend: { gameDay: number; gameMonth: number; serverMonth: number };
+  caps: { day?: number; month?: number; server?: number };
+}

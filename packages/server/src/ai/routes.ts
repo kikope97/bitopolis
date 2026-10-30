@@ -129,7 +129,15 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
     if (!t.success) return bad(reply, 'enlace no válido');
     const row = await load(t.data);
     if (!row) return bad(reply, 'no existe', 404);
-    return ai.take(row.id);
+    const s = await ai.settings(row.id);
+    const spent = await ai.spend(row.id);
+    // Fracción del tope más cercano (avisos al 50 % y al 80 %).
+    const fractions = [
+      s.capDay ? spent.gameDay / s.capDay : 0,
+      s.capMonth ? spent.gameMonth / s.capMonth : 0,
+      s.serverMonthly ? spent.serverMonth / s.serverMonthly : 0,
+    ];
+    return { ...ai.take(row.id), budgetFraction: Math.max(...fractions) };
   });
 
   app.get('/api/games/:token/ai-usage', async (req, reply) => {
