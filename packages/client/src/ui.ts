@@ -71,18 +71,42 @@ export function closeSheet() {
   if (!openSheetEl) return;
   openSheetEl.remove();
   openSheetEl = null;
-  lastFocus?.focus();
+  // Si lo que tenía el foco ya no existe (p. ej. el aviso que abrió la hoja), al mapa.
+  (lastFocus?.isConnected ? lastFocus : document.querySelector<HTMLElement>('#map'))?.focus();
+}
+
+function focusables(el: HTMLElement): HTMLElement[] {
+  return [...el.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])')].filter(
+    (x) => !x.hasAttribute('disabled') && x.tabIndex >= 0 && x.offsetParent !== null,
+  );
 }
 
 /** Hoja inferior (bottom sheet) al alcance del pulgar. */
 export function sheet(title: string | Node, ...content: (Node | string)[]): HTMLElement {
-  closeSheet();
-  lastFocus = document.activeElement as HTMLElement | null;
+  // Refresco de la misma hoja (p. ej. la ficha mientras el juego avanza): se cambia
+  // solo el contenido y se conservan el foco y el scroll, sin volver a anunciarla.
+  const titleText = typeof title === 'string' ? title : (title.textContent ?? '');
+  if (openSheetEl && openSheetEl.querySelector('#sheet-title')?.textContent === titleText) {
+    const body = openSheetEl.querySelector<HTMLElement>('.sheet-body')!;
+    const items = focusables(openSheetEl);
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    const scroll = body.scrollTop;
+    body.replaceChildren(...content);
+    body.scrollTop = scroll;
+    if (at >= 0) (focusables(openSheetEl)[at] ?? openSheetEl.querySelector<HTMLElement>('.sheet-close'))?.focus();
+    return openSheetEl;
+  }
+  const keepFocus = openSheetEl ? lastFocus : (document.activeElement as HTMLElement | null);
+  if (openSheetEl) {
+    openSheetEl.remove();
+    openSheetEl = null;
+  }
+  lastFocus = keepFocus;
   const close = h('button', { class: 'sheet-close', 'aria-label': 'Cerrar' }, '✕');
   close.addEventListener('click', closeSheet);
   const el = h(
     'section',
-    { class: 'sheet', role: 'dialog', 'aria-modal': 'false', 'aria-labelledby': 'sheet-title' },
+    { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'sheet-title' },
     h('header', { class: 'sheet-head' }, h('h2', { id: 'sheet-title' }, title), close),
     h('div', { class: 'sheet-body' }, ...content),
   );

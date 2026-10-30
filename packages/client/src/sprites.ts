@@ -781,7 +781,8 @@ export function grassTile(v: number, tx = v, ty = v * 7): Pix {
       const gx = tx * T + x;
       const gy = ty * T + y;
       const n = smooth(gx, gy, 11, 5) * 0.75 + smooth(gx, gy, 4, 9) * 0.25;
-      p.set(x, y, n > 0.77 ? 22 : n < 0.17 ? 24 : 23);
+      // Pocas manchas y suaves: la hierba no debe competir con los edificios.
+      p.set(x, y, n > 0.82 ? 22 : n < 0.13 ? 24 : 23);
     }
   }
   // Briznas: trazo claro arriba y sombra abajo.
@@ -982,8 +983,8 @@ function nearest(r: number, g: number, b: number): number {
 /** Tabla índice → índice para cada momento del día (siempre dentro de la paleta). */
 const REMAP: Record<TimeOfDay, number[]> = {
   day: RGB.map((_, i) => i),
-  dusk: RGB.map(([r, g, b], i) => (LIGHTS.has(i) ? i : nearest(r * 0.8 + 18, g * 0.62 + 4, b * 0.6 + 14))),
-  night: RGB.map(([r, g, b], i) => (LIGHTS.has(i) ? i : nearest(r * 0.3 + 6, g * 0.34 + 8, b * 0.55 + 26))),
+  dusk: RGB.map(([r, g, b], i) => (LIGHTS.has(i) ? i : nearest(r * 0.9 + 10, g * 0.8 + 2, b * 0.72 + 12))),
+  night: RGB.map(([r, g, b], i) => (LIGHTS.has(i) ? i : nearest(r * 0.34 + 8, g * 0.44 + 8, b * 0.6 + 28))),
 };
 
 const cache = new Map<string, HTMLCanvasElement>();

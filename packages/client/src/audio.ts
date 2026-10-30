@@ -19,7 +19,7 @@ function audio(): AudioContext | null {
   sfxBus.gain.value = 0.35;
   sfxBus.connect(ctx.destination);
   musicBus = ctx.createGain();
-  musicBus.gain.value = 0.12;
+  musicBus.gain.value = 0.08;
   musicBus.connect(ctx.destination);
   return ctx;
 }
@@ -52,11 +52,19 @@ interface Note {
   at?: number;
 }
 
-function play(notes: Note[], bus: 'sfx' | 'music' = 'sfx'): void {
+/** Último instante de cada efecto: el mismo no suena dos veces en menos de 400 ms (a x10 era una ráfaga). */
+const lastPlayed = new Map<string, number>();
+
+function play(notes: Note[], bus: 'sfx' | 'music' = 'sfx', name = ''): void {
   const p = prefs();
   if (bus === 'sfx' ? !p.sfx : !p.music) return;
   const a = audio();
   if (!a || a.state !== 'running') return;
+  if (name) {
+    const now = a.currentTime;
+    if (now - (lastPlayed.get(name) ?? -1) < 0.4) return;
+    lastPlayed.set(name, now);
+  }
   const out = bus === 'sfx' ? sfxBus! : musicBus!;
   const vary = 1 + (Math.random() - 0.5) * 0.08;
   for (const n of notes) {
@@ -90,7 +98,7 @@ function play(notes: Note[], bus: 'sfx' | 'music' = 'sfx'): void {
 
 /** Catálogo de efectos. */
 export const sfx = {
-  tap: () => play([{ wave: 'square', from: 880, to: 660, dur: 0.05, vol: 0.25 }]),
+  tap: () => play([{ wave: 'square', from: 880, to: 660, dur: 0.05, vol: 0.25 }], 'sfx', 'tap'),
   build: () =>
     play([
       { wave: 'noise', from: 900, to: 200, dur: 0.18, vol: 0.5 },
@@ -98,23 +106,31 @@ export const sfx = {
     ]),
   road: () => play([{ wave: 'noise', from: 2400, to: 600, dur: 0.07, vol: 0.3 }]),
   done: () =>
-    play([
+    play(
+      [
       { wave: 'square', from: 523, dur: 0.09, vol: 0.3 },
       { wave: 'square', from: 659, dur: 0.09, vol: 0.3, at: 0.08 },
       { wave: 'square', from: 784, dur: 0.16, vol: 0.3, at: 0.16 },
-    ]),
+      ],
+      'sfx',
+      'done',
+    ),
   coin: () =>
-    play([
-      { wave: 'square', from: 988, dur: 0.06, vol: 0.25 },
-      { wave: 'square', from: 1319, dur: 0.14, vol: 0.25, at: 0.06 },
-    ]),
+    play(
+      [
+        { wave: 'triangle', from: 988, dur: 0.06, vol: 0.35 },
+        { wave: 'triangle', from: 1319, dur: 0.14, vol: 0.35, at: 0.06 },
+      ],
+      'sfx',
+      'coin',
+    ),
   error: () => play([{ wave: 'sawtooth', from: 160, to: 110, dur: 0.18, vol: 0.3 }]),
   demolish: () =>
     play([
       { wave: 'noise', from: 600, to: 80, dur: 0.4, vol: 0.6 },
       { wave: 'triangle', from: 90, to: 40, dur: 0.3, vol: 0.5 },
     ]),
-  arrival: () => play([{ wave: 'triangle', from: 660, to: 880, dur: 0.12, vol: 0.3 }]),
+  arrival: () => play([{ wave: 'triangle', from: 660, to: 880, dur: 0.12, vol: 0.3 }], 'sfx', 'arrival'),
   milestone: () =>
     play([523, 659, 784, 1047].map((f, i) => ({ wave: 'square' as const, from: f, dur: 0.14, vol: 0.3, at: i * 0.09 }))),
   warn: () =>
@@ -136,18 +152,25 @@ let step = 0;
  */
 export function startMusic(isNight: () => boolean): void {
   if (musicTimer !== null) return;
+  // Frases de 8 notas con silencios de 4–8 s entre ellas; alguna nota se calla.
+  let rest = 0;
   const tick = () => {
     const night = isNight();
+    let wait = night ? 900 : 600;
     if (prefs().music) {
-      const base = night ? 196 : 262;
-      const deg = SCALE[(step * 3 + (step >> 2)) % SCALE.length]!;
-      const f = base * 2 ** (deg / 12);
-      play([{ wave: 'triangle', from: f, dur: night ? 1.4 : 0.9, vol: 0.5 }], 'music');
-      if (step % 4 === 0) play([{ wave: 'sine', from: base / 2, dur: 2.2, vol: 0.45 }], 'music');
-      if (night && step % 3 === 1) play([{ wave: 'noise', from: 5200, to: 4800, dur: 0.05, vol: 0.15 }], 'music');
-    }
-    step++;
-    musicTimer = window.setTimeout(tick, night ? 900 : 520);
+      if (rest > 0) {
+        rest -= wait;
+      } else {
+        const base = night ? 196 : 262;
+        const deg = SCALE[(step * 3 + (step >> 2) + (step >> 5)) % SCALE.length]!;
+        if (Math.random() > 0.3) play([{ wave: 'triangle', from: base * 2 ** (deg / 12), dur: night ? 1.4 : 0.9, vol: 0.5 }], 'music');
+        if (step % 8 === 0) play([{ wave: 'sine', from: base / 2, dur: 2.2, vol: 0.45 }], 'music');
+        if (night && step % 5 === 2) play([{ wave: 'noise', from: 5200, to: 4800, dur: 0.05, vol: 0.12 }], 'music');
+        step++;
+        if (step % 8 === 0) rest = 4000 + Math.random() * 4000;
+      }
+    } else wait = 1000;
+    musicTimer = window.setTimeout(tick, wait);
   };
   tick();
 }

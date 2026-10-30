@@ -1,5 +1,6 @@
 import { tickToDate, type Command } from '@bitopolis/shared';
 import {
+  BUILD,
   BUILD_NAMES,
   type Building,
   salePrice,
@@ -10,6 +11,7 @@ import {
   occupants,
   Tile,
   validateCommand,
+  ZONE_COST_PER_TILE,
   ZONE_UNLOCK_POP,
 } from '@bitopolis/sim';
 import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
@@ -68,6 +70,8 @@ export function startGame(opts: GameOptions): void {
   let selected: { x: number; y: number } | null = null;
   /** Primer toque de una carretera o zona (modo «toque inicio, toque fin»). */
   let anchor: { x: number; y: number } | null = null;
+  /** Final propuesto: se ve el trazado y el coste; un segundo toque ahí confirma. */
+  let pendingEnd: { x: number; y: number } | null = null;
   /** Cursor de casilla para jugar con teclado (flechas + Intro). */
   let cursor: { x: number; y: number } | null = null;
   const seenEvents = new Set(state.events.map((e) => `${e.tick}|${e.kind}|${e.text}`));
@@ -166,10 +170,7 @@ export function startGame(opts: GameOptions): void {
           toast(error, { kind: 'warn' });
           sfx.error();
         }
-        if (ok) {
-          vibrate(10);
-          feedback(cmd);
-        }
+        if (ok) feedback(cmd);
         resolve(ok);
       });
       send({ type: 'command', cmd, id });
@@ -178,12 +179,21 @@ export function startGame(opts: GameOptions): void {
 
   /** Sonido y efectos de cada orden aceptada. */
   function feedback(cmd: Command) {
-    if (cmd.type === 'Build') sfx.build();
-    else if (cmd.type === 'BuildRoad') sfx.road();
-    else if (cmd.type === 'Demolish') {
+    const say = (t: string) => ($('#sr-live').textContent = t);
+    if (cmd.type === 'Build') {
+      sfx.build();
+      say(`Obra empezada: ${BUILD_NAMES[cmd.kind] ?? cmd.kind}.`);
+    } else if (cmd.type === 'BuildRoad') {
+      sfx.road();
+      say(`Carretera construida: ${plural(tilesOf(cmd).length, 'casilla', 'casillas')}.`);
+    } else if (cmd.type === 'Demolish') {
       sfx.demolish();
       dust(cmd.x, cmd.y);
-    } else if (cmd.type === 'Zone' || cmd.type === 'SetTax' || cmd.type === 'SetTaxes') sfx.tap();
+      say('Derribado.');
+    } else if (cmd.type === 'Zone') {
+      sfx.tap();
+      say(cmd.zone === 'none' ? 'Zona quitada.' : `Zona ${cmd.zone} pintada: ${plural(cmd.w * cmd.h, 'casilla', 'casillas')}.`);
+    } else if (cmd.type === 'SetTax' || cmd.type === 'SetTaxes') sfx.tap();
   }
 
   /** Centro de una casilla en coordenadas de pantalla (CSS). */
@@ -194,7 +204,10 @@ export function startGame(opts: GameOptions): void {
 
   /** Modo tranquilo: un evento importante pausa el juego. */
   function calmPause() {
-    if (prefs().calm && speed > 0) setSpeed(0);
+    if (prefs().calm && speed > 0) {
+      setSpeed(0);
+      toast('Modo tranquilo: juego en pausa. Pulsa x1 para seguir.', { kind: 'info' });
+    }
   }
 
   /* ---------- HUD ---------- */
@@ -234,7 +247,7 @@ export function startGame(opts: GameOptions): void {
     tutorial.update(state, tool.id);
     canvas.setAttribute(
       'aria-label',
-      `Mapa del pueblo: ${plural(state.buildings.filter((b) => b.built).length, 'edificio', 'edificios')}, ${plural(state.projects.length, 'obra', 'obras')}.`,
+      `Mapa del pueblo: ${plural(state.buildings.filter((b) => b.built).length, 'edificio', 'edificios')}, ${plural(state.projects.length, 'obra', 'obras')}. Con el mapa enfocado, las flechas mueven un cursor e Intro usa la herramienta.`,
     );
     if (isSheetOpen() && openInspect) openInspect();
   }
@@ -296,6 +309,7 @@ export function startGame(opts: GameOptions): void {
     for (const e of notified) {
       toast(e.text, { kind: 'good', sticky: true, onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
       vibrate(80);
+      calmPause();
     }
     const plain = built.filter((e) => !e.notify);
     if (plain.length === 1) toast(plain[0]!.text, { kind: 'good' });
@@ -317,6 +331,7 @@ export function startGame(opts: GameOptions): void {
         if (th) coins(...screenOf(th.x, th.y), 8);
       } else if (e.kind === 'departure' || e.kind === 'business') {
         toast(e.text, { kind: 'warn' });
+        calmPause();
       }
     }
   }
@@ -477,7 +492,7 @@ export function startGame(opts: GameOptions): void {
     if (!prev) {
       // Ratón sin pulsar: vista previa del tile bajo el cursor.
       const t0 = tileAt(e.clientX, e.clientY);
-      preview = t0 && tool.id !== 'inspect' ? previewFor(anchor ?? t0, t0) : null;
+      if (!pendingEnd) preview = t0 && tool.id !== 'inspect' ? previewFor(anchor ?? t0, t0) : null;
       return;
     }
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -529,7 +544,8 @@ export function startGame(opts: GameOptions): void {
       const cmd = commandFor(tool, g.startTile, t1);
       if (cmd) void command(cmd);
     }
-    preview = null;
+    // Con un inicio marcado (dos toques) se mantiene la vista previa del trazado.
+    if (!anchor) preview = null;
   };
   canvas.addEventListener('pointerup', endPointer);
   canvas.addEventListener('pointercancel', endPointer);
@@ -566,17 +582,35 @@ export function startGame(opts: GameOptions): void {
     if (tool.shape !== 'tap') {
       if (!anchor) {
         anchor = tile;
+        pendingEnd = null;
         preview = previewFor(tile, tile);
+        document.body.classList.add('placing');
         $('#tool-info').textContent = `${tool.label}: ahora toca dónde termina (o arrastra). Esc para cancelar.`;
         $('#sr-live').textContent = `Inicio marcado en la casilla ${tile.x}, ${tile.y}. Elige el final.`;
         return;
       }
-      const start = anchor;
+      const line = commandFor(tool, anchor, tile);
+      if (!line) return;
+      // Primer toque en el final: se enseña el trazado y lo que cuesta; el segundo, ahí mismo, confirma.
+      if (!pendingEnd || pendingEnd.x !== tile.x || pendingEnd.y !== tile.y) {
+        pendingEnd = tile;
+        preview = previewFor(anchor, tile);
+        const n = tilesOf(line).length;
+        const cost = n * (tool.zone ? ZONE_COST_PER_TILE : BUILD.road.materials);
+        const v = validateCommand(state, line);
+        const msg = v.ok
+          ? `${tool.label}: ${plural(n, 'casilla', 'casillas')}, ${money(cost)}. Toca otra vez el final para confirmar.`
+          : `${tool.label}: no se puede (${v.error}). Elige otro final o pulsa Esc.`;
+        $('#tool-info').textContent = msg;
+        $('#sr-live').textContent = msg;
+        return;
+      }
       anchor = null;
+      pendingEnd = null;
       preview = null;
+      document.body.classList.remove('placing');
       selectTool(tool.id);
-      const line = commandFor(tool, start, tile);
-      if (line) await command(line);
+      await command(line);
       return;
     }
     const cmd = commandFor(tool, tile, tile);
@@ -588,7 +622,14 @@ export function startGame(opts: GameOptions): void {
     const b = state.buildings.find((x) => x.x === t.x && x.y === t.y);
     const i = t.y * state.map.w + t.x;
     const what = b ? (b.name ?? BUILD_NAMES[b.kind] ?? b.kind) : state.map.tiles[i] === Tile.Road ? 'carretera' : state.map.tiles[i] === Tile.Tree ? 'árboles' : 'solar libre';
-    return `Casilla ${t.x}, ${t.y}: ${what}`;
+    const zone = ['', ', zona residencial', ', zona comercial', ', zona industrial'][state.map.zones[i] ?? 0] ?? '';
+    let can = '';
+    if (tool.id !== 'inspect') {
+      const cmd = commandFor(tool, anchor ?? t, t);
+      const v = cmd ? validateCommand(state, cmd) : null;
+      can = v ? (v.ok ? `. ${tool.label}: se puede${costText(tool) ? ` (${costText(tool)})` : ''}` : `. ${tool.label}: no se puede (${v.error})`) : '';
+    }
+    return `Casilla ${t.x}, ${t.y}: ${what}${zone}${can}`;
   }
 
   window.addEventListener('keydown', (e) => {
@@ -636,7 +677,9 @@ export function startGame(opts: GameOptions): void {
       if (isSheetOpen()) closeSheet();
       else if (anchor) {
         anchor = null;
+        pendingEnd = null;
         preview = null;
+        document.body.classList.remove('placing');
         selectTool(tool.id);
       } else selectTool('inspect');
     } else {
@@ -696,6 +739,8 @@ export function startGame(opts: GameOptions): void {
       : `${tl.label}: ${tl.help}${costText(tl) ? ` · ${costText(tl)}` : ''}`;
     selected = null;
     anchor = null;
+    pendingEnd = null;
+    document.body.classList.remove('placing');
     tutorial.update(state, tool.id);
   }
 
@@ -886,6 +931,7 @@ export function startGame(opts: GameOptions): void {
     }
     speed = s;
     send({ type: 'speed', speed: s });
+    $('#sr-live').textContent = s === 0 ? 'Juego en pausa' : `Velocidad x${s}`;
     for (const b of document.querySelectorAll('[data-speed]')) b.setAttribute('aria-pressed', String(Number(b.getAttribute('data-speed')) === s));
   }
 
@@ -989,8 +1035,13 @@ export function startGame(opts: GameOptions): void {
   window.addEventListener('keydown', unlock, { once: true });
   startMusic(() => timeOfDay(state.tick) === 'night');
   // Al activar el modo tranquilo con x3/x10 puestos, se baja a x1.
+  const markCalm = () => {
+    for (const b of document.querySelectorAll('[data-speed="3"], [data-speed="10"]')) b.setAttribute('aria-disabled', String(prefs().calm));
+  };
+  markCalm();
   const offPrefs = onPrefs((p) => {
     if (p.calm && speed > 1) setSpeed(1);
+    markCalm();
   });
   requestAnimationFrame(frame);
 }

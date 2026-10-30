@@ -59,8 +59,8 @@ function mapSignature(state: GameState): string {
 /** Hora del juego → momento del día (1 tick = 1 hora; el día empieza a las 8:00). */
 export function timeOfDay(tick: number): TimeOfDay {
   const hour = (tick + 8) % 24;
-  if (hour >= 21 || hour < 6) return 'night';
-  if (hour === 6 || hour === 7 || hour === 19 || hour === 20) return 'dusk';
+  if (hour >= 22 || hour < 5) return 'night';
+  if (hour === 5 || hour === 6 || hour === 20 || hour === 21) return 'dusk';
   return 'day';
 }
 
@@ -330,9 +330,11 @@ export function render(
         ctx.drawImage(buildingSprite(b.kind, b.id, tod), px + Math.round((ts - dw) / 2), py + BH * z - dh, dw, dh);
       }
       // Humo de chimeneas (fábricas, central y casas): bocanadas que suben y crecen.
-      const chimneys = b.kind === 'factory' ? [[27, 0]] : b.kind === 'power' ? [[23, 2]] : b.kind === 'house' ? [[23, 6]] : [];
+      // En casas solo alguna chimenea y una bocanada: que no parezca contaminación.
+      const homeSmoke = b.kind === 'house' && hash(b.id, 9) < 0.2;
+      const chimneys = b.kind === 'factory' ? [[27, 0]] : b.kind === 'power' ? [[23, 2]] : homeSmoke ? [[23, 6]] : [];
       for (const [cx, cy] of chimneys) {
-        for (let k = 0; k < 3; k++) {
+        for (let k = 0; k < (homeSmoke ? 1 : 3); k++) {
           const life = still ? (k + 0.5) / 3 : ((opts.time / 2600 + k / 3 + hash(b.id, k) * 0.2) % 1);
           puffs.push({ x: x * T + cx! + Math.round(life * 4 + Math.sin(life * 6 + b.id) * 1.5), y: y * T - (BH - T) + cy! - Math.round(life * 14), size: Math.min(2, Math.floor(life * 3)) });
         }

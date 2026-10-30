@@ -14,6 +14,9 @@ function vars(block: string): Record<string, string> {
 }
 const root = vars(css.match(/:root\s*{([^}]*)}/)![1]!);
 const high = { ...root, ...vars(css.match(/html\[data-contrast='alto'\]\s*{([^}]*)}/)![1]!) };
+const mode = (sel: string) => vars(css.match(new RegExp(`html\\[data-colorblind='${sel}'\\]\\s*{([^}]*)}`))![1]!);
+const redGreen = { ...root, ...mode('rojo-verde') };
+const blueYellow = { ...root, ...mode('azul-amarillo') };
 
 function lum(hex: string): number {
   const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
@@ -34,20 +37,27 @@ const PAIRS: [string, string, number, string][] = [
   ['accent', 'panel', 4.5, 'acento en paneles'],
   ['bg', 'accent', 4.5, 'texto del botón principal'],
   ['good', 'bg', 3, 'indicadores «bien» (grandes o con icono)'],
-  ['bad', 'bg', 3, 'indicadores «mal» (grandes o con icono)'],
+  ['bad', 'bg', 4.5, 'texto «mal» (saldo negativo) sobre el fondo'],
+  ['bad', 'panel', 4.5, 'texto «mal» en paneles (cuentas)'],
+  ['good', 'panel', 3, 'indicadores «bien» en paneles'],
+  ['line', 'panel', 3, 'bordes de controles (WCAG 1.4.11)'],
+  ['line', 'bg', 3, 'bordes de controles sobre el fondo'],
 ];
 
 const fails: string[] = [];
-for (const [mode, v] of [['normal', root], ['alto contraste', high]] as const) {
+for (const [mode, v] of [
+  ['normal', root],
+  ['alto contraste', high],
+  ['daltonismo rojo-verde', redGreen],
+  ['daltonismo azul-amarillo', blueYellow],
+] as const) {
   for (const [fg, bg, min, what] of PAIRS) {
     const r = ratio(v[fg]!, v[bg]!);
     if (r < min) fails.push(`${mode}: ${what} (--${fg} sobre --${bg}) = ${r.toFixed(2)}:1 < ${min}:1`);
   }
-  // En alto contraste, también los bordes de los controles (WCAG 1.4.11).
-  if (mode === 'alto contraste' && ratio(v.line!, v.panel!) < 3) fails.push(`alto contraste: bordes ${ratio(v.line!, v.panel!).toFixed(2)}:1 < 3:1`);
 }
 if (fails.length) {
   console.error('Contraste insuficiente (WCAG AA):\n' + fails.join('\n'));
   process.exit(1);
 }
-console.log(`Contraste AA ok (${PAIRS.length} pares × 2 modos).`);
+console.log(`Contraste AA ok (${PAIRS.length} pares × 4 modos).`);

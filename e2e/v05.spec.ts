@@ -18,6 +18,8 @@ test('v0.5: ajustes de accesibilidad, teclado y carretera con dos toques', async
   await tap(page, cx + 3, cy);
   await expect(page.locator('#tool-info')).toContainText('toca dónde termina');
   await tap(page, cx + 3, cy + 3);
+  await expect(page.locator('#tool-info')).toContainText('Toca otra vez el final para confirmar');
+  await tap(page, cx + 3, cy + 3);
   await expect.poll(async () => (await state(page)).map.tiles.filter((t: number) => t === 1).length).toBeGreaterThan(s0.map.tiles.filter((t: number) => t === 1).length + 2);
 
   // Teclado: el mapa enfocado con un cursor de casilla que se anuncia.
@@ -45,7 +47,8 @@ test('v0.5: ajustes de accesibilidad, teclado y carretera con dos toques', async
   await shot('ajustes');
   await page.keyboard.press('Escape');
   // Modo tranquilo: x10 se queda en x1.
-  await page.locator('[data-speed="10"]').click();
+  await expect(page.locator('[data-speed="10"]')).toHaveAttribute('aria-disabled', 'true');
+  await page.locator('[data-speed="10"]').click({ force: true });
   await expect(page.locator('[data-speed="1"]')).toHaveAttribute('aria-pressed', 'true');
   await shot('texto-200');
   // Las preferencias se recuerdan al recargar.
