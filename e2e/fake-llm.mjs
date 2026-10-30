@@ -12,6 +12,20 @@ createServer((req, res) => {
   req.on('data', (c) => (body += c));
   req.on('end', () => {
     const data = JSON.parse(body || '{}');
+    const userText = (data.messages?.[1]?.content ?? '').split('\n\n')[0];
+    let parsed;
+    try {
+      parsed = JSON.parse(userText);
+    } catch {
+      parsed = {};
+    }
+    const isText = !Array.isArray(parsed.vecinos);
+    if (isText) {
+      const texto = 'Pues aquí andamos, alcalde, con ganas de que el pueblo siga creciendo.';
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ texto }) } }], usage: { prompt_tokens: 500, completion_tokens: 30 } }));
+      return;
+    }
     const user = JSON.parse((data.messages?.[1]?.content ?? '{"vecinos":[]}').split('\n\n')[0]);
     const decisiones = user.vecinos.map((v) => ({
       vecino: v.vecino,

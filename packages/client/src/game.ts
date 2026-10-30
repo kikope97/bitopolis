@@ -15,6 +15,7 @@ import {
 import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
 import { openNeighbours, openReport, openTaxes as openTaxesSheet } from './economy-ui.ts';
 import { LAYERS, type LayerId } from './layers.ts';
+import { openAdvisor, openCitizen, openDiary, openPleno, rememberSeen, renderObjectives, resumeSummary, type SocialCtx } from './social-ui.ts';
 import { api, ApiError } from './api.ts';
 import { nextHint } from './hints.ts';
 import { formatDate, money, plural, t } from './i18n.ts';
@@ -187,6 +188,7 @@ export function startGame(opts: GameOptions): void {
     $('#hud-happy').textContent = `☺ ${happy}`;
     updateDemand();
     updateToolLocks();
+    renderObjectives(state);
     announceEvents();
     tutorial.update(state, tool.id);
     canvas.setAttribute(
@@ -254,6 +256,9 @@ export function startGame(opts: GameOptions): void {
           kind: 'warn',
           sticky: true,
         });
+      } else if (e.kind === 'milestone') {
+        toast(e.text, { kind: 'good', sticky: true });
+        vibrate(120);
       } else if (e.kind === 'departure' || e.kind === 'business') {
         toast(e.text, { kind: 'warn' });
       }
@@ -278,7 +283,8 @@ export function startGame(opts: GameOptions): void {
     };
     el.addEventListener('click', () => {
       close();
-      focusBuilding(where.id);
+      if (c?.named) openCitizen(social, c.id);
+      else focusBuilding(where.id);
     });
     // Sin límite de tiempo con movimiento reducido; si no, según lo largo del texto.
     if (!reducedMotion()) setTimeout(close, Math.max(9000, entry.motivo.length * 90));
@@ -688,10 +694,12 @@ export function startGame(opts: GameOptions): void {
       const moodText = c.happiness >= 65 ? 'contento' : c.happiness >= 40 ? 'regular' : 'descontento';
       const mood = c.happiness >= 65 ? '😊' : c.happiness >= 40 ? '😐' : '☹️';
       const last = [...state.decisionLog].reverse().find((d) => d.citizenId === c.id);
-      ul.append(
+      const row = h(
+        'li',
+        { class: 'person-click' },
         h(
-          'li',
-          {},
+          'button',
+          { class: 'person-row', 'aria-label': `Ficha de ${c.name}` },
           h('span', { 'aria-hidden': 'true' }, `${mood} `),
           h('strong', {}, `${c.named ? '★ ' : ''}${c.name}`),
           ` (${moodText})`,
@@ -702,6 +710,8 @@ export function startGame(opts: GameOptions): void {
           factors.length ? h('span', { class: 'muted' }, ` · le preocupa: ${factors.join(', ')}`) : '',
         ),
       );
+      row.querySelector('button')!.addEventListener('click', () => openCitizen(social, c.id));
+      ul.append(row);
     }
     if (others > 0) {
       const avg = Math.round(all.filter((c) => !c.named).reduce((a, c) => a + c.happiness, 0) / others);
@@ -711,6 +721,7 @@ export function startGame(opts: GameOptions): void {
   }
 
   /* ---------- menú, impuestos y cuentas ---------- */
+  const social: SocialCtx = { token, state: () => state, command };
   const openTaxes = () => openTaxesSheet(() => state, command);
   const openAccounts = () => openReport(state);
 
@@ -724,12 +735,10 @@ export function startGame(opts: GameOptions): void {
       'Menú',
       item('Impuestos', openTaxes),
       item('Parte mensual', openAccounts),
-      item('Vecinos', () =>
-        openNeighbours(state, (c) => {
-          const b = state.buildings.find((x) => x.id === (c.homeId ?? c.jobId));
-          if (b) focusBuilding(b.id);
-        }),
-      ),
+      item('Vecinos', () => openNeighbours(state, (c) => openCitizen(social, c.id))),
+      item('Pleno municipal', () => openPleno(social)),
+      item('Consejero', () => openAdvisor(social)),
+      item('Diario del pueblo', () => openDiary(social)),
       ...(state.aiMode
         ? [
             item('Gasto de la IA', () => void openUsage(token)),
@@ -770,6 +779,7 @@ export function startGame(opts: GameOptions): void {
     }
   };
   const onPageHide = () => {
+    rememberSeen(token, state);
     send({ type: 'flush' });
     void flushQueue(true);
     void api.release(token, sessionId);
@@ -779,6 +789,7 @@ export function startGame(opts: GameOptions): void {
   const heartbeat = setInterval(() => !document.hidden && !lost && send({ type: 'flush' }), 30_000);
 
   function exit() {
+    rememberSeen(token, state);
     setSpeed(0);
     send({ type: 'flush' });
     setTimeout(() => {
@@ -848,6 +859,8 @@ export function startGame(opts: GameOptions): void {
   selectTool('inspect');
   setSpeed(0);
   onState();
+  const away = resumeSummary(token, state);
+  if (away && away.length) toast(`Desde tu última visita: ${away.join(' · ')}`, { sticky: true });
   tutorial.start(state);
   tutorial.update(state, tool.id);
   if (!tutorial.active) toast('En pausa. Pulsa x1 para que pase el tiempo.');

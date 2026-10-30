@@ -377,6 +377,13 @@ function needMet(state: GameState, p: PromiseRecord): boolean {
   return now < p.baseline;
 }
 
+/** Necesidades de un vecino por orden (para que el pleno traiga peticiones distintas). */
+export function needsOf(state: GameState, c: Citizen): Need[] {
+  const first = needOf(state, c);
+  const rest = NEEDS.filter((n) => n !== first && (NEED_KIND[n] ? !state.buildings.some((b) => b.kind === NEED_KIND[n] && b.built) : n === 'bajar_tasas'));
+  return [first, ...rest.sort((a, b) => (hash32(c.id, a.length) % 7) - (hash32(c.id, b.length) % 7))];
+}
+
 /** Lo que pediría un vecino: su carencia más fuerte (datos del motor). */
 export function needOf(state: GameState, c: Citizen): Need {
   const home = state.buildings.find((b) => b.id === c.homeId);
@@ -417,8 +424,8 @@ export function convenePleno(state: GameState): void {
   const petitions: Petition[] = [];
   for (const c of named) {
     if (petitions.length >= 3) break;
-    const need = needOf(state, c);
-    if (petitions.some((p) => p.need === need)) continue;
+    const need = needsOf(state, c).find((n) => !petitions.some((p) => p.need === n));
+    if (!need) continue;
     let yes = 0;
     const supporters: number[] = [];
     for (const v of state.citizens) {

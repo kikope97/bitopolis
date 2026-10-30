@@ -16,6 +16,8 @@ export type ToolId =
   | 'school'
   | 'clinic'
   | 'police'
+  | 'plaza'
+  | 'market'
   | 'demolish';
 
 export interface Tool {
@@ -42,6 +44,8 @@ export const TOOLS: Tool[] = [
   { id: 'school', label: 'Colegio', shape: 'tap', build: 'school', key: '9', help: 'Más felicidad en 8 casillas. 3 empleos.' },
   { id: 'clinic', label: 'Salud', shape: 'tap', build: 'clinic', key: 'h', help: 'Centro de salud: más felicidad en 8 casillas.' },
   { id: 'police', label: 'Policía', shape: 'tap', build: 'police', key: 'p', help: 'Baja la delincuencia en 10 casillas.' },
+  { id: 'plaza', label: 'Plaza', shape: 'tap', build: 'plaza', key: 'm', help: 'Plaza Mayor: mucha felicidad en 6 casillas. Premio del hito de 50 vecinos.' },
+  { id: 'market', label: 'Mercado', shape: 'tap', build: 'market', key: 'k', help: 'Mercado municipal: empleo y felicidad en 8 casillas. Premio del hito de 200 vecinos.' },
   { id: 'dezone', label: 'Sin zona', shape: 'rect', zone: 'none', key: 'z', help: 'Quita la zona (no derriba lo construido).' },
   { id: 'demolish', label: 'Derribar', shape: 'tap', key: 'x', help: 'Derriba un edificio o una carretera. Pide confirmación.' },
 ];
@@ -63,6 +67,7 @@ export function costText(tool: Tool): string {
 }
 
 export function isLocked(tool: Tool, state: GameState): boolean {
+  if (tool.build === 'plaza' || tool.build === 'market') return !state.unlocked.includes(tool.build);
   return state.citizens.length < unlockPop(tool);
 }
 

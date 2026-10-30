@@ -56,6 +56,9 @@ export const api = {
     ),
   aiUsage: (token: string) => call<AiUsage>('GET', `/api/games/${token}/ai-usage`),
   aiPreview: (token: string) => call<{ system: string; user: string }>('GET', `/api/games/${token}/ai-preview`),
+  talk: (token: string, citizenId: number, question: string) => call<{ text: string | null; reason?: string }>('POST', `/api/games/${token}/talk`, { citizenId, question }),
+  advisor: (token: string, question: string) => call<{ text: string | null; reason?: string }>('POST', `/api/games/${token}/advisor`, { question }),
+  chronicle: (token: string) => call<{ text: string | null; reason?: string }>('POST', `/api/games/${token}/chronicle`),
   regenerate: (token: string, sessionId: string) => call<{ token: string }>('POST', `/api/games/${token}/regenerate`, { sessionId }),
   async import(file: File): Promise<{ token: string }> {
     const r = await fetch('/api/import', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file });

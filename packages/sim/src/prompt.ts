@@ -197,3 +197,78 @@ export function parseDecisions(raw: string, pendings: Pending[], recent: Record<
   const invalid = all.filter((id) => !ok.has(id));
   return { decisions, invalid, reasons, ...(invalid.length ? { error: Object.keys(reasons).join(', ') } : {}) };
 }
+
+/* ---------------- textos premium (v0.4) ---------------- */
+
+export const TEXT_SYSTEM = `Eres la voz de Bitópolis, un pueblo español pequeño. Escribes en español de España, cercano y con humor suave.
+Reglas:
+- Usa solo los datos que te dan (JSON del juego). No inventes cifras, nombres ni edificios.
+- Sin markdown, sin emojis, sin comillas al principio o al final.
+- Responde solo con JSON que cumpla el esquema.`;
+
+const TEXT_SCHEMA = (max: number) => ({
+  type: 'object',
+  additionalProperties: false,
+  required: ['texto'],
+  properties: { texto: { type: 'string', description: `máximo ${max} caracteres` } },
+});
+
+export interface TextRequest {
+  system: string;
+  user: string;
+  schema: Record<string, unknown>;
+  max: number;
+}
+
+export function buildTalkRequest(state: GameState, c: Citizen, question: 'como_estas' | 'que_necesitas' | 'me_votarias'): TextRequest {
+  const q = { como_estas: '¿Cómo estás?', que_necesitas: '¿Qué necesitas?', me_votarias: '¿Me votarías?' }[question];
+  const p: Pending = { citizenId: c.id, trigger: 'opinion', actions: [], createdTick: state.tick, dueTick: state.tick };
+  const v = citizenView(state, c, p);
+  const { acciones: _a, situacion: _s, ...rest } = v;
+  void _a;
+  void _s;
+  return {
+    system: `${TEXT_SYSTEM}\n- Hablas como el vecino, en primera persona, en 1 o 2 frases (máx. 220 caracteres).\n\nEstado del pueblo: ${JSON.stringify(townSummary(state))}`,
+    user: JSON.stringify({ vecino: rest, pregunta_del_alcalde: q }),
+    schema: TEXT_SCHEMA(220),
+    max: 220,
+  };
+}
+
+export function buildAdvisorRequest(state: GameState, facts: Record<string, unknown>, question: 'como_va' | 'que_cambiarias'): TextRequest {
+  const q = question === 'como_va' ? '¿Cómo va el pueblo?' : '¿Qué cambiarías?';
+  return {
+    system: `${TEXT_SYSTEM}\n- Eres el consejero del alcalde: concreto, en 2 o 3 frases (máx. 400 caracteres), con los datos reales.`,
+    user: JSON.stringify({ datos: facts, pregunta: q }),
+    schema: TEXT_SCHEMA(400),
+    max: 400,
+  };
+}
+
+export function buildChronicleRequest(state: GameState, facts: Record<string, unknown>, events: string[]): TextRequest {
+  return {
+    system: `${TEXT_SYSTEM}\n- Eres el cronista del pueblo: escribe la crónica del mes en un párrafo (máx. 700 caracteres) con la voz de los vecinos.`,
+    user: JSON.stringify({ datos: facts, sucesos_del_mes: events.slice(-25) }),
+    schema: TEXT_SCHEMA(700),
+    max: 700,
+  };
+}
+
+/** Valida un texto premium: JSON, longitud y cifras que existan en los datos. */
+export function parseText(raw: string, req: TextRequest): string | null {
+  let data: unknown;
+  try {
+    data = JSON.parse(raw.trim().replace(/^```(?:json)?/, '').replace(/```$/, ''));
+  } catch {
+    return null;
+  }
+  const t = (data as { texto?: unknown })?.texto;
+  if (typeof t !== 'string') return null;
+  // eslint-disable-next-line no-control-regex
+  const text = t.replace(/[\u0000-\u001f<>`*_#]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (text.length < 4 || text.length > req.max + 40) return null;
+  // Lista blanca: toda cifra del texto tiene que estar en los datos que se enviaron.
+  const allowed = req.user + req.system;
+  for (const n of text.match(/\d[\d.,]*/g) ?? []) if (!allowed.includes(n.replace(/[.,]$/, '').replace(/\./g, ''))) return null;
+  return text;
+}

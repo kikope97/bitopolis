@@ -1,4 +1,4 @@
-import { buildDecisionRequest, type GameState, parseDecisions, type Pending, recentMotivos } from '@bitopolis/sim';
+import { buildDecisionRequest, type GameState, parseDecisions, parseText, type Pending, recentMotivos, type TextRequest } from '@bitopolis/sim';
 import type { Config } from '../config.ts';
 import type { Db } from '../db/index.ts';
 import { costEur, PROVIDER_INFO, PROVIDERS, priceTable, type ProviderId } from './catalog.ts';
@@ -233,6 +233,57 @@ export class AiService {
         status,
       })
       .execute();
+  }
+
+  /**
+   * Texto con el modelo premium (consejero, diario) o el barato (conversación).
+   * Reserva el presupuesto antes de empezar: si no alcanza, no empieza (spec §9.5).
+   */
+  async text(gameId: number, kind: 'consejero' | 'diario' | 'conversacion', req: TextRequest, premium: boolean): Promise<{ text: string | null; reason?: string }> {
+    const s = await this.settings(gameId);
+    if (!s.configured) return { text: null, reason: 'IA sin configurar' };
+    const model = premium ? s.modelPremium : s.model;
+    const est = costEur(this.prices, model, s.provider, { in: Math.ceil((req.system.length + req.user.length) / 3.2), cachedIn: 0, out: Math.ceil(req.max / 3) + 60 }) * 1.5;
+    const blocked = await this.budgetBlock(gameId, s, est);
+    if (blocked) return { text: null, reason: `${blocked} alcanzado` };
+    this.reserved.set(gameId, (this.reserved.get(gameId) ?? 0) + est);
+    const usage = { in: 0, cachedIn: 0, out: 0 };
+    let text: string | null = null;
+    let status = 'ok';
+    try {
+      const provider = this.providerOverride ? this.providerOverride(s) : makeProvider(s.provider, s.key, s.baseUrl);
+      const r = await provider.complete({ system: req.system, user: req.user, schema: req.schema, model, maxTokens: Math.ceil(req.max / 2) + 120 }, AbortSignal.timeout(TIMEOUT_MS));
+      usage.in = r.usage.in;
+      usage.cachedIn = r.usage.cachedIn;
+      usage.out = r.usage.out;
+      text = parseText(r.text, req);
+      if (!text) status = 'invalid';
+    } catch (e) {
+      status = (e as Error).name === 'TimeoutError' ? 'timeout' : 'error';
+    } finally {
+      this.reserved.set(gameId, Math.max(0, (this.reserved.get(gameId) ?? 0) - est));
+    }
+    const now = new Date();
+    await this.db
+      .insertInto('ai_usage')
+      .values({
+        game_id: gameId,
+        ts: now.getTime(),
+        day: day(now),
+        month: month(now),
+        kind,
+        model,
+        tokens_in: usage.in,
+        tokens_cached: usage.cachedIn,
+        tokens_out: usage.out,
+        eur: costEur(this.prices, model, s.provider, usage),
+        requested: 1,
+        valid: text ? 1 : 0,
+        retried: 0,
+        status,
+      })
+      .execute();
+    return text ? { text } : { text: null, reason: status };
   }
 
   /** Decisiones listas para el cliente (se entregan una sola vez). */

@@ -586,6 +586,69 @@ function policeStation(seed: number): Pix {
   return p;
 }
 
+function plaza(seed: number): Pix {
+  const p = new Pix(T, BH);
+  // Adoquinado.
+  p.rect(0, 16, 32, 32, MAT.stone[1]);
+  for (let y = 16; y < 48; y += 4) for (let x = (y / 4) % 2 ? 2 : 0; x < 32; x += 4) p.rect(x, y, 3, 3, MAT.stone[0]);
+  p.frame(0, 16, 32, 32, MAT.stone[3]);
+  // Fuente central de piedra.
+  p.ellipse(16, 33, 9, 6, MAT.stone[3]);
+  p.ellipse(16, 32.5, 8, 5, MAT.stone[0]);
+  p.ellipse(16, 33, 6.5, 3.8, MAT.blue[1]);
+  p.ellipse(15, 32, 3, 1.5, MAT.blue[0]);
+  p.rect(15, 24, 3, 9, MAT.stone[1]);
+  p.vline(15, 24, 9, MAT.stone[0]);
+  p.ellipse(16, 23, 4, 1.6, MAT.stone[0]);
+  for (const [x, y] of [[14, 20], [18, 20], [16, 18], [12, 22], [20, 22]] as const) p.set(x, y, 11);
+  p.set(16, 21, 31);
+  // Farolas y bancos.
+  for (const x of [3, 28]) {
+    p.vline(x, 18, 12, MAT.metal[3]);
+    p.rect(x - 1, 16, 3, 3, MAT.yellow[0]);
+    p.set(x, 17, 12);
+  }
+  p.rect(3, 43, 7, 2, MAT.wood[1]);
+  p.hline(3, 42, 7, MAT.wood[2]);
+  p.rect(22, 43, 7, 2, MAT.wood[1]);
+  p.hline(22, 42, 7, MAT.wood[2]);
+  bush(p, 4, 37, 2.5, seed, true);
+  bush(p, 28, 37, 2.5, seed + 2, true);
+  // Bandera en el mástil.
+  p.vline(30, 2, 16, MAT.metal[2]);
+  p.rect(24, 2, 6, 2, MAT.red[1]);
+  p.rect(24, 4, 6, 2, MAT.yellow[0]);
+  p.rect(24, 6, 6, 2, MAT.red[1]);
+  return p;
+}
+
+function market(seed: number): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 1, 14, 30, 32);
+  facade(p, 1, 20, 30, 26, MAT.cream, 'brick', seed);
+  // Tejado de hierro y cristal en arco.
+  for (let j = 0; j < 9; j++) {
+    const inset = Math.round(Math.sqrt(Math.max(0, 81 - (9 - j) * (9 - j))) / 2);
+    p.hline(0 + (4 - inset), 11 + j, 32 - 2 * (4 - inset), j % 3 === 0 ? MAT.metal[2] : MAT.glass[1]);
+  }
+  p.hline(0, 19, 32, MAT.metal[3]);
+  for (let x = 2; x < 32; x += 5) p.vline(x, 11, 9, MAT.metal[2]);
+  p.rect(10, 7, 12, 5, MAT.wood[3]);
+  p.rect(11, 8, 10, 3, MAT.yellow[0]);
+  for (let i = 0; i < 4; i++) p.rect(12 + i * 2, 9, 1, 1, MAT.wood[3]);
+  // Puestos con toldos de colores.
+  const awn = [MAT.red, MAT.moss, MAT.blue, MAT.yellow];
+  for (let k = 0; k < 4; k++) {
+    const x = 2 + k * 7;
+    for (let i = 0; i < 6; i++) p.vline(x + i, 30, 2, i % 2 ? 12 : awn[k]![1]);
+    p.hline(x, 32, 6, awn[k]![2]);
+    p.rect(x, 33, 6, 4, MAT.wood[1]);
+    for (let i = 0; i < 3; i++) p.set(x + 1 + i * 2, 33, [2, 4, 6, 3][(k + i) % 4]!);
+  }
+  doorAt(p, 13, 38, 6, 8, MAT.wood);
+  return p;
+}
+
 function park(seed: number): Pix {
   const p = new Pix(T, BH);
   // Césped cuidado.
@@ -905,6 +968,10 @@ export function buildingSprite(kind: string, id: number): HTMLCanvasElement {
       return sprite('clinic', () => clinic(4));
     case 'police':
       return sprite('police', () => policeStation(6));
+    case 'plaza':
+      return sprite('plaza', () => plaza(8));
+    case 'market':
+      return sprite('market', () => market(9));
     case 'factory':
       return sprite(`factory${id % 4}`, () => factory(id % 4));
     case 'shop':

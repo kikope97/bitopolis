@@ -38,6 +38,13 @@ test('Modo IA: configurar, jugar y ver un motivo de la IA', async ({ page }, inf
   expect(s1.decisionLog.some((d: { source: string }) => d.source === 'ai')).toBe(true);
 
   await page.locator('[data-speed="0"]').click();
+  // Consejero con IA (modelo premium) en Modo IA.
+  await page.locator('#menu').click();
+  await page.getByRole('button', { name: 'Consejero' }).click();
+  await page.getByRole('button', { name: '¿Cómo va el pueblo?' }).click();
+  await expect(page.locator('.advice')).toContainText('alcalde', { timeout: 10_000 });
+  await expect(page.locator('.advice .ai-badge')).toBeVisible();
+  await page.locator('.sheet-close').click();
   await page.locator('#menu').click();
   await page.getByRole('button', { name: 'Gasto de la IA' }).click();
   await expect(page.locator('.sheet')).toContainText('las tomó la IA');

@@ -1,0 +1,59 @@
+import { gzipSync } from 'node:zlib';
+import { expect, test } from '@playwright/test';
+import { runSimulation } from '../packages/sim/src/index.ts';
+
+function town() {
+  const { state } = runSimulation({ seed: 1, days: 420, profile: 'constructor' });
+  return gzipSync(JSON.stringify({ bitopolis: 1, formatVersion: state.formatVersion, exportedAt: '', mode: 'normal', state }));
+}
+
+test('v0.4: ficha y hablar, pleno con promesa, consejero, diario y objetivos', async ({ page, request }, info) => {
+  test.setTimeout(90_000);
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  const shot = (n: string) => page.screenshot({ path: `test-results/capturas/${info.project.name}-v04-${n}.png` });
+  const r = await request.post('/api/import', { data: town(), headers: { 'content-type': 'application/octet-stream' } });
+  const { token } = await r.json();
+  await page.goto(`/p/${token}`);
+  await page.getByRole('button', { name: 'Continuar' }).click();
+  await page.locator('.tut-box button').click();
+  await expect(page.locator('#objectives')).toContainText('Objetivos');
+  await shot('1-objetivos');
+
+  // Vecinos → ficha → hablar.
+  await page.locator('#menu').click();
+  await page.getByRole('button', { name: 'Vecinos' }).click();
+  await page.locator('.person-row').first().click();
+  await expect(page.locator('.sheet h2')).toContainText('★');
+  await expect(page.locator('.sheet')).toContainText('Relaciones');
+  await page.getByRole('button', { name: '¿Cómo estás?' }).click();
+  await expect(page.locator('.answer')).toContainText('«');
+  await shot('2-ficha');
+  await page.locator('.sheet-close').click();
+
+  // Pleno: convocar, prometer y cerrar.
+  await page.locator('#menu').click();
+  await page.getByRole('button', { name: 'Pleno municipal' }).click();
+  await page.getByRole('button', { name: /Convocar pleno/ }).click();
+  await expect(page.locator('.petition').first()).toContainText('pide');
+  await expect(page.locator('.petition').first()).toContainText('Votos');
+  await shot('3-pleno');
+  await page.getByRole('button', { name: 'Prometer' }).first().click();
+  await expect(page.locator('.petition').first()).toContainText('Prometido');
+  await page.getByRole('button', { name: 'Cerrar el pleno' }).click();
+  await expect(page.locator('.sheet')).toContainText('pendiente');
+  await page.locator('.sheet-close').click();
+
+  // Consejero y diario.
+  await page.locator('#menu').click();
+  await page.getByRole('button', { name: 'Consejero' }).click();
+  await page.getByRole('button', { name: '¿Qué cambiarías?' }).click();
+  await expect(page.locator('.advice p').first()).not.toBeEmpty();
+  await shot('4-consejero');
+  await page.locator('.sheet-close').click();
+  await page.locator('#menu').click();
+  await page.getByRole('button', { name: 'Diario del pueblo' }).click();
+  await expect(page.locator('.sheet h3').first()).toContainText('año');
+  await shot('5-diario');
+  expect(errors).toEqual([]);
+});
