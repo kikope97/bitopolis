@@ -463,3 +463,12 @@ html[data-font='pixel'][data-text='200'] { font-size: 275%; }
 html[data-font='pixel'] .sheet-head h2, html[data-font='pixel'] .sheet h3, html[data-font='pixel'] .logo { font-family: 'Bitopolis Pixel', ui-monospace, monospace; }
 .volume input[type='range'] { width: 100%; min-height: 44px; accent-color: #ffcd75; }
 .volume output { font-variant-numeric: tabular-nums; color: var(--muted); }
+
+/* ---------- áreas seguras laterales (móviles con notch en horizontal, v1.1) ---------- */
+.hud, .demand, .bottom { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+.float-right { right: max(8px, env(safe-area-inset-right)); }
+.objectives, .legend { left: max(8px, env(safe-area-inset-left)); }
+.saved { right: calc(72px + env(safe-area-inset-right)); }
+#toasts { left: max(8px, env(safe-area-inset-left)); right: calc(64px + max(8px, env(safe-area-inset-right))); }
+.sheet-head, .sheet-body { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+.start { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }

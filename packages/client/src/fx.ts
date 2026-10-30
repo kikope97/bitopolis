@@ -94,3 +94,35 @@ export function coins(fromX: number, fromY: number, n = 5): void {
     };
   }
 }
+
+/* ---------------- sacudida de cámara (v1.1) ---------------- */
+
+let shakeStart = -1;
+let shakeAmp = 0;
+let shakeMs = 0;
+
+/**
+ * Sacudida breve de la cámara. Poca y corta (regla de «game feel»: el feedback
+ * acompaña, no tapa): 3 px al derribar, 6 px en la noche electoral. Nada con
+ * movimiento reducido o en modo tranquilo.
+ */
+export function shake(amplitude: number, ms = 300, now = performance.now()): void {
+  if (lowMotion()) return;
+  // Si ya hay una más fuerte en curso, no se pisa.
+  if (shakeStart >= 0 && now - shakeStart < shakeMs && shakeAmp > amplitude) return;
+  shakeStart = now;
+  shakeAmp = amplitude;
+  shakeMs = ms;
+}
+
+/** Desplazamiento de la cámara en este instante (píxeles CSS, se escalan con el dpr). */
+export function shakeOffset(now: number): [number, number] {
+  if (shakeStart < 0) return [0, 0];
+  const t = (now - shakeStart) / shakeMs;
+  if (t >= 1 || lowMotion()) {
+    shakeStart = -1;
+    return [0, 0];
+  }
+  const a = shakeAmp * (1 - t) * (1 - t);
+  return [Math.round(Math.sin(now * 0.09) * a), Math.round(Math.cos(now * 0.113) * a)];
+}

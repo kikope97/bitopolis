@@ -29,7 +29,7 @@ import { commandFor, costText, isLocked, type Tool, type ToolId, TOOLS, tilesOf,
 import { Tutorial } from './tutorial.ts';
 import { $, closeSheet, confirmDialog, h, isSheetOpen, reducedMotion, sheet, toast, vibrate } from './ui.ts';
 import { duck, sfx, startAmbience, startMusic, stopMusic, unlockAudio } from './audio.ts';
-import { coins, dust, pop } from './fx.ts';
+import { coins, dust, pop, shake, shakeOffset } from './fx.ts';
 import { onPrefs, prefs } from './prefs.ts';
 import { openSettings } from './settings-ui.ts';
 import { openElectionNight, openPolitics, renderPollChip } from './politics-ui.ts';
@@ -190,6 +190,7 @@ export function startGame(opts: GameOptions): void {
     } else if (cmd.type === 'Demolish') {
       sfx.demolish();
       dust(cmd.x, cmd.y);
+      shake(3, 250);
       say('Derribado.');
     } else if (cmd.type === 'Zone') {
       sfx.tap();
@@ -321,6 +322,7 @@ export function startGame(opts: GameOptions): void {
       if (e.kind === 'bankrupt' || e.kind === 'warning') {
         sfx.warn();
         duck(1.5);
+        if (e.kind === 'bankrupt') shake(4, 400);
         calmPause();
         toast(e.kind === 'warning' ? `${e.text}. Prueba a subir los impuestos (☰ › Impuestos) o espera antes de construir.` : e.text, {
           kind: 'warn',
@@ -339,6 +341,7 @@ export function startGame(opts: GameOptions): void {
         if (won) sfx.milestone();
         else sfx.warn();
         duck(4);
+        shake(6, 500);
         vibrate(150);
         calmPause();
         openElectionNight(social);
@@ -1027,7 +1030,10 @@ export function startGame(opts: GameOptions): void {
   /* ---------- bucle de pintado ---------- */
   function frame(time: number) {
     if ($('#game').hidden) return;
-    render(ctx, state, cam, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer });
+    // La sacudida se aplica a una copia de la cámara: no cambia dónde mira el jugador.
+    const [sx, sy] = shakeOffset(time);
+    const view = sx || sy ? { ...cam, x: cam.x + sx * dpr(), y: cam.y + sy * dpr() } : cam;
+    render(ctx, state, view, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer });
     placeBubbles();
     requestAnimationFrame(frame);
   }
