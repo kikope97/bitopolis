@@ -102,7 +102,8 @@ export const MUNICIPAL_RENT = 180;
 export const PRIVATE_RENT = 280;
 /** Base del impuesto sobre inmuebles privados (al mes). */
 export const PROPERTY_BASE = 500;
-export const PIE_PER_CITIZEN = 40;
+// Ronda 07: con 40, a 8 años las cajas pasaban de 600.000 € con impuestos bajos.
+export const PIE_PER_CITIZEN = 30;
 /** Impuesto único: tipo sobre sueldos, ventas e inmuebles. */
 export const TAX_RATE = { low: 0.04, medium: 0.07, high: 0.1 } as const;
 export const TAX_HAPPINESS = { low: 6, medium: 0, high: -10 } as const;
@@ -134,6 +135,8 @@ export const HONEYMOON = 0.25;
 export const DEBT_INTEREST = 0.01;
 export const DEBT_INTEREST_HIGH = 0.03;
 export const DEBT_INTEREST_STEP = 5_000;
+/** Los intereses de un mes no superan esta parte de lo ingresado ese mes (ronda 07). */
+export const DEBT_INTEREST_CAP = 0.25;
 
 /* ---------------- v0.3: tributos y vivienda ---------------- */
 

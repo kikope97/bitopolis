@@ -4,6 +4,7 @@ import {
   COMMUTER_DAILY,
   DEBT_INTEREST,
   FOUND_MIN_MONEY,
+  DEBT_INTEREST_CAP,
   DEBT_INTEREST_HIGH,
   DEBT_INTEREST_STEP,
   DEBT_LIMIT,
@@ -500,7 +501,9 @@ function endOfMonth(state: GameState): void {
   if (state.treasury < 0) {
     const debt = -state.treasury;
     const interest = Math.min(debt, DEBT_INTEREST_STEP) * DEBT_INTEREST + Math.max(0, debt - DEBT_INTEREST_STEP) * DEBT_INTEREST_HIGH;
-    transfer(state, TREASURY, OUTSIDE, Math.ceil(interest), 'intereses');
+    // Tope: los intereses no pasan de una parte de lo ingresado en el mes (si no, la deuda no se paga nunca).
+    const cap = Math.max(100, state.month.income * DEBT_INTEREST_CAP);
+    transfer(state, TREASURY, OUTSIDE, Math.ceil(Math.min(interest, cap)), 'intereses');
   }
   monthlyMarket(state);
 
