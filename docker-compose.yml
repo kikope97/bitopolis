@@ -13,8 +13,7 @@ services:
       BITOPOLIS_PUBLIC_URL: "https://bitopolis.example.com"              # URL pública para generar los enlaces
       # Opcionales
       # PORT: "8080"
-      # BITOPOLIS_USER: "familia"                 # con PASSWORD, pide usuario y contraseña a todo el servidor
-      # BITOPOLIS_PASSWORD: "una-contraseña"
+      # BITOPOLIS_PASSWORD: "una-contraseña"      # si la pones, el servidor pide esta contraseña (sin usuario) para entrar
       # --- IA (si no pones la key, cada partida la pone en Configurar) ---
       # BITOPOLIS_API_KEY: "sk-ant-..."           # Anthropic (sk-ant-…) u OpenAI (sk-…): el proveedor se deduce de la key
       # BITOPOLIS_AI_MODEL: ""                    # opcional; por defecto claude-haiku-5-5 (Anthropic) o gpt-5.4-nano (OpenAI)

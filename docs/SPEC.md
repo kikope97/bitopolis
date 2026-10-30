@@ -227,7 +227,7 @@ Mudarse al pueblo o no, irse y vender la casa, comprar o alquilar casa, buscar o
 | `BITOPOLIS_MASTER_KEY` | sí | Cifra las API keys guardadas. Si se pierde, se pierden las keys. |
 | `BITOPOLIS_PUBLIC_URL` | sí | URL pública, para generar los enlaces. |
 | `PORT` | no (8080) | Puerto interno. |
-| `BITOPOLIS_USER` + `BITOPOLIS_PASSWORD` | no | Si se definen, todo el servidor pide ese usuario y contraseña al entrar (login propio, cookie `HttpOnly`/`Secure`/`SameSite`, bloqueo tras varios intentos fallidos). Es un acceso común, no son cuentas. |
+| `BITOPOLIS_PASSWORD` | no | Si se define, todo el servidor pide esa contraseña al entrar (login propio, cookie `HttpOnly`/`Secure`/`SameSite`, bloqueo tras varios intentos fallidos). Es un acceso común, no son cuentas: **solo contraseña, sin usuario** (decisión del creador, octubre de 2026; antes `BITOPOLIS_USER` + `BITOPOLIS_PASSWORD`). |
 | `BITOPOLIS_API_KEY` | no | Key por defecto para **todas** las partidas: todas arrancan en Modo IA y la key no se ve ni se cambia desde el juego. **El proveedor se deduce de la key** (decisión del creador, octubre de 2026): `sk-ant-…` es Anthropic y cualquier otra, OpenAI. No hay variable para elegirlo, y en Configurar solo se pide la key («se acepta API key de Anthropic o de OpenAI»). |
 | `BITOPOLIS_AI_BASE_URL` | no | Endpoint propio compatible con OpenAI (Ollama, LM Studio…); con él no hace falta key. |
 | `BITOPOLIS_AI_MODEL` | no | Modelo barato. |
@@ -263,7 +263,7 @@ El alcance está congelado hasta la v1.0. Todo lo de la sección 15 solo entra s
 
 - **v0.0 — Esqueleto**: monorepo, lint de fronteras, `sim` con PRNG, ticks y comandos, `pnpm sim`, invariantes, Fastify sirviendo el cliente, SQLite con migraciones, Dockerfile, compose de ejemplo, GitHub Actions publicando `:test`, Playwright en viewport móvil, `CLAUDE.md`.
   *Hecho cuando:* el CI está en verde, 365 días simulados tardan menos de 10 s, y `docker compose up` arranca y responde en `/healthz`.
-- **v0.1 — Pueblo jugable (Modo normal)**: pantalla de inicio, partida por URL, guardado en el servidor, exportar/importar, mapa, carreteras, agua y luz, zonas RCI con demanda, impuesto único, 3 servicios, obras con obreros, tutorial, controles táctiles y de escritorio, `BITOPOLIS_USER`/`PASSWORD`.
+- **v0.1 — Pueblo jugable (Modo normal)**: pantalla de inicio, partida por URL, guardado en el servidor, exportar/importar, mapa, carreteras, agua y luz, zonas RCI con demanda, impuesto único, 3 servicios, obras con obreros, tutorial, controles táctiles y de escritorio, `BITOPOLIS_PASSWORD`.
   *Hecho cuando:* se juega 15 minutos en el móvil sin quedarse bloqueado, y el CLI muestra que el pueblo puede crecer y también quebrar.
 - **v0.2 — Prueba de la IA**: configuración de la IA, key cifrada, variables de IA, proveedores, 5 vecinos con nombre, detonantes, enums y zod, petición anticipada, fallback, topes y estimación de coste, `ReplayProvider`, burbujas con `motivo`.
   *Hecho cuando:* el coste por mes de juego está medido, ≥98% de las respuestas son válidas o se resuelven con fallback, y los `motivo` tienen personalidad. **Si no se cumple, se replantea la IA antes de seguir.**

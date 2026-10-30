@@ -23,7 +23,7 @@ Todas son opcionales salvo las dos primeras. Lo que se define por variable **man
 | `BITOPOLIS_MASTER_KEY` | — (**obligatoria**) | Cifra (AES-256-GCM) las API keys que se guardan desde el juego. Si la pierdes o la cambias, las keys guardadas dejan de valer y hay que volver a ponerlas. Genera una con `openssl rand -base64 32`. |
 | `BITOPOLIS_PUBLIC_URL` | `http://localhost:8080` | URL con la que se entra al juego; se usa para los enlaces de las partidas. |
 | `PORT` | `8080` | Puerto del servidor dentro del contenedor. |
-| `BITOPOLIS_USER` / `BITOPOLIS_PASSWORD` | — | Si pones las dos, todo el servidor pide usuario y contraseña. |
+| `BITOPOLIS_PASSWORD` | — | Si la pones, todo el servidor pide esta contraseña al entrar; solo la contraseña, sin usuario. Sirve para que solo jueguen tus amigos y nadie más gaste tu API key si abres el juego a internet. Tras 5 fallos se bloquea 15 minutos y la sesión dura 30 días. Si la cambias, se cierran todas las sesiones. |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` o `error`. Las API keys no salen nunca en los logs. |
 
 ### IA de los vecinos

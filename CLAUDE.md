@@ -15,7 +15,7 @@ Monorepo pnpm + TypeScript:
 - `POST /api/games/:token/claim` (423 si otra sesión la tiene; `force` la toma), `/release`.
 - `PUT /api/games/:token/save`: el servidor **reproduce** los comandos sobre su estado y compara el hash; si no coincide, 409 con el estado bueno.
 - `POST /api/games/:token/regenerate`, `GET /api/games/:token/export` (.bitopolis = JSON gzip sin API key), `POST /api/import`.
-- Login opcional (`auth.ts`) si hay `BITOPOLIS_USER` y `BITOPOLIS_PASSWORD`.
+- Acceso con contraseña opcional (`auth.ts`) si hay `BITOPOLIS_PASSWORD` (solo contraseña, sin usuario: decisión del creador).
 - Equilibrio del juego: todos los números en `packages/sim/src/balance.ts`.
 
 ## IA de los vecinos (v0.2)

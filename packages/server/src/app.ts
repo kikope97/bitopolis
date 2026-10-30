@@ -46,8 +46,8 @@ export async function buildApp(config: Config, db: Db, ai = new AiService(db, co
 
   await app.register(rateLimit, { max: 300, timeWindow: '1 minute', allowList: (req) => req.url === '/healthz' });
 
-  if (config.user && config.password) {
-    await registerAuth(app, { user: config.user, password: config.password, secret: config.masterKey ?? 'bitopolis' });
+  if (config.password) {
+    await registerAuth(app, { password: config.password, secret: config.masterKey ?? 'bitopolis' });
   }
 
   // Entrar en / crea una URL nueva. La partida no se guarda hasta pulsar Jugar.

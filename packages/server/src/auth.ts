@@ -4,8 +4,9 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 /**
- * Acceso común opcional (BITOPOLIS_USER + BITOPOLIS_PASSWORD). No son
- * cuentas: es una sola contraseña para todo el servidor.
+ * Acceso común opcional (BITOPOLIS_PASSWORD). No son cuentas: una sola
+ * contraseña para todo el servidor (por ejemplo, para que solo jueguen tus
+ * amigos y nadie más gaste la API key). Sin usuario: no añade seguridad.
  */
 const COOKIE = 'bitopolis_auth';
 const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -22,10 +23,11 @@ function safeEqual(a: string, b: string): boolean {
 
 export async function registerAuth(
   app: FastifyInstance,
-  opts: { user: string; password: string; secret: string },
+  opts: { password: string; secret: string },
 ): Promise<void> {
   await app.register(cookie);
-  const key = createHash('sha256').update(`${opts.secret}:${opts.user}:${opts.password}`).digest();
+  // Cambiar la contraseña invalida las sesiones abiertas.
+  const key = createHash('sha256').update(`${opts.secret}:${opts.password}`).digest();
   const sign = (exp: number) => `${exp}.${createHmac('sha256', key).update(String(exp)).digest('base64url')}`;
   const valid = (v: string | undefined) => {
     if (!v) return false;
@@ -43,7 +45,7 @@ export async function registerAuth(
     return reply.redirect(`/login.html?next=${encodeURIComponent(path)}`);
   });
 
-  const Body = z.object({ user: z.string().max(200), password: z.string().max(500) });
+  const Body = z.object({ password: z.string().max(500) });
   app.post('/api/login', async (req, reply) => {
     const ip = req.ip;
     const f = fails.get(ip);
@@ -51,11 +53,11 @@ export async function registerAuth(
       return reply.code(429).send({ error: 'Demasiados intentos. Espera unos minutos.' });
     }
     const b = Body.safeParse(req.body);
-    const ok = b.success && safeEqual(b.data.user, opts.user) && safeEqual(b.data.password, opts.password);
+    const ok = b.success && safeEqual(b.data.password, opts.password);
     if (!ok) {
       const count = (f && f.until > Date.now() ? f.count : f?.count ?? 0) + 1;
       fails.set(ip, { count: count >= MAX_FAILS ? 0 : count, until: count >= MAX_FAILS ? Date.now() + LOCK_MS : 0 });
-      return reply.code(401).send({ error: 'Usuario o contraseña incorrectos' });
+      return reply.code(401).send({ error: 'Contraseña incorrecta' });
     }
     fails.delete(ip);
     reply.setCookie(COOKIE, sign(Date.now() + SESSION_MS), {
