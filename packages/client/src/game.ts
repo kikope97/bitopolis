@@ -685,13 +685,16 @@ export function startGame(opts: GameOptions): void {
       const factors = happinessFactors(state, c)
         .filter((f) => f.value < 0)
         .map((f) => f.label.toLowerCase());
+      const moodText = c.happiness >= 65 ? 'contento' : c.happiness >= 40 ? 'regular' : 'descontento';
       const mood = c.happiness >= 65 ? '😊' : c.happiness >= 40 ? '😐' : '☹️';
       const last = [...state.decisionLog].reverse().find((d) => d.citizenId === c.id);
       ul.append(
         h(
           'li',
           {},
-          h('strong', {}, `${mood} ${c.named ? '★ ' : ''}${c.name}`),
+          h('span', { 'aria-hidden': 'true' }, `${mood} `),
+          h('strong', {}, `${c.named ? '★ ' : ''}${c.name}`),
+          ` (${moodText})`,
           `, ${c.age} años · ${money(c.money)}`,
           c.named ? h('span', { class: 'muted' }, ` · quiere ${DESIRE_TEXT[c.desire]}, teme ${FEAR_TEXT[c.fear]}`) : '',
           last ? h('em', { class: 'quote' }, ` «${last.motivo}»`) : '',
@@ -803,6 +806,8 @@ export function startGame(opts: GameOptions): void {
     legend.hidden = layer === 'none';
     legend.replaceChildren(h('strong', {}, def.label), ...def.legend.map((x) => h('span', { class: `legend-item ${x.cls}` }, x.text)));
     $('#layers').setAttribute('aria-label', `Capas de datos: ${def.label}`);
+    $('#layers').setAttribute('aria-pressed', String(layer !== 'none'));
+    $('#sr-live').textContent = layer === 'none' ? 'Capas desactivadas' : `Capa activa: ${def.label}`;
   };
   $('#zoom-in').onclick = () => setZoom(cam.zoom + 1);
   $('#zoom-out').onclick = () => setZoom(cam.zoom - 1);

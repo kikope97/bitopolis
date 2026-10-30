@@ -98,7 +98,7 @@ export function detectTriggers(state: GameState): void {
     if (!c.named || c.cooldownUntil > state.tick) continue;
     if (state.pending.some((p) => p.citizenId === c.id)) continue;
     if (taxUp) addPending(state, c, 'subida_impuestos');
-    else if (c.happiness < 35) addPending(state, c, 'infeliz');
+    else if (c.happiness < 38) addPending(state, c, 'infeliz');
     else if (c.jobId === null && vacantJobs(state, c).length > 0) addPending(state, c, 'sin_trabajo');
     else if (canFound(state, c) && c.traits.ambicion > 40) addPending(state, c, 'emprender');
     else if (canBuyHome(state, c)) addPending(state, c, 'comprar_casa');

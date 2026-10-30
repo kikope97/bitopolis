@@ -1,5 +1,5 @@
 import type { Command, TaxLevel } from '@bitopolis/shared';
-import { BUILD_NAMES, type Citizen, type GameState, IBI_RATE, PLUSVALIA_RATE, TASA_BASURAS, TASA_TERRAZAS, TAX_SPLIT_POP } from '@bitopolis/sim';
+import { BUILD_NAMES, type Citizen, type GameState, IBI_RATE, PLUSVALIA_RATE, TASA_BASURAS, TASA_TERRAZAS, TAX_SPLIT_POP, unitValue } from '@bitopolis/sim';
 import { money, MONTHS } from './i18n.ts';
 import { h, sheet } from './ui.ts';
 
@@ -23,9 +23,27 @@ function affected(state: GameState, key: 'ibi' | 'tasas' | 'plusvalia' | 'all'):
   const group = key === 'tasas' || key === 'all' ? state.citizens : state.citizens.filter(isOwner);
   const names = named.filter((c) => group.includes(c)).map((c) => c.name.split(' ')[0]);
   if (group.length === 0) return 'Ahora mismo no afecta a nadie.';
+  const who = key === 'tasas' || key === 'all' ? 'vecinos' : 'propietarios';
+  if (names.length === 0) return `Afecta a ${group.length} ${who}.`;
   const shown = names.slice(0, 3).join(', ');
   const rest = group.length - Math.min(3, names.length);
-  return `Afecta a ${shown || 'vecinos'}${rest > 0 ? ` y ${rest} más` : ''}.`;
+  return `Afecta a ${shown}${rest > 0 ? ` y ${rest} ${who} más` : ''}.`;
+}
+
+/** Cuánto ingresaría al mes cada nivel (estimación con el estado actual). */
+function estimate(state: GameState, key: 'ibi' | 'tasas' | 'plusvalia', lv: TaxLevel): string {
+  if (key === 'plusvalia') return 'solo cuando se vende una vivienda con ganancia';
+  if (key === 'tasas') {
+    const shops = state.buildings.filter((b) => b.kind === 'shop' && b.built).length;
+    return `≈ ${money(state.citizens.length * TASA_BASURAS[lv] + shops * TASA_TERRAZAS[lv])}/mes`;
+  }
+  let total = 0;
+  for (const b of state.buildings) {
+    if (!b.built) continue;
+    const units = b.kind === 'res' ? 4 : b.kind === 'house' ? (b.privateUnits ?? 0) : b.kind === 'shop' || b.kind === 'factory' ? 1 : 0;
+    total += (units * unitValue(state, b) * IBI_RATE[lv]) / 12;
+  }
+  return `≈ ${money(Math.round(total))}/mes`;
 }
 
 export function openTaxes(getState: () => GameState, command: Cmd): void {
@@ -33,7 +51,12 @@ export function openTaxes(getState: () => GameState, command: Cmd): void {
   const radio = (current: TaxLevel, label: string, detail: (lv: TaxLevel) => string, onPick: (lv: TaxLevel) => Command) => {
     const box = h('div', { class: 'radio-list compact', role: 'radiogroup', 'aria-label': label });
     for (const lv of ['low', 'medium', 'high'] as const) {
-      const b = h('button', { class: 'btn choice', role: 'radio', 'aria-checked': String(current === lv) }, h('strong', {}, LEVEL_NAME[lv]), h('span', {}, detail(lv)));
+      const b = h(
+        'button',
+        { class: 'btn choice', role: 'radio', 'aria-checked': String(current === lv) },
+        h('strong', {}, `${current === lv ? '✓ ' : ''}${LEVEL_NAME[lv]}${current === lv ? ' (actual)' : ''}`),
+        h('span', {}, detail(lv)),
+      );
       b.addEventListener('click', async () => {
         await command(onPick(lv));
         openTaxes(getState, command);
@@ -48,7 +71,12 @@ export function openTaxes(getState: () => GameState, command: Cmd): void {
     sheet(
       'Impuestos',
       h('p', {}, 'Un único control para IBI, tasas y plusvalía. Se cobra a fin de mes con el nivel medio del mes.'),
-      radio(state.taxLevel, 'Nivel de impuestos', (lv) => (lv === 'low' ? 'Vecinos más contentos, llega más gente.' : lv === 'high' ? 'Más dinero ahora; baja la felicidad y la recuerdan.' : 'Equilibrio.'), (lv) => ({ type: 'SetTax', level: lv })),
+      radio(
+        state.taxLevel,
+        'Nivel de impuestos',
+        (lv) => `${lv === 'low' ? 'Vecinos más contentos, llega más gente.' : lv === 'high' ? 'Más dinero ahora; baja la felicidad y la recuerdan.' : 'Equilibrio.'} IBI ${estimate(state, 'ibi', lv)}, tasas ${estimate(state, 'tasas', lv)}.`,
+        (lv) => ({ type: 'SetTax', level: lv }),
+      ),
       h('p', { class: 'affects' }, affected(state, 'all')),
       gloss('ibi'),
       gloss('tasas'),
@@ -62,11 +90,11 @@ export function openTaxes(getState: () => GameState, command: Cmd): void {
     'Tributos municipales',
     h('p', {}, 'Cada tributo afecta a un grupo de vecinos distinto. Se cobran a fin de mes con el nivel medio del mes, y las subidas se recuerdan.'),
     h('h3', {}, 'IBI'),
-    radio(state.taxes.ibi, 'IBI', (lv) => `${pct(IBI_RATE[lv])} anual del valor`, (lv) => ({ type: 'SetTaxes', ibi: lv })),
+    radio(state.taxes.ibi, 'IBI', (lv) => `${pct(IBI_RATE[lv])} anual del valor · ${estimate(state, 'ibi', lv)}`, (lv) => ({ type: 'SetTaxes', ibi: lv })),
     h('p', { class: 'affects' }, affected(state, 'ibi')),
     gloss('ibi'),
     h('h3', {}, 'Tasas'),
-    radio(state.taxes.tasas, 'Tasas', (lv) => `${money(TASA_BASURAS[lv])} por hogar · ${money(TASA_TERRAZAS[lv])} por terraza`, (lv) => ({ type: 'SetTaxes', tasas: lv })),
+    radio(state.taxes.tasas, 'Tasas', (lv) => `${money(TASA_BASURAS[lv])} por hogar y ${money(TASA_TERRAZAS[lv])} por terraza · ${estimate(state, 'tasas', lv)}`, (lv) => ({ type: 'SetTaxes', tasas: lv })),
     h('p', { class: 'affects' }, affected(state, 'tasas')),
     gloss('tasas'),
     h('h3', {}, 'Plusvalía'),
@@ -105,13 +133,23 @@ export function openReport(state: GameState): void {
     .sort((a, b) => a[1] - b[1])
     .slice(0, 2)
     .map(([k, v]) => `${CONCEPT[k] ?? k} (${money(v)})${k === 'sueldos' ? `: ${publicWorkers(state)}` : ''}`);
+  const income = Object.fromEntries(Object.entries(last.breakdown).filter(([, v]) => v > 0));
+  const spend = Object.fromEntries(Object.entries(last.breakdown).filter(([, v]) => v < 0));
+  const biggest = Object.entries(spend).sort((a, b) => a[1] - b[1])[0];
+  const sentence =
+    net >= 0
+      ? `Sobran ${money(net)}.${biggest ? ` Tu mayor gasto: ${(CONCEPT[biggest[0]] ?? biggest[0]).toLowerCase()} (${money(-biggest[1])}).` : ''}`
+      : `Por qué baja tu saldo: ${reasons.join('; ')}.`;
+  const live = Object.keys(state.month.breakdown).length;
   sheet(
     `Parte de ${monthName}`,
-    h('p', { class: 'big-number' }, `${net >= 0 ? '▲ +' : '▼ '}${money(net)} este mes`),
-    rows(last.breakdown, prev?.breakdown),
-    net < 0 && reasons.length ? h('p', {}, `Por qué baja tu saldo: ${reasons.join('; ')}.`) : '',
-    h('h3', {}, 'Este mes (en curso)'),
-    rows(state.month.breakdown, undefined),
+    h('p', { class: 'big-number' }, `${net >= 0 ? '▲ sube' : '▼ baja'} ${money(Math.abs(net))} este mes`),
+    h('p', {}, sentence),
+    h('h3', {}, `Entra: ${money(last.income)}`),
+    rows(income, prev?.breakdown),
+    h('h3', {}, `Sale: ${money(last.expenses)}`),
+    rows(spend, prev?.breakdown),
+    live ? h('details', { class: 'advanced' }, h('summary', {}, 'Este mes (en curso)'), rows(state.month.breakdown, undefined)) : '',
   );
 }
 
@@ -143,11 +181,13 @@ export function openNeighbours(state: GameState, onPick: (c: Citizen) => void): 
   const ul = h('ul', { class: 'people' });
   for (const c of named) {
     const job = state.buildings.find((b) => b.id === c.jobId);
-    const mood = c.happiness >= 65 ? '😊' : c.happiness >= 40 ? '😐' : '☹️';
+    const mood = c.happiness >= 65 ? ['😊', 'contento'] : c.happiness >= 40 ? ['😐', 'regular'] : ['☹️', 'descontento'];
     const btn = h(
       'button',
       { class: 'person-row' },
-      h('strong', {}, `${mood} ${c.name}`),
+      h('span', { 'aria-hidden': 'true' }, `${mood[0]} `),
+      h('strong', {}, c.name),
+      h('span', {}, ` (${mood[1]})`),
       h('span', { class: 'muted' }, ` · ${c.age} años · ${job ? (job.name ?? BUILD_NAMES[job.kind]) : 'trabaja fuera'}${c.owns ? ' · propietario' : ''}`),
     );
     btn.addEventListener('click', () => onPick(c));

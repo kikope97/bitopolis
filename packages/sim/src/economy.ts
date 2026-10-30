@@ -14,6 +14,7 @@ import {
   IBI_MOOD_OWNER,
   IBI_MOOD_RENTER,
   IBI_RATE,
+  MORTGAGE_INTEREST,
   MORTGAGE_MONTHS,
   MUNICIPAL_PRICE_CAP,
   MUNICIPAL_RENT,
@@ -176,13 +177,16 @@ export function buyHome(state: GameState, c: Citizen): boolean {
   const price = salePrice(state, home);
   const down = Math.ceil(price * DOWN_PAYMENT);
   if (home.kind === 'house') {
-    transfer(state, c.id, TREASURY, down, 'venta de viviendas');
-    // El banco adelanta el resto al ayuntamiento; el vecino se lo debe al banco.
-    transfer(state, OUTSIDE, TREASURY, price - down, 'venta de viviendas');
-    transfer(state, c.id, TREASURY, Math.ceil(price * TRANSACTION_COST), 'venta de viviendas');
+    // Vivienda municipal: el ayuntamiento cobra la entrada y los gastos ahora,
+    // y el resto en cuotas (no hay banco que adelante el dinero).
+    transfer(state, c.id, TREASURY, down + Math.ceil(price * TRANSACTION_COST), 'venta de viviendas');
     home.privateUnits = (home.privateUnits ?? 0) + 1;
+    c.mortgageTo = TREASURY;
+    c.subsidized = true;
   } else {
     transfer(state, c.id, OUTSIDE, down + Math.ceil(price * TRANSACTION_COST));
+    c.mortgageTo = OUTSIDE;
+    c.subsidized = false;
   }
   c.owns = true;
   c.boughtPrice = price;
@@ -198,11 +202,19 @@ export function sellOnDeparture(state: GameState, c: Citizen): void {
   if (!c.owns) return;
   const home = state.buildings.find((b) => b.id === c.homeId);
   if (!home) return;
-  const market = unitValue(state, home);
+  // La vivienda que fue municipal mantiene el precio máximo al revenderla.
+  const market = c.subsidized ? Math.min(unitValue(state, home), MUNICIPAL_PRICE_CAP) : unitValue(state, home);
   // Antes de 90 días no hay ganancia (anti-especulación).
   const price = state.tick - c.boughtTick < RESALE_LOCK_TICKS ? Math.min(market, c.boughtPrice) : market;
-  transfer(state, OUTSIDE, c.id, price);
-  transfer(state, c.id, OUTSIDE, c.mortgage);
+  if (home.kind === 'house') {
+    // La vivienda vuelve al ayuntamiento, que paga el precio y cobra lo que se le debía.
+    transfer(state, TREASURY, c.id, price, 'recompra de viviendas');
+    transfer(state, c.id, c.mortgageTo, c.mortgage, 'cuotas de vivienda');
+    home.privateUnits = Math.max(0, (home.privateUnits ?? 0) - 1);
+  } else {
+    transfer(state, OUTSIDE, c.id, price);
+    transfer(state, c.id, c.mortgageTo, c.mortgage, 'cuotas de vivienda');
+  }
   const gain = Math.max(0, price - c.boughtPrice);
   const rate = monthRates(state).plusvalia;
   if (gain > 0) transfer(state, c.id, TREASURY, Math.round(gain * rate), 'plusvalía');
@@ -238,8 +250,7 @@ export function freeShopLot(state: GameState): number | null {
 }
 
 export function canFound(state: GameState, c: Citizen): boolean {
-  const jobless = state.citizens.some((x) => x.jobId === null && x.id !== c.id);
-  return c.money >= FOUND_MIN_MONEY && state.demand.C > 10 && jobless && freeShopLot(state) !== null;
+  return c.money >= FOUND_MIN_MONEY && state.demand.C > 10 && freeShopLot(state) !== null;
 }
 
 export function shopTypesFor(state: GameState, c: Citizen): string[] {
@@ -298,8 +309,11 @@ export function monthlyHousing(state: GameState, r: MonthRates): void {
     let municipal = municipalUnits(b);
     for (const c of residents) {
       if (c.owns) {
+        // Cuota de amortización + interés sobre lo pendiente.
+        const interest = Math.ceil(c.mortgage * MORTGAGE_INTEREST);
         const quota = Math.min(c.mortgage, Math.ceil(c.boughtPrice / MORTGAGE_MONTHS));
-        c.mortgage -= transfer(state, c.id, OUTSIDE, quota);
+        transfer(state, c.id, c.mortgageTo, interest, 'cuotas de vivienda');
+        c.mortgage -= transfer(state, c.id, c.mortgageTo, quota, 'cuotas de vivienda');
         transfer(state, c.id, TREASURY, ibi, 'IBI');
       } else if (municipal > 0) {
         municipal--;
@@ -328,10 +342,9 @@ export function businessTaxes(state: GameState, b: Building, r: MonthRates): voi
 export function monthlyMarket(state: GameState): void {
   for (const c of state.citizens) {
     if (c.named) continue; // los vecinos con nombre deciden ellos (detonantes)
-    if (canBuyHome(state, c) && chance(state.rng, BUY_CHANCE)) buyHome(state, c);
-    else if (canFound(state, c) && chance(state.rng, FOUND_CHANCE)) {
-      const types = shopTypesFor(state, c);
-      foundBusiness(state, c, types[0]!);
-    }
+    // Si puede las dos cosas, decide al azar si compra o emprende.
+    const foundFirst = canFound(state, c) && chance(state.rng, 0.5);
+    if (!foundFirst && canBuyHome(state, c) && chance(state.rng, BUY_CHANCE)) buyHome(state, c);
+    else if (canFound(state, c) && chance(state.rng, FOUND_CHANCE)) foundBusiness(state, c, shopTypesFor(state, c)[0]!);
   }
 }

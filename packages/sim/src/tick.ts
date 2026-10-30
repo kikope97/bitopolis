@@ -194,7 +194,7 @@ export function computeDemand(state: GameState): GameState['demand'] {
   const free = freeHomes(state);
   const happy = averageHappiness(state);
   const clamp = (v: number) => Math.round(Math.max(-100, Math.min(100, v)));
-  const R = 40 + vacancies(state) * 6 - Math.max(0, free - 6) * 3 + (happy - 55) + averageTaxMood(state) - (pop >= ZONE_UNLOCK_POP ? jobless * 2 : 0);
+  const R = 40 + vacancies(state) * 5 - Math.max(0, free - 8) * 1.5 + (happy - 55) + averageTaxMood(state) - (pop >= ZONE_UNLOCK_POP ? jobless * 2 : 0);
   const C = pop < ZONE_UNLOCK_POP ? 0 : (pop / 12 - shops) * 25;
   const I = pop < ZONE_UNLOCK_POP ? 0 : jobless * 6 - factories * 10 + 20;
   return { R: clamp(R), C: clamp(C), I: clamp(I) };
@@ -220,7 +220,7 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
       seen.add(b.kind);
     }
     if (services > 0) {
-      const v = Math.round(14 * (1 - Math.exp(-services / 12)) * (state.bankrupt ? 0.5 : 1));
+      const v = Math.round(10 * (1 - Math.exp(-services / 10)) * (state.bankrupt ? 0.5 : 1));
       if (v > 0) f.push({ label: `Servicios cerca (${[...seen].map((k) => BUILD_NAMES[k]!.toLowerCase()).join(', ')})`, value: v });
     }
     if (state.buildings.some((b) => b.kind === 'shop' && b.built && dist(b, home) <= 6)) f.push({ label: 'Tienda cerca', value: 4 });
@@ -229,8 +229,8 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
     const noise = state.fields.noise[i] ?? 0;
     const crime = state.fields.crime[i] ?? 0;
     if (pol > 20) f.push({ label: 'Contaminación', value: -Math.round((pol - 20) / 5) });
-    if (noise > 35) f.push({ label: 'Ruido', value: -Math.round((noise - 35) / 7) });
-    if (crime > 30) f.push({ label: 'Inseguridad', value: -Math.round((crime - 30) / 6) });
+    if (noise > 25) f.push({ label: 'Ruido', value: -Math.round((noise - 25) / 6) });
+    if (crime > 20) f.push({ label: 'Inseguridad', value: -Math.round((crime - 20) / 5) });
   }
   f.push(c.jobId !== null ? { label: 'Trabaja en el pueblo', value: 8 } : { label: 'Trabaja fuera', value: -4 });
   if (c.mortgage > 0 && c.money < 300) f.push({ label: 'Le cuesta pagar la hipoteca', value: -6 });
@@ -240,7 +240,7 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
 }
 
 function targetHappiness(state: GameState, c: Citizen): number {
-  const t = 50 + happinessFactors(state, c).reduce((s, x) => s + x.value, 0);
+  const t = 38 + happinessFactors(state, c).reduce((s, x) => s + x.value, 0);
   return Math.max(0, Math.min(100, t));
 }
 
@@ -291,6 +291,8 @@ function growZones(state: GameState, served: { water: Set<number>; power: Set<nu
   for (const [zone, kind, demand] of kinds) {
     if (demand <= 15) continue;
     if (kind === 'shop' && localFounders && chance(state.rng, 0.8)) continue;
+    // No se construyen más viviendas si ya sobran.
+    if (kind === 'res' && freeHomes(state) >= 6) continue;
     if (!chance(state.rng, Math.min(0.9, demand / 80))) continue;
     // Solares válidos: zona correcta, libre, junto a carretera con agua y luz.
     const spots: number[] = [];
@@ -405,7 +407,7 @@ function departures(state: GameState): void {
     if (state.citizens.length <= 1) break;
     // Los vecinos con nombre deciden irse ellos mismos (detonante «infeliz»).
     if (c.named) continue;
-    const unhappy = c.happiness < 30 && chance(state.rng, 0.04);
+    const unhappy = c.happiness < 35 && chance(state.rng, 0.04);
     const broke = c.money === 0 && c.homeId === null && chance(state.rng, 0.1);
     if (unhappy || broke) {
       sellOnDeparture(state, c);

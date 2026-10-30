@@ -46,9 +46,13 @@ describe('vivienda', () => {
     expect(buyHome(s, lucia)).toBe(true);
     expect(lucia.owns).toBe(true);
     expect(lucia.mortgage).toBeGreaterThan(0);
-    // El ayuntamiento cobra el precio entero (entrada + banco) y la transacción.
-    expect(s.treasury - before).toBeGreaterThan(lucia.boughtPrice);
+    // Sin banco: el ayuntamiento cobra entrada + gastos ahora y el resto en cuotas.
+    expect(lucia.mortgageTo).toBe(0);
+    expect(s.treasury - before).toBe(Math.ceil(lucia.boughtPrice * 0.2) + Math.ceil(lucia.boughtPrice * 0.04));
     expect(lucia.boughtPrice).toBeLessThanOrEqual(7_500);
+    // Las cuotas (con interés) van al ayuntamiento.
+    for (let i = 0; i < 24 * 30; i++) step(s);
+    expect(s.stats.at(-1)!.breakdown['cuotas de vivienda']).toBeGreaterThan(0);
     expect(checkInvariants(s)).toEqual([]);
   });
 
@@ -59,19 +63,17 @@ describe('vivienda', () => {
     s.ledger.externalIn += 5_000;
     applyCommand(s, { type: 'SetHousingMode', buildingId: houseId, mode: 'sale' });
     buyHome(s, lucia);
-    // Venta inmediata: sin ganancia.
+    // Venta inmediata: sin ganancia ni plusvalía; la vivienda vuelve al ayuntamiento.
     const copy = JSON.parse(JSON.stringify(s)) as GameState;
     const c2 = copy.citizens.find((c) => c.name === 'Lucía')!;
     c2.boughtPrice = 1_000;
-    const t0 = copy.treasury;
     sellOnDeparture(copy, c2);
-    expect(copy.treasury).toBe(t0);
+    expect(copy.month.breakdown['plusvalía']).toBeUndefined();
+    expect(copy.buildings.find((b) => b.id === houseId)!.privateUnits).toBe(0);
     // Después de 90 días y con el precio de compra bajo: plusvalía.
     s.tick += 24 * 91;
     lucia.boughtPrice = 1_000;
-    const t1 = s.treasury;
     sellOnDeparture(s, lucia);
-    expect(s.treasury).toBeGreaterThan(t1);
     expect(s.month.breakdown['plusvalía']).toBeGreaterThan(0);
     expect(checkInvariants(s)).toEqual([]);
   });
@@ -158,7 +160,7 @@ describe('externalidades', () => {
 
 describe('economía a un año', () => {
   it('hay propietarios, se separan los tributos y el dinero cuadra', () => {
-    const { state, report } = runSimulation({ seed: 1, days: 400, profile: 'constructor', checkEveryDay: true });
+    const { state, report } = runSimulation({ seed: 1, days: 400, profile: 'derrochador', checkEveryDay: true });
     expect(report.invariantErrors).toEqual([]);
     expect(state.citizens.some((c) => c.owns)).toBe(true);
     expect(state.taxesSplit).toBe(true);

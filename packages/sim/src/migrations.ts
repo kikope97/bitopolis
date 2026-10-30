@@ -56,7 +56,7 @@ export const MIGRATIONS: Record<number, Migration> = {
     return {
       ...s,
       formatVersion: 4,
-      citizens: (s.citizens ?? []).map((c: Record<string, unknown>) => ({ owns: false, boughtPrice: 0, mortgage: 0, boughtTick: 0, grudge: 0, ...c })),
+      citizens: (s.citizens ?? []).map((c: Record<string, unknown>) => ({ owns: false, boughtPrice: 0, mortgage: 0, mortgageTo: -1, subsidized: false, boughtTick: 0, grudge: 0, ...c })),
       taxes: s.taxes ?? { ibi: lvl, tasas: lvl, plusvalia: lvl },
       prevTaxes: s.prevTaxes ?? { ibi: lvl, tasas: lvl, plusvalia: lvl },
       taxesSplit: s.taxesSplit ?? false,

@@ -141,8 +141,8 @@ function planner(name: string, o: PlannerOpts): Profile {
 export const PROFILES: Record<string, Profile> = {
   pasivo: { name: 'pasivo', decide: () => [] },
   casual: planner('casual', { tax: 'medium', reserve: 3_000, activity: 0.3, services: ['park'], municipalHousing: false }),
-  ahorrador: planner('ahorrador', { tax: 'low', reserve: 6_000, activity: 0.5, services: ['park'], municipalHousing: false }),
-  agresivo: planner('agresivo', { tax: 'high', reserve: 2_000, activity: 0.6, services: [], municipalHousing: false }),
+  ahorrador: planner('ahorrador', { tax: 'low', reserve: 4_000, activity: 0.5, services: ['park'], municipalHousing: false }),
+  agresivo: planner('agresivo', { tax: 'high', reserve: 2_000, activity: 0.6, services: ['park'], municipalHousing: false }),
   derrochador: planner('derrochador', {
     tax: 'low',
     reserve: 0,

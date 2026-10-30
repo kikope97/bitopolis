@@ -116,9 +116,9 @@ export const TASA_TERRAZAS = { low: 40, medium: 60, high: 95 } as const;
 /** Plusvalía municipal sobre la ganancia de una compraventa. */
 export const PLUSVALIA_RATE = { low: 0.1, medium: 0.2, high: 0.3 } as const;
 /** Efecto en la felicidad por grupo afectado. */
-export const TASAS_MOOD = { low: 3, medium: 0, high: -6 } as const;
+export const TASAS_MOOD = { low: 3, medium: 0, high: -4 } as const;
 export const IBI_MOOD_OWNER = { low: 4, medium: 0, high: -8 } as const;
-export const IBI_MOOD_RENTER = { low: 1, medium: 0, high: -3 } as const;
+export const IBI_MOOD_RENTER = { low: 1, medium: 0, high: -2 } as const;
 export const PLUSVALIA_MOOD_OWNER = { low: 1, medium: 0, high: -3 } as const;
 /** Memoria fiscal: lo que suma una subida (por grupo) y su olvido diario. */
 export const GRUDGE_RAISE = { all: 6, ibi: 8, tasas: 5, plusvalia: 3 } as const;
@@ -129,7 +129,9 @@ export const GRUDGE_MAX = 40;
 export const PROPERTY_VALUE: Partial<Record<BuildingKind, number>> = { house: 7_000, res: 9_000, shop: 20_000, factory: 30_000 };
 /** Entrada mínima para comprar (resto con hipoteca) y cuota mensual. */
 export const DOWN_PAYMENT = 0.2;
-export const MORTGAGE_MONTHS = 100;
+export const MORTGAGE_MONTHS = 120;
+/** Interés mensual sobre lo que queda de hipoteca (≈5 % anual). */
+export const MORTGAGE_INTEREST = 0.004;
 /** Vivienda municipal: precio máximo y coste de transacción para el comprador. */
 export const MUNICIPAL_PRICE_CAP = 7_500;
 export const TRANSACTION_COST = 0.04;
@@ -140,8 +142,8 @@ export const BUY_CHANCE = 0.08;
 /** Empresas de vecinos: capital que pone el fundador (obra + caja inicial). */
 export const FOUND_COST = 2_000;
 export const FOUND_SEED = 2_500;
-export const FOUND_MIN_MONEY = 5_000;
-export const FOUND_CHANCE = 0.2;
+export const FOUND_MIN_MONEY = 3_000;
+export const FOUND_CHANCE = 0.35;
 export const SHOP_TYPES = ['panaderia', 'fruteria', 'bar', 'ropa', 'ferreteria', 'peluqueria'] as const;
 export const SHOP_NAMES: Record<string, string> = {
   panaderia: 'Panadería',

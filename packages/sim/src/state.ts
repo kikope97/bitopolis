@@ -98,6 +98,10 @@ export interface Citizen {
   boughtPrice: number;
   /** Lo que le queda por pagar de hipoteca. */
   mortgage: number;
+  /** A quién se la paga: 0 = ayuntamiento (vivienda municipal), -1 = banco. */
+  mortgageTo: number;
+  /** Su vivienda fue municipal: la reventa tiene precio máximo. */
+  subsidized: boolean;
   /** Tick en que compró (no se revende con ganancia antes de 90 días). */
   boughtTick: number;
   /** Memoria de las subidas de impuestos (0–40): resta felicidad y se olvida despacio. */
@@ -362,4 +366,4 @@ export function randomTraits(rng: RngState): Traits {
   return { terco: nextInt(rng, 0, 100), ahorro: nextInt(rng, 0, 100), social: nextInt(rng, 0, 100), ambicion: nextInt(rng, 0, 100) };
 }
 
-export const NO_PROPERTY = { owns: false, boughtPrice: 0, mortgage: 0, boughtTick: 0, grudge: 0 } as const;
+export const NO_PROPERTY = { owns: false, boughtPrice: 0, mortgage: 0, mortgageTo: -1, subsidized: false, boughtTick: 0, grudge: 0 } as const;
