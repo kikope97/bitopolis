@@ -36,6 +36,11 @@ Monorepo pnpm + TypeScript:
 - Servidor: `POST /api/games/:token/talk`, `/advisor` y `/chronicle` (crónica en caché), con reserva de gasto en `service.text()`.
 - Cliente: `social-ui.ts` (ficha con «Hablar», pleno, consejero, diario, objetivos, «Desde tu última visita»).
 
+## Elecciones (v1.0)
+- `sim/src/politics.ts` (+ `politics-core.ts`, sin dependencias, para evitar ciclos con `state.ts`): facciones (`factionOf`) con exigencias medidas en el pueblo, intención de voto determinista (`tally`, sin azar), avisos a 12/6/3/1 meses, oposición emergente (`OPPOSITION_APPROVAL`), elecciones cada `ELECTION_MONTHS`, gobierno rival (`rivalGovern` vía `governmentCommand`) y la oposición del jugador (solo `TalkTo`, `Campaign`, `NotifyProject` y `CitizenAct`). Luna de miel de 12 meses. Activa desde `OPPOSITION_POP` vecinos.
+- Detonante `elecciones` en `decisions.ts`: los vecinos con nombre eligen `votar_gobierno`, `votar_oposicion` o `abstenerse` (IA o reglas); el prompt recibe la política como datos.
+- Cliente: `politics-ui.ts` (indicador 🗳, hoja de política, noche electoral).
+
 ## Comandos
 ```
 pnpm install | pnpm dev | pnpm build | pnpm lint | pnpm typecheck | pnpm test

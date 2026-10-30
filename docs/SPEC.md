@@ -90,6 +90,8 @@ Cada uno tiene: coste de construcción, mantenimiento mensual, empleados necesar
 | 50–200 | tributos separados, más servicios, plenos, consejero | felicidad y facciones |
 | 200+ | facciones, elecciones, oposición | elecciones |
 
+*Ronda 06:* facciones y oposición se activan con **50** vecinos (con 200 casi ningún pueblo llegaba a tenerlas en 4 años); las elecciones son cada 4 años desde el principio.
+
 - Siempre hay 1–3 **objetivos** visibles con recompensa ("llega a 10 vecinos"), y cada fase tiene un hito con recompensa tangible (un edificio o una herramienta).
 - **Parte mensual**: ingresos y gastos con flechas, y un "por qué baja tu saldo" con nombres.
 

@@ -74,7 +74,17 @@ function planner(name: string, o: PlannerOpts): Profile {
     name,
     decide(state, rng) {
       const out: Command[] = [];
-      if (state.taxLevel !== o.tax) out.push({ type: 'SetTax', level: o.tax });
+      // Un jugador razonable sube impuestos si el mes cierra en negativo y la caja baja.
+      const lastMonth = state.stats.at(-1);
+      const deficit = !!lastMonth && lastMonth.income < lastMonth.expenses && state.treasury < 10_000;
+      const order: TaxLevel[] = ['low', 'medium', 'high'];
+      const cur = order.indexOf(state.taxLevel);
+      const pref = order.indexOf(o.tax);
+      // Con déficit sube un nivel; con la caja sana (o por debajo de su preferencia) vuelve a su nivel.
+      let target = cur;
+      if (deficit) target = Math.min(2, Math.max(cur, pref) + 1);
+      else if (state.treasury > 20_000 || cur < pref) target = pref;
+      if (target !== cur) out.push({ type: 'SetTax', level: order[target]! });
       if (!chance(rng, o.activity)) return out;
       const pop = state.citizens.length;
       const has = (k: string) => state.buildings.some((b) => b.kind === k);
