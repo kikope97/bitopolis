@@ -132,3 +132,22 @@ IA (simulador): 202.591 tokens de entrada frente a 298.772 antes. Coste por mes 
 - **Rechazado:**
   - Opción «estudiarlo» en el pleno: el cierre automático ya ofrece una salida suave.
   - Que «Hablar» espere a la IA sin mostrar antes la respuesta por reglas: preferimos respuesta inmediata. Con la caché por día la incoherencia es rara.
+
+## Medición en vivo con Anthropic (30/10/2026)
+
+Después de la ronda se añadió la integración con el SDK oficial de Anthropic: el proveedor se deduce de la key, hay salida estructurada y el esfuerzo de razonamiento es bajo. Se midió con una key real de pruebas.
+
+**Decisiones** (`pnpm ai-eval --live`, `claude-haiku-5-5`, 90 días, 1 semilla):
+- 55 de 55 decisiones válidas a la primera: 100 %, sin reintentos ni reglas. Cumple el criterio de la v0.2 (≥98 %).
+- 100 % de motivos distintos y con personalidad. Por ejemplo: «Llevo un año currando en el ayuntamiento y aquí nadie escucha. Pienso decírselo al alcalde a la cara, que para algo es mi jefe.»
+- 16 llamadas por mes de juego (como mucho 18), con unos 27.000 tokens de entrada y 1.700 de salida al mes. Coste: ≈0,0033 € por mes de juego.
+
+**Textos** (todos pasan la lista blanca de cifras y la de longitud):
+
+| Texto | Modelo | Tiempo |
+|---|---|---|
+| Hablar (dos preguntas) | `claude-haiku-5-5` | 1,4–1,9 s |
+| Consejero | `claude-sonnet-5-5` | 6,1 s |
+| Crónica | `claude-sonnet-5-5` | 3,3 s |
+
+**Observación:** en la crónica sale «Gonzalo y Gonzalo». Los eventos de pareja usan solo el nombre de pila y había dos Gonzalo. Se corrige en la v0.5 (nombre completo cuando el de pila se repite).

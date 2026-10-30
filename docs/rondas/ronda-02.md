@@ -20,6 +20,7 @@ IA (`pnpm ai-eval`, 3 semillas × 360 días, **LLM simulado**; no hay key de pru
 - Coste por mes de juego con 5 vecinos (precios orientativos): de 0,001 € (gemini-2.5-flash-lite) a 0,03 € (claude-sonnet-5-5); 0,002 € con gpt-5.4-nano.
 - Validez: el simulador repite frases a propósito y la nueva comprobación de calidad rechaza el 25 % por motivo repetido. Esto demuestra el filtro, no la calidad de un modelo real.
 - **Pendiente**: medir con un modelo real `válidas sin fallback ≥98 %` (`pnpm ai-eval --live`). Sin esa medición, el criterio de la v0.2 queda abierto y se revisará en cuanto haya key.
+- **Cerrado (30/10/2026, con key real de Anthropic)**: `claude-haiku-5-5`, 90 días de juego y 1 semilla. Resultado: 55 de 55 decisiones válidas a la primera (100 %, sin reintentos ni fallback) y 100 % de motivos distintos. Cuesta ≈0,0033 € por mes de juego, con 16 llamadas y unos 27.000 tokens de entrada al mes. El criterio de la v0.2 se cumple. Detalle en `ronda-04.md`.
 
 ## Agentes
 
