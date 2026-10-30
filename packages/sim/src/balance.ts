@@ -85,7 +85,8 @@ export const SERVICE: Partial<Record<BuildingKind, { radius: number; happiness: 
 };
 
 /** Edificios a los que llega cada planta por la red. */
-export const PLANT_CAPACITY = { water: 30, power: 40 } as const;
+// Ronda 06: con 30/40 los pueblos medianos acumulaban plantas (y sus sueldos) hasta quebrar.
+export const PLANT_CAPACITY = { water: 45, power: 60 } as const;
 
 export const PUBLIC_SALARY = 900;
 /** Empleos de servicios (colegio, salud, parque). */
@@ -115,14 +116,18 @@ export const ELECTION_MONTHS = 48;
 /** Facciones y oposición desde 50 vecinos (ronda 06: a 200 casi nadie llegaba en 4 años). */
 export const OPPOSITION_POP = 50;
 /** Con la intención de voto por debajo, un vecino influyente funda un partido. */
-export const OPPOSITION_APPROVAL = 72;
+export const OPPOSITION_APPROVAL = 90;
 /** Avisos de popularidad: meses antes de las elecciones. */
 export const POLL_WARN_MONTHS = [12, 6, 3, 1];
 /** Abstención mínima (los indecisos se abstienen más). */
 export const VOTE_ABSTENTION_BASE = 0.18;
 /** Campaña: una al mes en los últimos 12 meses; cada una mueve el voto de la facción. */
 export const CAMPAIGN_MONTHS = 12;
-export const CAMPAIGN_EFFECT = 0.06;
+export const CAMPAIGN_EFFECT = 0.03;
+/** Gobernando, cada acto de campaña cuesta (como un pleno); en la oposición es gratis y vale todo el mandato. */
+export const CAMPAIGN_COST = 300;
+/** Las bajadas de impuestos se notan despacio (días); las subidas, al momento. */
+export const TAX_RELIEF_DAYS = 90;
 /** Apoyo extra al gobierno recién elegido (se apaga en 12 meses). */
 export const HONEYMOON = 0.25;
 /** Interés mensual de la deuda: 1 % hasta 5.000 € y 3 % por encima. */

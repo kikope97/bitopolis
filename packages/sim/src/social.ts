@@ -40,6 +40,8 @@ export const MEMORY_KINDS = [
   'le_quitaron_el_local',
   'fundo_partido',
   'voto',
+  'gano_elecciones',
+  'perdio_elecciones',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -60,7 +62,7 @@ export const PROFESSIONS = [
 export const GOALS = ['comprar_casa', 'trabajo_en_el_pueblo', 'parque_cerca', 'tienda_cerca', 'ahorrar', 'vivir_tranquilo'] as const;
 export type Goal = (typeof GOALS)[number];
 
-export const HOOK_KINDS = ['mismo_local', 'despido_con_hipoteca', 'promesa_incumplida', 'amigo_se_va'] as const;
+export const HOOK_KINDS = ['mismo_local', 'despido_con_hipoteca', 'promesa_incumplida', 'amigo_se_va', 'rival_politico'] as const;
 export type HookKind = (typeof HOOK_KINDS)[number];
 export interface Hook {
   id: number;
@@ -160,6 +162,10 @@ export function memoryText(state: GameState, m: Memory): string {
       return 'Fundó un partido para presentarse a las elecciones';
     case 'voto':
       return 'Votó en las elecciones';
+    case 'gano_elecciones':
+      return 'Ganó las elecciones y llegó a la alcaldía';
+    case 'perdio_elecciones':
+      return 'Perdió las elecciones';
   }
 }
 
@@ -312,7 +318,7 @@ export function onCitizenLeaves(state: GameState, leaving: Citizen): void {
 
 /* ---------------- director de historias ---------------- */
 
-function addHook(state: GameState, kind: HookKind, actors: number[]): void {
+export function addHook(state: GameState, kind: HookKind, actors: number[]): void {
   if (state.hooks.length >= HOOKS_MAX) return;
   if (state.hooks.some((h) => h.actors.some((a) => actors.includes(a)))) return;
   state.hooks.push({ id: state.nextId++, kind, actors, createdTick: state.tick, expires: state.tick + TICKS_PER_DAY * 15 });
@@ -344,6 +350,7 @@ export const HOOK_TEXT: Record<HookKind, string> = {
   despido_con_hipoteca: 'no tiene trabajo en el pueblo y le cuesta pagar la hipoteca',
   promesa_incumplida: 'el alcalde le prometió algo y no lo cumplió',
   amigo_se_va: 'una persona querida se ha ido del pueblo',
+  rival_politico: 'acaba de fundar un partido para disputarle la alcaldía al alcalde',
 };
 
 export function hookFor(state: GameState, citizenId: number): Hook | undefined {
@@ -559,6 +566,12 @@ export const QUESTION_TEXT: Record<Question, string> = {
 
 /** Respuesta por reglas (Modo normal y fallback de la IA). */
 export function ruleAnswer(state: GameState, c: Citizen, q: Question, worst: string | undefined): string {
+  const text = answerText(state, c, q, worst);
+  // En la oposición el jugador ya no es el alcalde: es concejal.
+  return state.politics.mayor === 'player' ? text : text.replace(/alcalde/g, 'concejal').replace('Lo está haciendo bien', 'Desde la oposición lo hace bien');
+}
+
+function answerText(state: GameState, c: Citizen, q: Question, worst: string | undefined): string {
   const first = c.name.split(' ')[0];
   const pending = state.promises.find((p) => p.status === 'pending' && p.supporters.includes(c.id));
   const broken = state.promises.find((p) => p.status === 'broken' && p.supporters.includes(c.id));
@@ -574,6 +587,7 @@ export function ruleAnswer(state: GameState, c: Citizen, q: Question, worst: str
     case 'me_votarias': {
       const score = c.happiness - c.grudge + (broken ? -20 : 0) + (pending ? 5 : 0);
       if (broken) return `¿Después de prometer ${NEED_TEXT[broken.need]} y no cumplir? Lo dudo mucho.`;
+      if (state.politics.mayor === c.id) return 'Ahora el alcalde soy yo. Ya veremos en las próximas elecciones.';
       if (state.politics.party?.leaderId === c.id) return `Yo me presento con «${state.politics.party.name}». Ya sabe la respuesta.`;
       if (c.vote) return 'El voto es secreto, alcalde. Ya lo tengo decidido.';
       if (score >= 65) return `Sí, ${first} le votaría. Lo está haciendo bien.`;

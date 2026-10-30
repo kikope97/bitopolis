@@ -1,6 +1,7 @@
 import { TICKS_PER_DAY, TICKS_PER_MONTH, tickToDate } from '@bitopolis/shared';
 import {
   HONEYMOON,
+  CAMPAIGN_COST,
   CAMPAIGN_EFFECT,
   CAMPAIGN_MONTHS,
   ELECTION_MONTHS,
@@ -10,9 +11,10 @@ import {
   VOTE_ABSTENTION_BASE,
 } from './balance.ts';
 import { BUILD_NAMES, buildCost, governmentCommand } from './commands.ts';
-import { taxLevels } from './economy.ts';
+import { felt, updateFeltTaxes } from './economy.ts';
+import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { hash32 } from './hash.ts';
-import { addMemory } from './social.ts';
+import { addHook, addMemory } from './social.ts';
 import { buildingAt, type Citizen, type GameState, hasAdjacentRoad, pushEvent, Tile, tileIndex } from './state.ts';
 import { freeHomes } from './tick.ts';
 
@@ -54,7 +56,7 @@ function avgAtHomes(state: GameState, field: number[], members: Citizen[]): numb
 /** Exigencias de cada facción con los datos del pueblo (las no cumplidas restan). */
 function unmetDemands(state: GameState, f: Faction, members: Citizen[]): string[] {
   const has = (k: string) => state.buildings.some((b) => b.kind === k && b.built);
-  const lv = taxLevels(state);
+  const lv = felt(state);
   const out: string[] = [];
   if (f === 'jubilados') {
     if (!has('clinic')) out.push('un centro de salud');
@@ -156,6 +158,7 @@ function foundParty(state: GameState): void {
   const faction = factionOf(state, leader);
   p.party = { leaderId: leader.id, leaderName: leader.name, name: PARTY_NAMES[faction], faction, founded: state.tick };
   addMemory(state, leader, 'fundo_partido', 5, 3);
+  addHook(state, 'rival_politico', [leader.id]);
   pushEvent(state, 'politics', `${leader.name} funda «${PARTY_NAMES[faction]}» y se presentará a las elecciones`, { ref: leader.id });
 }
 
@@ -185,22 +188,30 @@ function holdElection(state: GameState): void {
   const playerVotes = playerGoverns ? t.gov : t.opp;
   const rivalVotes = playerGoverns ? t.opp : t.gov;
   const unopposed = !p.party;
-  const winner: 'player' | 'rival' = unopposed || playerVotes >= rivalVotes ? 'player' : 'rival';
+  // El empate lo gana quien gobierna.
+  const winner: 'player' | 'rival' = unopposed || playerVotes > rivalVotes || (playerVotes === rivalVotes && playerGoverns) ? 'player' : 'rival';
   p.history.push({ tick: state.tick, player: unopposed ? t.gov + t.opp : playerVotes, rival: unopposed ? 0 : rivalVotes, abstention: t.abstention, winner, rivalName: p.party?.name ?? null, unopposed });
   if (p.history.length > 10) p.history.splice(0, p.history.length - 10);
   if (unopposed) {
     pushEvent(state, 'election', `Elecciones del año ${year}: sin candidatura rival, ${playerGoverns ? 'sigues de alcalde' : 'vuelves a la alcaldía'}`);
     p.mayor = 'player';
   } else if (winner === 'player') {
+    const loser = state.citizens.find((c) => c.id === p.party!.leaderId);
+    if (loser) addMemory(state, loser, 'perdio_elecciones', 5, -4);
     pushEvent(state, 'election', `Elecciones del año ${year}: ganas con ${playerVotes} votos frente a ${rivalVotes} de «${p.party!.name}»${playerGoverns ? '' : '. Vuelves a la alcaldía'}`);
     p.mayor = 'player';
     p.party = null;
   } else {
     const leader = p.party!;
+    const winnerC = state.citizens.find((c) => c.id === leader.leaderId);
+    if (winnerC) addMemory(state, winnerC, 'gano_elecciones', 5, 6);
     pushEvent(state, 'election', `Elecciones del año ${year}: gana «${leader.name}» con ${rivalVotes} votos frente a tus ${playerVotes}. ${leader.leaderName} es ${playerGoverns ? 'el nuevo alcalde' : 'reelegido'}; tú pasas a la oposición`);
     p.mayor = leader.leaderId;
   }
-  for (const c of state.citizens) c.vote = undefined;
+  for (const c of state.citizens) {
+    if (c.named && c.vote) addMemory(state, c, 'voto', 1, 0);
+    c.vote = undefined;
+  }
   p.warned = [];
   p.campaign = { jubilados: 0, jovenes: 0, empresarios: 0, ecologistas: 0 };
   p.nextElection += ELECTION_MONTHS * TICKS_PER_MONTH;
@@ -235,17 +246,24 @@ function rivalGovern(state: GameState): void {
   const p = state.politics;
   if (p.mayor === 'player' || !p.party) return;
   const f = p.party.faction;
-  // Impuestos según la facción.
-  const want = f === 'empresarios' ? 'low' : f === 'jubilados' ? 'low' : 'medium';
-  if (state.taxesSplit) {
+  // Impuestos según la facción; con déficit y la caja baja, como cualquier gobierno, los sube.
+  const last = state.stats.at(-1);
+  const deficit = !!last && last.income < last.expenses && state.treasury < 10_000;
+  const want = deficit ? 'high' : f === 'empresarios' || f === 'jubilados' ? 'low' : 'medium';
+  if (deficit && state.taxesSplit) governmentCommand(state, { type: 'SetTaxes', ibi: 'high', tasas: 'high' });
+  else if (state.taxesSplit) {
     if (f === 'jubilados') governmentCommand(state, { type: 'SetTaxes', ibi: 'low', tasas: 'medium' });
     else if (f === 'empresarios') governmentCommand(state, { type: 'SetTaxes', ibi: 'medium', tasas: 'low' });
     else governmentCommand(state, { type: 'SetTaxes', ibi: 'medium', tasas: 'medium' });
   } else if (state.taxLevel !== want) governmentCommand(state, { type: 'SetTax', level: want });
   // Una obra al mes si hay caja, por orden de prioridad de la facción.
+  if (deficit) return;
   for (const kind of FACTION_BUILD[f]) {
     const exists = state.buildings.filter((b) => b.kind === kind).length;
     if (kind !== 'house' && kind !== 'park' && exists > 0) continue;
+    // Como mucho un parque por cada 25 vecinos y una casa municipal por cada 15.
+    if (kind === 'park' && exists >= Math.ceil(state.citizens.length / 25)) continue;
+    if (kind === 'house' && exists >= Math.ceil(state.citizens.length / 15)) continue;
     if (state.treasury < buildCost(kind as never) + 3_000) break;
     const spot = freeSpot(state);
     if (!spot) break;
@@ -266,6 +284,7 @@ export function politicsDay(state: GameState): void {
     p.party = null;
     p.mayor = 'player';
   }
+  updateFeltTaxes(state);
   updateFactions(state);
   p.approval = playerApproval(state);
   if (state.tick % TICKS_PER_MONTH === 0) {
@@ -281,13 +300,17 @@ export function politicsDay(state: GameState): void {
 export function canCampaign(state: GameState): { ok: boolean; error?: string } {
   const p = state.politics;
   if (!politicsActive(state)) return { ok: false, error: `La política empieza con ${OPPOSITION_POP} vecinos` };
-  if (p.nextElection - state.tick > CAMPAIGN_MONTHS * TICKS_PER_MONTH) return { ok: false, error: `La campaña empieza ${CAMPAIGN_MONTHS} meses antes de las elecciones` };
+  // En la oposición se puede hacer campaña todo el mandato; gobernando, el último año.
+  const governing = p.mayor === 'player';
+  if (governing && p.nextElection - state.tick > CAMPAIGN_MONTHS * TICKS_PER_MONTH) return { ok: false, error: `Gobernando, la campaña empieza ${CAMPAIGN_MONTHS} meses antes de las elecciones` };
   if (p.lastCampaign >= 0 && state.tick - p.lastCampaign < TICKS_PER_MONTH) return { ok: false, error: 'Solo una campaña al mes' };
+  if (governing && state.treasury < CAMPAIGN_COST) return { ok: false, error: `Cada acto cuesta ${CAMPAIGN_COST} €` };
   return { ok: true };
 }
 
 export function campaign(state: GameState, f: Faction): void {
   const p = state.politics;
+  if (p.mayor === 'player') transfer(state, TREASURY, OUTSIDE, CAMPAIGN_COST, 'actos');
   p.campaign[f] = Math.min(3, p.campaign[f] + 1);
   p.lastCampaign = state.tick;
   pushEvent(state, 'politics', `Haces campaña entre ${FACTION_TEXT[f].toLowerCase()}: escuchas lo que piden (${p.factions[f].demand ?? 'que todo siga así'})`);

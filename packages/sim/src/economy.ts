@@ -1,5 +1,6 @@
 import type { TaxLevel } from '@bitopolis/shared';
 import {
+  TAX_RELIEF_DAYS,
   BUSINESS_CASH_CAP,
   DOWN_PAYMENT,
   FOUND_CHANCE,
@@ -127,8 +128,29 @@ export function updateGrudges(state: GameState): void {
 }
 
 /** Efecto de los tributos en un vecino según su grupo. */
-export function taxMood(state: GameState, c: Citizen): { label: string; value: number }[] {
+/** Nivel que notan los vecinos: una bajada tarda en sentirse (ronda 06: bajar justo antes de votar no cuela). */
+export function felt(state: GameState): Record<TaxKey, TaxLevel> {
   const lv = taxLevels(state);
+  const p = state.politics?.perceivedTax;
+  if (!p) return lv;
+  const names: TaxLevel[] = ['low', 'medium', 'high'];
+  const pick = (k: TaxKey) => names[Math.max(names.indexOf(lv[k]), Math.round(p[k]))]!;
+  return { ibi: pick('ibi'), tasas: pick('tasas'), plusvalia: pick('plusvalia') };
+}
+
+/** Cada día: el nivel notado sube al momento y baja 1/TAX_RELIEF_DAYS por día. */
+export function updateFeltTaxes(state: GameState): void {
+  const lv = taxLevels(state);
+  const names: TaxLevel[] = ['low', 'medium', 'high'];
+  for (const k of ['ibi', 'tasas', 'plusvalia'] as const) {
+    const cur = names.indexOf(lv[k]);
+    const p = state.politics.perceivedTax;
+    p[k] = cur >= p[k] ? cur : Math.max(cur, p[k] - 1 / TAX_RELIEF_DAYS);
+  }
+}
+
+export function taxMood(state: GameState, c: Citizen): { label: string; value: number }[] {
+  const lv = felt(state);
   const out: { label: string; value: number }[] = [];
   const tasas = TASAS_MOOD[lv.tasas];
   if (tasas) out.push({ label: tasas > 0 ? 'Tasas bajas' : 'Tasas altas', value: tasas });

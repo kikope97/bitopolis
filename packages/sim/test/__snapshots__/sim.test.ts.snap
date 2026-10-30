@@ -8,6 +8,6 @@ exports[`golden > snapshot del día 90 (seed 42, casual) 1`] = `
     "population": 18,
     "treasury": 7921,
   },
-  "hash": "0a402556a80ae07e",
+  "hash": "b578f7fb2329ad31",
 }
 `;

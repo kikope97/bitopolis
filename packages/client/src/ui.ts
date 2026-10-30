@@ -69,6 +69,7 @@ let lastFocus: HTMLElement | null = null;
 
 export function closeSheet() {
   if (!openSheetEl) return;
+  document.body.classList.remove('election-night');
   openSheetEl.remove();
   openSheetEl = null;
   // Si lo que tenía el foco ya no existe (p. ej. el aviso que abrió la hoja), al mapa.

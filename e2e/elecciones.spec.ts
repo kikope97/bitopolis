@@ -4,7 +4,7 @@ import { runSimulation } from '../packages/sim/src/index.ts';
 
 /** Pueblo con impuestos altos a 4 días de votar: hay partido rival y la intención de voto es baja. */
 function town() {
-  const { state } = runSimulation({ seed: 42, days: 1436, profile: 'agresivo' });
+  const { state } = runSimulation({ seed: 5, days: 1436, profile: 'agresivo' });
   return gzipSync(JSON.stringify({ bitopolis: 1, formatVersion: state.formatVersion, exportedAt: '', mode: 'normal', state }));
 }
 
@@ -23,7 +23,7 @@ test('v1.0: intención de voto, facciones, noche electoral y oposición', async 
   await expect(page.locator('#hud-poll')).toContainText('%');
   await page.locator('#hud-poll').click();
   await expect(page.locator('.sheet')).toContainText('Intención de voto');
-  await expect(page.locator('.sheet')).toContainText('Bitópolis Emprende');
+  await expect(page.locator('.sheet')).toContainText('Jóvenes por Bitópolis');
   await expect(page.locator('.faction')).toHaveCount(4);
   await shot('1-politica');
   await page.getByRole('button', { name: 'Hacer campaña' }).first().click();
@@ -43,8 +43,8 @@ test('v1.0: intención de voto, facciones, noche electoral y oposición', async 
     await expect(page.locator('#hud-poll')).toContainText('Oposición');
     await page.locator('#menu').click();
     await page.getByRole('button', { name: 'Impuestos' }).click();
-    await page.getByRole('radio').first().click();
-    await expect(page.locator('.toast').last()).toContainText('oposición');
+    await expect(page.locator('.sheet')).toContainText('Estás en la oposición');
+    await expect(page.getByRole('radio')).toHaveCount(0);
     await shot('3-oposicion');
   }
   expect(errors).toEqual([]);

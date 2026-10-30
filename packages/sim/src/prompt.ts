@@ -84,7 +84,9 @@ function citizenView(state: GameState, c: Citizen, p: Pending) {
     vecino: c.id,
     nombre: c.name,
     edad: c.age,
-    ...(politicsActive(state) ? { faccion: FACTION_TEXT[factionOf(state, c)].toLowerCase() } : {}),
+    ...(politicsActive(state)
+      ? { faccion: FACTION_TEXT[factionOf(state, c)].toLowerCase(), faccion_pide: state.politics.factions[factionOf(state, c)].demand ?? 'nada en especial' }
+      : {}),
     rasgos: { terquedad: c.traits.terco, ahorrador: c.traits.ahorro, sociable: c.traits.social, ambicioso: c.traits.ambicion },
     deseo: c.desire.replace('_', ' '),
     miedo: c.fear,

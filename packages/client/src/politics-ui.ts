@@ -1,5 +1,5 @@
 import { tickToDate } from '@bitopolis/shared';
-import { canCampaign, daysToElection, type ElectionResult, FACTION_TEXT, FACTIONS, type GameState, OPPOSITION_POP, politicsActive } from '@bitopolis/sim';
+import { CAMPAIGN_COST, canCampaign, daysToElection, type ElectionResult, FACTION_TEXT, FACTIONS, type GameState, OPPOSITION_POP, politicsActive } from '@bitopolis/sim';
 import { formatDate } from './i18n.ts';
 import { lowMotion } from './prefs.ts';
 import { $, h, sheet } from './ui.ts';
@@ -42,7 +42,7 @@ export function renderPollChip(state: GameState, onOpen: () => void): void {
   const opp = p.mayor !== 'player';
   chip.textContent = opp ? `🗳 Oposición · ${p.approval} %` : `🗳 ${p.approval} %`;
   chip.classList.toggle('neg', p.approval < 50);
-  chip.setAttribute('aria-label', `${opp ? 'Estás en la oposición. ' : ''}Intención de voto: ${p.approval} %. Elecciones en ${months(state)} meses. Ver política`);
+  chip.setAttribute('aria-label', `${opp ? 'Estás en la oposición. ' : ''}Intención de voto: ${p.approval} %. Elecciones: ${left(state)}. Ver política`);
   if (!chip.dataset.bound) {
     chip.dataset.bound = '1';
     chip.addEventListener('click', onOpen);
@@ -74,17 +74,22 @@ export function openPolitics(ctx: SocialCtx): void {
     );
   }
   items.push(h('p', {}, `Próximas elecciones: ${date} (${left(state)}).`));
-  items.push(h('h3', {}, 'Intención de voto'));
+  items.push(h('h3', {}, 'Intención de voto'), h('p', { class: 'muted small' }, 'Entre quienes piensan votar (sin contar la abstención).'));
   items.push(bar('Tú', p.approval, 'me'));
   if (p.party) items.push(bar(`«${p.party.name}»`, 100 - p.approval, 'rival'));
   else items.push(h('p', { class: 'muted' }, 'Todavía no hay candidatura rival. Si tu intención de voto baja, algún vecino se animará a fundar un partido.'));
 
-  items.push(h('h3', {}, 'Facciones'));
+  items.push(
+    h('h3', {}, 'Facciones'),
+    h('p', { class: 'muted small' }, `Cumplir lo que pide cada facción es lo que más votos da. Cada campaña acerca un poco a una facción (una al mes${opp ? '' : `, el último año, ${CAMPAIGN_COST} € por acto`}).`),
+  );
   const can = canCampaign(state);
+  const why = h('p', { id: 'campaign-why', class: 'muted small' }, can.ok ? '' : (can.error ?? ''));
   for (const f of FACTIONS) {
     const info = p.factions[f];
-    const btn = h('button', { class: 'btn small', ...(can.ok ? {} : { 'aria-disabled': 'true' }) }, 'Hacer campaña');
+    const btn = h('button', { class: 'btn small', ...(can.ok ? {} : { 'aria-disabled': 'true', 'aria-describedby': 'campaign-why' }) }, `Hacer campaña con ${FACTION_TEXT[f].toLowerCase()}`);
     btn.addEventListener('click', async () => {
+      if (!can.ok) return;
       if (await ctx.command({ type: 'Campaign', faction: f })) openPolitics(ctx);
     });
     items.push(
@@ -97,7 +102,7 @@ export function openPolitics(ctx: SocialCtx): void {
       ),
     );
   }
-  if (!can.ok) items.push(h('p', { class: 'muted small' }, can.error ?? ''));
+  items.splice(items.length - FACTIONS.length, 0, why);
 
   if (p.party) {
     const leader = h('button', { class: 'btn small' }, `Ver la ficha de ${p.party.leaderName}`);
@@ -122,9 +127,16 @@ export function openElectionNight(ctx: SocialCtx): void {
   const state = ctx.state();
   const r = state.politics.history.at(-1);
   if (!r) return;
-  const total = Math.max(1, r.player + r.rival + r.abstention);
-  const pct = (n: number) => Math.round((n / total) * 100);
-  const rows = [bar('Tú', pct(r.player), 'me'), ...(r.unopposed ? [] : [bar(`«${r.rivalName}»`, pct(r.rival), 'rival')]), bar('Abstención', pct(r.abstention), 'abst')];
+  // Porcentajes que suman 100 (mayor resto) y, al lado, los votos.
+  const parts = r.unopposed ? [r.player, r.abstention] : [r.player, r.rival, r.abstention];
+  const total = Math.max(1, parts.reduce((a, b) => a + b, 0));
+  const raw = parts.map((n) => (n / total) * 100);
+  const pcts = raw.map(Math.floor);
+  const order = raw.map((v, i) => [v - Math.floor(v), i] as const).sort((a, b) => b[0] - a[0]);
+  for (let k = 0; k < 100 - pcts.reduce((a, b) => a + b, 0); k++) pcts[order[k % order.length]![1]]!++;
+  const labels = r.unopposed ? [`Tú (${r.player} votos)`, `Abstención (${r.abstention})`] : [`Tú (${r.player} votos)`, `«${r.rivalName}» (${r.rival})`, `Abstención (${r.abstention})`];
+  const classes = r.unopposed ? ['me', 'abst'] : ['me', 'rival', 'abst'];
+  const rows = labels.map((l, i) => bar(l, pcts[i]!, classes[i]));
   if (!lowMotion()) {
     for (const row of rows) {
       const fill = row.querySelector<HTMLElement>('.pol-fill')!;
@@ -134,6 +146,9 @@ export function openElectionNight(ctx: SocialCtx): void {
     }
   }
   const won = r.winner === 'player';
+  // El resultado se anuncia también al lector de pantalla.
+  $('#sr-live').textContent = `Noche electoral. ${r.unopposed ? 'Sin rival: sigues de alcalde' : won ? 'Ganas las elecciones' : 'Pierdes las elecciones'}. ${resultText(r)}`;
+  document.body.classList.add('election-night');
   sheet(
     'Noche electoral',
     h('p', { class: 'big-number' }, r.unopposed ? 'Sin rival: sigues de alcalde' : won ? '¡Ganas las elecciones!' : 'Pierdes las elecciones'),

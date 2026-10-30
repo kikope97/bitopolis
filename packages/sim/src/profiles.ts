@@ -1,5 +1,5 @@
 import type { BuildKind, Command, TaxLevel } from '@bitopolis/shared';
-import { ZONE_UNLOCK_POP } from './balance.ts';
+import { PLANT_CAPACITY, ZONE_UNLOCK_POP } from './balance.ts';
 import { buildCost, validateCommand } from './commands.ts';
 import { chance, type RngState, seedRng } from './prng.ts';
 import { buildingAt, type GameState, hasAdjacentRoad, Tile, tileIndex, Zone } from './state.ts';
@@ -104,10 +104,12 @@ function planner(name: string, o: PlannerOpts): Profile {
       if (!has("power")) { tryBuild("power"); return out; }
       // Ampliar la red si algún edificio terminado se queda sin agua o luz.
       const built = state.buildings.filter((b) => b.built && b.kind !== 'water' && b.kind !== 'power');
-      if (built.some((b) => !b.hasWater) && !state.projects.some((p) => buildingKindOf(state, p.buildingId) === 'water')) {
+      // No más plantas de las que el pueblo necesita (una nueva mal conectada no arregla nada).
+      const enough = (k: 'water' | 'power') => state.buildings.filter((b) => b.kind === k).length >= Math.ceil(built.length / (PLANT_CAPACITY[k] * 0.75)) + 1;
+      if (built.some((b) => !b.hasWater) && !enough('water') && !state.projects.some((p) => buildingKindOf(state, p.buildingId) === 'water')) {
         if (tryBuild('water')) return out;
       }
-      if (built.some((b) => !b.hasPower) && !state.projects.some((p) => buildingKindOf(state, p.buildingId) === 'power')) {
+      if (built.some((b) => !b.hasPower) && !enough('power') && !state.projects.some((p) => buildingKindOf(state, p.buildingId) === 'power')) {
         if (tryBuild('power')) return out;
       }
       // Un jugador razonable mira el parte: no añade servicios (y sus sueldos) con el mes en negativo.

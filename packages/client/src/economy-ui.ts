@@ -48,6 +48,16 @@ function estimate(state: GameState, key: 'ibi' | 'tasas' | 'plusvalia', lv: TaxL
 
 export function openTaxes(getState: () => GameState, command: Cmd): void {
   const state = getState();
+  // En la oposición los impuestos los pone el alcalde rival: se ven, pero no se tocan.
+  if (state.politics.mayor !== 'player') {
+    const lv = state.taxesSplit ? state.taxes : { ibi: state.taxLevel, tasas: state.taxLevel, plusvalia: state.taxLevel };
+    sheet(
+      'Impuestos',
+      h('p', { class: 'pol-banner' }, h('strong', {}, 'Estás en la oposición. '), `Los impuestos los decide el alcalde ${state.politics.party?.leaderName ?? 'rival'}.`),
+      h('p', {}, `IBI ${LEVEL_NAME[lv.ibi].toLowerCase()}, tasas ${LEVEL_NAME[lv.tasas].toLowerCase()} y plusvalía ${LEVEL_NAME[lv.plusvalia].toLowerCase()}.`),
+    );
+    return;
+  }
   const radio = (current: TaxLevel, label: string, detail: (lv: TaxLevel) => string, onPick: (lv: TaxLevel) => Command) => {
     const box = h('div', { class: 'radio-list compact', role: 'radiogroup', 'aria-label': label });
     for (const lv of ['low', 'medium', 'high'] as const) {

@@ -54,6 +54,8 @@ export interface Politics {
   /** Campaña del jugador por facción (0–3) y tick de la última. */
   campaign: Record<Faction, number>;
   lastCampaign: number;
+  /** Nivel de impuestos que notan los vecinos (0–2): sube al momento y baja despacio. */
+  perceivedTax: { ibi: number; tasas: number; plusvalia: number };
 }
 
 export function emptyPolitics(tick = 0): Politics {
@@ -68,6 +70,7 @@ export function emptyPolitics(tick = 0): Politics {
     factions: Object.fromEntries(FACTIONS.map((f) => [f, { satisfaction: 50, demand: null, members: 0 }])) as Politics['factions'],
     campaign: { jubilados: 0, jovenes: 0, empresarios: 0, ecologistas: 0 },
     lastCampaign: -1,
+    perceivedTax: { ibi: 1, tasas: 1, plusvalia: 1 },
   };
 }
 

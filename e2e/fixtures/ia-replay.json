@@ -143,63 +143,55 @@
    "out": 30
   }
  },
- "04ea33c0ba6c50c55ab64e0019a8c418": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"quedarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+ "5eb2024f7dfcbaf0a8dca844f5231898": {
+  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"irse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":6,\"accion\":\"quejarse\",\"motivo\":\"Que nadie diga que no avisé.\"},{\"vecino\":8,\"accion\":\"quejarse\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":9,\"accion\":\"quedarse\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":11,\"accion\":\"quedarse\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 802,
+   "in": 1537,
    "cachedIn": 0,
-   "out": 29
+   "out": 127
   }
  },
- "00f9b4e185d4ce9703c1188685b5d45a": {
+ "b3013b41bba9f7746e8145ef813f98e2": {
   "text": "{\"decisiones\":[{\"vecino\":15,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
   "usage": {
-   "in": 734,
+   "in": 733,
    "cachedIn": 0,
    "out": 31
   }
  },
- "f37a1f48cc9ca91d30ab9e1fd30b04ab": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"pedir:empleo\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+ "1a7d5332f5935b51a249d0ba939665e8": {
+  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"pedir:empleo\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
   "usage": {
-   "in": 803,
+   "in": 736,
+   "cachedIn": 0,
+   "out": 27
+  }
+ },
+ "2bb1e14f76a5a47ff7685208dd3488ee": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"pedir:colegio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 804,
    "cachedIn": 0,
    "out": 31
   }
  },
- "ecd41b1ff1ec5f5a28f3ca53339944c9": {
-  "text": "{\"decisiones\":[{\"vecino\":16,\"accion\":\"pedir:tienda\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+ "19deaf655974e7f67e5e7fe8bb1b8e57": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
   "usage": {
-   "in": 737,
+   "in": 801,
    "cachedIn": 0,
-   "out": 31
+   "out": 32
   }
  },
- "12e453de65aa5286dda95501e1e89727": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"pedir:empleo\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+ "51d12dd55d30d60fd82c7ef3e2334bed": {
+  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"pedir:tienda\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
   "usage": {
-   "in": 803,
+   "in": 789,
    "cachedIn": 0,
-   "out": 31
+   "out": 32
   }
  },
- "7b72d9e9dbe193f65404d5668c8b5aa0": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"quedarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
-  "usage": {
-   "in": 802,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "dd943ebc597dfa4772aefd33d3bb2c04": {
-  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"pedir:empleo\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 735,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "9893b30ad83341827d6e46153f111af6": {
+ "526d2dc2cf1c984dd3abeccd15af3d8c": {
   "text": "{\"decisiones\":[{\"vecino\":18,\"accion\":\"quedarse\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
   "usage": {
    "in": 736,
@@ -207,263 +199,639 @@
    "out": 31
   }
  },
- "30fa211031b9617c236a74221922304b": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
-  "usage": {
-   "in": 802,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "15622a24ba3d7c1d74e2426fd8f282f5": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"pedir:empleo\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
-  "usage": {
-   "in": 803,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "d40905973d2945c542d076a997ad2ce3": {
-  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"quedarse\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
-  "usage": {
-   "in": 740,
-   "cachedIn": 0,
-   "out": 28
-  }
- },
- "2b619baa66b90660281f5a121baf34c5": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"gastar_ocio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+ "ac5ff3f9f0e3653e55f82f478f19a5fb": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
   "usage": {
    "in": 801,
    "cachedIn": 0,
-   "out": 28
+   "out": 29
   }
  },
- "3fdeb9209a16b5bb71fd59796a953cce": {
-  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"pedir:parque\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+ "dc98d3e414483fd42ff456f5bb0c2bb6": {
+  "text": "{\"decisiones\":[{\"vecino\":19,\"accion\":\"pedir:parque\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 743,
+   "in": 736,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "e454732e0cf51c3bb217efe4f1ed3a14": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
+  "usage": {
+   "in": 802,
    "cachedIn": 0,
    "out": 31
   }
  },
- "191486c1263e06ba8637c3b9efe26b0e": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+ "43208b04ae448caa7d3f01186a0cc362": {
+  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 782,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "2d33e60628622c5418b9d98fdc149462": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"quedarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 741,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "4c38cc5726d1d7939a985daf6f7e563b": {
+  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"pedir:parque\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
+  "usage": {
+   "in": 744,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "9764a86773937f1e1e03512866171580": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
    "in": 800,
    "cachedIn": 0,
    "out": 31
   }
  },
- "28fcad4187080ee25a1f2e68e77358b2": {
-  "text": "{\"decisiones\":[{\"vecino\":26,\"accion\":\"pedir:colegio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+ "d3b1652006a2426297dce0b95c85896e": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"pedir:empleo\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
   "usage": {
-   "in": 740,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "3e6ec7feb1bafbf20abba5d04d36d09a": {
-  "text": "{\"decisiones\":[{\"vecino\":27,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
-  "usage": {
-   "in": 743,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "75344f93af19c4ea86c0f99001469d78": {
-  "text": "{\"decisiones\":[{\"vecino\":28,\"accion\":\"pedir:tienda\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
-  "usage": {
-   "in": 741,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "6f9e467941b745f1323ff1993d035aed": {
-  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
-  "usage": {
-   "in": 755,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "2a5f02109f53a3ac40de71895e641675": {
-  "text": "{\"decisiones\":[{\"vecino\":26,\"accion\":\"pedir:empleo\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 752,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "4e18c322fbe52645d9a14a0ed81997fa": {
-  "text": "{\"decisiones\":[{\"vecino\":28,\"accion\":\"comprar_casa\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 718,
-   "cachedIn": 0,
-   "out": 30
-  }
- },
- "b78a04de03ad7570702dc3c374cc3bf9": {
-  "text": "{\"decisiones\":[{\"vecino\":27,\"accion\":\"gastar_ocio\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 756,
-   "cachedIn": 0,
-   "out": 27
-  }
- },
- "a3da7d5d0023e157bdab25b48d75d665": {
-  "text": "{\"decisiones\":[{\"vecino\":30,\"accion\":\"quedarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 741,
-   "cachedIn": 0,
-   "out": 26
-  }
- },
- "86a9acf459bea1715b57aa020f288c01": {
-  "text": "{\"decisiones\":[{\"vecino\":28,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 770,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "25bd146113764bdd5cc0e3260bbd0106": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"pedir:parque\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
-  "usage": {
-   "in": 742,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "f5386e3882a97833bad182318df63b62": {
-  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:colegio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 742,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "86614c4ad350fa9e01a8dda61b9f5b0d": {
-  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"pedir:tienda\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
-  "usage": {
-   "in": 740,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "e54416e09d85da22fff1efd14250a2b4": {
-  "text": "{\"decisiones\":[{\"vecino\":28,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 791,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "0665884c3218140b4f8bd1f2dd96328c": {
-  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"comprar_casa\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
-  "usage": {
-   "in": 741,
-   "cachedIn": 0,
-   "out": 30
-  }
- },
- "efc2613f18150e21c39758c7b2f559e3": {
-  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"comprar_casa\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 717,
-   "cachedIn": 0,
-   "out": 30
-  }
- },
- "c0922ad6463d680553823ceb89ffd23f": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"pedir:colegio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
-  "usage": {
-   "in": 776,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "4a9991e9f37405901c9b9ba3673b38ad": {
-  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:parque\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
-  "usage": {
-   "in": 808,
-   "cachedIn": 0,
-   "out": 30
-  }
- },
- "8da7e460dd9a3a5e5c38edf1dcd62e26": {
-  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 790,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "963972944744664ab674c6151028c460": {
-  "text": "{\"decisiones\":[{\"vecino\":30,\"accion\":\"comprar_casa\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
-  "usage": {
-   "in": 763,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "51d5d2e567e9b344472b2b34ccba0b0d": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:parque\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
-  "usage": {
-   "in": 801,
+   "in": 796,
    "cachedIn": 0,
    "out": 32
   }
  },
- "423d69a7690a3241b024ce639ec6d473": {
+ "f121d1c25461a9e19a36f6a64b8339db": {
+  "text": "{\"decisiones\":[{\"vecino\":28,\"accion\":\"pedir:tienda\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":29,\"accion\":\"quedarse\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
+  "usage": {
+   "in": 917,
+   "cachedIn": 0,
+   "out": 52
+  }
+ },
+ "a39d6ca735ddad8d1397ba7a48c35082": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"pedir:parque\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":32,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 918,
+   "cachedIn": 0,
+   "out": 62
+  }
+ },
+ "a43811294f802c574543c18d94e7ec2d": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"comprar_casa\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 715,
+   "cachedIn": 0,
+   "out": 32
+  }
+ },
+ "530106110cc2e2780f977d53ca348b43": {
+  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"pedir:tienda\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 740,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "06ba9f75a38649249886dc3dd0031e7d": {
+  "text": "{\"decisiones\":[{\"vecino\":35,\"accion\":\"pedir:empleo\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 742,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "798004d43d4c5064fcafa6af60e6c48d": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+  "usage": {
+   "in": 757,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "71e2f8afacacf70aca6a64f6c57224b4": {
+  "text": "{\"decisiones\":[{\"vecino\":36,\"accion\":\"quedarse\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":34,\"accion\":\"seguir_alquilando\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 914,
+   "cachedIn": 0,
+   "out": 55
+  }
+ },
+ "e4706926cac864c6ff965e7e6f0381b7": {
+  "text": "{\"decisiones\":[{\"vecino\":37,\"accion\":\"pedir:parque\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 742,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "a4e245fea6d4cb7a7e452466c82b751b": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
+  "usage": {
+   "in": 794,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "6783b4fdded17243e9fb8cccf822f3cd": {
+  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"comprar_casa\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 737,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "4aecfeef53868a822f2614189818e1b5": {
+  "text": "{\"decisiones\":[{\"vecino\":35,\"accion\":\"quedarse\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 773,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "c4a8c480f357e288351ec60820ca9b06": {
+  "text": "{\"decisiones\":[{\"vecino\":36,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 795,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "350cc67f4238562b31eb10271210343d": {
+  "text": "{\"decisiones\":[{\"vecino\":37,\"accion\":\"pedir:parque\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 826,
+   "cachedIn": 0,
+   "out": 32
+  }
+ },
+ "d841cdf3daf94670803d637cbfc74556": {
   "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"gastar_ocio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
   "usage": {
-   "in": 802,
+   "in": 811,
    "cachedIn": 0,
    "out": 32
   }
  },
- "c3897feec46807a3a21e05bf47b06a6b": {
+ "83fae1e0ceab46df97336f6a4c142e1a": {
   "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"quejarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
   "usage": {
-   "in": 801,
+   "in": 810,
    "cachedIn": 0,
    "out": 26
   }
  },
- "da2e0907ceb4e4e013812e414e2a6e52": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:parque\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+ "3d61ac6019758f7a9248209ffa36077b": {
+  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:parque\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 828,
+   "in": 800,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "7a53aeece6f5a122efd24bfebfb5ae05": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 816,
+   "cachedIn": 0,
+   "out": 36
+  }
+ },
+ "072dd505fbb9aa9b27b3827e455780ed": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"pedir:empleo\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 813,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "9089bd1cfc0feb56550bf93df91b12ab": {
+  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"gastar_ocio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 815,
    "cachedIn": 0,
    "out": 32
   }
  },
- "e21a67423cdad7f24180103409980113": {
-  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"pedir:centro_salud\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+ "d67fdec7ee0eabeba01fdfe727a9cc88": {
+  "text": "{\"decisiones\":[{\"vecino\":15,\"accion\":\"pedir:centro_salud\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 830,
+   "in": 822,
    "cachedIn": 0,
    "out": 33
   }
  },
- "8f7774fea5a151a800dea2fa20ae98d5": {
-  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"pedir:empleo\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+ "03e57d490ca135078c89e7a1494cc683": {
+  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"gastar_ocio\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
   "usage": {
-   "in": 827,
+   "in": 824,
    "cachedIn": 0,
    "out": 27
   }
  },
- "a868538a6ec2a8e2297ddb738d1efaa8": {
-  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+ "62fc2c6d81c56eae86c54ccae45bc19b": {
+  "text": "{\"decisiones\":[{\"vecino\":18,\"accion\":\"quedarse\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 838,
+   "in": 807,
+   "cachedIn": 0,
+   "out": 33
+  }
+ },
+ "b127aa5d41df2b26454e72b471feaee9": {
+  "text": "{\"decisiones\":[{\"vecino\":19,\"accion\":\"quejarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+  "usage": {
+   "in": 806,
+   "cachedIn": 0,
+   "out": 26
+  }
+ },
+ "58744eb19538c144f3b45f9c21bdc0fd": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"quedarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 809,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "5b7c48570eb1fa3e830034ccd6baea4a": {
+  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"quejarse\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 845,
+   "cachedIn": 0,
+   "out": 28
+  }
+ },
+ "3dae79dee9d62cd05afa5f5369b5b4b0": {
+  "text": "{\"decisiones\":[{\"vecino\":28,\"accion\":\"pedir:empleo\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 837,
    "cachedIn": 0,
    "out": 29
   }
  },
- "30ddf12c58842acc201bbfee68ac6567": {
+ "a638be303bbdddc693737157b48d46be": {
+  "text": "{\"decisiones\":[{\"vecino\":29,\"accion\":\"gastar_ocio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 821,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "5ef181a0e3307ef97df7b68a839510fd": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 807,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "3a6a5aaae8197cd98047131f04f8243c": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:colegio\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 807,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "45e26715c5d929b52bacd6d90f392da4": {
+  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"pedir:empleo\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 838,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "80a7ce8e5705c78d106edb9339754f90": {
+  "text": "{\"decisiones\":[{\"vecino\":35,\"accion\":\"gastar_ocio\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 824,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "6867693a70ac86626f57eabc4f4962b2": {
+  "text": "{\"decisiones\":[{\"vecino\":36,\"accion\":\"quedarse\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 840,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "01218af33f461a20a03401e09ad581c8": {
+  "text": "{\"decisiones\":[{\"vecino\":37,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 841,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "6c96b2c419bb2b9b609a0bd2dbe6270f": {
+  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 806,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "d18b724c3b772b77d53989b6b8aacb98": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
+  "usage": {
+   "in": 780,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "9890d54072bf3cb914e3b0d64e30ceb2": {
+  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 804,
+   "cachedIn": 0,
+   "out": 32
+  }
+ },
+ "1919cb8f029a9dc1e8c3ec405ce51b0f": {
+  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 795,
+   "cachedIn": 0,
+   "out": 35
+  }
+ },
+ "b71c855140adaab9f0e5b9cf7036bb29": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 780,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "853fb18278060b6c0aef54fe2096434a": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"gastar_ocio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 814,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "5a77d6e0a4ba1f8947b82206f0195990": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"quedarse\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 808,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "d5cb6f964712b92dd81aa7e80287c376": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 781,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "1cbf105b152bd117bef981c4c878ce70": {
+  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"quejarse\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
+  "usage": {
+   "in": 828,
+   "cachedIn": 0,
+   "out": 28
+  }
+ },
+ "f99561a6202de0e6b88a30008615f839": {
+  "text": "{\"decisiones\":[{\"vecino\":15,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 840,
+   "cachedIn": 0,
+   "out": 36
+  }
+ },
+ "2d71dec678e900064a265481a323a27a": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 781,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "6aadb3b1c2cecbbe7addadf1374daf6f": {
+  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 825,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "116913317a1e4f4c5f81b69e60d0567c": {
+  "text": "{\"decisiones\":[{\"vecino\":18,\"accion\":\"quedarse\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 824,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "ab911868f0fc675b7884e5c58485d24b": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 781,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "d4c410b20e653b16a34be0ec5ad9a9ec": {
+  "text": "{\"decisiones\":[{\"vecino\":19,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 824,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "8dca8cb137acd0668496b26b4dcbc8e6": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"quedarse\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 844,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "2fa291db7063a1dbee152b32112c7178": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 781,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "d7a6b897b8803fa7cf79a05ae7621da4": {
+  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 847,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "df65feada1a66ca3e70be50c26b9f341": {
+  "text": "{\"decisiones\":[{\"vecino\":28,\"accion\":\"pedir:empleo\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 838,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "2dbcde6b63c0bf702279fa61830dd057": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 781,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "6bf842de32766d2cd05ef26a7a8a0925": {
+  "text": "{\"decisiones\":[{\"vecino\":29,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 824,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "2673fcca37519209440914dbdf55270e": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 766,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "58054b9729cb20666316e1fed6c857d0": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:colegio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 822,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "926984ba36aebbbc3f2ef7b1de22799a": {
+  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"pedir:empleo\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 839,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "256b0ba415808e366b9ec271413724b6": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 765,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "b2c15a1cb8642c53130a6a1a4ae620db": {
+  "text": "{\"decisiones\":[{\"vecino\":35,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 839,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "658a429e8a373e9073d0189360055eaf": {
+  "text": "{\"decisiones\":[{\"vecino\":36,\"accion\":\"quedarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+  "usage": {
+   "in": 841,
+   "cachedIn": 0,
+   "out": 26
+  }
+ },
+ "dab67a51e5f8ba51f7e1f3643c5781da": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 765,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "2532c5c6d948183b7b6c2c9d29046fb9": {
+  "text": "{\"decisiones\":[{\"vecino\":37,\"accion\":\"quejarse\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 840,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "57949a8540a626d524659bd94b6fdfc7": {
+  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 806,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "c69b75974cfda0207e9d274e916a618d": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 766,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "3e8010dc75b18b45924c97bc7c10bc9f": {
+  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+  "usage": {
+   "in": 796,
+   "cachedIn": 0,
+   "out": 27
+  }
+ },
+ "abc2ec34418dc3227376c4b822a3a7ff": {
+  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 795,
+   "cachedIn": 0,
+   "out": 35
+  }
+ },
+ "6eb69bc5f3aef340e29c0b20fcd03a2a": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 766,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "46a7207349c9817af24e6f009318982a": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"gastar_ocio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 814,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "50c821ed628e7fa3d04b90b3f0d330ff": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"quedarse\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 811,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "34cdafc230910ca1dca448ca16ffa503": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 766,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "bae0861f845d5a288c07e2314aa6ad7b": {
+  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"quejarse\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 828,
+   "cachedIn": 0,
+   "out": 28
+  }
+ },
+ "82c237926c4c8ba4fa9c257163d13c80": {
   "text": "{\"decisiones\":[{\"vecino\":15,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
   "usage": {
    "in": 840,
@@ -471,1468 +839,932 @@
    "out": 31
   }
  },
- "7166ab332a5fd0eea96b6058c3950545": {
-  "text": "{\"decisiones\":[{\"vecino\":16,\"accion\":\"pedir:empleo\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+ "260c9ed83e9d6e29aff8284b0a238d68": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 795,
+   "cachedIn": 0,
+   "out": 35
+  }
+ },
+ "1283a28c2aee12909b10764dc35ae6a2": {
+  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 827,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "f90fdc454f352d9772f7b0594a353103": {
+  "text": "{\"decisiones\":[{\"vecino\":18,\"accion\":\"quedarse\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
   "usage": {
    "in": 826,
    "cachedIn": 0,
-   "out": 31
-  }
- },
- "5c2e2766a5f747a90c006b750f98d0b1": {
-  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"gastar_ocio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
-  "usage": {
-   "in": 809,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "c6d0d198488bde2d9e0484cb389c6ef3": {
-  "text": "{\"decisiones\":[{\"vecino\":18,\"accion\":\"quedarse\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 809,
-   "cachedIn": 0,
-   "out": 28
-  }
- },
- "7d2f1cbe7d0a7f6a86711e5e51cf417c": {
-  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"quedarse\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 824,
-   "cachedIn": 0,
-   "out": 28
-  }
- },
- "47624b2ba07f04b077aaf0c1d1340348": {
-  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"quejarse\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 823,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "06cc13e5544bede67681e875eb89a0e2": {
-  "text": "{\"decisiones\":[{\"vecino\":26,\"accion\":\"pedir:colegio\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 820,
-   "cachedIn": 0,
    "out": 30
   }
  },
- "62cff95affa3dd67329212a353d97474": {
-  "text": "{\"decisiones\":[{\"vecino\":27,\"accion\":\"pedir:colegio\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+ "ed2a9b9bb7b791e5a1b213552fcdf4ac": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 800,
+   "in": 795,
    "cachedIn": 0,
-   "out": 30
+   "out": 35
   }
  },
- "3df5fe36e20a08b3c6cc4494ee695d25": {
-  "text": "{\"decisiones\":[{\"vecino\":28,\"accion\":\"pedir:empleo\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+ "5ab4f7e4d023a7d2af9acbc26d014735": {
+  "text": "{\"decisiones\":[{\"vecino\":19,\"accion\":\"quejarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
   "usage": {
    "in": 825,
-   "cachedIn": 0,
-   "out": 30
-  }
- },
- "975596333a38378455004f92c3a64103": {
-  "text": "{\"decisiones\":[{\"vecino\":30,\"accion\":\"quedarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 803,
    "cachedIn": 0,
    "out": 26
   }
  },
- "fdb34be1b57b36b0e4e93848b4fe990f": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"quejarse\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
+ "6bc5049cbfd154a45dd2b58f3c11d12d": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"quedarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
   "usage": {
-   "in": 792,
+   "in": 844,
    "cachedIn": 0,
-   "out": 28
+   "out": 26
   }
  },
- "f959f8b5dd96c47b10216a7f01fab19a": {
-  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:colegio\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
+ "4b28fc9357e0d6042bb5700fd3822301": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"gastar_ocio\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":31,\"accion\":\"comprar_casa\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
   "usage": {
-   "in": 827,
+   "in": 985,
    "cachedIn": 0,
-   "out": 30
+   "out": 55
   }
  },
- "01985b9cb2c1f38575feee2deb2254c5": {
-  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"pedir:empleo\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+ "dda3adab40fefef2e049ef886a00f146": {
+  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 846,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "a604d5bbc38b12daef00797876dc84a7": {
+  "text": "{\"decisiones\":[{\"vecino\":28,\"accion\":\"pedir:empleo\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 838,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "cd0f5384a9f60a91b512889f2bb6a5eb": {
+  "text": "{\"decisiones\":[{\"vecino\":29,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 824,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "8840ea721654b97c9963487e858a03ad": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"quejarse\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 785,
+   "cachedIn": 0,
+   "out": 33
+  }
+ },
+ "02118f94b1f6dca08ed7e1bd30189da5": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:colegio\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
   "usage": {
    "in": 808,
    "cachedIn": 0,
-   "out": 31
+   "out": 30
   }
  },
- "4a5c0c79a914a2014e080c8389d57cf2": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+ "527fd3a68da27589b4c4b0352318f470": {
+  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"pedir:empleo\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 796,
+   "in": 839,
    "cachedIn": 0,
    "out": 34
   }
  },
- "0ff3983390791cb46700e35a5e9c03e3": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+ "ae639d0fd5a23cabd4a956c2838a3425": {
+  "text": "{\"decisiones\":[{\"vecino\":35,\"accion\":\"gastar_ocio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
   "usage": {
-   "in": 797,
+   "in": 840,
    "cachedIn": 0,
    "out": 32
   }
  },
- "5eded5955e3c46e5babf4e20c94d5f40": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+ "f7621b3fc01d12ca958eb0c5ab40ef72": {
+  "text": "{\"decisiones\":[{\"vecino\":36,\"accion\":\"quedarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
   "usage": {
-   "in": 796,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "c150bc88f3f3b2bd0b520d45b9a77d00": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
-  "usage": {
-   "in": 825,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "d2049c07f594b14ba10d386ac989293a": {
-  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 828,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "8cae2fb4a947e583903f924bbff93789": {
-  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"quedarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 823,
+   "in": 841,
    "cachedIn": 0,
    "out": 26
   }
  },
- "0dbcc72016ca860a5f0037518ff9c151": {
-  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"quejarse\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 842,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "e186074dea1e89a2907eb99982e4940e": {
-  "text": "{\"decisiones\":[{\"vecino\":15,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+ "2743248b492b824b16037e59ea1f90a7": {
+  "text": "{\"decisiones\":[{\"vecino\":37,\"accion\":\"quejarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
   "usage": {
    "in": 841,
    "cachedIn": 0,
-   "out": 36
+   "out": 26
   }
  },
- "2d658a041d055d77577eec7fc7ac2970": {
-  "text": "{\"decisiones\":[{\"vecino\":16,\"accion\":\"pedir:empleo\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+ "177f5d59a7f7ca7a3c45fcd557ca21a4": {
+  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 826,
+   "in": 806,
    "cachedIn": 0,
    "out": 30
   }
  },
- "4ab639d6032f53401d76ab98d5d3132c": {
-  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"gastar_ocio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+ "105157e6a2bd6a137f418161aa08cea4": {
+  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 809,
+   "in": 782,
    "cachedIn": 0,
-   "out": 29
+   "out": 31
   }
  },
- "d6f2847d5221ab84dcc17e5225418c59": {
-  "text": "{\"decisiones\":[{\"vecino\":18,\"accion\":\"quedarse\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 810,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "08d6327de00d7f4546cb102b91dfe017": {
-  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"quedarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
-  "usage": {
-   "in": 828,
-   "cachedIn": 0,
-   "out": 30
-  }
- },
- "35d96c8a39d182ebf3d15d58eb5f8e25": {
-  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
-  "usage": {
-   "in": 824,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "cce38b75ba1e1661562d6c7f6a0fee25": {
-  "text": "{\"decisiones\":[{\"vecino\":26,\"accion\":\"pedir:colegio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
-  "usage": {
-   "in": 822,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "10a88924f1a97305fec9ca95561d3e29": {
-  "text": "{\"decisiones\":[{\"vecino\":27,\"accion\":\"pedir:colegio\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
-  "usage": {
-   "in": 802,
-   "cachedIn": 0,
-   "out": 30
-  }
- },
- "27c48baf82af91923d0f38e77052fd19": {
-  "text": "{\"decisiones\":[{\"vecino\":28,\"accion\":\"pedir:empleo\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
-  "usage": {
-   "in": 839,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "f11ccc59a8a1688afc1dbebad9e9c305": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+ "45957866c01e0f019262b3816c2b4fc8": {
+  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
    "in": 795,
    "cachedIn": 0,
-   "out": 34
+   "out": 35
   }
  },
- "931cf342b45efac6a846bc08045b7774": {
-  "text": "{\"decisiones\":[{\"vecino\":30,\"accion\":\"quedarse\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+ "5a4d3552c042e3edca84e315b7987050": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"gastar_ocio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
-   "in": 824,
+   "in": 814,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "9350f95767d79a656cfa165a02d62f50": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"quedarse\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 811,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "75709311d1c0d51e10031b7795f81bd3": {
+  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"quejarse\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 828,
    "cachedIn": 0,
    "out": 28
   }
  },
- "a111314d379755bb30960f8e934899a1": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+ "f06e408a8de3c25cf01f2072977a32df": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":36,\"accion\":\"seguir_alquilando\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
   "usage": {
-   "in": 795,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "180cb59dd8737c9886751955385638cd": {
-  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:colegio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
-  "usage": {
-   "in": 827,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "9d90a2c3d819b3f757752a032f75fa00": {
-  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"pedir:empleo\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 825,
-   "cachedIn": 0,
-   "out": 30
-  }
- },
- "29d93ea066f0632ae03205ad02ced0e9": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
-  "usage": {
-   "in": 796,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "fd9f4caf0576f6edcba3d32922f8d232": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 796,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "a695ec3eb927c156099067768cdf0d45": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 797,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "3a823d1ab0bbd777ec2ebdeb0079adf1": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
-  "usage": {
-   "in": 796,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "498bb4b78751c30cb951735828a1269a": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
-  "usage": {
-   "in": 796,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "ce54ea9788be0c56726adfe44d7dec15": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
-  "usage": {
-   "in": 826,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "4c40e2e752be0e8c0a5cee0a83b95e76": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
-  "usage": {
-   "in": 796,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "3e14fead4e8847e2764b980723ae8537": {
-  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 828,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "692106c7ad08692ad8f33f829197233f": {
-  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"quedarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 823,
-   "cachedIn": 0,
-   "out": 26
-  }
- },
- "5e00b628c0cc033469eea229ffe1a557": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
-  "usage": {
-   "in": 796,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "5221537e404f148a8050002fb90ca45e": {
-  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"quejarse\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 842,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "d57c6f979e6168d5a1ff17242b9d14c8": {
-  "text": "{\"decisiones\":[{\"vecino\":15,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 841,
-   "cachedIn": 0,
-   "out": 36
-  }
- },
- "3794f715243629a674293f84b3473131": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 799,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "87b7122c3e49b9fadc835511f94603ed": {
-  "text": "{\"decisiones\":[{\"vecino\":16,\"accion\":\"pedir:empleo\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
-  "usage": {
-   "in": 826,
-   "cachedIn": 0,
-   "out": 30
-  }
- },
- "56ae09596c01648b1e3cd0821e719544": {
-  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"gastar_ocio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
-  "usage": {
-   "in": 809,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "e622df09a8e4275d33a6587ae9472d43": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 799,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "43f681403258b6b504da6d10cc711078": {
-  "text": "{\"decisiones\":[{\"vecino\":18,\"accion\":\"quedarse\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 809,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "459d74261a8d84932d5a9a04d48e6180": {
-  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":26,\"accion\":\"seguir_alquilando\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
-  "usage": {
-   "in": 1011,
+   "in": 1053,
    "cachedIn": 0,
    "out": 58
   }
  },
- "56a67438815a5eadaaf270de8eb6271a": {
-  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"quedarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+ "f01eb10a888a7a3aa7d6e011b2a256bd": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"gastar_ocio\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
   "usage": {
-   "in": 827,
-   "cachedIn": 0,
-   "out": 30
-  }
- },
- "58cbd9342498608d705e99551ce9c301": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 798,
+   "in": 773,
    "cachedIn": 0,
    "out": 29
   }
  },
- "d3c974179a75c0ce94b3e77c12f38be2": {
-  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
-  "usage": {
-   "in": 824,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "daa00c188f853cb1f101e416fbfee2d1": {
-  "text": "{\"decisiones\":[{\"vecino\":26,\"accion\":\"comprar_casa\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
-  "usage": {
-   "in": 796,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "f41d8c8a0395b31e94b986a742f0c7c9": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 798,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "228c6c6e09aed01c72ba2b12e3d1a609": {
-  "text": "{\"decisiones\":[{\"vecino\":27,\"accion\":\"pedir:colegio\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
-  "usage": {
-   "in": 802,
-   "cachedIn": 0,
-   "out": 30
-  }
- },
- "e419fe59e140e18f226396b940dcce18": {
-  "text": "{\"decisiones\":[{\"vecino\":28,\"accion\":\"pedir:empleo\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
-  "usage": {
-   "in": 840,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "cf50984efe1c42b9221006515959533d": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 799,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "769110986192fbdbb3f7e15bfe6cedea": {
-  "text": "{\"decisiones\":[{\"vecino\":30,\"accion\":\"quedarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
-  "usage": {
-   "in": 825,
-   "cachedIn": 0,
-   "out": 30
-  }
- },
- "3e3ef2f4c1f48beec5069f45c09c2fbc": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 799,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "37dc4d0dcfa7eaeaeb568ab9deb2aaf0": {
-  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:colegio\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 811,
-   "cachedIn": 0,
-   "out": 30
-  }
- },
- "33b6774bdfda9c4506419d6d79015d60": {
-  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"pedir:empleo\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 811,
-   "cachedIn": 0,
-   "out": 27
-  }
- },
- "93d3692d3913128f2dafb7b94e21e212": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 799,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "8015701c8021e15eb29295695e242eb8": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 796,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "dcb1cfed837d7702f0d8a56cdb42556a": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 797,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "77a0e20737cc9cbbc1ee2d5a9ca2b608": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 799,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "cf2b5cc15d8c0b535f45a23c0062569a": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
-  "usage": {
-   "in": 796,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "73c3ff16b0781b74651890594f1d19f4": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
-  "usage": {
-   "in": 826,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "ef2bf1556ac7b10b7bf4fd47754c859f": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 799,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "e26e2b19acc3c1619e740830597dd8aa": {
-  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 828,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "2783ee0b894491aaebc9767cff076dbc": {
-  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"quedarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 823,
-   "cachedIn": 0,
-   "out": 26
-  }
- },
- "9b01a0d0f70d667a00925c884b0bb56a": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 798,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "9b84537de0b47dc75a81392ee4796f41": {
-  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"quejarse\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 842,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "837882b69d2899c09e8d5ba6285cd8ec": {
-  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 785,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "ea63325a3994a4f5e7241576cb55cd52": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 798,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "837371464ef71c209ecd12b775aa7673": {
-  "text": "{\"decisiones\":[{\"vecino\":16,\"accion\":\"pedir:empleo\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+ "64c5bc382639d650e896f15cb510c8a0": {
+  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
    "in": 827,
    "cachedIn": 0,
    "out": 34
   }
  },
- "aabc1527143ac5b67e5d1064e67ede17": {
-  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+ "56d026178cbb28b0d23ae9ced7af68a4": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":36,\"accion\":\"seguir_alquilando\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
   "usage": {
-   "in": 785,
+   "in": 1053,
    "cachedIn": 0,
-   "out": 34
+   "out": 58
   }
  },
- "f743f29d78af355fbe8215049f6d6a05": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+ "59fb79be44501920cb96355428656d43": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"gastar_ocio\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
   "usage": {
-   "in": 799,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "e4058428e0c06390bb089fb84625985a": {
-  "text": "{\"decisiones\":[{\"vecino\":18,\"accion\":\"quedarse\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 810,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "195411f7d48141f9df98213fa7557e96": {
-  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"quedarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
-  "usage": {
-   "in": 828,
-   "cachedIn": 0,
-   "out": 30
-  }
- },
- "2c395a144c3c09a5d30995160d4c2d19": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 799,
+   "in": 773,
    "cachedIn": 0,
    "out": 29
   }
  },
- "5392ed526cfb6833e3ef87ab59977f8d": {
-  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
-  "usage": {
-   "in": 824,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "dd82e41eacd504b230aa2a21182d2974": {
-  "text": "{\"decisiones\":[{\"vecino\":26,\"accion\":\"pedir:colegio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
-  "usage": {
-   "in": 824,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "d596c0be68dc63a425fa2749a8ea29ed": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 799,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "c8cfaa4ba6fbba40ee2eef418fe7f348": {
-  "text": "{\"decisiones\":[{\"vecino\":27,\"accion\":\"pedir:colegio\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
-  "usage": {
-   "in": 802,
-   "cachedIn": 0,
-   "out": 30
-  }
- },
- "2e589ac0e1ed2b067ee68565c903cd23": {
-  "text": "{\"decisiones\":[{\"vecino\":28,\"accion\":\"pedir:empleo\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
-  "usage": {
-   "in": 840,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "4c38216f13b6e8a7336f958e93a12042": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 799,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "b9abde3d26cf25ddfa7a06c623b70a11": {
-  "text": "{\"decisiones\":[{\"vecino\":30,\"accion\":\"quedarse\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+ "b37fa57f73336402adfd27946d193bd0": {
+  "text": "{\"decisiones\":[{\"vecino\":19,\"accion\":\"quejarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
   "usage": {
    "in": 825,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "6c2fedc9b12385dc8cc13eaef4767e51": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 799,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "52449fe86188ac22b197c412a9d40eab": {
-  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:colegio\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 813,
-   "cachedIn": 0,
-   "out": 30
-  }
- },
- "be2cc8183d5fa66f33ec81ef1f25f43b": {
-  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"pedir:empleo\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 811,
-   "cachedIn": 0,
-   "out": 27
-  }
- },
- "10524320c2331ccc42e0b4461c690b9b": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 799,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "908445344c4be317a0666ff98ca02a66": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 796,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "83ace8e405086f06597121ccb5b0f4ce": {
-  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"gastar_ocio\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":17,\"accion\":\"gastar_ocio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":18,\"accion\":\"gastar_ocio\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":25,\"accion\":\"comprar_casa\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
-  "usage": {
-   "in": 1421,
-   "cachedIn": 0,
-   "out": 102
-  }
- },
- "445aa307abf519921a2165bdbc805768": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 797,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "4daae6fb40314db704f8371bd532f31f": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 798,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "77cb3e6aba41131b600eb036da496dc3": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"gastar_ocio\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
-  "usage": {
-   "in": 758,
-   "cachedIn": 0,
-   "out": 30
-  }
- },
- "fc81dc11e1e081714efa41a6120f3a28": {
-  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"gastar_ocio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":17,\"accion\":\"gastar_ocio\",\"motivo\":\"Que nadie diga que no avisé.\"},{\"vecino\":18,\"accion\":\"gastar_ocio\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
-  "usage": {
-   "in": 1192,
-   "cachedIn": 0,
-   "out": 79
-  }
- },
- "b9cce370a09a36992127fd304d7d8900": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
-  "usage": {
-   "in": 825,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "c9544fa6392e6d27ae2f631b51c4a428": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 798,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "63315b40e3fa47a27bddead5c94ac448": {
-  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 828,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "ab29f3ba3074295bee03fc82b0d8df1f": {
-  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"quedarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 823,
    "cachedIn": 0,
    "out": 26
   }
  },
- "f5701c53f01b69f719fb5f42accf725a": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+ "b0da290b063d8fc6bee41f7b6a10962d": {
+  "text": "{\"decisiones\":[{\"vecino\":36,\"accion\":\"comprar_casa\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
   "usage": {
-   "in": 799,
+   "in": 814,
+   "cachedIn": 0,
+   "out": 27
+  }
+ },
+ "2036dbf25ead037eea14d9874e752d21": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"quedarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+  "usage": {
+   "in": 845,
+   "cachedIn": 0,
+   "out": 26
+  }
+ },
+ "41d79272557c2416e9c7393350b134be": {
+  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 847,
    "cachedIn": 0,
    "out": 29
   }
  },
- "2ee85e0f5ac5aa0f6ee653ab6d64bc04": {
-  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"quejarse\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+ "3d830773c6cd8b0e838d92352510b95d": {
+  "text": "{\"decisiones\":[{\"vecino\":28,\"accion\":\"pedir:empleo\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
   "usage": {
-   "in": 842,
+   "in": 839,
    "cachedIn": 0,
-   "out": 33
+   "out": 30
   }
  },
- "5586fa2f500c0bea50b92c6783d4335d": {
-  "text": "{\"decisiones\":[{\"vecino\":15,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+ "936fa7b980a329f7d80f304cfb44fa51": {
+  "text": "{\"decisiones\":[{\"vecino\":29,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 824,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "8873b15c73354985f5ad6bc937bd83f8": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"quejarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 793,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "f0cacda0582b2df2b5853ef4ceb973bc": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:colegio\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 808,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "52f071fa7b35c7bd61e1d6fa45be26e6": {
+  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"pedir:empleo\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 839,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "378df42dab9f60131b9b0b74b50eb50f": {
+  "text": "{\"decisiones\":[{\"vecino\":35,\"accion\":\"gastar_ocio\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+  "usage": {
+   "in": 825,
+   "cachedIn": 0,
+   "out": 27
+  }
+ },
+ "48383e94807491e001616066b8485a29": {
+  "text": "{\"decisiones\":[{\"vecino\":36,\"accion\":\"quejarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+  "usage": {
+   "in": 834,
+   "cachedIn": 0,
+   "out": 26
+  }
+ },
+ "2885ff0a62059380e849a8b40a81630d": {
+  "text": "{\"decisiones\":[{\"vecino\":37,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
   "usage": {
    "in": 841,
    "cachedIn": 0,
-   "out": 36
+   "out": 29
   }
  },
- "59271fb53f53f52cce12a73840a7c9bc": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+ "1f97c3a667119d9df7b8017f2ea0b5a3": {
+  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 799,
+   "in": 806,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "b1169939d70443519ef69daa5c250f4b": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"gastar_ocio\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":24,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 1012,
+   "cachedIn": 0,
+   "out": 53
+  }
+ },
+ "e30d8fe663d59ea7ca52de7905c9475f": {
+  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
+  "usage": {
+   "in": 797,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "2d524a13055f553af6dd5d2639808316": {
+  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 795,
+   "cachedIn": 0,
+   "out": 35
+  }
+ },
+ "642f8a72be0d5f8706622ef14ff8372c": {
+  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"gastar_ocio\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":24,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 1012,
+   "cachedIn": 0,
+   "out": 53
+  }
+ },
+ "76d6cb35df217a0a92521e4e77b36099": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"gastar_ocio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 814,
    "cachedIn": 0,
    "out": 29
   }
  },
- "302e5861158ed0d37f33b429c9433864": {
-  "text": "{\"decisiones\":[{\"vecino\":16,\"accion\":\"pedir:empleo\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+ "50ea1357d5713f4ae1b2d01c3f98719f": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 827,
+   "in": 807,
    "cachedIn": 0,
    "out": 34
   }
  },
- "97190950e8950df92d7aa24704d04c1a": {
-  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"gastar_ocio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+ "7fa59ec9eac4b31335820f5c10677188": {
+  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"quejarse\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 828,
+   "cachedIn": 0,
+   "out": 28
+  }
+ },
+ "d3a14f8902a3b9c4aebc51bb11236e9e": {
+  "text": "{\"decisiones\":[{\"vecino\":15,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 840,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "66ba3a4a80e59ac3a07ccb86f2d850f0": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 807,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "4db4a9acccff87727cf527c7ded47e4c": {
+  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 828,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "7796da95397928fbdc5306e2100cbf71": {
+  "text": "{\"decisiones\":[{\"vecino\":18,\"accion\":\"quedarse\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 826,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "ac134febd12b45e7607b230c15441987": {
+  "text": "{\"decisiones\":[{\"vecino\":19,\"accion\":\"quejarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+  "usage": {
+   "in": 825,
+   "cachedIn": 0,
+   "out": 26
+  }
+ },
+ "0a43fe590b1037259119bed61f519d2e": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"quedarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+  "usage": {
+   "in": 845,
+   "cachedIn": 0,
+   "out": 26
+  }
+ },
+ "ae4d649c7cb5f996cff79e89bc5826b7": {
+  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 847,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "473d0890b276f9ade73d866120f86728": {
+  "text": "{\"decisiones\":[{\"vecino\":28,\"accion\":\"pedir:empleo\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 838,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "766fadbc88f6777a31b8e2ecd1a4974b": {
+  "text": "{\"decisiones\":[{\"vecino\":29,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 824,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "b6613bd88de9aaa4fdde84074d238f3b": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"quejarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 793,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "acc6f51e8ae47c7ec7e008b94c1d5c07": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:colegio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
   "usage": {
    "in": 809,
    "cachedIn": 0,
    "out": 29
   }
  },
- "788b39fc6e55f69d2861991a6e7ca5dd": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+ "7ac8531c8260d28781b2b66672b7b111": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
   "usage": {
-   "in": 799,
+   "in": 1677,
    "cachedIn": 0,
-   "out": 29
+   "out": 126
   }
  },
- "c6b61a349b1f9d9ad7cb21c12e46ba7f": {
-  "text": "{\"decisiones\":[{\"vecino\":18,\"accion\":\"quedarse\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+ "7ba7612a821873be6269aef88c356a30": {
+  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"pedir:empleo\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 810,
+   "in": 839,
    "cachedIn": 0,
-   "out": 33
+   "out": 34
   }
  },
- "7ed7512c9663e441ef78eb00bada4202": {
-  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"quedarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+ "2dfde9fb29cd2840f38d65fd21354176": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"gastar_ocio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
   "usage": {
-   "in": 828,
+   "in": 771,
+   "cachedIn": 0,
+   "out": 32
+  }
+ },
+ "351989568b448d4f74196ca35c68f40f": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Que nadie diga que no avisé.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 1676,
+   "cachedIn": 0,
+   "out": 129
+  }
+ },
+ "b2ae19d3e91a0bf57144a2bd70911944": {
+  "text": "{\"decisiones\":[{\"vecino\":36,\"accion\":\"quedarse\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
+  "usage": {
+   "in": 842,
+   "cachedIn": 0,
+   "out": 28
+  }
+ },
+ "c7336190515a9c790240763d2f6c76e2": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"gastar_ocio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 771,
+   "cachedIn": 0,
+   "out": 32
+  }
+ },
+ "bec6aab073e714c33a444e3177f0bc0b": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+  "usage": {
+   "in": 1438,
+   "cachedIn": 0,
+   "out": 101
+  }
+ },
+ "ce3a8aab748e4b7e29dc71bb8d7d5556": {
+  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 807,
    "cachedIn": 0,
    "out": 30
   }
  },
- "9e694ecb4937ce8060ff2f77448a1d4e": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+ "29a7e0e30fbd8a5afab1d3ba066adab0": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"gastar_ocio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
   "usage": {
-   "in": 799,
+   "in": 771,
+   "cachedIn": 0,
+   "out": 32
+  }
+ },
+ "8ea2fd1ab88b52a0694d0ffa03230e33": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 1439,
+   "cachedIn": 0,
+   "out": 103
+  }
+ },
+ "7edf8a90d103b069acfb62e31ce4bcab": {
+  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 796,
+   "cachedIn": 0,
+   "out": 35
+  }
+ },
+ "71a1ce01c21c5d88a52aa67d62008ef7": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 1439,
+   "cachedIn": 0,
+   "out": 103
+  }
+ },
+ "23cc0ef7b1c521dc4058fb03803609b4": {
+  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"quejarse\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 829,
+   "cachedIn": 0,
+   "out": 28
+  }
+ },
+ "a0aaa44b3ddd1107f5621bf0d0573bc0": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 1423,
+   "cachedIn": 0,
+   "out": 103
+  }
+ },
+ "9f01df99f10048db5a59e2a84548cf23": {
+  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 828,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "b0caf6ed6606d74bd1505422e6d5b3ff": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 1423,
+   "cachedIn": 0,
+   "out": 103
+  }
+ },
+ "4fea57478f2c9a3318721ef196676d1e": {
+  "text": "{\"decisiones\":[{\"vecino\":19,\"accion\":\"quejarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 826,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "a7eeb79bfa277a0f4effca7911cca606": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 1439,
+   "cachedIn": 0,
+   "out": 103
+  }
+ },
+ "64c6e34602c097fa539767507b78b260": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"quedarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+  "usage": {
+   "in": 845,
+   "cachedIn": 0,
+   "out": 26
+  }
+ },
+ "ba335fd7e741c88b9e7d85e1ee3b393e": {
+  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"fundar:ropa\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":28,\"accion\":\"seguir_alquilando\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":32,\"accion\":\"fundar:ropa\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":35,\"accion\":\"comprar_casa\",\"motivo\":\"Que nadie diga que no avisé.\"},{\"vecino\":37,\"accion\":\"seguir_alquilando\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 1755,
+   "cachedIn": 0,
+   "out": 135
+  }
+ },
+ "1cc0ca27c8605d41850c2dcee308f15f": {
+  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 847,
    "cachedIn": 0,
    "out": 29
   }
  },
- "6b89c040a5f6d4ad88aca21fc9b9aa81": {
-  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"quedarse\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+ "e75d14a4554053fd68f70a9d4e47be5d": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Que nadie diga que no avisé.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 1438,
+   "cachedIn": 0,
+   "out": 98
+  }
+ },
+ "d4eb0d84e09383d5e49d269ebbd4c17e": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 807,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "9274d7ddb6484340f6440f9e20006820": {
+  "text": "{\"decisiones\":[{\"vecino\":29,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 824,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "5f00b58b8f37b1a5e975f6d87dc82816": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 1423,
+   "cachedIn": 0,
+   "out": 103
+  }
+ },
+ "134060bec618619cd4f4adceeb75b2d4": {
+  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 807,
+   "cachedIn": 0,
+   "out": 34
+  }
+ },
+ "af61dd02d58dbb01ee80a2deaa6db77a": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:colegio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
    "in": 819,
    "cachedIn": 0,
    "out": 31
   }
  },
- "edfdc3ee7ca4c51ccd4b03efd53b10d2": {
-  "text": "{\"decisiones\":[{\"vecino\":26,\"accion\":\"pedir:colegio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+ "bc03668525259145734d2d5a40f19da2": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
   "usage": {
-   "in": 824,
+   "in": 1423,
    "cachedIn": 0,
-   "out": 33
+   "out": 103
   }
  },
- "a449d56c5d64fc456e690dc2b5bb03a2": {
-  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"seguir_alquilando\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
+ "73897015ad55c9e9499ff826ecbf6364": {
+  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"pedir:empleo\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
   "usage": {
-   "in": 799,
+   "in": 840,
    "cachedIn": 0,
-   "out": 29
+   "out": 34
   }
  },
- "8f2fac5e89a09d7157c32aab69e52b79": {
-  "text": "{\"decisiones\":[{\"vecino\":27,\"accion\":\"pedir:colegio\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+ "65d642ec9762c8111fd2a38f77e892b9": {
+  "text": "{\"decisiones\":[{\"vecino\":35,\"accion\":\"quedarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 802,
+   "in": 833,
    "cachedIn": 0,
    "out": 30
   }
  },
- "d84a77bf33222f1319b4f26132540728": {
-  "text": "{\"decisiones\":[{\"vecino\":28,\"accion\":\"pedir:empleo\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+ "940b4c21c903390bf9ca8834ee9c3301": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Que nadie diga que no avisé.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 1438,
+   "cachedIn": 0,
+   "out": 98
+  }
+ },
+ "6f9f396d7878bf6e3588171b144e5dc6": {
+  "text": "{\"decisiones\":[{\"vecino\":36,\"accion\":\"quedarse\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
+  "usage": {
+   "in": 842,
+   "cachedIn": 0,
+   "out": 28
+  }
+ },
+ "8a4d1cf58dbe6a8c2d50ba95d4aad723": {
+  "text": "{\"decisiones\":[{\"vecino\":37,\"accion\":\"quejarse\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
+  "usage": {
+   "in": 842,
+   "cachedIn": 0,
+   "out": 28
+  }
+ },
+ "d93ae7446891de4b5469e5a3f18feacb": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 1439,
+   "cachedIn": 0,
+   "out": 103
+  }
+ },
+ "7b154aa5f4484a57f3a26b1dc18e7b1a": {
+  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 807,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "7f13943836123cdab4ead3b3afa56c13": {
+  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 796,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "2fe3e9ba8c5ddc5e408b424a488367b3": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 1439,
+   "cachedIn": 0,
+   "out": 103
+  }
+ },
+ "78aa9c332e923cc47eebd3f941f3863c": {
+  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 796,
+   "cachedIn": 0,
+   "out": 35
+  }
+ },
+ "1d2f6e4fab0cd5cc035719bd7854d91d": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 1439,
+   "cachedIn": 0,
+   "out": 103
+  }
+ },
+ "c086552d0fdc14155ba3594666fc090d": {
+  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
+  "usage": {
+   "in": 822,
+   "cachedIn": 0,
+   "out": 36
+  }
+ },
+ "35555c0b78377d21a3dfbd729c449c58": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Que nadie diga que no avisé.\"},{\"vecino\":17,\"accion\":\"gastar_ocio\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":18,\"accion\":\"gastar_ocio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":24,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":28,\"accion\":\"comprar_casa\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":34,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+  "usage": {
+   "in": 2378,
+   "cachedIn": 0,
+   "out": 209
+  }
+ },
+ "25f6509e0686cafb49209b2e39700eda": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Que nadie diga que no avisé.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":34,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":37,\"accion\":\"seguir_alquilando\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 2158,
+   "cachedIn": 0,
+   "out": 176
+  }
+ },
+ "294bdc0d297b77e9502325f5f866b8b5": {
+  "text": "{\"decisiones\":[{\"vecino\":19,\"accion\":\"quejarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 826,
+   "cachedIn": 0,
+   "out": 30
+  }
+ },
+ "1d2a9fe57b5ad375b9fa765cca3cd4ab": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Que nadie diga que no avisé.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":34,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":37,\"accion\":\"seguir_alquilando\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 2158,
+   "cachedIn": 0,
+   "out": 176
+  }
+ },
+ "68d32ad060eb69dc0ef67d452d340685": {
+  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"quejarse\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+  "usage": {
+   "in": 848,
+   "cachedIn": 0,
+   "out": 29
+  }
+ },
+ "cdf1601f7f0c2bbe36ac27704a2f57f5": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Que nadie diga que no avisé.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":34,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":37,\"accion\":\"seguir_alquilando\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 2158,
+   "cachedIn": 0,
+   "out": 176
+  }
+ },
+ "c7da21a36b818761556a7fab218cf926": {
+  "text": "{\"decisiones\":[{\"vecino\":28,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
+  "usage": {
+   "in": 832,
+   "cachedIn": 0,
+   "out": 32
+  }
+ },
+ "5ceb3fae21f1dae449f0a3d97bea4839": {
+  "text": "{\"decisiones\":[{\"vecino\":29,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 825,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "4815f8a8179d2bb744cc24d406073777": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Que nadie diga que no avisé.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":34,\"accion\":\"gastar_ocio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":37,\"accion\":\"comprar_casa\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
+  "usage": {
+   "in": 1919,
+   "cachedIn": 0,
+   "out": 155
+  }
+ },
+ "c3fc2ee749d7d640772bf252455a458d": {
+  "text": "{\"decisiones\":[{\"vecino\":31,\"accion\":\"quejarse\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
+  "usage": {
+   "in": 809,
+   "cachedIn": 0,
+   "out": 28
+  }
+ },
+ "43a79d3ede4602956715be2b538d8ead": {
+  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:colegio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 810,
+   "cachedIn": 0,
+   "out": 31
+  }
+ },
+ "c38ab9f4e4a1edc45d9ffe96e553ecb2": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":34,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+  "usage": {
+   "in": 1672,
+   "cachedIn": 0,
+   "out": 129
+  }
+ },
+ "baf2e6579ae9fb613b1620f9d9318cd1": {
+  "text": "{\"decisiones\":[{\"vecino\":35,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
    "in": 840,
    "cachedIn": 0,
    "out": 31
   }
  },
- "9005323f6ad28b55745ab5007454bc0d": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"gastar_ocio\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":11,\"accion\":\"gastar_ocio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":12,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":16,\"accion\":\"ahorrar\",\"motivo\":\"Que nadie diga que no avisé.\"},{\"vecino\":17,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Que nadie diga que no avisé.\"},{\"vecino\":31,\"accion\":\"comprar_casa\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
+ "b708a3c520ace20774f7b102ae302f2f": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
   "usage": {
-   "in": 2280,
+   "in": 1440,
    "cachedIn": 0,
-   "out": 198
+   "out": 103
   }
  },
- "4633e72641c6f37c39e13fec5d0bba46": {
-  "text": "{\"decisiones\":[{\"vecino\":30,\"accion\":\"quedarse\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
+ "7c9f8814fcc5be24b48ea88ca6128a1b": {
+  "text": "{\"decisiones\":[{\"vecino\":36,\"accion\":\"quedarse\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
   "usage": {
-   "in": 825,
+   "in": 842,
    "cachedIn": 0,
-   "out": 31
+   "out": 28
   }
  },
- "6d05b9dd308479ca04e7e0ad89ceb357": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"gastar_ocio\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":16,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":17,\"accion\":\"gastar_ocio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":18,\"accion\":\"gastar_ocio\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
+ "da0333f9546633e4d44320a14a1c01ee": {
+  "text": "{\"decisiones\":[{\"vecino\":37,\"accion\":\"pedir:colegio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
-   "in": 1604,
-   "cachedIn": 0,
-   "out": 129
-  }
- },
- "35b62c1c5f9f1224b8e28b224c15b616": {
-  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:colegio\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 813,
-   "cachedIn": 0,
-   "out": 30
-  }
- },
- "07d3442462697e171c1258267ac9934e": {
-  "text": "{\"decisiones\":[{\"vecino\":34,\"accion\":\"pedir:empleo\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 811,
-   "cachedIn": 0,
-   "out": 27
-  }
- },
- "e910641f744e043665bd63fb2793324d": {
-  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"gastar_ocio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":16,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":18,\"accion\":\"gastar_ocio\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
-  "usage": {
-   "in": 1211,
-   "cachedIn": 0,
-   "out": 80
-  }
- },
- "3ea7bf85358d548087b89c5a16462b07": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 796,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "2fe449eeec5cf330357a3cb123797f8e": {
-  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 797,
-   "cachedIn": 0,
-   "out": 32
-  }
- },
- "413218b5506b40d54cd21ffb933940fe": {
-  "text": "{\"decisiones\":[{\"vecino\":16,\"accion\":\"gastar_ocio\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
-  "usage": {
-   "in": 790,
-   "cachedIn": 0,
-   "out": 30
-  }
- },
- "a20bdc66c4fc70362f3362fe44c5f27f": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
-  "usage": {
-   "in": 796,
+   "in": 834,
    "cachedIn": 0,
    "out": 31
   }
  },
- "ceedd55470d79d80386b45b62fd6bd9d": {
-  "text": "{\"decisiones\":[{\"vecino\":9,\"accion\":\"pedir:centro_salud\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
+ "e5e16eed67f6b61c1312578672b51485": {
+  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"},{\"vecino\":18,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
   "usage": {
-   "in": 826,
+   "in": 1440,
    "cachedIn": 0,
-   "out": 32
+   "out": 103
   }
  },
- "1e21b1f4253a11184f714928e42e376a": {
-  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"gastar_ocio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 828,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "f3921892a738720ac21b6f9466f5a332": {
-  "text": "{\"decisiones\":[{\"vecino\":12,\"accion\":\"quedarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 823,
-   "cachedIn": 0,
-   "out": 26
-  }
- },
- "1339e30f769e8231b5377cd7c187a852": {
-  "text": "{\"decisiones\":[{\"vecino\":13,\"accion\":\"quejarse\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 843,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "4cd4f3e2480fafaa936bcb290e3e40af": {
-  "text": "{\"decisiones\":[{\"vecino\":15,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 841,
-   "cachedIn": 0,
-   "out": 36
-  }
- },
- "5931cf1807448ff0186ad0fe9441bed5": {
-  "text": "{\"decisiones\":[{\"vecino\":16,\"accion\":\"pedir:empleo\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 828,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "40bce528946e3108f6a06a5e7d52dfb6": {
-  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"gastar_ocio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
-  "usage": {
-   "in": 809,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "5255e2928f9d5fd57c6e3aecd3b3b95d": {
-  "text": "{\"decisiones\":[{\"vecino\":18,\"accion\":\"quedarse\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 810,
-   "cachedIn": 0,
-   "out": 33
-  }
- },
- "0c01a81c2fccc848c4114d9fed998bf0": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":9,\"accion\":\"gastar_ocio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":16,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
-  "usage": {
-   "in": 2097,
-   "cachedIn": 0,
-   "out": 181
-  }
- },
- "9c3472f1ce382532bfb6254c35f1123b": {
-  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
-  "usage": {
-   "in": 771,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "fe9e1fd8db41b1b064dfe7b7e4fdb766": {
-  "text": "{\"decisiones\":[{\"vecino\":18,\"accion\":\"gastar_ocio\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
-  "usage": {
-   "in": 772,
-   "cachedIn": 0,
-   "out": 30
-  }
- },
- "0acc6fcf8456e2cd12ff870ba27e0d48": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":9,\"accion\":\"gastar_ocio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":16,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
-  "usage": {
-   "in": 2097,
-   "cachedIn": 0,
-   "out": 181
-  }
- },
- "fa312f1f4f7e29b8b6ace8d08f43caf0": {
-  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
-  "usage": {
-   "in": 771,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "6d981d1bafc9f29385e4668b7b53a5ba": {
-  "text": "{\"decisiones\":[{\"vecino\":18,\"accion\":\"gastar_ocio\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
-  "usage": {
-   "in": 772,
-   "cachedIn": 0,
-   "out": 30
-  }
- },
- "17e17b62875bb62f9eae5450bb6730b0": {
-  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":16,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 1465,
-   "cachedIn": 0,
-   "out": 101
-  }
- },
- "c11b62ee532bb7979b78ac4e82b6fbcd": {
-  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
-  "usage": {
-   "in": 771,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "62ef9bd05b8c7346351b081664cb64b1": {
-  "text": "{\"decisiones\":[{\"vecino\":30,\"accion\":\"quedarse\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
-  "usage": {
-   "in": 825,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "b55d73ca19db43d6079ed0be5687ae2f": {
-  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":16,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 1465,
-   "cachedIn": 0,
-   "out": 101
-  }
- },
- "330974ea0fbafbfcf266c08bc9325e31": {
-  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
-  "usage": {
-   "in": 771,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "577019f0b2a9bad0456f59c6389b58ef": {
-  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:colegio\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 813,
-   "cachedIn": 0,
-   "out": 30
-  }
- },
- "3cf9b3b613e9187c026f1d9d4a724271": {
-  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":16,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 1465,
-   "cachedIn": 0,
-   "out": 101
-  }
- },
- "d06ed5f5b196180695178656cbd04cba": {
-  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
-  "usage": {
-   "in": 771,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "b6efc920b62fb4316c94e42522e56dd6": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 796,
-   "cachedIn": 0,
-   "out": 34
-  }
- },
- "cdd86de06cdc376c936baa7d91b8e558": {
-  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":16,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 1465,
-   "cachedIn": 0,
-   "out": 101
-  }
- },
- "402af5570b5a1844b9e094514286d662": {
-  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
-  "usage": {
-   "in": 771,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "451069f05d6dc14bc3bd9f9bc919601e": {
-  "text": "{\"decisiones\":[{\"vecino\":8,\"accion\":\"pedir:colegio\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
-  "usage": {
-   "in": 796,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "553dfc5a8490282cd0f177fb75d5e0fc": {
-  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":16,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 1465,
-   "cachedIn": 0,
-   "out": 101
-  }
- },
- "597c7193d5ff00f585c5397b232a3fa0": {
-  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
-  "usage": {
-   "in": 771,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "f0aeb8e36d7cc2484a0f67582aeccbb1": {
-  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":16,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 1465,
-   "cachedIn": 0,
-   "out": 101
-  }
- },
- "5d38b53019f02c70d9e02a7864f8815e": {
-  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
-  "usage": {
-   "in": 771,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "41bf2cf6b6408662f593d1f51b4125dd": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"gastar_ocio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":9,\"accion\":\"gastar_ocio\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":13,\"accion\":\"fundar:ferreteria\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":18,\"accion\":\"fundar:panaderia\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":24,\"accion\":\"fundar:peluqueria\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"},{\"vecino\":28,\"accion\":\"fundar:ropa\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"},{\"vecino\":30,\"accion\":\"fundar:ferreteria\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 2159,
-   "cachedIn": 0,
-   "out": 192
-  }
- },
- "e75854add88083d2d7d8232ccca2cb0d": {
-  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":16,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 1464,
-   "cachedIn": 0,
-   "out": 101
-  }
- },
- "0ac894d8c3f9b98d97e285b60c2d6b2c": {
-  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
-  "usage": {
-   "in": 771,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "e25e198f8c76b3df97c165ff2ee47c60": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"gastar_ocio\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"},{\"vecino\":9,\"accion\":\"gastar_ocio\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"}]}",
-  "usage": {
-   "in": 1198,
-   "cachedIn": 0,
-   "out": 83
-  }
- },
- "2332d84cb98a44fced7ecaf3e0016761": {
-  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":16,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 1464,
-   "cachedIn": 0,
-   "out": 101
-  }
- },
- "7c5fd4b1da9a4ad832384000a45c8e70": {
-  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
-  "usage": {
-   "in": 771,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "fc057f63370edada157f0797096cdb89": {
-  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
-  "usage": {
-   "in": 788,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "65c06cd1f30001c32c37eff0273b07d5": {
-  "text": "{\"decisiones\":[{\"vecino\":18,\"accion\":\"pedir:centro_salud\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
+ "c4f09d48f6f4304af4c847e348299b06": {
+  "text": "{\"decisiones\":[{\"vecino\":6,\"accion\":\"quedarse\",\"motivo\":\"A ver si el alcalde se entera de una vez.\"}]}",
   "usage": {
    "in": 806,
    "cachedIn": 0,
-   "out": 32
-  }
- },
- "f680d961a3a6df870c7d4d1afcb7dd78": {
-  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":16,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 1465,
-   "cachedIn": 0,
-   "out": 101
-  }
- },
- "e6407a0287b3db69a984af63f561dc8e": {
-  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
-  "usage": {
-   "in": 771,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "910c1dbb2c4a20a0858a3c70e00b02d3": {
-  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
-  "usage": {
-   "in": 788,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "d222b0505a587c717b54b4177f088eb1": {
-  "text": "{\"decisiones\":[{\"vecino\":25,\"accion\":\"quejarse\",\"motivo\":\"Que nadie diga que no avisé.\"}]}",
-  "usage": {
-   "in": 825,
-   "cachedIn": 0,
-   "out": 26
-  }
- },
- "b29210ef7efe2d3de38f5d57e6e85ad5": {
-  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":16,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 1465,
-   "cachedIn": 0,
-   "out": 101
-  }
- },
- "5f62c24ef77f05cf72fe7989e36e4610": {
-  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
-  "usage": {
-   "in": 771,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "792e00e9b8f88ee4a801d30bdf4d7408": {
-  "text": "{\"decisiones\":[{\"vecino\":24,\"accion\":\"gastar_ocio\",\"motivo\":\"Esto hay que decirlo alto y claro.\"}]}",
-  "usage": {
-   "in": 788,
-   "cachedIn": 0,
-   "out": 29
-  }
- },
- "675a72b6a3c5c26294aa10713ff802a4": {
-  "text": "{\"decisiones\":[{\"vecino\":27,\"accion\":\"pedir:colegio\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
-  "usage": {
-   "in": 802,
-   "cachedIn": 0,
    "out": 30
-  }
- },
- "e8bca97f578560ba2095e89ad426d69d": {
-  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":16,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 1465,
-   "cachedIn": 0,
-   "out": 101
-  }
- },
- "cf744a47e90cc5649b37593a6f04437a": {
-  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
-  "usage": {
-   "in": 771,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "9e8426e2166e9b8fce77e567a046f137": {
-  "text": "{\"decisiones\":[{\"vecino\":30,\"accion\":\"quedarse\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
-  "usage": {
-   "in": 825,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "039b34156350f4e84345a8d12799f538": {
-  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":16,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 1465,
-   "cachedIn": 0,
-   "out": 101
-  }
- },
- "01a6a7feece7dc6b6e8455af0b613dc6": {
-  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
-  "usage": {
-   "in": 771,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "d8fee78b9f1ec0f3af08c49b6c1a5999": {
-  "text": "{\"decisiones\":[{\"vecino\":32,\"accion\":\"pedir:colegio\",\"motivo\":\"Si no lo hago ahora, no lo hago nunca.\"}]}",
-  "usage": {
-   "in": 810,
-   "cachedIn": 0,
-   "out": 30
-  }
- },
- "66f13693171a2368c94bbeff0a1e2c95": {
-  "text": "{\"decisiones\":[{\"vecino\":11,\"accion\":\"ahorrar\",\"motivo\":\"Me lo he pensado mucho y lo tengo claro.\"},{\"vecino\":12,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"},{\"vecino\":15,\"accion\":\"ahorrar\",\"motivo\":\"Esto hay que decirlo alto y claro.\"},{\"vecino\":16,\"accion\":\"ahorrar\",\"motivo\":\"Aquí estoy bien y no pienso moverme.\"}]}",
-  "usage": {
-   "in": 1465,
-   "cachedIn": 0,
-   "out": 101
-  }
- },
- "0e196a9d8042e1943043c06d9875dff2": {
-  "text": "{\"decisiones\":[{\"vecino\":17,\"accion\":\"ahorrar\",\"motivo\":\"Con calma, que las prisas no traen nada bueno.\"}]}",
-  "usage": {
-   "in": 771,
-   "cachedIn": 0,
-   "out": 31
-  }
- },
- "6398f801e754ffe5cd46ce05cfbab566": {
-  "text": "{\"decisiones\":[{\"vecino\":2,\"accion\":\"pedir:colegio\",\"motivo\":\"Mi madre siempre decía que el pueblo es lo primero.\"}]}",
-  "usage": {
-   "in": 796,
-   "cachedIn": 0,
-   "out": 34
   }
  },
  "7040c9d8174ebcd4d1b51470e8c9262c": {

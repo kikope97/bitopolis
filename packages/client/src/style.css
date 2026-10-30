@@ -445,3 +445,7 @@ body.placing #toasts { bottom: calc(260px + env(safe-area-inset-bottom)); }
 #hud-poll.neg { color: var(--bad); }
 .game.opposition .tools { opacity: 0.55; }
 .game.opposition .tool-info::before { content: 'Oposición · '; color: var(--bad); font-weight: 700; }
+.pol-fill { border-right: 2px solid var(--text); }
+.pol-bar.abst .pol-fill { background: repeating-linear-gradient(45deg, #94b0c2 0 3px, #566c86 3px 6px); }
+.btn[aria-disabled='true'] { opacity: 0.5; border-style: dashed; cursor: not-allowed; }
+body.election-night .bubbles { display: none; }
