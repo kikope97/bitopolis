@@ -1,5 +1,5 @@
 import { tickToDate } from '@bitopolis/shared';
-import { CAMPAIGN_COST, canCampaign, daysToElection, type ElectionResult, FACTION_TEXT, FACTIONS, type GameState, OPPOSITION_POP, politicsActive } from '@bitopolis/sim';
+import { CAMPAIGN_COST, canCampaign, canMotion, daysToElection, type ElectionResult, FACTION_TEXT, FACTIONS, type GameState, OPPOSITION_POP, politicsActive } from '@bitopolis/sim';
 import { formatDate } from './i18n.ts';
 import { lowMotion } from './prefs.ts';
 import { $, h, sheet } from './ui.ts';
@@ -97,8 +97,9 @@ export function openPolitics(ctx: SocialCtx): void {
         'div',
         { class: 'faction' },
         bar(`${FACTION_TEXT[f]} (${info.members})`, info.satisfaction),
-        h('p', { class: 'muted' }, info.demand ? `Piden: ${info.demand}.` : 'Están conformes.', p.campaign[f] ? ` Campaña: ${'●'.repeat(p.campaign[f])}` : ''),
+        h('p', { class: 'muted' }, info.demands.length ? `Piden: ${info.demands.join(' y ')}.` : 'Están conformes.', p.campaign[f] ? ` Campaña: ${'●'.repeat(p.campaign[f])}` : ''),
         btn,
+        opp ? motionButton(ctx, f) : '',
       ),
     );
   }
@@ -108,12 +109,44 @@ export function openPolitics(ctx: SocialCtx): void {
     const leader = h('button', { class: 'btn small' }, `Ver la ficha de ${p.party.leaderName}`);
     leader.addEventListener('click', () => openCitizen(ctx, p.party!.leaderId));
     items.push(h('h3', {}, opp ? 'Gobierno' : 'Oposición'), h('p', {}, `«${p.party.name}», de la facción ${FACTION_TEXT[p.party.faction].toLowerCase()}. Lo lidera ${p.party.leaderName}.`), leader);
+    // Lo que ha prometido el rival (y si lo cumple): munición para la oposición.
+    if (p.party.promises.length) {
+      const status = { pending: 'pendiente', kept: '✓ cumplida', broken: '✗ incumplida' } as const;
+      items.push(
+        h('h3', {}, `Promesas de «${p.party.name}»`),
+        h(
+          'ul',
+          { class: 'accounts' },
+          ...p.party.promises.map((pr) =>
+            h(
+              'li',
+              { class: pr.status === 'broken' ? 'neg' : pr.status === 'kept' ? 'pos' : '' },
+              h('span', {}, `${pr.need} (${FACTION_TEXT[pr.faction].toLowerCase()})${pr.fromMotion ? ' · tu moción' : ''}`),
+              h('span', {}, pr.status === 'pending' && p.mayor === p.party!.leaderId ? `pendiente hasta el ${formatDate(tickToDate(pr.deadline))}` : status[pr.status]),
+            ),
+          ),
+        ),
+      );
+    }
   }
   if (p.history.length) {
     items.push(h('h3', {}, 'Elecciones anteriores'));
     items.push(h('ul', { class: 'people' }, ...[...p.history].reverse().map((r) => h('li', {}, resultText(r)))));
   }
   sheet('Política y elecciones', ...items);
+}
+
+/** Moción desde la oposición: llevar al pleno lo que pide la facción. */
+function motionButton(ctx: SocialCtx, f: (typeof FACTIONS)[number]): HTMLElement {
+  const state = ctx.state();
+  const can = canMotion(state, f);
+  const id = `motion-why-${f}`;
+  const btn = h('button', { class: 'btn small', ...(can.ok ? {} : { 'aria-disabled': 'true', 'aria-describedby': id }) }, `Presentar moción: ${state.politics.factions[f].demand ?? '—'}`);
+  btn.addEventListener('click', async () => {
+    if (!can.ok) return;
+    if (await ctx.command({ type: 'Motion', faction: f })) openPolitics(ctx);
+  });
+  return h('div', {}, btn, can.ok ? '' : h('p', { id, class: 'muted small' }, can.error ?? ''));
 }
 
 function resultText(r: ElectionResult): string {

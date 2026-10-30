@@ -129,6 +129,10 @@ export const CAMPAIGN_EFFECT = 0.03;
 export const CAMPAIGN_COST = 300;
 /** Las bajadas de impuestos se notan despacio (días); las subidas, al momento. */
 export const TAX_RELIEF_DAYS = 90;
+/** Plazo del rival para cumplir lo prometido si gana (meses tras las elecciones). */
+export const RIVAL_PROMISE_MONTHS = 12;
+/** Plazo para cumplir una moción aprobada (meses). */
+export const MOTION_MONTHS = 6;
 /** Apoyo extra al gobierno recién elegido (se apaga en 12 meses). */
 export const HONEYMOON = 0.25;
 /** Interés mensual de la deuda: 1 % hasta 5.000 € y 3 % por encima. */
