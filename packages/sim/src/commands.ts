@@ -1,5 +1,6 @@
 import { canMeetAssociation, meetAssociation } from './associations.ts';
 import { canUpgradeBuilding, startUpgrade } from './levels.ts';
+import { applyTownTurn, canApplyTurn, mayorText, noteMayor, setAiShare } from './turns.ts';
 import { canMicrocredit, canSettleDebt, grantMicrocredit, settleDebt } from './household.ts';
 import { serviceCounts } from './economy.ts';
 import { BUILD_LEVEL, canUpgradeTownhall, plenoUnlocked, townLevel, upgradeTownhall, zonesUnlocked } from './townhall.ts';
@@ -207,6 +208,14 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
     }
     case 'UpgradeTownhall':
       return canUpgradeTownhall(state);
+    case 'TownTurn':
+      return canApplyTurn(state, cmd.n);
+    case 'SetAiShare':
+      if (!state.aiMode || !state.ai) return { ok: false, error: 'Solo en Modo IA' };
+      return cmd.share === state.ai.share ? { ok: false, error: 'Ya está en ese %' } : { ok: true };
+    case 'SetTurnPace':
+      if (!state.aiMode || !state.ai) return { ok: false, error: 'Solo en Modo IA' };
+      return cmd.days === state.ai.paceDays ? { ok: false, error: 'Ya está a ese ritmo' } : { ok: true };
     case 'UpgradeBuilding': {
       const b = state.buildings.find((x) => x.id === cmd.buildingId);
       return canUpgradeBuilding(state, b, b ? serviceCounts(state).get(b.id) : undefined);
@@ -271,7 +280,18 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
   const v = validateCommand(state, raw);
   if (!v.ok) return v;
   const cmd = Command.parse(raw);
+  // 2.0: lo que hace el alcalde se cuenta a la IA del pueblo (texto del motor).
+  const mayor = mayorText(state, cmd);
   switch (cmd.type) {
+    case 'TownTurn':
+      applyTownTurn(state, cmd.n, cmd.acts, { focus: cmd.focus, chronicle: cmd.chronicle });
+      break;
+    case 'SetAiShare':
+      setAiShare(state, cmd.share);
+      break;
+    case 'SetTurnPace':
+      state.ai!.paceDays = cmd.days;
+      break;
     case 'SetTax':
       if (state.taxLevel !== cmd.level) {
         state.taxLevel = cmd.level;
@@ -435,5 +455,6 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       talkTo(state, state.citizens.find((c) => c.id === cmd.citizenId)!);
       break;
   }
+  if (mayor) noteMayor(state, mayor.text, mayor.big);
   return { ok: true };
 }

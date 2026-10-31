@@ -132,6 +132,15 @@ export const MIGRATIONS: Record<number, Migration> = {
     debtLedger: s.debtLedger ?? { created: 0, repaid: 0, written: 0, forgiven: 0 },
     justice: s.justice ? { ...s.justice, jail: (s.justice.jail ?? []).map((p: number | { until: number }) => (typeof p === 'number' ? { until: p } : p)) } : s.justice,
   }),
+  // 2.0: turnos del pueblo con IA. Las partidas en Modo IA siguen con sus vecinos con
+  // nombre (ahora piensan en turnos) y un 25 % para los que lleguen; el primer turno, en una semana.
+  12: (s) => ({
+    ...s,
+    formatVersion: 13,
+    ...(s.aiMode && !s.ai
+      ? { ai: { share: 25, paceDays: 7, turn: null, lastN: 0, next: (s.tick ?? 0) + 7 * 24, mayor: [], quick: null, lastQuick: -1e9, log: [] } }
+      : {}),
+  }),
 };
 
 export function migrate(raw: unknown): GameState {

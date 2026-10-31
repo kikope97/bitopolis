@@ -12,8 +12,7 @@ import {
   OPPOSITION_APPROVAL,
   OPPOSITION_POP,
   POLL_WARN_MONTHS,
-  VOTE_ABSTENTION_BASE,
-} from './balance.ts';
+  VOTE_ABSTENTION_BASE, TURN } from './balance.ts';
 import { BUILD_NAMES, buildCost, governmentCommand } from './commands.ts';
 import { rivalBudget } from './civic.ts';
 import { felt, saturated, taxLevels, updateFeltTaxes } from './economy.ts';
@@ -114,6 +113,8 @@ function govSupport(state: GameState, c: Citizen): number {
   // Luna de miel: el primer año tras unas elecciones, el descontento aún se achaca a quien gobernaba antes.
   const last = state.politics.history.at(-1);
   if (last) p += Math.max(0, 1 - (state.tick - last.tick) / (12 * TICKS_PER_MONTH)) * HONEYMOON;
+  // 2.0: la actitud que decide la IA (−2…2) mueve su voto dentro de un margen.
+  if (c.attitude) p += c.attitude * TURN.attitudeVote * (governs ? 1 : -1);
   return Math.max(0.05, Math.min(0.95, p));
 }
 

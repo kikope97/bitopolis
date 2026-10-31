@@ -318,11 +318,11 @@ export function goalDone(state: GameState, c: Citizen): boolean {
 
 /* ---------------- relaciones ---------------- */
 
-function relation(c: Citizen, id: number): Relation | undefined {
+export function relation(c: Citizen, id: number): Relation | undefined {
   return c.relations.find((r) => r.id === id);
 }
 
-function setRelation(state: GameState, a: Citizen, b: Citizen, kind: RelationKind, strength: number): void {
+export function setRelation(state: GameState, a: Citizen, b: Citizen, kind: RelationKind, strength: number): void {
   for (const [x, y] of [
     [a, b],
     [b, a],

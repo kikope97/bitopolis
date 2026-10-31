@@ -497,3 +497,27 @@ export const MICROCREDIT = {
   /** Ayuntamiento de nivel mínimo para ofrecerlos. */
   townhallLevel: 2,
 } as const;
+
+/**
+ * 2.0 (petición del creador): turnos del pueblo con IA. Ver turns.ts y
+ * docs/propuestas/v2.0-superia.md.
+ */
+export const TURN = {
+  /** % de vecinos con IA por defecto. */
+  defaultShare: 50,
+  /** Días de juego entre turnos a x1 (el cliente lo alarga a x3/x10). */
+  days: 7,
+  /** Horas de juego que espera un turno a la IA antes de que decidan las reglas. */
+  dueHours: 12,
+  /** Vecinos con IA como mucho en un turno semanal y en una reacción rápida. */
+  maxCitizens: 150,
+  quickCitizens: 12,
+  /** Vecinos con nombre como mucho (rendimiento: relaciones entre todos los pares). */
+  maxNamed: 150,
+  /** Lo que se guarda: acciones del alcalde, turnos y líneas por turno. */
+  mayorLog: 20,
+  logTurns: 12,
+  logLines: 40,
+  /** Cuánto mueve la actitud hacia el alcalde la intención de voto (por punto, de −2 a +2). */
+  attitudeVote: 0.05,
+} as const;

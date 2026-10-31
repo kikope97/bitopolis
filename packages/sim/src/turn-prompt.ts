@@ -1,0 +1,261 @@
+import { tickToDate } from '@bitopolis/shared';
+import { z } from 'zod';
+import { CAUSE_ASK } from './associations.ts';
+import { MIN_WAGE } from './balance.ts';
+import { BUILD_NAMES } from './commands.ts';
+import { debtBand, pocketOf } from './household.ts';
+import { daysToElection, FACTION_TEXT, factionOf, politicsActive } from './politics.ts';
+import { inventedName, toneOf } from './prompt.ts';
+import { GOAL_TEXT, HOOK_TEXT, hookFor, memoryText, NEED_TEXT, NEEDS, needsOf } from './social.ts';
+import type { Citizen, GameState } from './state.ts';
+import { averageHappiness } from './tick.ts';
+import { GESTURES, gestureCandidates, isAiCitizen, PLANS, planText, SPEND, type TurnAct, turnMenu } from './turns.ts';
+
+/**
+ * 2.0: la petición de un turno del pueblo. Tres partes, para aprovechar la caché:
+ * - `system`: reglas fijas (igual siempre).
+ * - `shared`: cómo está el pueblo y qué ha hecho el alcalde (igual en todos los lotes del turno).
+ * - `user`: el lote de vecinos (lo único que cambia entre lotes).
+ * La salida tiene un esquema fijo (sin uniones por vecino); cada parte se valida
+ * en el motor con el menú del vecino. Nunca va texto libre del jugador.
+ */
+export const TURN_PROMPT_VERSION = 6;
+
+export const TURN_SYSTEM = `Eres la mente de los vecinos de Bitópolis, un pueblo español pequeño. Cada semana decides, a la vez, qué hace cada vecino de la lista. Ellos viven de verdad: trabajan, compran, se enamoran, se enfadan, ahorran o se arruinan, y reaccionan a lo que hace el alcalde (el jugador).
+
+Para cada vecino del lote devuelve exactamente un objeto con:
+- "vecino": su id.
+- "accion": UNA de las acciones de su lista "acciones" (copia el texto exacto). Si no quiere hacer nada especial, "seguir". No inventes acciones.
+- "gesto": con quién (id de su lista "con_quien", o 0) y qué ("ninguno", "acercarse", "enfadarse", "hacer_las_paces", "pedir_salir", "romper").
+- "actitud": qué piensa del alcalde ahora, de -2 (muy en contra) a 2 (muy a favor). Tiene que salir de lo que vive: impuestos, servicios, su bolsillo, sus planes.
+- "gasto": dónde compra este mes ("pueblo", "fuera" o "ahorrar"), en qué tienda del pueblo si la prefiere (id de la lista de tiendas, o 0) y si se da algún capricho ("ocio"). Comer y lo básico se pagan siempre: tú decides dónde y si hay ocio. Si nadie compra en las tiendas del pueblo, cierran y su gente se queda sin trabajo: compra en el pueblo si le va bien y le compensa.
+- "plan": un ultimátum o propósito con plazo si de verdad le importa algo ("irse_si_no", "protestar_si_no", "votar_en_contra_si_no", con la "necesidad" de su lista y los "meses", de 1 a 6), o "ninguno". Úsalo con moderación: es una promesa que el pueblo recordará.
+- "pensamiento": una frase en primera persona, en español de España, con su tono y su vida (máx. 140 caracteres).
+- "motivo": por qué hace lo que hace esta semana, en una frase corta en primera persona (máx. 160 caracteres).
+
+Reglas:
+- Decide según su personalidad (rasgos 0-100), su deseo, su miedo, su situación (dinero, deudas, trabajo, casa), sus relaciones, sus recuerdos y lo que ha hecho el alcalde. La terquedad alta puede llevar a decisiones poco racionales.
+- Coherencia: recuerda lo que pensaba y lo que hizo la semana pasada; si tenía un plan, actúa en consecuencia.
+- Variedad: no todos hacen lo mismo ni suenan igual. Que pasen cosas, buenas y malas, pero creíbles.
+- Dinero con cabeza: con deudas, sin trabajo o "no llega", el ocio sobra; con dinero de sobra, puede gastar, invertir o ayudar al negocio del pueblo.
+- "robar" solo existe para quien está desesperado; es una decisión grave y rara.
+- No menciones a nadie que no esté en los datos, ni cifras inventadas, ni que eres una IA. Sin comillas ni emojis.
+- Responde solo con JSON que cumpla el esquema, con un objeto por cada vecino del lote.`;
+
+const band = (n: number, cuts: number[], names: string[]) => names[cuts.findIndex((c) => n < c) === -1 ? names.length - 1 : cuts.findIndex((c) => n < c)]!;
+const lvl = (v: string) => ({ low: 'bajo', medium: 'medio', high: 'alto' })[v] ?? v;
+
+/** Cómo está el pueblo (igual para todos los lotes del turno). */
+export function turnShared(state: GameState): string {
+  const d = tickToDate(state.tick);
+  const kinds = new Set(state.buildings.filter((b) => b.built).map((b) => b.kind));
+  const last = state.stats.at(-1);
+  const ai = state.ai!;
+  const t = ai.turn;
+  const shops = state.buildings.filter((b) => b.kind === 'shop' && b.built && !b.damaged);
+  const data = {
+    turno: t ? { numero: t.n, tipo: t.kind === 'rapida' ? `reacción rápida a: el alcalde ${t.reason}` : 'semana' } : null,
+    fecha: `día ${d.day}, mes ${d.month}, año ${d.year}`,
+    poblacion: state.citizens.length,
+    felicidad_media: Math.round(averageHappiness(state)),
+    caja_ayuntamiento: band(state.treasury, [0, 5_000, 30_000], ['en deuda', 'justa', 'normal', 'holgada']),
+    impuestos: state.taxesSplit ? { ibi: lvl(state.taxes.ibi), tasas: lvl(state.taxes.tasas), plusvalia: lvl(state.taxes.plusvalia) } : lvl(state.taxLevel),
+    sueldo_minimo_empresas: `${MIN_WAGE[state.minWage ?? 'none']} € al mes`,
+    servicios: ['water', 'power', 'park', 'school', 'clinic', 'police', 'bar', 'chapel', 'cemetery', 'library', 'sports', 'jail'].filter((k) => kinds.has(k as never)).map((k) => BUILD_NAMES[k]!.toLowerCase()),
+    economia: last
+      ? {
+          vecinos_con_deudas: last.debtors ?? 0,
+          en_paro: last.jobless ?? 0,
+          empresas: last.businesses ?? 0,
+          empresas_que_pierden_dinero: last.losing ?? 0,
+          cierres_el_mes_pasado: last.closures ?? 0,
+        }
+      : null,
+    tiendas: shops.slice(0, 12).map((b) => ({ id: b.id, nombre: b.name ?? 'tienda', ventas_mes_pasado: b.books?.sales ?? 0 })),
+    asociaciones: (state.associations ?? []).map((a) => ({ id: a.id, nombre: a.name, piden: CAUSE_ASK[a.cause], socios: a.members.length, manifestaciones_sin_respuesta: a.protests ?? 0 })),
+    ...(politicsActive(state)
+      ? {
+          politica: {
+            gobierna: state.politics.mayor === 'player' ? 'el alcalde (el jugador)' : (state.politics.party?.leaderName ?? 'el rival'),
+            partido_rival: state.politics.party ? `${state.politics.party.leaderName}, «${state.politics.party.name}»` : null,
+            intencion_de_voto_al_alcalde: `${state.politics.approval} %`,
+            elecciones_en_dias: daysToElection(state),
+          },
+        }
+      : {}),
+    lo_que_ha_hecho_el_alcalde: ai.mayor.slice(-12).map((m) => `el alcalde ${m.text}`),
+    la_semana_pasada: ai.log.at(-1)?.lines.slice(0, 10).map((l) => l.text) ?? [],
+  };
+  return `Así está el pueblo:\n${JSON.stringify(data)}`;
+}
+
+function citizenBrief(state: GameState, c: Citizen) {
+  const job = state.buildings.find((b) => b.id === c.jobId);
+  const home = state.buildings.find((b) => b.id === c.homeId);
+  const nameOf = (id: number) => state.citizens.find((x) => x.id === id)?.name.split(' ')[0] ?? '?';
+  const lastLine = [...(state.ai?.log ?? [])].reverse().flatMap((l) => l.lines).find((l) => l.id === c.id);
+  const hook = hookFor(state, c.id);
+  return {
+    vecino: c.id,
+    nombre: c.name,
+    edad: c.age,
+    profesion: c.profession,
+    rasgos: { terquedad: c.traits.terco, ahorrador: c.traits.ahorro, sociable: c.traits.social, ambicioso: c.traits.ambicion },
+    tono: toneOf(c),
+    deseo: c.desire.replace('_', ' '),
+    miedo: c.fear,
+    meta: GOAL_TEXT[c.goal],
+    ...(politicsActive(state) ? { faccion: FACTION_TEXT[factionOf(state, c)].toLowerCase() } : {}),
+    felicidad: Math.round(c.happiness),
+    bolsillo: pocketOf(c).replace('_', ' '),
+    dinero: band(c.money, [300, 1_500, 4_000], ['casi nada', 'poco', 'algo', 'bastante']),
+    deuda: debtBand(c),
+    ...(c.last ? { mes_pasado: { entro: c.last.in, salio: c.last.out } } : {}),
+    trabajo: job ? (job.name ?? BUILD_NAMES[job.kind] ?? job.kind) : c.unemployedSince !== undefined ? 'en paro' : 'fuera del pueblo',
+    casa: home ? (c.owns ? 'vivienda en propiedad' : home.kind === 'house' ? 'casa municipal de alquiler' : 'piso de alquiler') : 'sin casa',
+    hijos: c.kids?.length ?? 0,
+    relaciones: c.relations.map((r) => ({ con: nameOf(r.id), tipo: r.kind, intensidad: r.strength >= 70 ? 'fuerte' : r.strength >= 40 ? 'media' : 'leve' })),
+    recuerdos: [...c.memories].sort((a, b) => b.importance - a.importance).slice(0, 3).map((m) => memoryText(state, m)),
+    ...(hook ? { gancho: HOOK_TEXT[hook.kind] } : {}),
+    ...(c.thought ? { pensaba: c.thought } : {}),
+    ...(lastLine ? { la_semana_pasada: lastLine.text } : {}),
+    ...(c.plan ? { su_plan: planText(c.plan) } : {}),
+    actitud_anterior: c.attitude ?? 0,
+    necesidades: needsOf(state, c).slice(0, 3),
+    acciones: turnMenu(state, c).map((m) => (m.detalle ? `${m.accion} (${m.detalle})` : m.accion)),
+    con_quien: gestureCandidates(state, c).map((x) => {
+      const r = c.relations.find((y) => y.id === x.id);
+      return { id: x.id, nombre: x.name, relacion: r?.kind ?? 'conocido' };
+    }),
+  };
+}
+
+/** Esquema fijo de la respuesta (el mismo en todos los lotes: no rompe la caché). */
+export const TURN_SCHEMA = {
+  type: 'object',
+  properties: {
+    decisiones: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          vecino: { type: 'integer' },
+          accion: { type: 'string' },
+          gesto: {
+            type: 'object',
+            properties: { con: { type: 'integer' }, tipo: { type: 'string', enum: [...GESTURES] } },
+            required: ['con', 'tipo'],
+            additionalProperties: false,
+          },
+          actitud: { type: 'integer' },
+          gasto: {
+            type: 'object',
+            properties: { donde: { type: 'string', enum: [...SPEND] }, tienda: { type: 'integer' }, ocio: { type: 'boolean' } },
+            required: ['donde', 'tienda', 'ocio'],
+            additionalProperties: false,
+          },
+          plan: {
+            type: 'object',
+            properties: { tipo: { type: 'string', enum: [...PLANS] }, necesidad: { type: 'string', enum: ['', ...NEEDS] }, meses: { type: 'integer' } },
+            required: ['tipo', 'necesidad', 'meses'],
+            additionalProperties: false,
+          },
+          pensamiento: { type: 'string' },
+          motivo: { type: 'string' },
+        },
+        required: ['vecino', 'accion', 'gesto', 'actitud', 'gasto', 'plan', 'pensamiento', 'motivo'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['decisiones'],
+  additionalProperties: false,
+} as const;
+
+export interface TurnRequest {
+  system: string;
+  shared: string;
+  user: string;
+  schema: Record<string, unknown>;
+  ids: number[];
+}
+
+/** Vecinos con IA del turno abierto, en lotes. */
+export function turnBatches(state: GameState, size: number): number[][] {
+  const t = state.ai?.turn;
+  if (!t) return [];
+  const ids = t.ids.filter((id) => {
+    const c = state.citizens.find((x) => x.id === id);
+    return c && isAiCitizen(state, c);
+  });
+  const out: number[][] = [];
+  for (let i = 0; i < ids.length; i += size) out.push(ids.slice(i, i + size));
+  return out;
+}
+
+export function buildTurnRequest(state: GameState, ids: number[], shared = turnShared(state)): TurnRequest {
+  const batch = ids.map((id) => state.citizens.find((c) => c.id === id)).filter((c): c is Citizen => !!c);
+  const user = `Lote de vecinos (decide para cada uno; ${batch.length} en total):\n${JSON.stringify(batch.map((c) => citizenBrief(state, c)))}`;
+  return { system: TURN_SYSTEM, shared, user, schema: TURN_SCHEMA as unknown as Record<string, unknown>, ids: batch.map((c) => c.id) };
+}
+
+const ActSchema = z.object({
+  vecino: z.number().int(),
+  accion: z.string().max(60),
+  gesto: z.object({ con: z.number().int(), tipo: z.string().max(30) }),
+  actitud: z.number(),
+  gasto: z.object({ donde: z.string().max(20), tienda: z.number().int(), ocio: z.boolean() }),
+  plan: z.object({ tipo: z.string().max(40), necesidad: z.string().max(30), meses: z.number() }),
+  pensamiento: z.string().max(600),
+  motivo: z.string().max(600),
+});
+
+const clean = (s: string, max: number) =>
+  s
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001f<>`*_#"«»]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, max);
+
+/**
+ * Lee la respuesta de un lote. Devuelve las decisiones bien formadas (las que
+ * el motor validará con el menú) y los ids que faltan o no valen.
+ * Un nombre inventado borra el texto (no la decisión).
+ */
+export function parseTurn(text: string, ids: number[], sent: string): { acts: TurnAct[]; missing: number[] } {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return { acts: [], missing: ids };
+  }
+  const list = (raw as { decisiones?: unknown })?.decisiones;
+  if (!Array.isArray(list)) return { acts: [], missing: ids };
+  const acts: TurnAct[] = [];
+  for (const item of list) {
+    const r = ActSchema.safeParse(item);
+    if (!r.success || !ids.includes(r.data.vecino) || acts.some((a) => a.vecino === r.data.vecino)) continue;
+    const a = r.data;
+    // El esquema del comando admite «verbo» o «verbo:arg» en minúsculas: se quita el detalle que copie el modelo.
+    const accion = (a.accion.split(' ')[0] ?? 'seguir').toLowerCase();
+    let pensamiento = clean(a.pensamiento, 160);
+    let motivo = clean(a.motivo, 160);
+    if (inventedName(pensamiento, sent)) pensamiento = '';
+    if (inventedName(motivo, sent)) motivo = '';
+    acts.push({
+      vecino: a.vecino,
+      accion: /^[a-z_]+(:[a-z0-9_]+)?$/.test(accion) ? accion : 'seguir',
+      gesto: { con: a.gesto.con, tipo: a.gesto.tipo },
+      actitud: Math.max(-2, Math.min(2, Math.round(a.actitud))),
+      gasto: a.gasto,
+      plan: { tipo: a.plan.tipo, necesidad: a.plan.necesidad, meses: Math.max(0, Math.min(12, Math.round(a.plan.meses))) },
+      pensamiento,
+      motivo,
+    });
+  }
+  return { acts, missing: ids.filter((id) => !acts.some((a) => a.vecino === id)) };
+}
+
+/** Texto de las necesidades para los planes (para la interfaz). */
+export const PLAN_NEED_TEXT = NEED_TEXT;

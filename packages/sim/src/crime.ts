@@ -196,7 +196,7 @@ function robbery(state: GameState, b: Building): void {
  * cerca y calabozo libre, detienen al ladrón y no se pierde nada. Si no, la
  * víctima se queda sin ese dinero y puede no llegar a fin de mes (y endeudarse).
  */
-function homeRobbery(state: GameState, b: Building, thief: Citizen | undefined): void {
+export function homeRobbery(state: GameState, b: Building, thief: Citizen | undefined): void {
   const j = state.justice;
   const living = state.citizens.filter((c) => c.homeId === b.id && c !== thief);
   const victim = living.filter((c) => c.money > 0).sort((a, c) => c.money - a.money)[0];

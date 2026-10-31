@@ -25,6 +25,7 @@ import {
   CRIME,
   SOCIAL_PLACES,
   TERRAIN,
+  TURN,
 } from './balance.ts';
 import { applyCommand, BUILD_NAMES, removeBuilding } from './commands.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
@@ -55,6 +56,8 @@ import { crimeDay, jailNear } from './crime.ts';
 import { townLevel, zonesUnlocked } from './townhall.ts';
 import { finishUpgrades, jobsOf, maintenanceOf, plantCapacityOf, radiusOf, serviceHappiness } from './levels.ts';
 import { lifeDay, lifeMonth, lifeYear } from './lifecycle.ts';
+import { aiByShare, plansDay, turnsTick } from './turns.ts';
+import { ruleTurn } from './decisions.ts';
 import { basicLiving, drownedInDebt, economyStats, outsideJobsMonth, settleMonth, totalDebt } from './household.ts';
 import { FIRST_NAMES, SURNAMES } from './names.ts';
 import { addMemory, goalFor, memoryMood, onCitizenLeaves, PROFESSIONS, relationMood, socialDay } from './social.ts';
@@ -456,7 +459,9 @@ function arrivals(state: GameState): void {
 /** Vecino nuevo (llega de fuera o se independiza de su familia, v1.5). No lo añade al pueblo. */
 export function newResident(state: GameState, opts: { age: number; surname?: string }): Citizen {
   {
-    const named = state.citizens.filter((x) => x.named).length < state.namedLimit;
+    // 2.0: en Modo IA, el % de vecinos con IA decide quién tiene nombre (y piensa con IA).
+    const namedCount = state.citizens.filter((x) => x.named).length;
+    const named = state.aiMode && state.ai ? namedCount < TURN.maxNamed && aiByShare(state, state.nextId) : namedCount < state.namedLimit;
     let name = uniqueName(state);
     // Con el apellido de la familia, que no se repita el nombre completo (ronda 11).
     if (opts.surname) {
@@ -491,6 +496,15 @@ export function newResident(state: GameState, opts: { age: number; surname?: str
     }
     return c;
   }
+}
+
+/** Un vecino se va del pueblo por su propio pie (vende lo que tenga). */
+export function leaveVoluntarily(state: GameState, c: Citizen): void {
+  if (!state.citizens.includes(c) || state.citizens.length <= 1) return;
+  sellOnDeparture(state, c);
+  onCitizenLeaves(state, c);
+  transfer(state, c.id, OUTSIDE, c.money);
+  state.citizens = state.citizens.filter((x) => x !== c);
 }
 
 function departures(state: GameState): void {
@@ -555,6 +569,8 @@ function endOfDay(state: GameState): void {
   lifeDay(state);
   associationsDay(state);
   crimeDay(state);
+  // 2.0: planes y ultimátums de los vecinos que vencen.
+  plansDay(state, (c) => leaveVoluntarily(state, c));
   // v1.8: mejoras de servicios terminadas.
   for (const b of finishUpgrades(state)) {
     pushEvent(state, 'built', `${b.name ?? BUILD_NAMES[b.kind] ?? b.kind} sube a nivel ${b.level}: llega más lejos y atiende a más gente`, { ref: b.id });
@@ -692,6 +708,8 @@ export function step(state: GameState): void {
   if (state.pending.length > 0) resolveDuePending(state);
   if (state.tick % TICKS_PER_DAY === 0) endOfDay(state);
   if (state.tick % TICKS_PER_MONTH === 0) endOfMonth(state);
+  // 2.0: turnos del pueblo con IA (abrir, y si vencen sin respuesta, reglas).
+  turnsTick(state, ruleTurn);
 }
 
 /** Aplica los comandos de este tick y avanza. */

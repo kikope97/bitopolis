@@ -9,6 +9,7 @@ import { factionOf, voteLean } from './politics.ts';
 import { protestFor } from './associations.ts';
 import { DEBT } from './balance.ts';
 import { totalDebt } from './household.ts';
+import { extraAction, isAiCitizen, setPerformImpl } from './turns.ts';
 import {
   type Citizen,
   type DecisionLogEntry,
@@ -115,6 +116,8 @@ function addPending(state: GameState, c: Citizen, trigger: Trigger) {
 
 /** Al llegar un vecino con nombre: primera decisión visible (el momento «wow»). */
 export function onNamedArrival(state: GameState, c: Citizen) {
+  // 2.0: en Modo IA, los vecinos con IA deciden en los turnos del pueblo.
+  if (isAiCitizen(state, c)) return;
   addPending(state, c, 'llegada');
 }
 
@@ -128,6 +131,8 @@ export function detectTriggers(state: GameState): void {
   const voting = pol.party !== null && pol.nextElection - state.tick <= VOTE_WINDOW_DAYS * TICKS_PER_DAY;
   for (const c of state.citizens) {
     if (!c.named || state.pending.some((p) => p.citizenId === c.id)) continue;
+    // 2.0: los vecinos con IA no esperan a un detonante: deciden en los turnos del pueblo.
+    if (isAiCitizen(state, c)) continue;
     if (voting && !c.vote) {
       addPending(state, c, 'elecciones');
       continue;
@@ -158,6 +163,40 @@ export function detectTriggers(state: GameState): void {
   }
 }
 
+/**
+ * 2.0: si la IA no responde a un turno, cada vecino del turno decide «por
+ * costumbre» con las reglas de siempre (el mismo detonante y la misma puntuación).
+ */
+export function ruleTurn(state: GameState, ids: number[]): { id: number; text: string; motivo?: string }[] {
+  const lines: { id: number; text: string; motivo?: string }[] = [];
+  const pol = state.politics;
+  const voting = pol.party !== null && pol.nextElection - state.tick <= VOTE_WINDOW_DAYS * TICKS_PER_DAY;
+  for (const id of ids) {
+    const c = state.citizens.find((x) => x.id === id);
+    if (!c) continue;
+    let trigger: Trigger | null = null;
+    const assoc = protestFor(state, c);
+    if (voting && !c.vote) trigger = 'elecciones';
+    else if (assoc && c.protest !== assoc.id && c.protest !== -assoc.id) trigger = 'protesta';
+    else if (totalDebt(c) >= DEBT.noticeable && state.tick - (c.debtAsked ?? -1e9) >= DEBT_ASK_TICKS) {
+      c.debtAsked = state.tick;
+      trigger = 'deudas';
+    } else if (c.happiness < 38) trigger = 'infeliz';
+    else if (c.jobId === null && vacantJobs(state, c).length > 0) trigger = 'sin_trabajo';
+    else if (canFound(state, c) && c.traits.ambicion > 40) trigger = 'emprender';
+    else if (canBuyHome(state, c)) trigger = 'comprar_casa';
+    else if (c.money > 2_500 + c.traits.ahorro * 30) trigger = 'ahorros';
+    if (!trigger) continue;
+    const actions = validActions(state, c, trigger);
+    if (actions.length < 2) continue;
+    const p: Pending = { citizenId: c.id, trigger, actions, createdTick: state.tick, dueTick: state.tick };
+    const d = ruleDecide(state, p);
+    const effect = performAction(state, c, trigger, d.action, d.motivo, 'rule');
+    lines.push({ id: c.id, text: `${c.name} ${effect}`, motivo: d.motivo });
+  }
+  return lines;
+}
+
 /* ---------------- aplicar ---------------- */
 
 export function cleanMotivo(raw: string): string {
@@ -181,6 +220,18 @@ export function applyDecision(state: GameState, citizenId: number, action: strin
   const c = state.citizens.find((x) => x.id === citizenId);
   state.pending = state.pending.filter((x) => x !== p);
   if (!p || !c || !p.actions.includes(action)) return false;
+  performAction(state, c, p.trigger, action, motivo, source);
+  return true;
+}
+
+/**
+ * Aplica una acción ya validada de un vecino (decisión con detonante o, en la 2.0,
+ * acción del turno del pueblo) y la apunta en el registro y el diario.
+ * Devuelve el texto del efecto.
+ */
+export function performAction(state: GameState, c: Citizen, trigger: Trigger, action: string, motivo: string, source: 'ai' | 'rule'): string {
+  const citizenId = c.id;
+  const p = { trigger };
   const text = cleanMotivo(motivo) || '…';
   const [verb, arg] = action.split(':') as [string, string | undefined];
   let effect: string;
@@ -250,7 +301,7 @@ export function applyDecision(state: GameState, citizenId: number, action: strin
       effect = foundBusiness(state, c, arg ?? 'bar') ? `abre su propio negocio (${SHOP_NAMES[arg ?? '']?.toLowerCase() ?? 'tienda'})` : 'no consigue abrir el negocio';
       break;
     default:
-      effect = verb === 'ahorrar' ? 'decide ahorrar' : 'se queda';
+      effect = extraAction(state, c, verb!, arg) ?? (verb === 'ahorrar' ? 'decide ahorrar' : 'se queda');
   }
   const entry: DecisionLogEntry = { tick: state.tick, citizenId, trigger: p.trigger, action, motivo: text, source };
   state.decisionLog.push(entry);
@@ -259,7 +310,7 @@ export function applyDecision(state: GameState, citizenId: number, action: strin
   // vecino, no en el diario ni en burbujas (en 12 años eran miles de «decide ahorrar»).
   const routine = ['ahorrar', 'gastar_ocio', 'seguir_alquilando', 'seguir_fuera'].includes(verb) || (verb === 'quedarse' && p.trigger === 'opinion');
   if (!routine) pushEvent(state, 'decision', `${c.name} ${effect}: «${text}»`, { ref: citizenId });
-  return true;
+  return effect;
 }
 
 /* ---------------- reglas (Modo normal y fallback) ---------------- */
@@ -429,3 +480,6 @@ export function resolveDuePending(state: GameState): void {
 export function namedCitizens(state: GameState): Citizen[] {
   return state.citizens.filter((c) => c.named);
 }
+
+// 2.0: los turnos del pueblo aplican las acciones con la misma función (sin ciclo al cargar).
+setPerformImpl(performAction);
