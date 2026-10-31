@@ -40,7 +40,7 @@ test('Modo IA: configurar, jugar y ver un motivo de la IA', async ({ page }, inf
   await expect(page.locator('.bubble .ai-badge').first()).toBeVisible({ timeout: 90_000 });
   await expect(page.locator('.bubble .bubble-text').first()).toContainText('«');
   await page.screenshot({ path: `test-results/capturas/${info.project.name}-ia-burbuja.png` });
-  await expect(page.locator('#ai-chip')).toHaveText('IA ●');
+  await expect(page.locator('#ai-chip')).toHaveText('IA ✦');
   const s1 = await state(page);
   expect(s1.ai.log.some((l: { source: string }) => l.source === 'ia')).toBe(true);
 

@@ -281,7 +281,7 @@ export class AiService {
     const timeLeft = () => Math.max(1000, Math.min(TURN_TIMEOUT_MS, deadline - Date.now()));
     /** Pide un lote; a los vecinos que la IA se haya dejado se les pregunta una vez más, solos. */
     const one = async (ids: number[], retry = true): Promise<void> => {
-      let missing: number[] = [];
+      let missing: number[];
       const req = buildTurnRequest(state, ids, shared);
       const est = costEur(this.prices, model, s.provider, { in: Math.ceil((req.system.length + req.shared.length + req.user.length) / 3.2), cachedIn: 0, out: ids.length * TURN_OUT_PER_CITIZEN }) * 1.5;
       const blocked = await this.reserve(gameId, s, est);

@@ -803,6 +803,13 @@ export function startGame(opts: GameOptions): void {
     setAiChip(on ? 'thinking' : 'on');
     const strip = document.getElementById('thinking');
     if (strip) strip.hidden = !on;
+    // Ronda 16: el botón de velocidad dice que el reloj espera a la IA (no que se haya colgado).
+    const sp = $('#speed');
+    sp.dataset.waiting = String(on);
+    if (on) {
+      sp.textContent = '✦';
+      sp.setAttribute('aria-label', `El reloj espera a que el pueblo decida la semana (como mucho 45 s). Velocidad x${lastSpeed}`);
+    } else paintSpeed();
   }
   function releaseTurn(n: number, why: string) {
     send({ type: 'release', n });
@@ -854,9 +861,9 @@ export function startGame(opts: GameOptions): void {
   function setAiChip(mode: 'on' | 'paused' | 'thinking') {
     const chip = $('#ai-chip');
     chip.hidden = !state.aiMode;
-    chip.textContent = mode === 'on' ? 'IA ●' : mode === 'thinking' ? 'IA …' : 'IA en pausa';
+    chip.textContent = mode === 'on' ? 'IA ✦' : mode === 'thinking' ? 'IA …' : 'IA en pausa';
     chip.classList.toggle('paused', mode === 'paused');
-    chip.classList.toggle('thinking', mode === 'thinking');
+    chip.classList.toggle('is-thinking', mode === 'thinking');
     chip.setAttribute('aria-label', mode === 'on' ? 'IA activa: ver gasto' : mode === 'thinking' ? 'El pueblo está pensando (la IA decide la semana). Ver gasto' : 'IA en pausa por el tope de gasto: deciden las reglas. Ver gasto');
   }
   setAiChip('on');
@@ -2059,8 +2066,10 @@ export function startGame(opts: GameOptions): void {
     play.setAttribute('aria-label', speed === 0 ? `Poner en marcha a x${lastSpeed}` : 'Pausar');
     play.dataset.paused = String(speed === 0);
     const sp = $('#speed');
-    sp.textContent = `x${lastSpeed}`;
     sp.dataset.speed = String(lastSpeed);
+    // Mientras el reloj espera a la IA, el botón lo dice (paintThinking).
+    if (sp.dataset.waiting === 'true') return;
+    sp.textContent = `x${lastSpeed}`;
     sp.setAttribute('aria-label', `Velocidad x${lastSpeed}. Toca para cambiarla`);
   }
 

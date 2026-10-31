@@ -48,12 +48,21 @@ export function openWhatsHappening(ctx: SocialCtx, onCitizen: (id: number) => vo
       ),
     );
     if (t.focus) body.push(h('p', { class: 'turn-focus' }, t.focus));
-    if (t.chronicle) body.push(h('p', { class: 'muted' }, t.chronicle));
+    if (t.chronicle) body.push(h('p', { class: 'turn-chronicle' }, t.chronicle));
     if (!t.lines.length) body.push(h('p', { class: 'muted small' }, 'Semana tranquila: nadie hizo nada que contar.'));
     const ul = h('ul', { class: 'turn-lines' });
     for (const l of t.lines) {
       const c = who(l.id);
-      const row = h('button', { class: 'turn-line', ...(c ? {} : { disabled: 'true' }) }, l.text, l.motivo ? h('span', { class: 'turn-why' }, ` «${l.motivo}»`) : '');
+      // Ronda 16: el ✦ (suceso del director) no se lee; la etiqueta es corta.
+      const director = l.text.startsWith('✦ ');
+      const text = director ? l.text.slice(2) : l.text;
+      const row = h(
+        'button',
+        { class: 'turn-line', 'aria-label': `${director ? 'Suceso: ' : ''}${text}${c ? '. Abrir su ficha' : ''}`, ...(c ? {} : { disabled: 'true' }) },
+        director ? h('span', { 'aria-hidden': 'true' }, '✦ ') : '',
+        text,
+        l.motivo ? h('span', { class: 'turn-why' }, ` «${l.motivo}»`) : '',
+      );
       if (c) row.addEventListener('click', () => onCitizen(c.id));
       ul.append(h('li', {}, row));
     }
@@ -84,7 +93,7 @@ export function mindBox(s: GameState, c: Citizen): HTMLElement | null {
   if (!s.aiMode || !c.named) return null;
   const att = c.attitude ?? 0;
   const attText = att >= 2 ? 'muy a favor del alcalde' : att === 1 ? 'a favor del alcalde' : att === 0 ? 'ni a favor ni en contra del alcalde' : att === -1 ? 'en contra del alcalde' : 'muy en contra del alcalde';
-  const box = h('section', { class: 'mind-box' }, h('p', { class: 'mind-tag' }, '✦ Piensa con IA'));
+  const box = h('section', { class: 'mind-box' }, h('p', { class: 'mind-tag' }, '✦ Piensa con IA', h('span', { class: 'muted small' }, ': decide cada semana lo que hace')));
   if (c.thought) box.append(h('p', { class: 'mind-thought' }, `«${c.thought}»`));
   box.append(h('p', { class: 'muted small' }, `Ahora mismo está ${attText}.`));
   if (c.plan) {
