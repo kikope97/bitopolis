@@ -131,6 +131,9 @@ test('admin: primer acceso, ajustes que valen al momento y vista móvil', async 
   const copias = page.getByRole('region', { name: 'Copias de seguridad' });
   await copias.getByRole('button', { name: 'Hacer una copia ahora' }).click();
   await expect(copias.getByRole('link', { name: 'Descargar' }).first()).toBeVisible();
+  // Resúmenes visibles sin abrir las tarjetas (v1.4).
+  await expect(copias.locator('.fold-summary')).toHaveText('última: hoy');
+  await expect(partidas.locator('.fold-summary')).toHaveText(/\d+ partidas?|ninguna/);
 
   // Móvil: sin desbordes horizontales.
   await page.setViewportSize({ width: 320, height: 720 });

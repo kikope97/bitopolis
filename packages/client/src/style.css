@@ -526,3 +526,7 @@ html[data-font='pixel'] .sheet-head h2, html[data-font='pixel'] .sheet h3, html[
 .admin-fold { all: unset; cursor: pointer; display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; }
 .fold-arrow { color: var(--accent); }
 .admin-fold:focus-visible { outline: 3px solid var(--accent); }
+/* Resumen de las tarjetas plegadas de /admin (v1.4). */
+.admin-card h2 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.admin-card h2 .admin-fold { width: auto; flex: 1; }
+.fold-summary { font-family: system-ui, sans-serif; font-weight: 400; font-size: 0.9rem; }

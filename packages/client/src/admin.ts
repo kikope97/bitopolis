@@ -112,7 +112,7 @@ function card(title: string, ...content: (Node | string)[]): HTMLElement {
 }
 
 /** Tarjeta plegable (v1.3): el panel en móvil son muchas pantallas. Recuerda si estaba abierta. */
-function foldCard(title: string, openByDefault: boolean, ...content: (Node | string)[]): HTMLElement {
+function foldCard(title: string, openByDefault: boolean, summary: HTMLElement | null, ...content: (Node | string)[]): HTMLElement {
   const id = `c${++uid}`;
   const key = `bitopolis.admin.open.${title}`;
   let open = openByDefault;
@@ -126,7 +126,7 @@ function foldCard(title: string, openByDefault: boolean, ...content: (Node | str
   const body = h('div', { id: `${id}-body`, class: 'admin-card-body' }, ...content);
   // La flecha va aparte y oculta al lector: el nombre del botón es solo el título.
   const arrow = h('span', { class: 'fold-arrow', 'aria-hidden': 'true' });
-  const toggle = h('button', { class: 'admin-fold', type: 'button', 'aria-expanded': String(open), 'aria-controls': `${id}-body` }, arrow, title);
+  const toggle = h('button', { id: `${id}-t`, class: 'admin-fold', type: 'button', 'aria-expanded': String(open), 'aria-controls': `${id}-body` }, arrow, title);
   const set = (v: boolean) => {
     open = v;
     body.hidden = !v;
@@ -141,7 +141,9 @@ function foldCard(title: string, openByDefault: boolean, ...content: (Node | str
   toggle.addEventListener('click', () => set(!open));
   body.hidden = !open;
   arrow.textContent = open ? '▾' : '▸';
-  return h('section', { class: 'admin-card', 'aria-labelledby': id }, h('h2', { id, tabindex: '-1', 'data-title': title }, toggle), body);
+  // El resumen (v1.4) se ve sin abrir la tarjeta; la sección se nombra solo con el título.
+  summary?.classList.add('fold-summary');
+  return h('section', { class: 'admin-card', 'aria-labelledby': `${id}-t` }, h('h2', { id, tabindex: '-1', 'data-title': title }, toggle, summary ?? ''), body);
 }
 function focusCard(title: string): void {
   [...document.querySelectorAll<HTMLElement>('.admin-card h2')].find((x) => x.dataset.title === title)?.focus();
@@ -427,6 +429,11 @@ action('Guardar la IA', async () => (await saveAi(), 'IA guardada'), 'btn primar
 
   /* --- partidas --- */
   const gameList = h('ul', { class: 'admin-list' });
+  const gamesSummary = h('span', { class: 'muted small' });
+  const countGames = () => {
+    const n = gameList.querySelectorAll('li .btn.danger').length;
+    gamesSummary.textContent = n ? `${n} ${n === 1 ? 'partida' : 'partidas'}` : 'ninguna';
+  };
   const fillGames = (rows: GameRow[]) =>
     gameList.replaceChildren(
       ...(rows.length
@@ -435,7 +442,7 @@ action('Guardar la IA', async () => (await saveAi(), 'IA guardada'), 'btn primar
               'li',
               {},
               h('a', { href: `${base}/p/${g.token}`, class: 'mono small', target: '_blank', rel: 'noopener' }, `…/p/${g.token.slice(0, 6)}…`),
-              h('span', { class: 'small' }, `${g.mode === 'ai' ? 'IA' : 'Normal'} · ${g.population} vecinos${g.date ? ` · ${formatDate(g.date)}` : ''}${g.aiMonthEur ? ` · ${eur(g.aiMonthEur)} este mes` : ''}`),
+              h('span', { class: 'small' }, `${g.mode === 'ai' ? 'IA' : 'Normal'} · ${g.population} ${g.population === 1 ? 'vecino' : 'vecinos'}${g.date ? ` · ${formatDate(g.date)}` : ''}${g.aiMonthEur ? ` · ${eur(g.aiMonthEur)} este mes` : ''}`),
               h('span', { class: 'muted small' }, `Última partida: ${new Date(g.updatedAt).toLocaleString('es-ES')}`),
             );
             const row = h('div', { class: 'row' }, h('a', { class: 'btn small', href: `/api/games/${g.token}/export`, download: '' }, 'Exportar'));
@@ -447,6 +454,7 @@ action('Guardar la IA', async () => (await saveAi(), 'IA guardada'), 'btn primar
                   await req('DELETE', `/api/admin/games/${g.token}`);
                   const next = li.nextElementSibling?.querySelector<HTMLElement>('.btn.danger') ?? li.previousElementSibling?.querySelector<HTMLElement>('.btn.danger');
                   li.remove();
+                  countGames();
                   if (next) next.focus();
                   else focusCard('Partidas');
                   return 'Partida borrada';
@@ -460,17 +468,24 @@ action('Guardar la IA', async () => (await saveAi(), 'IA guardada'), 'btn primar
         : [h('li', { class: 'muted' }, 'Todavía no hay partidas.')]),
     );
   fillGames(games);
-  const gamesCard = foldCard('Partidas', false, h('p', { class: 'help' }, 'El enlace de cada partida es su contraseña: no lo compartas.'), gameList);
+  countGames();
+  const gamesCard = foldCard('Partidas', false, gamesSummary, h('p', { class: 'help' }, 'El enlace de cada partida es su contraseña: no lo compartas.'), gameList);
 
   /* --- copias --- */
   const keep = input({ type: 'number', min: '1', max: '60', step: '1', value: String(v.backups.keep), inputmode: 'numeric' });
   const backupList = h('ul', { class: 'admin-list' });
-  const fillBackups = (rows: { name: string; size: number }[]) =>
+  const backupSummary = h('span', { class: 'muted small' });
+  const fillBackups = (rows: { name: string; size: number }[]) => {
+    const last = rows[0]?.name.match(/\d{4}-\d{2}-\d{2}/)?.[0];
+    const days = last ? Math.floor((Date.parse(new Date().toISOString().slice(0, 10)) - Date.parse(last)) / 86_400_000) : null;
+    backupSummary.textContent = days === null ? '⚠ ninguna' : `última: ${days <= 0 ? 'hoy' : days === 1 ? 'ayer' : `hace ${days} días`}`;
+    backupSummary.classList.toggle('error', days === null || days > 2);
     backupList.replaceChildren(
       ...(rows.length
         ? rows.map((b) => h('li', { class: 'row between' }, h('span', { class: 'mono small' }, `${b.name} · ${(b.size / 1024).toFixed(0)} KB`), h('a', { class: 'btn small', href: `/api/admin/backups/${b.name}`, download: b.name }, 'Descargar')))
         : [h('li', { class: 'muted' }, 'Sin copias todavía.')]),
     );
+  };
   fillBackups(backups);
   // Sin copias, o la última de hace más de 2 días: la tarjeta se abre sola (ronda 09).
   const lastBackup = backups[0]?.name.match(/\d{4}-\d{2}-\d{2}/)?.[0];
@@ -478,6 +493,7 @@ action('Guardar la IA', async () => (await saveAi(), 'IA guardada'), 'btn primar
   const backupCard = foldCard(
     'Copias de seguridad',
     staleBackups,
+    backupSummary,
     h('p', { class: 'help' }, 'Una al día en /data/backups. Para mover el servidor, copia la carpeta /data entera (incluye la clave que cifra las API keys).'),
     field('Copias que se guardan', keep),
     h(
@@ -503,6 +519,7 @@ action('Guardar la IA', async () => (await saveAi(), 'IA guardada'), 'btn primar
   const account = foldCard(
     'Cuenta del administrador',
     false,
+    h('span', { class: 'muted small' }, v.admin.user),
     field('Usuario', user),
     field('Contraseña nueva', npw),
     field('Contraseña actual (para confirmar)', cur),
