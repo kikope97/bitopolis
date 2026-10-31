@@ -11,6 +11,7 @@ import { totalDebt } from './household.ts';
 import { jobsOf } from './levels.ts';
 import { addMemory, goalFor, NEED_TEXT, needOf, needsOf, PROFESSIONS, relation, setRelation } from './social.ts';
 import { transfer } from './money.ts';
+import { canDump, dumpTrash } from './trash.ts';
 import { type Building, type Citizen, DESIRES, FEARS, type GameState, pushEvent, type Trigger } from './state.ts';
 
 /**
@@ -199,6 +200,8 @@ export function turnMenu(state: GameState, c: Citizen): MenuItem[] {
   // Pedir y quejarse.
   for (const n of needsOf(state, c).slice(0, 2)) out.push({ accion: `pedir:${n}`, detalle: `pedir al alcalde ${NEED_TEXT[n]}` });
   out.push({ accion: 'quejarse', detalle: 'quejarse al ayuntamiento' });
+  // 2.1: sin camión y con la basura en la puerta, puede tirarla al monte (contamina y está mal visto).
+  if (canDump(state, c)) out.push({ accion: 'tirar_al_monte', detalle: 'tirar la basura al monte: no pasa el camión por su calle (contamina cerca y los vecinos lo verán mal)' });
   // Deudas.
   if (totalDebt(c) >= DEBT.noticeable) {
     out.push({ accion: 'apretarse', detalle: 'apretarse el cinturón para pagar lo que debe' });
@@ -306,6 +309,8 @@ export function extraAction(state: GameState, c: Citizen, verb: string, arg: str
       pushEvent(state, 'milestone', `${c.name.split(' ')[0]} y ${p.name.split(' ')[0]} tienen un bebé`, { ref: c.id });
       return 'tiene un bebé';
     }
+    case 'tirar_al_monte':
+      return canDump(state, c) ? dumpTrash(state, c) : 'al final no tira la basura al monte';
     case 'robar': {
       if (!desperate(c)) return 'se lo piensa mejor y no roba';
       const targets = state.buildings.filter((b) => (b.kind === 'house' || b.kind === 'res') && b.built && b.id !== c.homeId);

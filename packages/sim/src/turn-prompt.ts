@@ -6,6 +6,7 @@ import { BUILD_NAMES } from './commands.ts';
 import { freeShopLot } from './economy.ts';
 import { debtBand, pocketOf } from './household.ts';
 import { jobsOf } from './levels.ts';
+import { trashStateOf } from './trash-core.ts';
 import { daysToElection, FACTION_TEXT, factionOf, politicsActive } from './politics.ts';
 import { brewingNow, type DirectorChoice, directorMenu, dramaBudget } from './director.ts';
 import { inventedName, inventedNumber, toneOf } from './prompt.ts';
@@ -22,7 +23,7 @@ import { GESTURES, gestureCandidates, isAiCitizen, PLANS, planText, SPEND, type 
  * La salida tiene un esquema fijo (sin uniones por vecino); cada parte se valida
  * en el motor con el menú del vecino. Nunca va texto libre del jugador.
  */
-export const TURN_PROMPT_VERSION = 8;
+export const TURN_PROMPT_VERSION = 9;
 
 export const TURN_SYSTEM = `Eres la mente de los vecinos de Bitópolis, un pueblo español pequeño. Cada semana decides, a la vez, qué hace cada vecino de la lista. Ellos viven de verdad: trabajan, compran, se enamoran, se enfadan, ahorran o se arruinan, y reaccionan a lo que hace el alcalde (el jugador).
 
@@ -46,6 +47,7 @@ Reglas:
 - Mira "oportunidades" del pueblo: quien está en paro, cobra poco o tiene un negocio que pierde dinero debería pensar en aceptar un trabajo, mudarse, despedir o cerrar; quien tiene dinero y ambición alta, en abrir un negocio o contratar.
 - Dinero con cabeza: con deudas, sin trabajo o "no llega", el ocio sobra; con dinero de sobra, puede gastar, invertir o ayudar al negocio del pueblo.
 - "robar" solo existe para quien está desesperado; es una decisión grave y rara.
+- "tirar_al_monte" solo aparece si no pasa el camión de la basura y la tiene en la puerta: lo hace quien es terco o está harto; los vecinos lo ven mal. Lo normal es quejarse o pedir "recogida".
 - No menciones a nadie que no esté en los datos, ni cifras inventadas, ni que eres una IA. Sin comillas ni emojis.
 - Responde solo con JSON que cumpla el esquema, con un objeto por cada vecino del lote (no te dejes ninguno). Sé breve en los textos.`;
 
@@ -68,7 +70,7 @@ export function turnShared(state: GameState): string {
     caja_ayuntamiento: band(state.treasury, [0, 5_000, 30_000], ['en deuda', 'justa', 'normal', 'holgada']),
     impuestos: state.taxesSplit ? { ibi: lvl(state.taxes.ibi), tasas: lvl(state.taxes.tasas), plusvalia: lvl(state.taxes.plusvalia) } : lvl(state.taxLevel),
     sueldo_minimo_empresas: `${MIN_WAGE[state.minWage ?? 'none']} € al mes`,
-    servicios: ['water', 'power', 'park', 'school', 'clinic', 'police', 'bar', 'chapel', 'cemetery', 'library', 'sports', 'jail'].filter((k) => kinds.has(k as never)).map((k) => BUILD_NAMES[k]!.toLowerCase()),
+    servicios: ['water', 'power', 'park', 'school', 'clinic', 'police', 'bar', 'chapel', 'cemetery', 'library', 'sports', 'jail', 'cleanpoint'].filter((k) => kinds.has(k as never)).map((k) => BUILD_NAMES[k]!.toLowerCase()),
     economia: last
       ? {
           vecinos_con_deudas: last.debtors ?? 0,
@@ -124,6 +126,14 @@ function askedBefore(state: GameState, c: Citizen) {
   return out.slice(0, 3);
 }
 
+/** 2.1: cómo está la basura en su calle (solo si se nota). */
+function trashBrief(state: GameState, c: Citizen): string | null {
+  const home = state.buildings.find((b) => b.id === c.homeId);
+  if (!home) return null;
+  const st = trashStateOf(home);
+  return st === 'ratas' ? 'ratas en su portal: la basura lleva semanas sin recogerse' : st === 'bolsas' ? 'bolsas de basura amontonadas en su calle' : null;
+}
+
 function citizenBrief(state: GameState, c: Citizen) {
   const job = state.buildings.find((b) => b.id === c.jobId);
   const home = state.buildings.find((b) => b.id === c.homeId);
@@ -148,6 +158,7 @@ function citizenBrief(state: GameState, c: Citizen) {
     trabajo: job ? (job.name ?? BUILD_NAMES[job.kind] ?? job.kind) : c.unemployedSince !== undefined ? 'en paro' : 'fuera del pueblo',
     casa: home ? (c.owns ? 'vivienda en propiedad' : home.kind === 'house' ? 'casa municipal de alquiler' : 'piso de alquiler') : 'sin casa',
     hijos: c.kids?.length ?? 0,
+    ...(trashBrief(state, c) ? { basura: trashBrief(state, c) } : {}),
 
     recuerdos: [...c.memories].sort((a, b) => b.importance - a.importance).slice(0, 3).map((m) => memoryText(state, m)),
     ...(hook ? { gancho: HOOK_TEXT[hook.kind] } : {}),
