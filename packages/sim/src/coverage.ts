@@ -27,7 +27,7 @@ export const NEED_KINDS: Record<NeedKey, string[]> = {
   ocio: ['park', 'plaza', 'market'],
 };
 
-export interface Need {
+export interface CoverageNeed {
   key: NeedKey;
   /** «falta»: no llega; «lleno»: llega pero está saturado (por encima del 90 %). */
   status: 'falta' | 'lleno';
@@ -91,8 +91,8 @@ export function coverageCtx(state: GameState): CoverageCtx {
  * de agua y luz (que respetan la capacidad de las plantas); en un solar, si
  * alguna carretera vecina está en la red.
  */
-export function missingServices(state: GameState, x: number, y: number, ctx: CoverageCtx = coverageCtx(state)): Need[] {
-  const out: Need[] = [];
+export function missingServices(state: GameState, x: number, y: number, ctx: CoverageCtx = coverageCtx(state)): CoverageNeed[] {
+  const out: CoverageNeed[] = [];
   const b = state.buildings.find((q) => q.x === x && q.y === y);
   const roadNear = (set: Set<number>) =>
     DIRS.some(([dx, dy]) => inBounds(state, x + dx, y + dy) && set.has(tileIndex(state, x + dx, y + dy)));

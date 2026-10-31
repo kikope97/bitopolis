@@ -1078,7 +1078,7 @@ function sports(seed: number): Pix {
     const tone = u < 0.22 ? 0 : u < 0.6 ? 1 : u < 0.85 ? 2 : 3;
     for (let k = 1; k <= D; k++) {
       let c = MAT.metal[tone];
-      if (k % 2 === 0) c = MAT.metal[Math.min(3, tone + 1)];
+      if (k % 2 === 0) c = MAT.metal[Math.min(3, tone + 1)]!;
       if (k === D) c = MAT.metal[3];
       p.set(x, a - k, c);
     }
@@ -1362,7 +1362,7 @@ function liquidTile(land: readonly boolean[], v: number, frame: 0 | 1, sea: bool
         else if (d < foam + 1) c = (x + frame) % 3 ? 12 : 31;
         else if (d < foam + 2) c = (x + y + frame) % 2 ? 31 : 48;
         else if (d < foam + 5) c = (x + y) % 2 ? 10 : 49;
-        else c = deep[1];
+        else c = deep[1]!;
       } else if (side === 0) {
         // Orilla norte: se ve el talud de tierra y su sombra en el agua.
         if (d < grass + 1) c = 22;
@@ -1370,18 +1370,18 @@ function liquidTile(land: readonly boolean[], v: number, frame: 0 | 1, sea: bool
         else if (d < grass + 3) c = hash(x, 4, v) > 0.75 ? 28 : MAT.dirt[2];
         else if (d < grass + 4) c = 50;
         else if (d < grass + 5) c = (x + y) % 2 ? 49 : 50;
-        else c = deep[1];
+        else c = deep[1]!;
       } else {
         // Orilla sur, este u oeste: arena con guijarros y agua somera.
         if (d < grass + 1) c = hash(x, y, v, 6) > 0.8 ? 30 : 45;
         else if (d < grass + 2) c = hash(x, y, v, 7) > 0.7 ? 29 : 46;
         else if (d < grass + 3) c = 10;
         else if (d < grass + 4) c = (x + y) % 2 ? 10 : 49;
-        else c = deep[1];
+        else c = deep[1]!;
       }
       // Pozas profundas en el centro del cauce.
       const inner = Math.min(x, y, T - 1 - x, T - 1 - y) >= 4;
-      if (inner && c === deep[1] && d > (sea ? 10 : 8) && smooth(x + v * 5, y + v * 3, 7, sea ? 12 : 13) > 0.55 && (x + y) % 2 === 0) c = deep[2];
+      if (inner && c === deep[1] && d > (sea ? 10 : 8) && smooth(x + v * 5, y + v * 3, 7, sea ? 12 : 13) > 0.55 && (x + y) % 2 === 0) c = deep[2]!;
       p.set(x, y, c);
     }
   }
@@ -1398,8 +1398,8 @@ function liquidTile(land: readonly boolean[], v: number, frame: 0 | 1, sea: bool
         const y = oy % T;
         const cur = p.get(x, y);
         if (cur !== deep[1] && cur !== deep[2]) continue;
-        p.set(x, y, i === 0 ? deep[0] : sea ? 49 : 10);
-        if (p.get(x, y + 1) === deep[1] && i > 0) p.set(x, y + 1, deep[2]);
+        p.set(x, y, i === 0 ? deep[0]! : sea ? 49 : 10);
+        if (p.get(x, y + 1) === deep[1] && i > 0) p.set(x, y + 1, deep[2]!);
       }
       if (hash(gx, gy, v, frame + 21) > 0.7) {
         const x = (gx * 8 + 3 + Math.floor(hash(gy, gx, frame) * 4)) % T;

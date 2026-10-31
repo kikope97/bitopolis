@@ -1,4 +1,4 @@
-import { coverageCtx, type GameState, homeSites, missingServices, type Need, type NeedKey, SERVICE } from '@bitopolis/sim';
+import { coverageCtx, type GameState, homeSites, missingServices, type CoverageNeed, type NeedKey, SERVICE } from '@bitopolis/sim';
 import { PALETTE } from './palette.ts';
 import { prefs } from './prefs.ts';
 import { T } from './sprites.ts';
@@ -140,9 +140,9 @@ export function happinessMarks(state: GameState): { x: number; y: number; lv: nu
 /** Icono de cada necesidad (icons.ts). */
 export const NEED_ICON: Record<NeedKey, string> = { agua: 'drop', luz: 'bolt', colegio: 'school', salud: 'health', policia: 'police', ocio: 'leaf' };
 
-let marksCache: { key: string; marks: { x: number; y: number; needs: Need[] }[] } | null = null;
+let marksCache: { key: string; marks: { x: number; y: number; needs: CoverageNeed[] }[] } | null = null;
 /** Lo que falta en cada vivienda o solar R (se rehace cada día de juego y al construir). */
-export function missingMarks(state: GameState): { x: number; y: number; needs: Need[] }[] {
+export function missingMarks(state: GameState): { x: number; y: number; needs: CoverageNeed[] }[] {
   const key = `${Math.floor(state.tick / 24)}:${state.buildings.length}:${state.buildings.filter((b) => b.built).length}`;
   if (marksCache?.key === key) return marksCache.marks;
   const ctx = coverageCtx(state);
@@ -151,7 +151,7 @@ export function missingMarks(state: GameState): { x: number; y: number; needs: N
   // así el icono de cada casa señala la misma prioridad que la leyenda.
   const count = new Map<string, number>();
   for (const m of raw) for (const n of m.needs) if (n.status === 'falta') count.set(n.key, (count.get(n.key) ?? 0) + 1);
-  const rank = (n: Need) => (n.key === 'agua' || n.key === 'luz' ? -1e6 : 0) + (n.status === 'falta' ? -1000 - (count.get(n.key) ?? 0) : 0);
+  const rank = (n: CoverageNeed) => (n.key === 'agua' || n.key === 'luz' ? -1e6 : 0) + (n.status === 'falta' ? -1000 - (count.get(n.key) ?? 0) : 0);
   const marks = raw.map((m) => ({ ...m, needs: [...m.needs].sort((a, b) => rank(a) - rank(b)) }));
   marksCache = { key, marks };
   return marks;
