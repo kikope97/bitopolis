@@ -14,8 +14,12 @@ import {
   OBJECTIVES,
   onCitizenLeaves,
   parseText,
+  meetingPlace,
+  memoryLine,
+  newBuilding,
   ruleAnswer,
   runSimulation,
+  socialDay,
   step,
   validActions,
 } from '../src/index.ts';
@@ -235,3 +239,102 @@ describe('determinismo y migración', () => {
   });
 });
 
+
+describe('historias con desenlace (v1.3)', () => {
+  it('despido con hipoteca: al encontrar trabajo, el diario lo cuenta y el vecino lo recuerda', () => {
+    const s = town();
+    const c = s.citizens.find((x) => x.named)!;
+    s.hooks = [{ id: 9001, kind: 'despido_con_hipoteca', actors: [c.id], createdTick: s.tick, expires: s.tick + 24 * 15 }];
+    c.mortgage = 5000;
+    c.jobId = s.buildings.find((b) => b.built && b.kind !== 'house')!.id;
+    s.tick += 24;
+    socialDay(s);
+    expect(s.hooks.some((h) => h.id === 9001)).toBe(false);
+    expect(c.memories.some((m) => m.kind === 'salio_adelante')).toBe(true);
+    expect(s.events.some((e) => e.text.includes('ha salido adelante'))).toBe(true);
+  });
+
+  it('amigo que se va: el gancho no desaparece al día siguiente y acaba en «pasar página»', () => {
+    const s = town();
+    const [a, b] = s.citizens.filter((x) => x.named);
+    s.hooks = [{ id: 9002, kind: 'amigo_se_va', actors: [a!.id, 999_999], createdTick: s.tick, expires: s.tick + 24 * 15 }];
+    s.tick += 24;
+    socialDay(s);
+    expect(s.hooks.some((h) => h.id === 9002)).toBe(true);
+    s.tick += 24 * 15;
+    socialDay(s);
+    expect(s.hooks.some((h) => h.id === 9002)).toBe(false);
+    expect(a!.memories.some((m) => m.kind === 'paso_pagina')).toBe(true);
+    void b;
+  });
+
+  it('mismo local: si nadie se lo queda, los rivales hacen las paces', () => {
+    const s = town();
+    const [a, b] = s.citizens.filter((x) => x.named);
+    a!.relations = a!.relations.filter((r) => r.id !== b!.id);
+    b!.relations = b!.relations.filter((r) => r.id !== a!.id);
+    a!.relations.push({ id: b!.id, kind: 'rivalidad', strength: 40, since: s.tick });
+    b!.relations.push({ id: a!.id, kind: 'rivalidad', strength: 40, since: s.tick });
+    s.hooks = [{ id: 9003, kind: 'mismo_local', actors: [a!.id, b!.id], createdTick: s.tick, expires: s.tick + 1 }];
+    s.tick += 24;
+    socialDay(s);
+    expect(a!.relations.find((r) => r.id === b!.id)?.kind).toBe('amistad');
+    expect(b!.memories.some((m) => m.kind === 'se_reconcilio')).toBe(true);
+  });
+});
+
+describe('amistades de barrio (v1.3)', () => {
+  it('una plaza cerca de las dos casas es punto de encuentro; lejos, no', () => {
+    const s = town();
+    const homes = s.buildings.filter((b) => b.kind === 'house' && b.built);
+    const [a, b] = s.citizens.filter((x) => x.named && x.homeId !== null);
+    const ha = s.buildings.find((x) => x.id === a!.homeId)!;
+    const other = homes.find((h) => h.id !== ha.id && Math.abs(h.x - ha.x) + Math.abs(h.y - ha.y) <= 6)!;
+    b!.homeId = other.id;
+    s.buildings = s.buildings.filter((x) => !['plaza', 'park', 'market'].includes(x.kind));
+    expect(meetingPlace(s, a!, b!)).toBeUndefined();
+    const plaza = newBuilding(s, 'plaza', ha.x, ha.y + 1, 0);
+    plaza.built = true;
+    s.buildings.push(plaza);
+    expect(meetingPlace(s, a!, b!)?.kind).toBe('plaza');
+    plaza.x += 40;
+    expect(meetingPlace(s, a!, b!)).toBeUndefined();
+  });
+
+  it('con plaza, en tres meses salen más amistades que sin ella (misma semilla)', () => {
+    const count = (withPlaza: boolean) => {
+      const { state } = runSimulation({ seed: 7, days: 120, profile: 'constructor' });
+      if (withPlaza) {
+        const homes = state.buildings.filter((b) => b.kind === 'house' && b.built);
+        for (const h of homes.slice(0, 6)) {
+          const p = newBuilding(state, 'plaza', h.x, h.y, 0);
+          p.built = true;
+          state.buildings.push(p);
+        }
+      }
+      for (const c of state.citizens) c.relations = [];
+      for (let d = 0; d < 90; d++) {
+        state.tick += 24;
+        socialDay(state);
+      }
+      return state.citizens.reduce((n, c) => n + c.relations.filter((r) => r.kind !== 'rivalidad' && r.kind !== 'rencor').length, 0);
+    };
+    expect(count(true)).toBeGreaterThan(count(false));
+  });
+});
+
+describe('respuestas que recuerdan (v1.3)', () => {
+  it('«¿Cómo estás?» menciona lo último importante que ha vivido', () => {
+    const s = town();
+    const [c, friend] = s.citizens.filter((x) => x.named);
+    c!.memories = [];
+    expect(memoryLine(s, c!)).toBeNull();
+    addMemory(s, c!, 'nueva_pareja', 4, 4, [friend!.id]);
+    const line = memoryLine(s, c!)!;
+    expect(line).toContain(friend!.name.split(' ')[0]);
+    expect(ruleAnswer(s, c!, 'como_estas', undefined)).toContain(line);
+    // Los recuerdos de hace más de 60 días ya no salen.
+    s.tick += 24 * 61;
+    expect(memoryLine(s, c!)).toBeNull();
+  });
+});
