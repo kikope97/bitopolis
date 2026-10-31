@@ -92,7 +92,7 @@ export function proposeBudget(state: GameState, plan: BudgetPlan): void {
 
 /* ---------------- fiestas ---------------- */
 
-const PATRONS = ['San Ladrillo', 'Santa Farola', 'la Virgen del Píxel', 'San Bitorio', 'San Tributo', 'Santa Rotonda', 'San Pleno', 'la Cosecha'];
+const PATRONS = ['San Ladrillo', 'Santa Farola', 'la Virgen del Píxel', 'San Bitorio', 'Santa Rotonda', 'la Cosecha', 'San Botijo', 'la Vendimia'];
 
 export function festivalActive(state: GameState): boolean {
   return state.festival.until > state.tick;

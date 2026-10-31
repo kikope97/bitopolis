@@ -45,7 +45,7 @@ import {
 } from './economy.ts';
 import { budgetFx, civicDay, festivalMood, onBuildingDone } from './civic.ts';
 import { updateFields } from './fields.ts';
-import { lifeMonth, lifeYear } from './lifecycle.ts';
+import { lifeDay, lifeMonth, lifeYear } from './lifecycle.ts';
 import { FIRST_NAMES, SURNAMES } from './names.ts';
 import { goalFor, memoryMood, onCitizenLeaves, PROFESSIONS, relationMood, socialDay } from './social.ts';
 import { politicsDay } from './politics.ts';
@@ -398,10 +398,16 @@ function arrivals(state: GameState): void {
 export function newResident(state: GameState, opts: { age: number; surname?: string }): Citizen {
   {
     const named = state.citizens.filter((x) => x.named).length < state.namedLimit;
-    const base = uniqueName(state);
+    let name = uniqueName(state);
+    // Con el apellido de la familia, que no se repita el nombre completo (ronda 11).
+    if (opts.surname) {
+      const used = new Set(state.citizens.map((x) => x.name));
+      for (let i = 0; i < 20 && (i === 0 || used.has(name)); i++) name = `${uniqueName(state).split(' ')[0]} ${opts.surname}`;
+      if (used.has(name)) name = `${name} ${state.nextId}`;
+    }
     const c: Citizen = {
       id: state.nextId++,
-      name: opts.surname ? `${base.split(' ')[0]} ${opts.surname}` : base,
+      name,
       age: opts.age,
       money: 0,
       homeId: null,
@@ -471,6 +477,7 @@ function endOfDay(state: GameState): void {
   // 1 de enero: cumpleaños, hijos que se independizan y fallecimientos (v1.5).
   const d = tickToDate(state.tick);
   if (d.month === 1 && d.day === 1 && state.tick > 0) lifeYear(state);
+  lifeDay(state);
   accumulateRates(state);
 }
 

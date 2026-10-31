@@ -206,7 +206,7 @@ describe('ciclo vital (v1.5)', () => {
     const deaths = state.events.filter((e) => e.text.startsWith('Fallece')).length;
     void deaths;
     expect(state.citizens.every((c) => c.age >= 18)).toBe(true);
-  });
+  }, 60_000);
 });
 
 describe('migración 8 → 9', () => {

@@ -255,6 +255,8 @@ export interface GameState {
   budget: Budget;
   festival: Festival;
   grants: Grant[];
+  /** Última despedida (como mucho una por semana). */
+  lastDeathTick?: number;
 }
 
 export type BudgetPlan = 'austero' | 'equilibrado' | 'inversor';

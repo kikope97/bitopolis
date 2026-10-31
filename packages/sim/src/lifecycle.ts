@@ -1,4 +1,5 @@
-import { TICKS_PER_DAY, DAYS_PER_YEAR } from '@bitopolis/shared';
+import { DAYS_PER_YEAR, TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
+import { hash32 } from './hash.ts';
 import {
   ADULT_AGE,
   BIRTH_CHANCE_ADULT,
@@ -25,15 +26,10 @@ const YEAR_TICKS = DAYS_PER_YEAR * TICKS_PER_DAY;
 const first = (c: Citizen) => c.name.split(' ')[0]!;
 const surname = (c: Citizen) => c.name.split(' ').slice(1, 2).join(' ') || 'García';
 
-/** A quién pasa lo suyo: su pareja o, si no, su amistad más fuerte en el pueblo. */
+/** A quién pasa lo suyo: a su pareja. Si no tiene, a su familia de fuera (ronda 11: heredaban amistades). */
 export function heirOf(state: GameState, c: Citizen): Citizen | undefined {
-  const rels = [...c.relations].sort((a, b) => (a.kind === 'pareja' ? -1 : b.kind === 'pareja' ? 1 : b.strength - a.strength));
-  for (const r of rels) {
-    if (r.kind !== 'pareja' && r.kind !== 'amistad') continue;
-    const h = state.citizens.find((x) => x.id === r.id);
-    if (h) return h;
-  }
-  return undefined;
+  const r = c.relations.find((x) => x.kind === 'pareja');
+  return r ? state.citizens.find((x) => x.id === r.id) : undefined;
 }
 
 /** Fallece un vecino: herencia (dinero, casa, negocio y plusvalía municipal), duelo y baja. */
@@ -75,7 +71,9 @@ export function dies(state: GameState, c: Citizen): void {
   }
   state.pending = state.pending.filter((p) => p.citizenId !== c.id);
   state.citizens = state.citizens.filter((x) => x !== c);
-  pushEvent(state, 'departure', `Fallece ${c.name} a los ${c.age} años${heir ? `. Hereda ${first(heir)}` : ''}`, heir ? { ref: heir.id } : {});
+  const keeps = heir && heir.owns && heir.homeId === c.homeId ? `Su casa queda con ${first(heir)}` : heir ? `Lo suyo queda con ${first(heir)}` : 'Lo deja todo a su familia de fuera';
+  pushEvent(state, 'departure', `Nos ha dejado ${c.name}, a los ${c.age} años. El pueblo le despide en la plaza. ${keeps}`, heir ? { ref: heir.id } : {});
+  state.lastDeathTick = state.tick;
 }
 
 /** Una vez al año (1 de enero): cumpleaños, hijos que cumplen 18 y fallecimientos. */
@@ -92,18 +90,30 @@ export function lifeYear(state: GameState): void {
         const kid = newResident(state, { age: ADULT_AGE, surname: surname(c) });
         state.citizens.push(kid);
         transfer(state, c.id, kid.id, Math.min(c.money, 500));
-        pushEvent(state, 'arrival', `${kid.name}, de la familia de ${first(c)}, se independiza y se queda en el pueblo`, { ref: kid.id });
+        pushEvent(state, 'arrival', `${first(kid)}, de casa de ${first(c)}, cumple 18, se independiza y se queda en el pueblo`, { ref: kid.id });
       } else {
-        pushEvent(state, 'info', `Un hijo de ${first(c)} cumple 18 y se va a estudiar fuera: no hay casa libre`, { ref: c.id });
+        pushEvent(state, 'info', `En casa de ${first(c)}, alguien cumple 18 y se va a estudiar fuera: no hay casa libre en el pueblo`, { ref: c.id });
       }
     }
   }
-  // Fallecimientos (los líderes políticos no: la política tiene su propio ciclo).
+}
+
+/**
+ * Cada día: el dado de la vida de cada mayor se tira en «su» día del año
+ * (no todos el 1 de enero) y como mucho hay una despedida por semana (ronda 11).
+ */
+export function lifeDay(state: GameState): void {
+  if (state.citizens.length <= 2 || state.tick - (state.lastDeathTick ?? -1e9) < 7 * TICKS_PER_DAY) return;
+  const dayOfYear = Math.floor(state.tick / TICKS_PER_DAY) % DAYS_PER_YEAR;
+  // Los líderes políticos no: la política tiene su propio ciclo.
   const protectedIds = new Set([state.politics.party?.leaderId, typeof state.politics.mayor === 'number' ? state.politics.mayor : undefined]);
-  for (const c of [...state.citizens]) {
-    if (state.citizens.length <= 2 || c.age < DEATH_START_AGE || protectedIds.has(c.id)) continue;
+  for (const c of state.citizens) {
+    if (c.age < DEATH_START_AGE || protectedIds.has(c.id) || hash32(state.seed, c.id) % DAYS_PER_YEAR !== dayOfYear) continue;
     const p = Math.min(DEATH_RATE_MAX, (c.age - DEATH_START_AGE + 2) * DEATH_RATE_PER_YEAR_OVER);
-    if (chance(state.rng, p)) dies(state, c);
+    if (chance(state.rng, p)) {
+      dies(state, c);
+      return;
+    }
   }
 }
 
@@ -115,17 +125,20 @@ export function lifeMonth(state: GameState): void {
       if (r.kind !== 'pareja' || r.id < a.id) continue; // cada pareja una vez
       const b = state.citizens.find((x) => x.id === r.id);
       if (!b || b.homeId === null || b.homeId !== a.homeId) continue;
-      const young = Math.min(a.age, b.age);
-      if (young < 20 || young > 42 || (a.kids ?? []).length >= KIDS_MAX) continue;
+      // Los dos con 20–45 años y 18 meses desde el último bebé (ronda 11: había bebés a los 50 y seguidos).
+      const kids = a.kids ?? [];
+      if (Math.min(a.age, b.age) < 20 || Math.max(a.age, b.age) > 45 || kids.length >= KIDS_MAX) continue;
+      if (kids.length && state.tick - kids.at(-1)! < 18 * TICKS_PER_MONTH) continue;
       if (!chance(state.rng, BIRTH_CHANCE_COUPLE)) continue;
       a.kids = [...(a.kids ?? []), state.tick];
       addMemory(state, a, 'nacio_hijo', 5, 5);
       addMemory(state, b, 'nacio_hijo', 5, 5);
-      pushEvent(state, 'arrival', `¡Nace un bebé en casa de ${first(a)} y ${first(b)}!`, { ref: a.id });
+      pushEvent(state, 'arrival', `¡Llega un bebé a casa de ${first(a)} y ${first(b)}!`, { ref: a.id });
     }
   }
   for (const c of state.citizens) {
     if (c.named || c.homeId === null || c.age < 20 || c.age > 42 || (c.kids ?? []).length >= KIDS_MAX) continue;
+    if ((c.kids ?? []).length && state.tick - c.kids!.at(-1)! < 18 * TICKS_PER_MONTH) continue;
     if (chance(state.rng, BIRTH_CHANCE_ADULT)) c.kids = [...(c.kids ?? []), state.tick];
   }
 }

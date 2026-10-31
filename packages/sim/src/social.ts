@@ -774,6 +774,19 @@ const MEMORY_LINE: Partial<Record<MemoryKind, (who: string) => string>> = {
   subida_impuestos: () => 'Y la última subida de impuestos no ayuda.',
 };
 
+/** Frase de un recuerdo; las pérdidas, distintas para la pareja y para una amistad (ronda 11). */
+function lineFor(state: GameState, m: Memory): string {
+  const who = memoryWho(state, m);
+  if (m.kind === 'perdio_a') {
+    const pareja = [`Sin ${who} la casa está muy callada.`, `Todavía pongo dos tazas por la mañana. Echo de menos a ${who}.`];
+    const amistad = [`Echo de menos los cafés con ${who}.`, `Cada vez que paso por su calle me acuerdo de ${who}.`, `No me hago a la idea de que ${who} ya no esté.`];
+    const list = m.importance >= 5 ? pareja : amistad;
+    return list[hash32(m.tick, m.about[0] ?? 0) % list.length]!;
+  }
+  if (m.kind === 'nacio_hijo') return ['Con el bebé en casa no paro, pero estoy feliz.', 'El bebé ya duerme del tirón… casi.', 'Desde que llegó el bebé, la casa es otra.'][hash32(m.tick, 3) % 3]!;
+  return MEMORY_LINE[m.kind]!(who);
+}
+
 function recentMemory(state: GameState, c: Citizen): Memory | undefined {
   return c.memories
     .filter((m) => state.tick - m.tick < TICKS_PER_DAY * MEMORY_DAYS && MEMORY_LINE[m.kind])
@@ -782,7 +795,7 @@ function recentMemory(state: GameState, c: Citizen): Memory | undefined {
 
 export function memoryLine(state: GameState, c: Citizen): string | null {
   const recent = recentMemory(state, c);
-  return recent ? MEMORY_LINE[recent.kind]!(memoryWho(state, recent)) : null;
+  return recent ? lineFor(state, recent) : null;
 }
 
 function answerText(state: GameState, c: Citizen, q: Question, worst: string | undefined): string {
@@ -790,7 +803,7 @@ function answerText(state: GameState, c: Citizen, q: Question, worst: string | u
   if (q !== 'como_estas') return base;
   const m = recentMemory(state, c);
   if (!m) return base;
-  const line = MEMORY_LINE[m.kind]!(memoryWho(state, m));
+  const line = lineFor(state, m);
   // Si el recuerdo va en contra del ánimo, un enlace para que no suene incoherente.
   const lower = line.charAt(0).toLowerCase() + line.slice(1);
   if (c.happiness >= 70 && m.valence < 0) return `${base} Eso sí, ${lower}`;
