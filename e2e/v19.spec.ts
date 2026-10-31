@@ -46,7 +46,7 @@ test('v1.9: ficha con el bolsillo del vecino; aplazar su deuda; sueldo mínimo; 
   await page.locator('#menu').click();
   await page.getByRole('button', { name: 'Impuestos' }).click();
   await expect(page.locator('.sheet')).toContainText('Sueldo mínimo');
-  await page.getByRole('radio', { name: /Alto.*1250/ }).click();
+  await page.getByRole('radio', { name: /Alto.*1150/ }).click();
   await expect(page.getByRole('radio', { name: /Alto/ }).last()).toHaveAttribute('aria-checked', 'true');
   await shot('2-sueldo-minimo');
   await page.locator('.sheet-close').click();

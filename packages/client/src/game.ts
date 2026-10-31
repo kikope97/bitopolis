@@ -466,7 +466,8 @@ export function startGame(opts: GameOptions): void {
       if (dayAgoTreasury.length > 2) dayAgoTreasury.shift();
     }
     const diff = state.treasury - (dayAgoTreasury[0] ?? state.treasury);
-    moneyText.textContent = money(state.treasury);
+    // Ronda 15: con 6 cifras la barra se pisaba: en miles a partir de 100.000 €.
+    moneyText.textContent = Math.abs(state.treasury) >= 100_000 ? `${Math.round(state.treasury / 1000)} mil €` : money(state.treasury);
     moneyTrend.textContent = diff > 0 ? '▲' : diff < 0 ? '▼' : '';
     moneyTrend.className = `trend ${diff > 0 ? 'up' : diff < 0 ? 'down' : ''}`;
     $('#hud-money').classList.toggle('neg', state.treasury < 0);

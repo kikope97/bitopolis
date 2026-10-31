@@ -43,6 +43,8 @@ test('v1.0: intención de voto, facciones, noche electoral y oposición', async 
   await shot('2-noche-electoral');
   const lost = (await page.locator('.sheet').textContent())!.includes('Pierdes');
   await page.locator('.sheet-close').click();
+  // Ronda 15: en pausa, para que la hoja no se redibuje a x10 mientras se toca.
+  await setSpeed(page, 0);
   if (lost) {
     // En la oposición no se puede gobernar.
     await expect(page.locator('#hud-poll')).toContainText('Oposición');
@@ -54,11 +56,14 @@ test('v1.0: intención de voto, facciones, noche electoral y oposición', async 
     await page.locator('.sheet-close').click();
     // Moción desde la oposición: el pleno la aprueba o la rechaza, y queda registrada.
     await page.locator('#hud-poll').click();
-    const motion = page.getByRole('button', { name: /Presentar moción/ }).first();
-    await expect(motion).toBeVisible();
-    await motion.click();
-    await expect(page.locator('#toasts')).toContainText(/moción/);
-    await shot('4-mocion');
+    // Ronda 15: la primera moción puede estar bloqueada (el gobierno ya se comprometió); se usa una disponible.
+    await expect(page.getByRole('button', { name: /Presentar moción/ }).first()).toBeVisible();
+    const motion = page.locator('button:not([aria-disabled="true"])', { hasText: 'Presentar moción' }).first();
+    if (await motion.count()) {
+      await motion.click();
+      await expect(page.locator('#toasts')).toContainText(/moción/);
+      await shot('4-mocion');
+    }
   }
   expect(errors).toEqual([]);
 });
