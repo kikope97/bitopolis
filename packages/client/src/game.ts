@@ -224,6 +224,77 @@ export function startGame(opts: GameOptions): void {
     } else if (cmd.type === 'SetTax' || cmd.type === 'SetTaxes') sfx.tap();
   }
 
+  /**
+   * v1.8 (aplazado de la ronda 13): la primera vez en cada partida, se presenta
+   * la geografía. La cámara se acerca al río o al mar más cercano al
+   * ayuntamiento, un aviso explica qué supone y la cámara vuelve al pueblo.
+   * Con movimiento reducido, solo el aviso (al tocarlo, lleva allí).
+   */
+  function introGeography() {
+    const key = `bitopolis.geo.${token}`;
+    // En pruebas automáticas, no (la cámara se movería mientras se toca el mapa).
+    if (navigator.webdriver) return;
+    try {
+      if (localStorage.getItem(key)) return;
+      localStorage.setItem(key, '1');
+    } catch {
+      return;
+    }
+    const ter = state.map.terrain ?? [];
+    const hall = state.buildings.find((b) => b.kind === 'townhall');
+    if (!hall) return;
+    let best = -1;
+    let bestD = Infinity;
+    ter.forEach((t, i) => {
+      if (t !== Terrain.River && t !== Terrain.Sea) return;
+      const d = Math.abs((i % state.map.w) - hall.x) + Math.abs(Math.floor(i / state.map.w) - hall.y);
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    });
+    if (best < 0) return;
+    const wx = best % state.map.w;
+    const wy = Math.floor(best / state.map.w);
+    const sea = ter[best] === Terrain.Sea;
+    const dir = Math.abs(wx - hall.x) > Math.abs(wy - hall.y) ? (wx > hall.x ? 'al este' : 'al oeste') : wy > hall.y ? 'al sur' : 'al norte';
+    const hills = ter.includes(Terrain.Hill) ? ' Las colinas (hierba alta) también se edifican, pero los materiales cuestan un 50 % más.' : '';
+    const text = sea
+      ? `Tu pueblo da al mar ${dir}: cerca de la costa el suelo vale más.${hills}`
+      : `${dir[0]!.toUpperCase()}${dir.slice(1)} pasa un río: junto a él el suelo vale más, pero con las tormentas se desborda. Para cruzarlo, una carretera sobre el río hace de puente.${hills}`;
+    const look = () => centerOn(wx, wy);
+    setTimeout(() => {
+      if (reducedMotion()) {
+        toast(text, { kind: 'info', sticky: true, onClick: look });
+        return;
+      }
+      const from = { x: cam.x, y: cam.y };
+      glide(from, () => {
+        look();
+        return { x: cam.x, y: cam.y };
+      }, () => {
+        toast(text, { kind: 'info', sticky: true, onClick: look });
+        setTimeout(() => glide({ x: cam.x, y: cam.y }, () => from, () => {}), 3500);
+      });
+    }, 1500);
+  }
+  /** Desliza la cámara de `from` al destino que calcula `to` (en 1 s). */
+  function glide(from: { x: number; y: number }, to: () => { x: number; y: number }, done: () => void) {
+    const target = to();
+    cam.x = from.x;
+    cam.y = from.y;
+    const t0 = performance.now();
+    const stepFn = (now: number) => {
+      const k = Math.min(1, (now - t0) / 1000);
+      const e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+      cam.x = Math.round(from.x + (target.x - from.x) * e);
+      cam.y = Math.round(from.y + (target.y - from.y) * e);
+      if (k < 1) requestAnimationFrame(stepFn);
+      else done();
+    };
+    requestAnimationFrame(stepFn);
+  }
+
   /** Centro de una casilla en coordenadas de pantalla (CSS). */
   function screenOf(tx: number, ty: number): [number, number] {
     const r = canvas.getBoundingClientRect();
@@ -1812,6 +1883,7 @@ export function startGame(opts: GameOptions): void {
   if (away && away.length) toast(`Desde tu última visita: ${away.join(' · ')}`, { sticky: true });
   tutorial.start(state);
   tutorial.update(state, tool.id);
+  introGeography();
   if (!tutorial.active && resume === 0) toast(`En pausa. Pulsa ▶ (${matchMedia('(orientation: landscape) and (max-height: 500px)').matches ? 'arriba' : 'arriba a la izquierda'}) para que pase el tiempo.`);
   // Sonido: se desbloquea con el primer gesto; el ambiente sigue la hora del juego.
   const unlock = () => unlockAudio();

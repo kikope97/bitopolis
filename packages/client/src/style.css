@@ -898,3 +898,6 @@ html[data-text='200'] .tray-grid { grid-template-columns: repeat(auto-fill, minm
 .svc.bad { border-left-color: var(--bad); }
 .svc.bad .svc-state { color: var(--bad); font-weight: 600; }
 .danger-box { border-left-color: #b13e53; }
+@media (max-width: 420px) { .poll-word { display: none; } }
+.album-more summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 600; }
+.album-more .album-card { margin-top: 8px; }

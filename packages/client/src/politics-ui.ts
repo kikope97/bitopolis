@@ -43,7 +43,8 @@ export function renderPollChip(state: GameState, onOpen: () => void): void {
   // Cuenta atrás en los últimos 3 meses (v1.3).
   const d = daysToElection(state);
   const countdown = d <= 90 ? ` · ${d} d` : '';
-  chip.textContent = (opp ? `🗳 Oposición · ${p.approval} %` : `🗳 ${p.approval} %`) + countdown;
+  // v1.8: «Votos» a la vista en pantallas anchas (ronda 13: «84 %» solo no se entendía).
+  chip.replaceChildren('🗳 ', opp ? 'Oposición · ' : h('span', { class: 'poll-word' }, 'Votos '), `${p.approval} %${countdown}`);
   chip.classList.toggle('soon', d <= 90);
   chip.classList.toggle('neg', p.approval < 50);
   chip.setAttribute('aria-label', `${opp ? 'Estás en la oposición. ' : ''}Intención de voto: ${p.approval} %. Elecciones: ${left(state)}. Ver política`);
