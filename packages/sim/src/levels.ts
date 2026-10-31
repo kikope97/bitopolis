@@ -1,5 +1,6 @@
 import { TICKS_PER_DAY } from '@bitopolis/shared';
-import { BUILD, CRIME, JOBS, MAINTENANCE, PLANT_CAPACITY, SERVICE, SERVICE_CAPACITY, SERVICE_LEVELS as L } from './balance.ts';
+import { BUILD, CRIME, JOBS, MAINTENANCE, PLANT_CAPACITY, SERVICE, SERVICE_CAPACITY, SERVICE_LEVELS as L, TRASH } from './balance.ts';
+import { truckRoutes } from './trash-core.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import type { Building, BuildingKind, GameState } from './state.ts';
 
@@ -8,7 +9,7 @@ import type { Building, BuildingKind, GameState } from './state.ts';
  * radio, más capacidad (vecinos, casas con agua o luz, calabozos, plazas de
  * cárcel), algo más de felicidad y un empleo más; cuesta más mantenerlo.
  */
-export const UPGRADABLE: BuildingKind[] = ['water', 'power', 'school', 'clinic', 'police', 'jail', 'park', 'library', 'sports'];
+export const UPGRADABLE: BuildingKind[] = ['water', 'power', 'school', 'clinic', 'police', 'jail', 'park', 'library', 'sports', 'cleanpoint'];
 
 export const levelOf = (b: Building): number => b.level ?? 1;
 const mult = (b: Building) => L.capacity[levelOf(b) - 1] ?? 1;
@@ -32,6 +33,10 @@ export function cellsOf(b: Building): number {
 }
 export function jailPlacesOf(b: Building): number {
   return Math.round(CRIME.jailCapacity * mult(b));
+}
+/** 2.1: casillas de carretera que recorre al día el camión de un punto limpio. */
+export function truckRouteOf(b: Building): number {
+  return b.kind === 'cleanpoint' ? Math.round(TRASH.route * mult(b)) : 0;
 }
 export function jobsOf(b: Building): number {
   const base = JOBS[b.kind];
@@ -62,6 +67,11 @@ export function usageOf(state: GameState, b: Building, served?: number): { used:
     const cap = state.buildings.filter((p) => p.kind === 'jail' && p.built).reduce((a, p) => a + jailPlacesOf(p), 0);
     return { used: state.justice?.jail.length ?? 0, of: cap };
   }
+  if (b.kind === 'cleanpoint') {
+    // 2.1: calles que recorre el camión frente a las que podría recorrer.
+    const r = truckRoutes(state).find((x) => x.id === b.id);
+    return { used: r?.roads.length ?? 0, of: truckRouteOf(b) };
+  }
   if (SERVICE_CAPACITY[b.kind]) return { used: served ?? 0, of: serviceCapacityOf(b) };
   // Parques, biblioteca, polideportivo: vecinos que viven en su radio.
   const r = radiusOf(b);
@@ -83,11 +93,12 @@ export function upgradeReqs(state: GameState, b: Building, served?: number): Upg
   const pop = L.pop[next] ?? 0;
   reqs.push({ label: `${pop} vecinos en el pueblo`, ok: state.citizens.length >= pop });
   const u = usageOf(state, b, served);
-  const residentsKind = !SERVICE_CAPACITY[b.kind] && b.kind !== 'water' && b.kind !== 'power' && b.kind !== 'jail';
+  const residentsKind = !SERVICE_CAPACITY[b.kind] && b.kind !== 'water' && b.kind !== 'power' && b.kind !== 'jail' && b.kind !== 'cleanpoint';
   if (residentsKind) reqs.push({ label: `${u.of} vecinos viviendo cerca (hay ${u.used})`, ok: u.used >= u.of });
   else {
     const need = Math.ceil(u.of * L.usage);
-    const what = b.kind === 'water' || b.kind === 'power' ? 'edificios conectados' : b.kind === 'jail' ? 'presos' : 'vecinos atendidos';
+    const what =
+      b.kind === 'water' || b.kind === 'power' ? 'edificios conectados' : b.kind === 'jail' ? 'presos' : b.kind === 'cleanpoint' ? 'casillas de calle que recorre el camión' : 'vecinos atendidos';
     reqs.push({ label: `Que se use: ${need} ${what} (hay ${u.used})`, ok: u.used >= need });
   }
   const cost = upgradeCost(b);

@@ -1,6 +1,7 @@
 import { emptyPolitics } from './politics-core.ts';
 import { FORMAT_VERSION, type GameState } from './state.ts';
 import { levelForPop } from './townhall.ts';
+import { TRASH } from './balance.ts';
 
 /**
  * Migraciones encadenadas: MIGRATIONS[n] convierte un estado de formatVersion
@@ -141,7 +142,23 @@ export const MIGRATIONS: Record<number, Migration> = {
       ? { ai: { share: 25, paceDays: 7, turn: null, lastN: 0, next: (s.tick ?? 0) + 7 * 24, mayor: [], quick: null, lastQuick: -1e9, log: [] } }
       : {}),
   }),
+  // 2.1: cada parte de la 2.1 añade lo suyo en su propia función.
+  13: (s) => migrate14Trash({ ...s, formatVersion: 14 }),
 };
+
+/**
+ * 2.1 (basura y punto limpio): campo de suciedad vacío y 60 días de gracia
+ * para que un pueblo de antes no se ensucie de golpe (la basura empieza a
+ * contar cuando se pueda construir el punto limpio, y nunca antes de la gracia).
+ */
+export function migrate14Trash(s: Record<string, any>): Record<string, any> {
+  const n = (s.map?.w ?? 0) * (s.map?.h ?? 0);
+  return {
+    ...s,
+    trash: s.trash ?? { start: -1, graceUntil: (s.tick ?? 0) + TRASH.graceDays * 24 },
+    fields: s.fields ? { ...s.fields, dirt: s.fields.dirt ?? new Array(n).fill(0) } : s.fields,
+  };
+}
 
 export function migrate(raw: unknown): GameState {
   if (typeof raw !== 'object' || raw === null) throw new Error('estado inválido');

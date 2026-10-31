@@ -1,5 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { createInitialState, FORMAT_VERSION, MIGRATIONS, migrate } from '../src/index.ts';
+import { createInitialState, FORMAT_VERSION, MIGRATIONS, migrate, migrate14Trash } from '../src/index.ts';
+
+describe('migración 13 → 14 (2.1)', () => {
+  it('basura: campo de suciedad vacío y 60 días de gracia (migrate14Trash)', () => {
+    const s = createInitialState({ seed: 4 }) as unknown as Record<string, any>;
+    const v13: Record<string, any> = { ...s, formatVersion: 13, tick: 1_000, fields: { ...s.fields } };
+    delete v13.trash;
+    delete v13.fields.dirt;
+    const m = migrate(v13);
+    expect(m.formatVersion).toBe(FORMAT_VERSION);
+    expect(m.trash).toEqual({ start: -1, graceUntil: 1_000 + 60 * 24 });
+    expect(m.fields.dirt).toEqual(new Array(m.map.w * m.map.h).fill(0));
+    // Lo que ya tenía no se toca.
+    expect(migrate14Trash({ trash: { start: 7 }, map: { w: 1, h: 1 }, fields: { dirt: [3] } })).toMatchObject({ trash: { start: 7 }, fields: { dirt: [3] } });
+  });
+});
 
 describe('migraciones', () => {
   it('hay una migración por cada versión anterior', () => {

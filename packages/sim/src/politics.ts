@@ -12,7 +12,8 @@ import {
   OPPOSITION_APPROVAL,
   OPPOSITION_POP,
   POLL_WARN_MONTHS,
-  VOTE_ABSTENTION_BASE, TURN } from './balance.ts';
+  VOTE_ABSTENTION_BASE, TURN, TRASH } from './balance.ts';
+import { levelOf } from './levels.ts';
 import { BUILD_NAMES, buildCost, governmentCommand } from './commands.ts';
 import { rivalBudget } from './civic.ts';
 import { felt, saturated, taxLevels, updateFeltTaxes } from './economy.ts';
@@ -79,6 +80,8 @@ function unmetDemands(state: GameState, f: Faction, members: Citizen[]): string[
     if (state.bankrupt || state.treasury < 0) out.push('sanear las cuentas');
   } else {
     if (avgAtHomes(state, state.fields.pollution, members) > 20) out.push('menos contaminación');
+    // 2.1: la basura en la calle les pesa.
+    if (avgAtHomes(state, state.fields.dirt ?? [], members) > TRASH.dirtyField / 2) out.push('recogida de basura');
     if (!has('park')) out.push('un parque');
     const factories = state.buildings.filter((b) => b.kind === 'factory').length;
     const shops = state.buildings.filter((b) => b.kind === 'shop').length;
@@ -93,7 +96,10 @@ export function updateFactions(state: GameState): void {
     const unmet = unmetDemands(state, f, members);
     const happy = members.length ? members.reduce((a, c) => a + c.happiness, 0) / members.length : 50;
     // Con un gobierno rival, las exigencias de su propia facción pesan a su favor.
-    const bonus = state.politics.mayor !== 'player' && state.politics.party?.faction === f ? 10 : 0;
+    const bonus =
+      (state.politics.mayor !== 'player' && state.politics.party?.faction === f ? 10 : 0) +
+      // 2.1: el reciclaje (punto limpio de nivel 2 o más) contenta a los ecologistas.
+      (f === 'ecologistas' && state.buildings.some((b) => b.kind === 'cleanpoint' && b.built && levelOf(b) >= 2) ? TRASH.recyclingFaction : 0);
     const satisfaction = Math.max(0, Math.min(100, Math.round(happy * 0.6 + 40 - unmet.length * 14 + bonus)));
     state.politics.factions[f] = { satisfaction, demand: unmet[0] ?? null, demands: unmet.slice(0, 2), unmet, members: members.length };
   }
@@ -334,6 +340,7 @@ const NEED_BUILD: Record<string, string> = {
   'un parque': 'park',
   'más seguridad': 'police',
   vivienda: 'house',
+  'recogida de basura': 'cleanpoint',
 };
 
 /** Promesas del rival: cumplidas si la exigencia ya no falta; rotas si vence el plazo gobernando. */

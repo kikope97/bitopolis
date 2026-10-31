@@ -42,6 +42,7 @@ export const BUILD_NAMES: Record<string, string> = {
   library: 'Biblioteca',
   sports: 'Polideportivo',
   jail: 'Cárcel',
+  cleanpoint: 'Punto limpio',
   clinic: 'Centro de salud',
   police: 'Comisaría',
   plaza: 'Plaza Mayor',

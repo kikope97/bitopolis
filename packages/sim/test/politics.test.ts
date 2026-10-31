@@ -11,10 +11,12 @@ import {
   migrate,
   playerApproval,
   newBuilding,
+  radiusOf,
   saturated,
   serviceSaturation,
   runSimulation,
   step,
+  updateFactions,
   validActions,
   validateCommand,
 } from '../src/index.ts';
@@ -254,16 +256,21 @@ describe('elecciones (v1.0)', () => {
   });
 });
 
+/** Vecinos de más en una vivienda al alcance del colegio (2.1: antes se copiaba al primero, viviera donde viviera). */
+function crowd(s: GameState, school: GameState['buildings'][number], n: number) {
+  const home = s.buildings.find((b) => (b.kind === 'house' || b.kind === 'res') && Math.abs(b.x - school.x) + Math.abs(b.y - school.y) <= radiusOf(school))!;
+  for (let i = 0; i < n; i++) s.citizens.push({ ...s.citizens[0]!, id: 900_000 + i, homeId: home.id, named: false, relations: [], memories: [] });
+}
+
 describe('servicios que escalan con la población (v1.3)', () => {
   it('un colegio atiende a 60 vecinos: con más, se satura y piden otro', () => {
     const s = town(900);
     const schools = s.buildings.filter((b) => b.kind === 'school' && b.built);
     if (!schools.length) return;
     s.buildings = s.buildings.filter((b) => b.kind !== 'school' || b === schools[0]);
-    const extra = Math.max(0, 90 - s.citizens.length);
-    for (let i = 0; i < extra; i++) s.citizens.push({ ...s.citizens[0]!, id: 900_000 + i, named: false, relations: [], memories: [] });
+    crowd(s, schools[0]!, 90);
     expect(serviceSaturation(s, 'school')).toBeLessThan(1);
-    step(s);
+    updateFactions(s);
     const all = Object.values(s.politics.factions).flatMap((f) => f.unmet);
     expect(all).toContain('otro colegio');
   });
@@ -273,7 +280,7 @@ describe('servicios que escalan con la población (v1.3)', () => {
     const school = s.buildings.find((b) => b.kind === 'school' && b.built);
     if (!school) return;
     s.buildings = s.buildings.filter((b) => b.kind !== 'school' || b === school);
-    for (let i = s.citizens.length; i < 100; i++) s.citizens.push({ ...s.citizens[0]!, id: 900_000 + i, named: false, relations: [], memories: [] });
+    crowd(s, school, 100);
     expect(saturated(s, 'school')).toBe(true);
     s.buildings.push({ ...school, id: 999_999, built: false });
     expect(saturated(s, 'school')).toBe(false);

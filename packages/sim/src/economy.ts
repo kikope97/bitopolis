@@ -44,6 +44,7 @@ import { charge, totalDebt } from './household.ts';
 import { radiusOf, serviceCapacityOf } from './levels.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance } from './prng.ts';
+import { compostMonth, trashFee, trashServed } from './trash.ts';
 import { addMemory, onBusinessFounded } from './social.ts';
 import {
   type Building,
@@ -375,6 +376,9 @@ export function payDividends(state: GameState, b: Building): void {
 
 /** Vivienda (alquiler, hipoteca, IBI) y tasas de cada hogar. */
 export function monthlyHousing(state: GameState, r: MonthRates): void {
+  // 2.1: la tasa de basuras solo la paga quien tiene recogida (sin nieve: el servicio de siempre).
+  const served = trashServed(state);
+  compostMonth(state, served);
   const byHome = new Map<number, Citizen[]>();
   for (const c of state.citizens) {
     if (c.homeId === null) continue;
@@ -408,7 +412,7 @@ export function monthlyHousing(state: GameState, r: MonthRates): void {
         c.rentArrears = paid < PRIVATE_RENT + ibi ? (c.rentArrears ?? 0) + 1 : 0;
         transfer(state, OUTSIDE, TREASURY, ibi, 'IBI');
       }
-      charge(state, c, TREASURY, r.basuras, 'tasas');
+      charge(state, c, TREASURY, trashFee(state, r.basuras, served.get(b.id)), 'tasas');
     }
     // Viviendas privadas vacías: el dueño de fuera paga su IBI.
     const capacity = HOMES[b.kind] ?? 0;

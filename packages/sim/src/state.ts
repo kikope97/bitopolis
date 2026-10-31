@@ -14,7 +14,7 @@ import type { Departed } from './family.ts';
 import type { Justice } from './crime.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
-export const FORMAT_VERSION = 13;
+export const FORMAT_VERSION = 14;
 
 export const MAP_W = 48;
 export const MAP_H = 48;
@@ -44,6 +44,8 @@ export type BuildingKind =
   | 'library'
   | 'sports'
   | 'jail'
+  /** 2.1: punto limpio (recogida de basura). */
+  | 'cleanpoint'
   | 'house'
   /** Crecen solos sobre zonas. */
   | 'res'
@@ -85,6 +87,8 @@ export interface Building {
   forSale?: boolean;
   /** Viviendas de una casa municipal que ya no son del ayuntamiento. */
   privateUnits?: number;
+  /** 2.1: basura acumulada sin recoger (ver trash.ts). */
+  trash?: number;
 }
 
 /** Obra en curso: necesita obreros × días. */
@@ -374,6 +378,8 @@ export interface GameState {
   justice: Justice;
   /** Última despedida (como mucho una por semana). */
   lastDeathTick?: number;
+  /** 2.1: basura. `start`: desde qué tick se acumula (−1: aún no); `graceUntil`: gracia de las partidas migradas; `warned`: último aviso de ratas. */
+  trash?: { start: number; graceUntil?: number; warned?: number };
 }
 
 export type BudgetPlan = 'austero' | 'equilibrado' | 'inversor';
@@ -474,6 +480,7 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiSh
       : {}),
     minWage: 'none',
     debtLedger: { created: 0, repaid: 0, written: 0, forgiven: 0 },
+    trash: { start: -1 },
   };
   // Árboles dispersos (se talan gratis al construir encima).
   for (let i = 0; i < tiles.length; i++) {
