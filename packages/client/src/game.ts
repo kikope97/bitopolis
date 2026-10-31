@@ -6,7 +6,24 @@ import {
   unitValue,
   type GameEvent,
   type GameState,
+  cellsUsed,
   coverageSummary,
+  CRIME,
+  jailCapacity,
+  canUpgradeBuilding,
+  cellsOf,
+  jailPlacesOf,
+  levelOf,
+  plantCapacityOf,
+  radiusOf,
+  SERVICE_LEVELS,
+  serviceCapacityOf,
+  serviceCounts,
+  UPGRADABLE,
+  upgradeCost,
+  upgradeReqs,
+  type NeedKey,
+  stationsFor,
   SEASON_TEXT,
   seasonOf,
   WEATHER_TEXT,
@@ -21,7 +38,10 @@ import {
   Tile,
   validateCommand,
   ZONE_COST_PER_TILE,
-  ZONE_UNLOCK_POP,
+  canUpgradeTownhall,
+  TOWNHALL_LEVELS,
+  townLevel,
+  zonesUnlocked,
 } from '@bitopolis/sim';
 import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
 import { openNeighbours, openReport, openTaxes as openTaxesSheet } from './economy-ui.ts';
@@ -31,12 +51,13 @@ import { openAlbum, snapMoments } from './album-ui.ts';
 import { objectivesNode, openAdvisor, openCitizen, openDiary, openPleno, portraitCanvas, rememberSeen, renderObjectives, resumeSummary, type SocialCtx } from './social-ui.ts';
 import { api, ApiError } from './api.ts';
 import { nextHint } from './hints.ts';
-import { formatDate, money, plural, shortDate, t } from './i18n.ts';
-import { type Camera, type Preview, render } from './render.ts';
+import { openManagement } from './manage-ui.ts';
+import { formatDate, money, MONTHS, plural, shortDate, t } from './i18n.ts';
+import { type Camera, type Preview, render, restartAnimations } from './render.ts';
 import type { FromWorker, SaveBatch, ToWorker } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
 import { buildingSprite, letterSprite, T } from './sprites.ts';
-import { commandFor, costText, isLocked, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayCost, unlockPop } from './tools.ts';
+import { commandFor, costText, isLocked, lockLong, lockShort, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayCost } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
 import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, h, isSheetOpen, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack } from './ui.ts';
 import { pixelIcon } from './icons.ts';
@@ -219,11 +240,143 @@ export function startGame(opts: GameOptions): void {
     } else if (cmd.type === 'SetTax' || cmd.type === 'SetTaxes') sfx.tap();
   }
 
+  /**
+   * v1.8 (aplazado de la ronda 13): la primera vez en cada partida, se presenta
+   * la geografía. La cámara se acerca al río o al mar más cercano al
+   * ayuntamiento, un aviso explica qué supone y la cámara vuelve al pueblo.
+   * Con movimiento reducido, solo el aviso (al tocarlo, lleva allí).
+   */
+  function introGeography() {
+    const key = `bitopolis.geo.${token}`;
+    // En pruebas automáticas, no (la cámara se movería mientras se toca el mapa).
+    if (navigator.webdriver) return;
+    try {
+      if (localStorage.getItem(key)) return;
+      localStorage.setItem(key, '1');
+    } catch {
+      return;
+    }
+    const ter = state.map.terrain ?? [];
+    const hall = state.buildings.find((b) => b.kind === 'townhall');
+    if (!hall) return;
+    let best = -1;
+    let bestD = Infinity;
+    ter.forEach((t, i) => {
+      if (t !== Terrain.River && t !== Terrain.Sea) return;
+      const d = Math.abs((i % state.map.w) - hall.x) + Math.abs(Math.floor(i / state.map.w) - hall.y);
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    });
+    if (best < 0) return;
+    const wx = best % state.map.w;
+    const wy = Math.floor(best / state.map.w);
+    const sea = ter[best] === Terrain.Sea;
+    const dir = Math.abs(wx - hall.x) > Math.abs(wy - hall.y) ? (wx > hall.x ? 'al este' : 'al oeste') : wy > hall.y ? 'al sur' : 'al norte';
+    const hills = ter.includes(Terrain.Hill) ? ' Las colinas (hierba alta) también se edifican, pero los materiales cuestan un 50 % más.' : '';
+    const text = sea
+      ? `Tu pueblo da al mar ${dir}: cerca de la costa el suelo vale más.${hills}`
+      : `${dir[0]!.toUpperCase()}${dir.slice(1)} pasa un río: junto a él el suelo vale más, pero con las tormentas se desborda. Para cruzarlo, una carretera sobre el río hace de puente.${hills}`;
+    const look = () => centerOn(wx, wy);
+    setTimeout(() => {
+      if (reducedMotion()) {
+        toast(text, { kind: 'info', sticky: true, onClick: look });
+        return;
+      }
+      const from = { x: cam.x, y: cam.y };
+      glide(from, () => {
+        look();
+        return { x: cam.x, y: cam.y };
+      }, () => {
+        toast(text, { kind: 'info', sticky: true, onClick: look });
+        setTimeout(() => glide({ x: cam.x, y: cam.y }, () => from, () => {}), 3500);
+      });
+    }, 1500);
+  }
+  /** v1.8: a x3/x10, un calendario arriba a la izquierda que pasa la hoja cada día. */
+  let calDay = -1;
+  function paintCalendar(d: { year: number; month: number; day: number }) {
+    const cal = $('#calendar');
+    const on = speed >= 3;
+    if (cal.hidden === on) {
+      cal.hidden = !on;
+      document.body.classList.toggle('cal-on', on);
+    }
+    if (!on || d.day === calDay) return;
+    calDay = d.day;
+    cal.querySelector('.cal-m')!.textContent = `${MONTHS[d.month - 1]!.toLowerCase()} A${d.year}`;
+    cal.querySelector('.cal-d')!.textContent = String(d.day);
+    if (!reducedMotion()) {
+      cal.classList.remove('flip');
+      void cal.offsetWidth;
+      cal.classList.add('flip');
+    }
+  }
+  /** Desliza la cámara de `from` al destino que calcula `to` (en 1 s). */
+  function glide(from: { x: number; y: number }, to: () => { x: number; y: number }, done: () => void) {
+    const target = to();
+    cam.x = from.x;
+    cam.y = from.y;
+    const t0 = performance.now();
+    const stepFn = (now: number) => {
+      const k = Math.min(1, (now - t0) / 1000);
+      const e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+      cam.x = Math.round(from.x + (target.x - from.x) * e);
+      cam.y = Math.round(from.y + (target.y - from.y) * e);
+      if (k < 1) requestAnimationFrame(stepFn);
+      else done();
+    };
+    requestAnimationFrame(stepFn);
+  }
+
   /** Centro de una casilla en coordenadas de pantalla (CSS). */
   function screenOf(tx: number, ty: number): [number, number] {
     const r = canvas.getBoundingClientRect();
     return [r.left + ((tx + 0.5) * 32 * cam.zoom - cam.x) / dpr(), r.top + ((ty + 0.2) * 32 * cam.zoom - cam.y) / dpr()];
   }
+
+  /**
+   * v1.8 (petición del creador): algo pide atención (robo sin resolver,
+   * calabozos llenos, manifestación, disturbios, riada). Siempre destella el
+   * sitio; a x3/x10 además vuelve a x1, tiembla el mapa y la cámara va allí.
+   * Como mucho una vez cada 45 s: que no se pare todo el rato.
+   */
+  let highlight: { x: number; y: number; since: number } | null = null;
+  let lastAttention = -Infinity;
+  function attention(at: { x: number; y: number } | undefined) {
+    const now = performance.now();
+    if (at) highlight = { x: at.x, y: at.y, since: now };
+    // Ronda 14: si en este mismo lote ya se bajó a x1 (una oferta con plazo), el motivo
+    // que llega detrás sí se enseña; si no, como mucho una parada cada 45 s.
+    const sameBatch = now - lastAttention < 2_000;
+    if (!sameBatch && (speed < 3 || now - lastAttention < 45_000)) return;
+    lastAttention = now;
+    if (speed >= 3) setSpeed(1);
+    shake(5, 450);
+    vibrate(100);
+    if (!at) return;
+    // Ronda 14: acercar lo bastante para que se vea la animación (la marcha, el ladrón).
+    const want = Math.max(touchZoom(), Math.round(dpr() * 2));
+    if (cam.zoom < want) setZoom(want);
+    if (reducedMotion()) {
+      centerOn(at.x, at.y);
+      restartAnimations();
+      return;
+    }
+    glide({ x: cam.x, y: cam.y }, () => {
+      centerOn(at.x, at.y);
+      return { x: cam.x, y: cam.y };
+    }, () => restartAnimations());
+  }
+  /** Una oferta con plazo baja a x1 (sin temblor) y cuenta como parada (ronda 14). */
+  function slowDown() {
+    if (speed < 3) return;
+    setSpeed(1);
+    lastAttention = performance.now();
+  }
+  const hallSpot = () => state.buildings.find((b) => b.kind === 'townhall');
+  const refSpot = (ref?: number) => (ref !== undefined ? state.buildings.find((b) => b.id === ref) : undefined);
 
   /** Modo tranquilo: un evento importante pausa el juego. */
   function calmPause() {
@@ -242,21 +395,30 @@ export function startGame(opts: GameOptions): void {
   const happyText = h('span', { class: 'tb-text' });
   $('#hud-happy').replaceChildren(pixelIcon('smile'), happyText);
   let lastStats = state.stats.length;
-  let lastPop = state.citizens.length;
+  let lastLevel = townLevel(state);
+  let upgradeWarned = townLevel(state) - 1;
   const albumSeen = { n: state.album?.length ?? 0 };
   function onState() {
     // v1.7: foto de cada momento nuevo del álbum (en este navegador).
     snapMoments(token, state, albumSeen);
     if (layer === 'missing' && Math.floor(state.tick / 24) !== legendDay) missingLegend();
     // Ronda 12: al llegar a 10 vecinos, un momento de desbloqueo que lleva a la bandeja.
-    if (lastPop < ZONE_UNLOCK_POP && state.citizens.length >= ZONE_UNLOCK_POP) {
+    // v1.8: cuando se puede ampliar el ayuntamiento, se avisa una vez por nivel.
+    const lv = townLevel(state);
+    if (canUpgradeTownhall(state).ok && upgradeWarned < lv) {
+      upgradeWarned = lv;
+      const hall = hallSpot();
+      toast(`Ya puedes ampliar el ayuntamiento a nivel ${lv + 1}: toca el ayuntamiento para ver qué desbloquea.`, { kind: 'good', sticky: true, onClick: hall ? () => focusBuilding(hall.id) : undefined });
+      if (hall) highlight = { x: hall.x, y: hall.y, since: performance.now() };
+    }
+    if (lastLevel < 2 && lv >= 2) {
       sfx.milestone();
       vibrate(120);
       toast('¡Zonas desbloqueadas! Toca aquí o «Construir» para pintar zonas R, C e I junto a la carretera.', { kind: 'good', sticky: true, onClick: () => openTray() });
       tabBuild.classList.add('pulse');
       setTimeout(() => tabBuild.classList.remove('pulse'), 8000);
     }
-    lastPop = state.citizens.length;
+    lastLevel = lv;
     if (state.stats.length !== lastStats) {
       lastStats = state.stats.length;
       const m = state.stats.at(-1);
@@ -271,6 +433,7 @@ export function startGame(opts: GameOptions): void {
       }
     }
     const d = tickToDate(state.tick);
+    paintCalendar(d);
     $('#hud-date').textContent = shortDate(d);
     $('#hud-date').setAttribute('aria-label', formatDate(d));
     // v1.7: el tiempo de hoy junto a la fecha (icono y, en pantallas anchas, el nombre).
@@ -318,7 +481,7 @@ export function startGame(opts: GameOptions): void {
 
   function updateDemand() {
     const box = $('#demand');
-    const unlocked = state.citizens.length >= ZONE_UNLOCK_POP;
+    const unlocked = zonesUnlocked(state);
     for (const k of ['R', 'C', 'I'] as const) {
       const row = box.querySelector<HTMLElement>(`[data-d="${k}"]`)!;
       const v = state.demand[k];
@@ -333,13 +496,15 @@ export function startGame(opts: GameOptions): void {
     next.hidden = unlocked;
     if (!unlocked) {
       const n = state.citizens.length;
-      const sig = `${n}`;
+      const need = TOWNHALL_LEVELS[1]!.pop;
+      const sig = `${Math.min(n, need)}`;
       if (next.dataset.sig !== sig) {
         next.dataset.sig = sig;
         const fill = h('span', { class: 'bar-fill' });
         // Con CSSOM (la CSP no deja atributos style).
-        fill.style.width = `${Math.round((100 * n) / ZONE_UNLOCK_POP)}%`;
-        next.replaceChildren(h('span', {}, `Zonas: ${n}/${ZONE_UNLOCK_POP} vecinos`), h('span', { class: 'bar', 'aria-hidden': 'true' }, fill));
+        fill.style.width = `${Math.min(100, Math.round((100 * n) / need))}%`;
+        // v1.8: con los vecinos ya, falta ampliar el ayuntamiento.
+        next.replaceChildren(h('span', {}, n >= need ? 'Zonas: amplía el ayuntamiento' : `Zonas: ${n}/${need} vecinos`), h('span', { class: 'bar', 'aria-hidden': 'true' }, fill));
       }
     }
   }
@@ -349,18 +514,18 @@ export function startGame(opts: GameOptions): void {
       const btn = document.querySelector<HTMLButtonElement>(`#tray [data-tool="${tl.id}"]`);
       if (!btn) continue;
       const locked = isLocked(tl, state);
-      if (btn.classList.contains('locked') === locked && btn.dataset.ready) continue;
+      // Ronda 14: también cambia el motivo («ayto. nivel 2» → «25 vecinos»), no solo el candado.
+      const sig = locked ? lockText(tl) : '';
+      if (btn.dataset.ready && btn.dataset.lock === sig) continue;
       btn.dataset.ready = '1';
+      btn.dataset.lock = sig;
       btn.classList.toggle('locked', locked);
       btn.setAttribute('aria-disabled', String(locked));
       btn.querySelector('.tool-cost')!.textContent = locked ? `🔒 ${lockText(tl)}` : trayCost(tl);
     }
   }
   /** Qué falta para desbloquear una herramienta, en pocas palabras. */
-  function lockText(tl: Tool): string {
-    if (tl.build === 'plaza' || tl.build === 'market') return `hito de ${unlockPop(tl)}`;
-    return `${unlockPop(tl)} vecinos`;
-  }
+  const lockText = (tl: Tool) => lockShort(tl, state) ?? '';
 
   function announceEvents() {
     const fresh: GameEvent[] = [];
@@ -435,7 +600,7 @@ export function startGame(opts: GameOptions): void {
         // v1.5: ofertas de subvención y fiestas: llevan a su sección del Ayuntamiento.
         // Si hay que decidir algo con plazo, el juego baja a x1 para que dé tiempo (ronda 11).
         const decide = /Responde antes|puedes organizarlas/.test(e.text);
-        if (decide && speed >= 3) setSpeed(1);
+        if (decide) slowDown();
         toast(e.text, { kind: 'info', sticky: decide, onClick: () => openTownHall(social, /fiestas/i.test(e.text) ? 'festival' : 'grants') });
       } else if (e.kind === 'info' && /^(Nieva|Ola de calor|Tormenta sobre|El río crece)/.test(e.text)) {
         // v1.7: el tiempo que cambia algo (no el sol ni las nubes).
@@ -444,20 +609,35 @@ export function startGame(opts: GameOptions): void {
         sfx.warn();
         vibrate(80);
         calmPause();
+        attention(refSpot(e.ref));
         toast(e.text, { kind: 'warn', sticky: true, onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+      } else if (e.kind === 'crime') {
+        // v1.8: robos, detenciones, calabozos llenos y disturbios.
+        const bad = /Disturbios|llenos|escapa/.test(e.text);
+        if (quiet && !bad) continue;
+        if (bad) {
+          sfx.warn();
+          calmPause();
+          attention(refSpot(e.ref) ?? state.buildings.find((b) => b.kind === 'police' && b.built));
+        }
+        toast(e.text, { kind: bad ? 'warn' : 'good', sticky: /Disturbios|llenos/.test(e.text), onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
       } else if (e.kind === 'protest') {
         sfx.warn();
         duck(1.5);
         calmPause();
+        attention(hallSpot());
         toast(e.text, { kind: 'warn', sticky: true, onClick: () => openTownHall(social, 'associations') });
       } else if (e.kind === 'politics' && /Asociación|asociación/.test(e.text)) {
         // v1.7: asociaciones. Si convocan una manifestación, hay 3 días para reunirse con ellos: baja a x1.
         const urgent = e.text.includes('convoca una manifestación');
-        if (urgent && speed >= 3) setSpeed(1);
+        if (urgent) {
+          const a = state.associations?.find((x) => x.id === e.ref);
+          attention(a?.x !== undefined && a.y !== undefined ? { x: a.x, y: a.y } : hallSpot());
+        }
         toast(e.text, { kind: urgent ? 'warn' : 'info', sticky: urgent || e.text.startsWith('Nace'), onClick: () => openTownHall(social, 'associations') });
       } else if (e.kind === 'politics' && /presupuesto/i.test(e.text)) {
         const decide = e.text.startsWith('Toca presentar');
-        if (decide && speed >= 3) setSpeed(1);
+        if (decide) slowDown();
         toast(e.text, { kind: e.text.includes('rechaza') ? 'warn' : 'info', sticky: decide, onClick: () => openTownHall(social, 'budget') });
       } else if (e.kind === 'politics') {
         // Lo que responde a una acción tuya (moción, campaña) se avisa siempre.
@@ -801,7 +981,7 @@ export function startGame(opts: GameOptions): void {
   async function tapTile(tile: { x: number; y: number }) {
     if (tool.id === 'inspect') return inspect(tile);
     if (isLocked(tool, state)) {
-      toast(`${tool.label}: se desbloquea con ${unlockPop(tool)} vecinos`, { kind: 'warn' });
+      toast(lockLong(tool, state), { kind: 'warn' });
       return;
     }
     if (tool.id === 'demolish') {
@@ -1104,11 +1284,7 @@ export function startGame(opts: GameOptions): void {
       btn.addEventListener('click', () => {
         if (isLocked(tl, state)) {
           // Ronda 12: tocar algo bloqueado no hacía nada; ahora explica qué falta.
-          const need = unlockPop(tl);
-          trayMsg.textContent =
-            tl.build === 'plaza' || tl.build === 'market'
-              ? `${tl.label}: es el premio del hito de ${need} vecinos (tienes ${state.citizens.length}).`
-              : `${tl.label}: faltan ${need - state.citizens.length} vecinos (tienes ${state.citizens.length} de ${need}).`;
+          trayMsg.textContent = lockLong(tl, state);
           trayMsg.classList.remove('muted');
           sfx.error();
           vibrate(30);
@@ -1175,7 +1351,7 @@ export function startGame(opts: GameOptions): void {
     const info = $('#tool-info');
     const locked = isLocked(tl, state);
     // Con «Mirar», la franja enseña la fecha y la demanda.
-    if (locked) info.textContent = `${tl.label}: se desbloquea con ${unlockPop(tl)} vecinos.`;
+    if (locked) info.textContent = lockLong(tl, state);
     else if (tl.id === 'inspect') info.textContent = '';
     else {
       const cost = trayCost(tl) || costText(tl);
@@ -1219,6 +1395,39 @@ export function startGame(opts: GameOptions): void {
     revealTile(tile);
   }
 
+  /** Nivel del servicio, lo que da y qué pide subirlo (con «Mejorar»). */
+  function levelBox(b: Building): HTMLElement {
+    const lv = levelOf(b);
+    const served = serviceCounts(state).get(b.id);
+    const box = h('section', { class: 'level-box' }, h('h3', {}, pixelIcon('upgrade'), ` Nivel ${lv} de ${SERVICE_LEVELS.maxLevel}`));
+    const gives: string[] = [];
+    if (radiusOf(b)) gives.push(`llega a ${radiusOf(b)} casillas`);
+    if (serviceCapacityOf(b)) gives.push(`atiende a ${serviceCapacityOf(b)} vecinos${served !== undefined ? ` (ahora ${served})` : ''}`);
+    if (plantCapacityOf(b)) gives.push(`da ${b.kind === 'water' ? 'agua' : 'luz'} a ${plantCapacityOf(b)} edificios`);
+    if (b.kind === 'police') gives.push(`${cellsOf(b)} calabozos`);
+    if (b.kind === 'jail') gives.push(`${jailPlacesOf(b)} plazas`);
+    if (gives.length) box.append(h('p', { class: 'muted small' }, `Ahora ${gives.join(', ')}.`));
+    if (b.upgradeUntil !== undefined) {
+      box.append(h('p', {}, `Mejorando a nivel ${lv + 1}: termina el ${formatDate(tickToDate(b.upgradeUntil))}. Sigue abierto mientras tanto.`));
+      return box;
+    }
+    if (lv >= SERVICE_LEVELS.maxLevel) {
+      box.append(h('p', { class: 'muted small' }, 'Está en su nivel más alto.'));
+      return box;
+    }
+    const reqs = upgradeReqs(state, b, served);
+    box.append(
+      h('p', {}, `Para el nivel ${lv + 1} (más alcance y más capacidad; cuesta más mantenerlo):`),
+      h('ul', { class: 'reqs' }, ...reqs.map((r) => h('li', { class: r.ok ? 'ok' : 'no' }, h('span', { 'aria-hidden': 'true' }, r.ok ? '✓ ' : '✗ '), r.label, h('span', { class: 'visually-hidden' }, r.ok ? ' (cumplido)' : ' (falta)')))),
+    );
+    const ok = canUpgradeBuilding(state, b, served).ok;
+    const btn = h('button', { class: 'btn primary wide' }, `Mejorar · ${money(upgradeCost(b))}`) as HTMLButtonElement;
+    btn.disabled = !ok;
+    btn.addEventListener('click', () => void command({ type: 'UpgradeBuilding', buildingId: b.id }));
+    box.append(btn);
+    return box;
+  }
+
   /** Que la casilla quede a la vista, por encima (o al lado) de la hoja abierta (v1.6). */
   function revealTile(t: { x: number; y: number }) {
     const el = currentSheet();
@@ -1256,6 +1465,21 @@ export function startGame(opts: GameOptions): void {
       inspectSheet = null;
       return;
     }
+    // v1.8: el ayuntamiento abre el panel de gestión a pantalla completa.
+    if (b.kind === 'townhall' && b.built) {
+      openManagement(social, {
+        townHall: () => withBack('Gestión', () => focusBuilding(b.id), () => openTownHall(social)),
+        politics: () => withBack('Gestión', () => focusBuilding(b.id), () => openPolitics(social)),
+        accounts: () => withBack('Gestión', () => focusBuilding(b.id), openAccounts),
+        focus: (x, y) => {
+          closeSheet();
+          centerOn(x, y);
+          inspect({ x, y });
+        },
+      });
+      inspectSheet = currentSheet();
+      return;
+    }
     const content: (Node | string)[] = [];
     const p = state.projects.find((x) => x.buildingId === b.id);
     if (p) {
@@ -1279,25 +1503,50 @@ export function startGame(opts: GameOptions): void {
         h('label', { class: 'check' }, notify, ' Avísame cuando acabe'),
       );
     } else {
-      const pills: HTMLElement[] = [];
-      if (b.kind !== 'water' && b.kind !== 'power') {
-        pills.push(h('span', { class: `pill ${b.hasWater ? 'good' : 'bad'}` }, b.hasWater ? 'Agua ✓' : 'SIN AGUA'));
-        pills.push(h('span', { class: `pill ${b.hasPower ? 'good' : 'bad'}` }, b.hasPower ? 'Luz ✓' : 'SIN LUZ'));
-      }
-      if (b.kind === 'house' || b.kind === 'res' || b.kind === 'shop' || b.kind === 'factory') {
-        pills.push(h('span', { class: 'pill' }, `${money(unitValue(state, b))}${b.kind === 'house' || b.kind === 'res' ? '/vivienda' : ''}`));
-      }
-      // v1.7: qué servicio le falta a esta vivienda (o lo tiene lleno).
-      if (b.kind === 'house' || b.kind === 'res') {
-        for (const n of missingServices(state, b.x, b.y)) {
-          if (n.key === 'agua' || n.key === 'luz') continue;
-          pills.push(h('span', { class: `pill ${n.status === 'falta' ? 'bad' : 'warn'}` }, `${n.status === 'falta' ? 'Sin' : 'Lleno:'} ${NEED_LABEL[n.key]}`));
+      // v1.8: destrozado en unos disturbios: no funciona hasta que se repara.
+      if (b.damaged) {
+        const dmg = b.damaged;
+        const box = h('div', { class: 'petition danger-box' }, h('p', {}, h('strong', {}, 'Destrozada en unos disturbios. '), 'No vende hasta repararla, pero sigue pagando sueldos e impuestos con sus ahorros: si dos meses seguidos no llega a las nóminas, cierra.'));
+        if (dmg.repairUntil >= 0) box.append(h('p', { class: 'muted small' }, `En reparación: reabre el ${formatDate(tickToDate(dmg.repairUntil))}.`));
+        else {
+          const fix = h('button', { class: 'btn primary wide' }, `Reparar · ${money(dmg.cost)}`);
+          fix.addEventListener('click', () => void command({ type: 'RepairBuilding', buildingId: b.id }));
+          box.append(fix);
         }
+        content.push(box);
       }
-      if (pills.length) content.push(h('div', { class: 'status-row' }, ...pills));
+      const home = b.kind === 'house' || b.kind === 'res';
+      if (home) content.push(servicesTable(b));
+      else {
+        const pills: HTMLElement[] = [];
+        if (b.kind !== 'water' && b.kind !== 'power') {
+          pills.push(h('span', { class: `pill ${b.hasWater ? 'good' : 'bad'}` }, b.hasWater ? 'Agua ✓' : `SIN AGUA${b.dryDays ? ` (${plural(b.dryDays, 'día', 'días')})` : ''}`));
+          pills.push(h('span', { class: `pill ${b.hasPower ? 'good' : 'bad'}` }, b.hasPower ? 'Luz ✓' : `SIN LUZ${b.darkDays ? ` (${plural(b.darkDays, 'día', 'días')})` : ''}`));
+        }
+        if (b.kind === 'shop' || b.kind === 'factory') pills.push(h('span', { class: 'pill' }, money(unitValue(state, b))));
+        if (pills.length) content.push(h('div', { class: 'status-row' }, ...pills));
+      }
+      // v1.8: comisaría (calabozos) y cárcel (presos).
+      if (b.kind === 'police') {
+        const used = cellsUsed(state, b.id);
+        content.push(h('p', {}, `Calabozos: ${used} de ${cellsOf(b)} ocupados. Cada detenido paga ${money(CRIME.finePerDay)} de multa por día.`));
+        if (used >= cellsOf(b)) content.push(h('p', { class: 'pol-tag' }, jailCapacity(state) ? 'Llenos: esperan sitio en la cárcel.' : 'Llenos: hace falta una cárcel para poder detener a más.'));
+      }
+      if (b.kind === 'jail') content.push(h('p', {}, `Presos: ${state.justice?.jail.length ?? 0} de ${jailCapacity(state)} plazas.`));
+      // v1.8 (petición del creador): los servicios suben de nivel.
+      if (UPGRADABLE.includes(b.kind)) content.push(levelBox(b));
       const res = occupants(state, b);
-      if (res.length) content.push(h('h3', {}, 'Viven aquí'), citizenList(res));
       const workers = state.citizens.filter((c) => c.jobId === b.id);
+      if (home && res.length) {
+        // Resumen de quien vive aquí antes de la lista.
+        const avg = Math.round(res.reduce((t, c) => t + c.happiness, 0) / res.length);
+        const inTown = res.filter((c) => c.jobId !== null).length;
+        content.push(
+          h('h3', {}, 'Viven aquí'),
+          h('p', { class: 'muted small' }, `${plural(res.length, 'vecino', 'vecinos')} · felicidad media ${avg} · ${inTown} trabajan en el pueblo, ${res.length - inTown} fuera`),
+          citizenList(res),
+        );
+      } else if (res.length) content.push(h('h3', {}, 'Viven aquí'), citizenList(res));
       if (workers.length) content.push(h('h3', {}, 'Trabajan aquí'), citizenList(workers));
       if (b.kind === 'house') {
         const sale = !!b.forSale;
@@ -1321,6 +1570,34 @@ export function startGame(opts: GameOptions): void {
     inspectSheet.classList.add('half');
     const body = document.querySelector('.sheet-body');
     if (body) body.scrollTop = prevScroll;
+  }
+
+  /**
+   * v1.8: tabla de servicios de una vivienda (petición del creador): agua y
+   * luz (con los días que lleva sin ellas), seguridad, colegio, salud, ocio y
+   * tienda, cada uno con su estado. Valor de la vivienda al pie.
+   */
+  function servicesTable(b: Building): HTMLElement {
+    const needs = new Map(missingServices(state, b.x, b.y).map((n) => [n.key, n.status] as const));
+    const row = (icon: string, label: string, ok: boolean | 'warn', text: string) =>
+      h('div', { class: `svc ${ok === true ? 'ok' : ok === 'warn' ? 'warn' : 'bad'}` }, pixelIcon(icon), h('span', { class: 'svc-label' }, label), h('span', { class: 'svc-state' }, text));
+    const svc = (key: NeedKey, icon: string, label: string) => {
+      const st = needs.get(key);
+      return row(icon, label, st === undefined ? true : st === 'lleno' ? 'warn' : false, st === undefined ? 'Cubierto' : st === 'lleno' ? 'Lleno' : 'No llega');
+    };
+    const i = b.y * state.map.w + b.x;
+    const crime = state.fields.crime[i] ?? 0;
+    const police = stationsFor(state, b.x, b.y).length > 0;
+    const pop = state.citizens.length;
+    const rows = [
+      row('drop', 'Agua', b.hasWater, b.hasWater ? 'Sí' : b.dryDays ? `Sin agua desde hace ${plural(b.dryDays, 'día', 'días')}` : 'Sin agua'),
+      row('bolt', 'Luz', b.hasPower, b.hasPower ? 'Sí' : b.darkDays ? `Sin luz desde hace ${plural(b.darkDays, 'día', 'días')}` : 'Sin luz'),
+      row('police', 'Seguridad', crime < 20 ? true : crime < 40 ? 'warn' : false, `${crime < 20 ? 'Tranquilo' : crime < 40 ? 'Algo de delincuencia' : 'Inseguro'}${police ? ' · comisaría cerca' : pop >= 20 ? ' · sin comisaría cerca' : ''}`),
+      ...(pop >= 25 ? [svc('colegio', 'school', 'Colegio'), svc('salud', 'health', 'Salud')] : []),
+      ...(pop >= 10 ? [svc('ocio', 'leaf', 'Parque o plaza')] : []),
+      row('bar', 'Tienda', state.buildings.some((s) => s.kind === 'shop' && s.built && !s.damaged && Math.abs(s.x - b.x) + Math.abs(s.y - b.y) <= 6), state.buildings.some((s) => s.kind === 'shop' && s.built && !s.damaged && Math.abs(s.x - b.x) + Math.abs(s.y - b.y) <= 6) ? 'Cerca' : 'Lejos'),
+    ];
+    return h('div', { class: 'svc-table' }, ...rows, h('p', { class: 'muted small' }, `Valor: ${money(unitValue(state, b))} por vivienda`));
   }
 
   /** Vecinos de un edificio: una fila por persona con retrato y lo esencial (v1.6). */
@@ -1546,7 +1823,7 @@ export function startGame(opts: GameOptions): void {
 
   /** Qué es R, C, I (o qué falta para las zonas): al tocar la franja. */
   function openDemand() {
-    const unlocked = state.citizens.length >= ZONE_UNLOCK_POP;
+    const unlocked = zonesUnlocked(state);
     const { R, C, I } = state.demand;
     const line = (k: string, name: string, v: number, hint: string) => h('li', {}, h('span', {}, h('strong', {}, `${k} · ${name}`), h('span', { class: 'p-sub' }, hint)), h('span', {}, v > 0 ? `+${v}` : String(v)));
     sheet(
@@ -1560,7 +1837,7 @@ export function startGame(opts: GameOptions): void {
             line('C', 'tiendas', C, C > 20 ? 'Quieren comprar cerca: pinta zona C.' : 'Hay tiendas de sobra.'),
             line('I', 'empleo e industria', I, I > 20 ? 'Hay gente sin trabajo: pinta zona I (lejos de las casas).' : 'Hay empleo de sobra.'),
           )
-        : h('p', {}, `Con ${ZONE_UNLOCK_POP} vecinos se desbloquean las zonas R (viviendas), C (tiendas) e I (industria). Ahora hay ${state.citizens.length}. Construye casas con agua y luz.`),
+        : h('p', {}, `Las zonas R (viviendas), C (tiendas) e I (industria) llegan con el ayuntamiento de nivel 2: pide ${TOWNHALL_LEVELS[1]!.pop} vecinos (ahora hay ${state.citizens.length}) y ${money(TOWNHALL_LEVELS[1]!.cost)}. Toca el ayuntamiento para ampliarlo.`),
       h('p', { class: 'muted small' }, 'Cuanto más alta la barra, más falta hace. Si está en negativo, sobra.'),
     ).classList.add('half');
   }
@@ -1609,6 +1886,8 @@ export function startGame(opts: GameOptions): void {
     send({ type: 'speed', speed: s });
     $('#sr-live').textContent = s === 0 ? 'Juego en pausa' : `Velocidad x${s}`;
     paintSpeed();
+    calDay = -1;
+    paintCalendar(tickToDate(state.tick));
   }
   /** ⏯ y el botón de velocidad (x1 → x3 → x10) del dock (v1.4). */
   let lastSpeed = 1;
@@ -1712,6 +1991,10 @@ export function startGame(opts: GameOptions): void {
       return state;
     },
     sprite: (kind: string, id: number) => buildingSprite(kind, id),
+    /** Para las pruebas: centra la cámara en una casilla (no toca el estado). */
+    centerOn(tx: number, ty: number) {
+      centerOn(tx, ty);
+    },
     tileCenter(tx: number, ty: number) {
       const r = canvas.getBoundingClientRect();
       return { x: r.left + ((tx + 0.5) * tileSize() - cam.x) / dpr(), y: r.top + ((ty + 0.5) * tileSize() - cam.y) / dpr() };
@@ -1724,7 +2007,7 @@ export function startGame(opts: GameOptions): void {
     // La sacudida se aplica a una copia de la cámara: no cambia dónde mira el jugador.
     const [sx, sy] = shakeOffset(time);
     const view = sx || sy ? { ...cam, x: cam.x + sx * dpr(), y: cam.y + sy * dpr() } : cam;
-    render(ctx, state, view, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer });
+    render(ctx, state, view, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer, highlight });
     placeBubbles();
     requestAnimationFrame(frame);
   }
@@ -1747,6 +2030,7 @@ export function startGame(opts: GameOptions): void {
   if (away && away.length) toast(`Desde tu última visita: ${away.join(' · ')}`, { sticky: true });
   tutorial.start(state);
   tutorial.update(state, tool.id);
+  introGeography();
   if (!tutorial.active && resume === 0) toast(`En pausa. Pulsa ▶ (${matchMedia('(orientation: landscape) and (max-height: 500px)').matches ? 'arriba' : 'arriba a la izquierda'}) para que pase el tiempo.`);
   // Sonido: se desbloquea con el primer gesto; el ambiente sigue la hora del juego.
   const unlock = () => unlockAudio();

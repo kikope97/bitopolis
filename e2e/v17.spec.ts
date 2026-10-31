@@ -115,3 +115,12 @@ test('v1.7.0: al volver a la partida sigue a la velocidad en que la dejaste', as
   await page.getByRole('button', { name: 'Continuar' }).click();
   await expect(page.locator('#play-pause')).toHaveAttribute('data-paused', 'true');
 });
+
+test('v1.8: la versión de la aplicación sale abajo del todo en Ajustes', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Jugar' }).click();
+  await skipTutorial(page);
+  await page.locator('#menu').click();
+  await page.getByRole('button', { name: /Ajustes/ }).click();
+  await expect(page.locator('.sheet .app-version')).toHaveText(/^Bitópolis \d+\.\d+\.\d+$/);
+});

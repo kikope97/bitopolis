@@ -1,5 +1,6 @@
 import { emptyPolitics } from './politics-core.ts';
 import { FORMAT_VERSION, type GameState } from './state.ts';
+import { levelForPop } from './townhall.ts';
 
 /**
  * Migraciones encadenadas: MIGRATIONS[n] convierte un estado de formatVersion
@@ -114,6 +115,14 @@ export const MIGRATIONS: Record<number, Migration> = {
     associations: s.associations ?? [],
     album: s.album ?? [],
     departed: s.departed ?? [],
+  }),
+  // 10 → 11 (v1.8): delincuencia (calabozos, cárcel y robos).
+  // y el ayuntamiento por niveles: un pueblo de antes empieza en el nivel que le daría su población.
+  10: (s) => ({
+    ...s,
+    formatVersion: 11,
+    justice: s.justice ?? { cells: [], jail: [], hot: [], robberies: 0, arrests: 0, fullWarned: -1 },
+    townhallLevel: s.townhallLevel ?? levelForPop(s.citizens?.length ?? 0),
   }),
 };
 

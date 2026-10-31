@@ -221,7 +221,8 @@ export function sheet(title: string | Node, ...content: (Node | string)[]): HTML
   // Trampa de foco: con el teclado, Tab no sale de la hoja hasta cerrarla (Esc o ✕).
   el.addEventListener('keydown', (e) => {
     // Como panel lateral (tableta, horizontal) no es modal: Tab puede salir al mapa (ronda 12).
-    if (e.key !== 'Tab' || sidePanel()) return;
+    // El panel a pantalla completa (v1.8) sí es modal también en tableta.
+    if (e.key !== 'Tab' || (sidePanel() && !el.classList.contains('full'))) return;
     const items = [...el.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])')].filter((x) => !x.hasAttribute('disabled') && x.tabIndex >= 0 && x.offsetParent !== null);
     if (!items.length) return;
     const first = items[0]!;

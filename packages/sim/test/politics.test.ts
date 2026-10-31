@@ -88,9 +88,12 @@ describe('elecciones (v1.0)', () => {
     for (const c of s.citizens) count.set(factionOf(s, c), (count.get(factionOf(s, c)) ?? 0) + 1);
     const f = [...count.entries()].sort((a, b) => b[1] - a[1])[0]![0] as ReturnType<typeof factionOf>;
     const before = playerApproval(s);
+    const pushed = s.politics.campaign[f];
     expect(applyCommand(s, { type: 'Campaign', faction: f }).ok).toBe(true);
     expect(applyCommand(s, { type: 'Campaign', faction: f }).ok).toBe(false);
-    expect(playerApproval(s)).toBeGreaterThan(before);
+    // La campaña sube el empuje de esa facción; el porcentaje (redondeado y a veces ya muy alto) no baja.
+    expect(s.politics.campaign[f]).toBeGreaterThan(pushed);
+    expect(playerApproval(s)).toBeGreaterThanOrEqual(before);
   });
 
   it('determinista con la misma semilla (también en la oposición)', { timeout: 60_000 }, () => {
@@ -190,9 +193,12 @@ describe('elecciones (v1.0)', () => {
     const f = (Object.keys(s.politics.factions) as (keyof typeof s.politics.factions)[]).find((k) => s.politics.factions[k].demand && k !== s.politics.party!.faction);
     if (!f) return;
     expect(applyCommand(s, { type: 'Motion', faction: f }).ok).toBe(true);
+    const first = s.politics.motions.at(-1)!.need;
     for (let i = 0; i < TICKS_PER_MONTH + 1; i++) step(s);
+    // Ronda 14: se compara con la primera moción (antes se miraba la última, que podía ser esta).
+    const same = s.politics.factions[f].demand === first;
     const again = applyCommand(s, { type: 'Motion', faction: f });
-    if (s.politics.factions[f].demand === s.politics.motions.at(-1)!.need) expect(again.ok ? '' : again.error).toMatch(/6 meses|comprometió/);
+    if (same) expect(again.ok ? '' : again.error).toMatch(/6 meses|comprometió/);
   });
 
   it('el gobierno rival rechaza lo que no puede hacer (sin obra ni impuesto) si no es de su facción', () => {

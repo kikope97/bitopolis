@@ -57,7 +57,7 @@ test('v0.3: tributos separados, capas, venta de vivienda, parte y vecinos', asyn
   const house = st.buildings.find((b: { kind: string; built: boolean }) => b.kind === 'house' && b.built);
   const p = await page.evaluate(([x, y]) => (window as any).__bitopolis.tileCenter(x, y), [house.x, house.y]);
   await page.mouse.click(p.x, p.y);
-  await expect(page.locator('.sheet')).toContainText('€/vivienda');
+  await expect(page.locator('.sheet')).toContainText('por vivienda');
   await page.getByRole('button', { name: 'Poner a la venta' }).click();
   await expect(page.getByRole('button', { name: 'Pasar a alquiler' })).toBeVisible();
   await shot('4-venta');

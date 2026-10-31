@@ -30,6 +30,8 @@ export const BUILD: Record<BuildKind, BuildSpec> = {
   cemetery: { materials: 2_200, workers: 3, days: 3, unlockPop: 20 },
   library: { materials: 4_500, workers: 4, days: 4, unlockPop: 35 },
   sports: { materials: 5_500, workers: 5, days: 4, unlockPop: 35 },
+  // v1.8: la cárcel (los vecinos no la quieren cerca).
+  jail: { materials: 9_000, workers: 6, days: 5, unlockPop: 60 },
 };
 
 /** Obras que crecen solas sobre zonas (las paga un inversor de fuera). */
@@ -61,6 +63,7 @@ export const JOBS: Record<BuildingKind, number> = {
   cemetery: 0,
   library: 2,
   sports: 2,
+  jail: 1, // ronda 14: con 4 empleos costaba ~4.100 €/mes sin beneficio medible
   house: 0,
   res: 0,
   shop: 3,
@@ -84,6 +87,7 @@ export const MAINTENANCE: Record<BuildingKind, number> = {
   cemetery: 150,
   library: 300,
   sports: 350,
+  jail: 500,
   house: 20,
   res: 0,
   shop: 0,
@@ -327,6 +331,15 @@ export const ASSOCIATIONS = {
   max: 3,
   /** Socios que deciden si van a cada manifestación (el líder y los primeros). */
   deciders: 6,
+  /** v1.8: cada manifestación sin solución es mayor que la anterior (+50 % de gente). */
+  growth: 0.2, // ronda 14: con 0,5 la marcha llegaba a 4 veces la población
+  /** Tras estas manifestaciones sin respuesta, puede haber disturbios. */
+  riotAfter: 4,
+  /** Probabilidad de disturbios (a la mitad si la policía puede detener a los alborotadores). */
+  riotChance: 0.5,
+  /** Reparación de una tienda dañada (euros, la paga el ayuntamiento) y días que tarda. */
+  repairCost: 1_500,
+  repairDays: 2,
 } as const;
 
 /**
@@ -336,4 +349,61 @@ export const ASSOCIATIONS = {
  */
 export const FIELDS = {
   pollutionDecay: 0.85,
+} as const;
+
+/** v1.8: delincuencia, calabozos y cárcel. */
+export const CRIME = {
+  /** Población mínima para que haya robos. */
+  minPop: 15,
+  /** Probabilidad diaria de robo en una tienda por cada 50 puntos de delincuencia por encima del umbral. */
+  robBase: 0.006,
+  robThreshold: 10,
+  /** Lo que se llevan como mucho de la caja de la tienda. */
+  robLoss: 400,
+  /** Un robo sin resolver sube la inseguridad alrededor durante estos días. */
+  hotDays: 30,
+  hotCrime: 15,
+  /** Calabozos por comisaría. */
+  cellsPerStation: 2, // ronda 14: con 4 casi nunca se llenaban y la cárcel no servía
+  /** Días en el calabozo hasta el traslado (con cárcel) o cumpliendo (sin cárcel). */
+  transferDays: 2,
+  cellDays: 60,
+  /** Plazas y días de condena en la cárcel. */
+  jailCapacity: 30,
+  jailDays: 60,
+  /** A los vecinos no les gusta la cárcel cerca. */
+  jailNuisanceRadius: 4,
+  jailNuisanceMood: 3,
+  /** Multa por cada día detenido (calabozo o cárcel), para el ayuntamiento. Petición del creador. */
+  finePerDay: 10,
+  /** Días de calabozo de un vecino detenido en unos disturbios (no pasa a la cárcel). */
+  riotDays: 10,
+} as const;
+
+/**
+ * v1.8 (petición del creador): los servicios suben de nivel (1–3). Cada subida
+ * cuesta más, pide nivel de ayuntamiento, vecinos y que el servicio ya se use
+ * (que haga falta), y tarda unos días de obra (el servicio sigue abierto).
+ */
+export const SERVICE_LEVELS = {
+  maxLevel: 3,
+  /** Capacidad (vecinos atendidos, edificios con agua/luz, plazas de cárcel, calabozos) por nivel. */
+  capacity: [1, 1.6, 2.3],
+  /** Casillas de radio de más por cada nivel por encima del 1. */
+  radiusPlus: 2,
+  /** Felicidad de más por nivel (en su radio). */
+  happinessPlus: 1,
+  /** Empleos de más por nivel (solo donde trabajan 2 o más). */
+  jobsPlus: 1,
+  maintenance: [1, 1.6, 2.4],
+  /** Coste de subir AL nivel i: × materiales del edificio. */
+  cost: [0, 0, 2, 4.5],
+  days: [0, 0, 4, 7],
+  /** Nivel de ayuntamiento y vecinos que pide subir al nivel i. */
+  townhall: [0, 0, 3, 4],
+  pop: [0, 0, 40, 100],
+  /** Uso mínimo (respecto a lo que atiende ahora) para que tenga sentido ampliarlo. */
+  usage: 0.75,
+  /** En parques, biblioteca y polideportivo: vecinos que viven en su radio, por nivel. */
+  residents: [0, 0, 20, 50],
 } as const;

@@ -117,21 +117,36 @@ export function openAlbum(ctx: SocialCtx): void {
   const state = ctx.state();
   const album = [...(state.album ?? [])].reverse();
   const list = h('div', { class: 'album' });
-  for (const m of album) {
+  const card = (m: Moment) => {
     const { el, live } = photo(ctx.token, state, m);
     const save = h('button', { class: 'btn small', 'aria-label': `Guardar postal del ${formatDate(tickToDate(m.tick))}` }, 'Guardar postal');
     el.setAttribute('role', 'img');
     el.setAttribute('aria-label', `Foto: ${m.text}`);
     save.addEventListener('click', () => void postcard(ctx.token, state, m));
-    list.append(
-      h(
-        'figure',
-        { class: 'album-card' },
-        el,
-        h('figcaption', {}, h('strong', {}, formatDate(tickToDate(m.tick))), ` · ${m.text}`, live ? h('span', { class: 'muted small' }, ' (así está hoy)') : ''),
-        save,
-      ),
+    return h(
+      'figure',
+      { class: 'album-card' },
+      el,
+      h('figcaption', {}, h('strong', {}, formatDate(tickToDate(m.tick))), ` · ${m.text}`, live ? h('span', { class: 'muted small' }, ' (así está hoy)') : ''),
+      save,
     );
+  };
+  // v1.8 (ronda 13): lo que se repite (riadas, fiestas, elecciones…) se agrupa: se ve el último
+  // y los anteriores quedan en un desplegable debajo.
+  const seen = new Map<string, Moment[]>();
+  for (const m of album) if (!m.kind.startsWith('primer')) seen.set(m.kind, [...(seen.get(m.kind) ?? []), m]);
+  for (const m of album) {
+    const group = seen.get(m.kind);
+    if (group && group[0] !== m) continue;
+    const el = card(m);
+    if (group && group.length > 1) {
+      const more = h('details', { class: 'album-more' }, h('summary', {}, `Ver ${group.length - 1} ${group.length - 1 === 1 ? 'anterior' : 'anteriores'}`));
+      more.addEventListener('toggle', () => {
+        if (more.open && more.children.length === 1) more.append(...group.slice(1).map(card));
+      }, { once: false });
+      el.append(more);
+    }
+    list.append(el);
   }
   sheet(
     'Álbum del pueblo',

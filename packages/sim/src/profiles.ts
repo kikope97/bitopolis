@@ -1,5 +1,6 @@
 import type { BuildKind, Command, TaxLevel } from '@bitopolis/shared';
-import { PLANT_CAPACITY, ZONE_UNLOCK_POP } from './balance.ts';
+import { PLANT_CAPACITY } from './balance.ts';
+import { canUpgradeTownhall, nextLevel, zonesUnlocked } from './townhall.ts';
 import { buildCost, validateCommand } from './commands.ts';
 import { chance, type RngState, seedRng } from './prng.ts';
 import { buildingAt, type GameState, hasAdjacentRoad, Tile, tileIndex, Zone } from './state.ts';
@@ -112,18 +113,34 @@ function planner(name: string, o: PlannerOpts): Profile {
       if (built.some((b) => !b.hasPower) && !enough('power') && !state.projects.some((p) => buildingKindOf(state, p.buildingId) === 'power')) {
         if (tryBuild('power')) return out;
       }
+      // v1.8: repara lo que rompieron los disturbios si la caja lo permite.
+      const broken = state.buildings.find((b) => b.damaged && b.damaged.repairUntil < 0);
+      if (broken && state.treasury > broken.damaged!.cost + o.reserve) {
+        out.push({ type: 'RepairBuilding', buildingId: broken.id });
+        return out;
+      }
+      // v1.8: amplía el ayuntamiento en cuanto puede pagarlo sin tocar su reserva.
+      const up = nextLevel(state);
+      // El nivel 2 (las zonas) es lo primero; los demás, solo con el mes en positivo y colchón.
+      const prev = state.stats.at(-1);
+      const prudent = up && (up.level === 2 ? state.treasury >= up.cost : state.treasury >= up.cost * 2 + o.reserve && (!prev || prev.income >= prev.expenses));
+      if (up && prudent && canUpgradeTownhall(state).ok) {
+        out.push({ type: 'UpgradeTownhall' });
+        return out;
+      }
+      const zonesOn = zonesUnlocked(state);
       // Un jugador razonable mira el parte: no añade servicios (y sus sueldos) con el mes en negativo.
       const last = state.stats.at(-1);
-      if (pop >= ZONE_UNLOCK_POP && (!last || last.income >= last.expenses)) {
+      if (zonesOn && (!last || last.income >= last.expenses)) {
         const count = (k: string) => state.buildings.filter((b) => b.kind === k).length;
         const wanted = o.servicesPer ? Math.ceil(pop / o.servicesPer) : 1;
         for (const kind of o.services) if (count(kind) < wanted && tryBuild(kind)) return out;
       }
       // Vivienda municipal al principio (o siempre, según el perfil).
-      if ((pop < ZONE_UNLOCK_POP || o.municipalHousing) && freeHomes(state) + state.projects.filter((p) => p.payer === 0).length * 3 < 3 && state.demand.R > 0) {
+      if ((!zonesOn || o.municipalHousing) && freeHomes(state) + state.projects.filter((p) => p.payer === 0).length * 3 < 3 && state.demand.R > 0) {
         if (tryBuild('house')) return out;
       }
-      if (pop >= ZONE_UNLOCK_POP) {
+      if (zonesOn) {
         const zoned = (z: number) =>
           spots.filter((s) => state.map.zones[tileIndex(state, s.x, s.y)] === z).length;
         const unzoned = spots.filter((s) => state.map.zones[tileIndex(state, s.x, s.y)] === Zone.None);
@@ -161,7 +178,7 @@ export const PROFILES: Record<string, Profile> = {
     tax: 'low',
     reserve: 0,
     activity: 1,
-    services: ['park', 'school', 'clinic'],
+    services: ['park', 'school', 'clinic', 'police'],
     municipalHousing: true,
     servicesPer: 6,
   }),
@@ -169,7 +186,7 @@ export const PROFILES: Record<string, Profile> = {
     tax: 'medium',
     reserve: 0,
     activity: 1,
-    services: ['park', 'school', 'clinic'],
+    services: ['park', 'school', 'clinic', 'police'],
     municipalHousing: true,
   }),
 };

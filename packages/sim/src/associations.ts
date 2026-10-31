@@ -3,7 +3,11 @@ import { ASSOCIATIONS } from './balance.ts';
 import { coverageCtx, missingServices, type NeedKey } from './coverage.ts';
 import { felt } from './economy.ts';
 import { addMemory } from './social.ts';
-import { type Citizen, type GameState, pushEvent } from './state.ts';
+import { barrioOf } from './barrio.ts';
+import { stationsFor, tryArrest, cellsUsed } from './crime.ts';
+import { chance } from './prng.ts';
+import { type Building, type Citizen, type GameState, pushEvent } from './state.ts';
+import { CRIME } from './balance.ts';
 
 /**
  * v1.7: asociaciones vecinales y protestas. Cuando varios vecinos con nombre
@@ -53,6 +57,34 @@ export interface Association {
   promiseUntil: number;
   /** Última reunión con el alcalde (una al mes como mucho). */
   lastMeeting: number;
+  /** v1.8: el barrio de los socios (centro de sus casas) y cuántas veces se han manifestado sin solución. */
+  x?: number;
+  y?: number;
+  protests?: number;
+}
+
+/** v1.8: lema de la pancarta según lo que piden. */
+export const LEMA: Record<Cause, string> = {
+  agua: '¡Agua para todos!',
+  luz: '¡Luz para el barrio!',
+  colegio: '¡Colegio ya!',
+  salud: '¡Sanidad en el barrio!',
+  policia: '¡Queremos seguridad!',
+  ocio: '¡Un parque para los niños!',
+  ruido: '¡Queremos dormir!',
+  contaminacion: '¡Aire limpio ya!',
+  inseguridad: '¡Barrio seguro!',
+  impuestos: '¡No más impuestos!',
+};
+
+/** Centro de las casas de unos vecinos (el barrio de la asociación). */
+function centerOf(state: GameState, ids: number[]): { x: number; y: number } {
+  const homes = ids.map((id) => state.buildings.find((b) => b.id === state.citizens.find((c) => c.id === id)?.homeId)).filter((b): b is Building => !!b);
+  if (!homes.length) {
+    const hall = state.buildings.find((b) => b.kind === 'townhall');
+    return { x: hall?.x ?? 0, y: hall?.y ?? 0 };
+  }
+  return { x: Math.round(homes.reduce((s, b) => s + b.x, 0) / homes.length), y: Math.round(homes.reduce((s, b) => s + b.y, 0) / homes.length) };
 }
 
 /** La queja principal de un vecino, si la tiene (lo que más le resta). */
@@ -91,10 +123,12 @@ export function associationsMonth(state: GameState): void {
   // Las que ya existen: socios al día; si casi nadie sigue con la queja, celebran y se disuelven.
   for (const a of [...state.associations]) {
     const still = byCause.get(a.cause) ?? [];
+    const before = a.members;
     a.members = still.map((c) => c.id);
     if (still.length < ASSOCIATIONS.dissolveBelow) {
-      const old = state.citizens.filter((c) => c.named && grievanceOf(state, c, ctx) !== a.cause);
-      for (const c of old.slice(0, 6)) addMemory(state, c, 'logro_vecinal', 3, 3);
+      // Lo celebran los socios que siguen en el pueblo (ronda 13: se lo daba a otros vecinos).
+      const old = state.citizens.filter((c) => before.includes(c.id));
+      for (const c of old) addMemory(state, c, 'logro_vecinal', 3, 3);
       pushEvent(state, 'politics', `La ${a.name} celebra que ya hay ${CAUSE_TEXT[a.cause]}. Se disuelve: misión cumplida`);
       state.associations = state.associations.filter((x) => x !== a);
       continue;
@@ -121,9 +155,17 @@ export function associationsMonth(state: GameState): void {
   if (fresh && state.associations.length < ASSOCIATIONS.max) {
     const [cause, cs] = fresh;
     const leader = leaderOf(cs);
+    // v1.8: nombre del barrio («Asociación Vecinal del Río»); si ya hay una allí, con su causa.
+    // El barrio es el de la casa del líder (la media de todas las casas caía siempre en el centro).
+    const at = centerOf(state, [leader.id]);
+    let name = `Asociación Vecinal ${barrioOf(state, at.x, at.y)}`;
+    if (state.associations.some((x) => x.name === name)) name = `${name} por ${CAUSE_TEXT[cause]}`;
     const a: Association = {
       id: state.nextId++,
-      name: `Asociación de vecinos por ${CAUSE_TEXT[cause]}`,
+      name,
+      x: at.x,
+      y: at.y,
+      protests: 0,
       cause,
       members: cs.map((c) => c.id),
       leaderId: leader.id,
@@ -159,21 +201,33 @@ export function associationsDay(state: GameState): void {
   for (const a of state.associations ?? []) {
     if (a.protestDay < 0 || state.tick < a.protestDay) continue;
     const marchers = state.citizens.filter((c) => a.members.includes(c.id) && c.protest === a.id);
+    const at = a.x !== undefined && a.y !== undefined ? { x: a.x, y: a.y } : centerOf(state, a.members);
+    a.x = at.x;
+    a.y = at.y;
     state.pending = state.pending.filter((p) => !(p.trigger === 'protesta' && a.members.includes(p.citizenId)));
     a.protestDay = -1;
     a.lastProtest = state.tick;
     for (const c of state.citizens) if (c.protest === a.id || c.protest === -a.id) delete c.protest;
-    // Además de los socios con nombre, se suman vecinos anónimos del barrio.
-    const crowd = marchers.length * 3 + Math.round(a.members.length * 1.5);
+    // Además de los socios con nombre, se suman vecinos anónimos del barrio; y cada vez que
+    // vuelven a salir sin solución, son más (v1.8).
+    const times = a.protests ?? 0;
+    // Ronda 14: nunca más gente que la que vive en el pueblo.
+    const crowd = Math.min(state.citizens.length, Math.round((marchers.length * 3 + a.members.length * 1.5) * (1 + ASSOCIATIONS.growth * times)));
     for (const c of marchers) addMemory(state, c, 'se_manifesto', 4, -2);
+    if (!marchers.length) {
+      pushEvent(state, 'protest', `La manifestación de la ${a.name} se queda en nada: casi nadie acude`, { ref: a.id });
+      continue;
+    }
+    a.protests = times + 1;
+    const leader = state.citizens.find((c) => c.id === a.leaderId)?.name ?? 'la asociación';
     pushEvent(
       state,
       'protest',
-      marchers.length
-        ? `Manifestación ante el ayuntamiento: unas ${crowd} personas piden ${CAUSE_ASK[a.cause]}. Encabeza ${state.citizens.find((c) => c.id === a.leaderId)?.name ?? 'la asociación'}`
-        : `La manifestación de la ${a.name} se queda en nada: casi nadie acude`,
+      `${times ? `${times + 1}.ª manifestación` : 'Manifestación'} de la ${a.name}: unas ${crowd} personas recorren el barrio hasta el ayuntamiento gritando «${LEMA[a.cause]}». Encabeza ${leader}`,
       { ref: a.id },
     );
+    // v1.8: tras varias sin respuesta, puede haber disturbios (menos si la policía puede detener).
+    if (a.protests > ASSOCIATIONS.riotAfter) riot(state, a, marchers, at);
   }
 }
 
@@ -217,4 +271,29 @@ export function protestFor(state: GameState, c: Citizen): Association | undefine
 }
 function deciders(a: Association): number[] {
   return [a.leaderId, ...a.members.filter((id) => id !== a.leaderId)].slice(0, ASSOCIATIONS.deciders);
+}
+
+/**
+ * v1.8: disturbios. Tras varias manifestaciones sin respuesta, la protesta
+ * puede acabar mal: rompen una o dos tiendas del barrio (dejan de funcionar
+ * hasta que el ayuntamiento paga la reparación). Si la policía puede detener a
+ * los alborotadores, es menos probable y rompen menos.
+ */
+function riot(state: GameState, a: Association, marchers: Citizen[], at: { x: number; y: number }): void {
+  const canArrest = stationsFor(state, at.x, at.y).some((s) => cellsUsed(state, s.id) < CRIME.cellsPerStation);
+  if (!chance(state.rng, ASSOCIATIONS.riotChance * (canArrest ? 0.5 : 1))) return;
+  const shops = state.buildings
+    .filter((b) => b.kind === 'shop' && b.built && !b.damaged)
+    .sort((p, q) => Math.abs(p.x - at.x) + Math.abs(p.y - at.y) - (Math.abs(q.x - at.x) + Math.abs(q.y - at.y)))
+    .slice(0, canArrest ? 1 : 2);
+  for (const b of shops) b.damaged = { cost: ASSOCIATIONS.repairCost, repairUntil: -1 };
+  const arrested = tryArrest(state, at.x, at.y, Math.min(3, marchers.length), marchers.slice(0, 3));
+  for (const c of marchers.slice(0, arrested)) addMemory(state, c, 'detenido', 5, -5);
+  const broken = shops.map((b) => b.name ?? 'una tienda').join(' y ');
+  pushEvent(
+    state,
+    'crime',
+    `Disturbios tras la manifestación de la ${a.name}${broken ? `: destrozan ${broken}` : ''}${arrested ? `. La policía detiene a ${arrested === 1 ? 'una persona' : `${arrested} personas`}` : '. No hay policía que pueda detenerlos'}${broken ? '. Repararlo cuesta ' + ASSOCIATIONS.repairCost + ' € por tienda (toca la tienda)' : ''}`,
+    { ref: shops[0]?.id ?? a.id },
+  );
 }

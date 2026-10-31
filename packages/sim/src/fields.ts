@@ -1,6 +1,7 @@
 import type { GameState } from './state.ts';
 import { Tile } from './state.ts';
-import { FIELDS, TERRAIN } from './balance.ts';
+import { CRIME, FIELDS, TERRAIN } from './balance.ts';
+import { radiusOf } from './levels.ts';
 import { isWater, Terrain } from './terrain.ts';
 
 /**
@@ -76,8 +77,12 @@ export function updateFields(state: GameState): void {
       case 'chapel':
         stamp(good, w, h, b.x, b.y, 7, 8);
         break;
+      case 'jail':
+        // A nadie le gusta vivir junto a la cárcel: baja el valor del suelo.
+        stamp(good, w, h, b.x, b.y, 4, -12);
+        break;
       case 'police':
-        stamp(police, w, h, b.x, b.y, 10, 1);
+        stamp(police, w, h, b.x, b.y, radiusOf(b), 1);
         stamp(good, w, h, b.x, b.y, 6, 5);
         break;
       default:
@@ -86,6 +91,8 @@ export function updateFields(state: GameState): void {
     const people = residents.get(b.id) ?? 0;
     if (people > 0) stamp(crime, w, h, b.x, b.y, 4, people * 2.2);
   }
+  // v1.8: los robos sin resolver suben la inseguridad alrededor durante un tiempo.
+  for (const hs of state.justice?.hot ?? []) stamp(crime, w, h, hs.x, hs.y, 3, CRIME.hotCrime);
   // Tráfico: las carreteras hacen ruido según la población.
   const traffic = Math.min(25, 4 + state.citizens.length / 12);
   for (let i = 0; i < n; i++) if (tiles[i] === Tile.Road) noise[i]! += traffic;

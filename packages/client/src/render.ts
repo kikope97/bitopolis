@@ -28,6 +28,13 @@ import {
   snowGrass,
   walkerSprite,
   waterTile,
+  damagedSprite,
+  marcherSprite,
+  policeSprite,
+  serviceSprite,
+  sparkleSprite,
+  thiefSprite,
+  townhallSprite,
   zoneTile,
 } from './sprites.ts';
 
@@ -293,6 +300,14 @@ function warmGrounds(state: GameState, current: TimeOfDay, sig: string) {
 
 const roadCache = new Map<string, Pix>();
 
+/** Sprite de un edificio: destrozado, el ayuntamiento según su nivel (v1.8) o el normal. */
+function bSprite(b: GameState['buildings'][number], tod: TimeOfDay, snowing: boolean, state: GameState): HTMLCanvasElement {
+  if (b.damaged) return damagedSprite(b.kind, b.id, tod);
+  if (b.kind === 'townhall') return townhallSprite(state.townhallLevel ?? 1, tod, snowing);
+  if (b.level && b.level > 1) return serviceSprite(b.kind, b.id, b.level, tod, snowing);
+  return buildingSprite(b.kind, b.id, tod, snowing);
+}
+
 /** Imagen de las herramientas: un sprite reducido a su caja. */
 export function toolCanvas(kind: string): HTMLCanvasElement {
   return buildingSprite(kind, 1);
@@ -355,7 +370,7 @@ export function render(
   ctx: CanvasRenderingContext2D,
   state: GameState,
   cam: Camera,
-  opts: { preview?: Preview | null; selected?: { x: number; y: number } | null; cursor?: { x: number; y: number } | null; time: number; reducedMotion: boolean; layer?: LayerId },
+  opts: { preview?: Preview | null; selected?: { x: number; y: number } | null; cursor?: { x: number; y: number } | null; time: number; reducedMotion: boolean; layer?: LayerId; highlight?: { x: number; y: number; since: number } | null },
 ): void {
   const z = cam.zoom;
   const ts = T * z;
@@ -456,11 +471,11 @@ export function render(
       }
       // Squash & stretch al terminarse (anclado abajo, en el centro).
       const [sx, sy] = squash(b.id, opts.time);
-      if (sx === 1 && sy === 1) ctx.drawImage(buildingSprite(b.kind, b.id, tod, snowing), px, py, ts, BH * z);
+      if (sx === 1 && sy === 1) ctx.drawImage(bSprite(b, tod, snowing, state), px, py, ts, BH * z);
       else {
         const dw = Math.round(ts * sx);
         const dh = Math.round(BH * z * sy);
-        ctx.drawImage(buildingSprite(b.kind, b.id, tod, snowing), px + Math.round((ts - dw) / 2), py + BH * z - dh, dw, dh);
+        ctx.drawImage(bSprite(b, tod, snowing, state), px + Math.round((ts - dw) / 2), py + BH * z - dh, dw, dh);
       }
       // Humo de chimeneas (fábricas, central y casas): bocanadas que suben y crecen.
       // En casas solo alguna chimenea y una bocanada: que no parezca contaminación.
@@ -482,14 +497,17 @@ export function render(
         ctx.fillStyle = P(12);
         ctx.fillRect(fxp + (jet - 1) * 2 * z, fyp - (jet + 1) * z, z, z);
       }
-      if (b.kind !== 'water' && b.kind !== 'power' && b.kind !== 'park' && blink) {
+      // v1.8 (petición del creador): el icono sale cuando el problema dura (un día o más) y,
+      // si pasa de una semana, parpadea para llamar la atención. Recién terminado no avisa.
+      if (b.kind !== 'water' && b.kind !== 'power' && b.kind !== 'park') {
         let ix = px + ts - 12 * z;
         const iy = py + 2 * z;
-        if (!b.hasWater) {
+        const show = (days: number | undefined) => (days ?? 0) >= 1 && ((days ?? 0) < 7 || blink);
+        if (!b.hasWater && show(b.dryDays)) {
           ctx.drawImage(iconSprite('noWater'), ix, iy, 11 * z, 13 * z);
           ix -= 12 * z;
         }
-        if (!b.hasPower) ctx.drawImage(iconSprite('noPower'), ix, iy, 11 * z, 13 * z);
+        if (!b.hasPower && show(b.darkDays)) ctx.drawImage(iconSprite('noPower'), ix, iy, 11 * z, 13 * z);
       }
     }
   }
@@ -571,6 +589,9 @@ export function render(
   }
 
   drawProtest(ctx, state, cam, opts.time, opts.reducedMotion, tod);
+  drawPolice(ctx, state, cam, opts.time, opts.reducedMotion, tod);
+  drawThief(ctx, state, cam, opts.time, opts.reducedMotion, tod);
+  if (opts.highlight) drawHighlight(ctx, cam, opts.highlight, opts.time, opts.reducedMotion);
   drawWeather(ctx, state, opts.time, opts.reducedMotion);
 
   const corner = (tx: number, ty: number, color: number, thick: number) => {
@@ -627,34 +648,232 @@ function drawWeather(ctx: CanvasRenderingContext2D, state: GameState, time: numb
   }
 }
 
+/* ---------- v1.8: marcha por el barrio, policía y caminos por las calles ---------- */
+
+const pathCache = new Map<string, { x: number; y: number }[]>();
+/** Camino más corto por carretera entre dos sitios (desde la carretera más cercana a cada uno). */
+function roadPath(state: GameState, from: { x: number; y: number }, to: { x: number; y: number }): { x: number; y: number }[] {
+  const { w, h, tiles } = state.map;
+  const key = `${from.x},${from.y}>${to.x},${to.y}:${mapSignature(state)}`;
+  const hit = pathCache.get(key);
+  if (hit) return hit;
+  const nearestRoad = (p: { x: number; y: number }) => {
+    let best = -1;
+    let bd = Infinity;
+    for (let i = 0; i < tiles.length; i++) {
+      if (tiles[i] !== Tile.Road) continue;
+      const d = Math.abs((i % w) - p.x) + Math.abs(Math.floor(i / w) - p.y);
+      if (d < bd) {
+        bd = d;
+        best = i;
+      }
+    }
+    return best;
+  };
+  const start = nearestRoad(from);
+  const goal = nearestRoad(to);
+  let out: { x: number; y: number }[] = [];
+  if (start >= 0 && goal >= 0) {
+    const prev = new Map<number, number>([[start, -1]]);
+    const queue = [start];
+    while (queue.length) {
+      const i = queue.shift()!;
+      if (i === goal) break;
+      const x = i % w;
+      const y = Math.floor(i / w);
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const j = ny * w + nx;
+        if (tiles[j] !== Tile.Road || prev.has(j)) continue;
+        prev.set(j, i);
+        queue.push(j);
+      }
+    }
+    if (prev.has(goal)) {
+      for (let i = goal; i !== -1; i = prev.get(i)!) out.push({ x: i % w, y: Math.floor(i / w) });
+      out = out.reverse();
+    }
+  }
+  if (pathCache.size > 40) pathCache.clear();
+  pathCache.set(key, out);
+  return out;
+}
+
+/** Punto (en píxeles de sprite) a `d` casillas del inicio del camino, y hacia dónde mira. */
+function along(path: { x: number; y: number }[], d: number): { fx: number; fy: number; dir: 1 | -1 } {
+  const k = Math.max(0, Math.min(path.length - 1, d));
+  const i = Math.floor(k);
+  const a = path[i]!;
+  const b = path[Math.min(path.length - 1, i + 1)]!;
+  const t = k - i;
+  return { fx: (a.x + (b.x - a.x) * t + 0.5) * T, fy: (a.y + (b.y - a.y) * t + 0.5) * T + 6, dir: b.x < a.x ? -1 : 1 };
+}
+
+/** Cuándo se vio por primera vez cada suceso animado (la animación va en tiempo real). */
+const seenAt = new Map<string, number>();
+/** Ronda 14: al llegar la cámara, las animaciones empiezan de nuevo (para verlas enteras). */
+export function restartAnimations(): void {
+  seenAt.clear();
+}
+function sinceSeen(key: string, time: number): number {
+  if (!seenAt.has(key)) {
+    if (seenAt.size > 50) seenAt.clear();
+    seenAt.set(key, time);
+  }
+  return time - seenAt.get(key)!;
+}
+
 /**
- * v1.7: la manifestación, durante un día, delante del ayuntamiento: vecinos
- * con pancartas en la calle (cuantos más, más gente; como mucho 24).
+ * v1.8 (petición del creador): la manifestación, durante un día, es un grupo de
+ * vecinos con pancartas que sale de su barrio y recorre las calles hasta el
+ * ayuntamiento; allí se concentran. Cuanto más grande, más gente (hasta 30).
  */
 function drawProtest(ctx: CanvasRenderingContext2D, state: GameState, cam: Camera, time: number, still: boolean, tod: TimeOfDay): void {
   const e = [...state.events].reverse().find((x) => x.kind === 'protest');
   if (!e || state.tick - e.tick > 24) return;
-  const crowd = Math.min(24, Number(/unas (\d+) personas/.exec(e.text)?.[1] ?? 0));
+  const crowd = Math.min(30, Number(/unas (\d+) personas/.exec(e.text)?.[1] ?? 0));
   const hall = state.buildings.find((b) => b.kind === 'townhall');
   if (!crowd || !hall) return;
   const z = cam.zoom;
+  const a = state.associations?.find((x) => x.id === e.ref);
+  const from = a?.x !== undefined && a.y !== undefined ? marchStart(state, { x: a.x, y: a.y }, hall) : null;
+  const path = from ? roadPath(state, from, { x: hall.x, y: hall.y + 1 }) : [];
+  // Recorrido a 1,2 casillas por segundo; quien llega, se queda en la plaza.
+  const walked = still ? Infinity : (sinceSeen(`p${e.tick}`, time) / 1000) * 1.2;
   for (let i = 0; i < crowd; i++) {
-    // En filas sobre la calle de delante, centradas en el ayuntamiento.
-    const col = (i % 8) - 3.5;
-    const row = Math.floor(i / 8);
-    const fx = (hall.x + 0.5) * T + col * 9 + (hash(i, 31) - 0.5) * 4;
-    const fy = (hall.y + 1) * T + 10 + row * 7;
+    const behind = i * 0.18;
+    const d = walked - behind;
+    let fx: number;
+    let fy: number;
+    let dir: 1 | -1 = i % 2 ? 1 : -1;
+    let frame = 0;
+    if (path.length > 1 && d < path.length - 1) {
+      if (d < 0) continue; // aún no ha salido
+      const p = along(path, d);
+      fx = p.fx + ((i % 2) - 0.5) * 8;
+      fy = p.fy + ((i % 3) - 1) * 3;
+      dir = p.dir;
+      frame = Math.floor(time / 170 + i) % 4;
+    } else {
+      // Concentración ante el ayuntamiento, en filas.
+      const col = (i % 10) - 4.5;
+      const row = Math.floor(i / 10);
+      fx = (hall.x + 0.5) * T + col * 8 + (hash(i, 31) - 0.5) * 3;
+      fy = (hall.y + 1) * T + 10 + row * 7;
+    }
     const bob = still ? 0 : Math.floor(time / 400 + i) % 2;
-    const img = walkerSprite(Math.floor(hash(i, 32) * 64), 0, i % 2 ? 1 : -1, tod);
-    ctx.drawImage(img, (fx - 3) * z - cam.x, (fy - 11 - bob) * z - cam.y, 7 * z, 12 * z);
-    if (i % 3 === 0) {
-      // Pancarta: palo y cartel.
-      ctx.fillStyle = P(19);
-      ctx.fillRect((fx + 2) * z - cam.x, (fy - 18 - bob) * z - cam.y, z, 8 * z);
-      ctx.fillStyle = P(12);
-      ctx.fillRect((fx - 2) * z - cam.x, (fy - 22 - bob) * z - cam.y, 9 * z, 5 * z);
-      ctx.fillStyle = P(2);
-      ctx.fillRect((fx - 1) * z - cam.x, (fy - 20 - bob) * z - cam.y, 7 * z, z);
+    const variant = Math.floor(hash(i, 32) * 64);
+    if (i % 2 === 0) {
+      const img = marcherSprite(variant, frame, dir, (i / 2) % 4, tod);
+      ctx.drawImage(img, (fx - 4) * z - cam.x, (fy - 17 - bob) * z - cam.y, img.width * z, img.height * z);
+    } else {
+      const img = walkerSprite(variant, frame, dir, tod);
+      ctx.drawImage(img, (fx - 3) * z - cam.x, (fy - 11 - bob) * z - cam.y, 7 * z, 12 * z);
     }
   }
+}
+
+/**
+ * Ronda 14: la marcha sale de una calle a 6–10 casillas del ayuntamiento (la
+ * más cercana al barrio de la asociación), para que se vea recorrer calles
+ * aunque la asociación sea del centro.
+ */
+const startCache = new Map<string, { x: number; y: number }>();
+function marchStart(state: GameState, home: { x: number; y: number }, hall: { x: number; y: number }): { x: number; y: number } {
+  const key = `${home.x},${home.y}:${mapSignature(state)}`;
+  const hit = startCache.get(key);
+  if (hit) return hit;
+  const { w, h, tiles } = state.map;
+  let best = home;
+  let bestD = Infinity;
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      if (tiles[y * w + x] !== Tile.Road) continue;
+      const fromHall = Math.abs(x - hall.x) + Math.abs(y - hall.y);
+      if (fromHall < 6 || fromHall > 10) continue;
+      const d = Math.abs(x - home.x) + Math.abs(y - home.y);
+      if (d < bestD) {
+        bestD = d;
+        best = { x, y };
+      }
+    }
+  if (startCache.size > 20) startCache.clear();
+  startCache.set(key, best);
+  return best;
+}
+
+/** v1.8: tras un robo resuelto, un agente va de la comisaría a la tienda (medio día). */
+function drawPolice(ctx: CanvasRenderingContext2D, state: GameState, cam: Camera, time: number, still: boolean, tod: TimeOfDay): void {
+  const e = [...state.events].reverse().find((x) => x.kind === 'crime' && x.text.includes('policía detiene'));
+  if (!e || state.tick - e.tick > 12 || e.ref === undefined) return;
+  const shop = state.buildings.find((b) => b.id === e.ref);
+  if (!shop) return;
+  const station = state.buildings
+    .filter((b) => b.kind === 'police' && b.built)
+    .sort((p, q) => Math.abs(p.x - shop.x) + Math.abs(p.y - shop.y) - (Math.abs(q.x - shop.x) + Math.abs(q.y - shop.y)))[0];
+  if (!station) return;
+  const path = roadPath(state, station, shop);
+  if (path.length < 2) return;
+  const z = cam.zoom;
+  const d = still ? path.length - 1 : Math.min(path.length - 1, (sinceSeen(`c${e.tick}`, time) / 1000) * 2);
+  const p = along(path, d);
+  for (const [k, off] of [[0, -4], [1, 4]] as const) {
+    const img = policeSprite(Math.floor(time / 150 + k) % 4, p.dir, tod);
+    ctx.drawImage(img, (p.fx - 3 + off) * z - cam.x, (p.fy - 11) * z - cam.y, img.width * z, img.height * z);
+  }
+}
+
+/**
+ * v1.8: robo sin resolver. Durante unas horas de juego, el ladrón sale
+ * corriendo de la tienda con el saco por la calle, alejándose del centro.
+ */
+function drawThief(ctx: CanvasRenderingContext2D, state: GameState, cam: Camera, time: number, still: boolean, tod: TimeOfDay): void {
+  const e = [...state.events].reverse().find((x) => x.kind === 'crime' && x.text.includes('el ladrón escapa'));
+  if (!e || state.tick - e.tick > 8 || e.ref === undefined) return;
+  const shop = state.buildings.find((b) => b.id === e.ref);
+  const hall = state.buildings.find((b) => b.kind === 'townhall');
+  if (!shop) return;
+  // Hacia la carretera más alejada del ayuntamiento a pocas casillas.
+  let best: { x: number; y: number } | null = null;
+  let bestD = -1;
+  const { w, h, tiles } = state.map;
+  for (let dy = -8; dy <= 8; dy++)
+    for (let dx = -8; dx <= 8; dx++) {
+      const x = shop.x + dx;
+      const y = shop.y + dy;
+      if (x < 0 || y < 0 || x >= w || y >= h || tiles[y * w + x] !== Tile.Road) continue;
+      const d = hall ? Math.abs(x - hall.x) + Math.abs(y - hall.y) : Math.abs(dx) + Math.abs(dy);
+      if (d > bestD) {
+        bestD = d;
+        best = { x, y };
+      }
+    }
+  if (!best) return;
+  const path = roadPath(state, shop, best);
+  if (path.length < 2) return;
+  const z = cam.zoom;
+  // Ronda 14: más despacio y en bucle mientras dura el suceso, para que dé tiempo a verlo.
+  const d = still ? 1 : ((sinceSeen(`t${e.tick}`, time) / 1000) * 1.3) % (path.length - 1);
+  const p = along(path, d);
+  const img = thiefSprite(Math.floor(time / 90) % 4, p.dir, tod);
+  ctx.drawImage(img, (p.fx - 3) * z - cam.x, (p.fy - 11) * z - cam.y, img.width * z, img.height * z);
+}
+
+/** v1.8: destello sobre lo que ha hecho volver a x1 (unos segundos). */
+function drawHighlight(ctx: CanvasRenderingContext2D, cam: Camera, hl: { x: number; y: number; since: number }, time: number, still: boolean): void {
+  const age = time - hl.since;
+  if (age > 4000) return;
+  const z = cam.zoom;
+  const cx = (hl.x + 0.5) * T * z - cam.x;
+  const cy = (hl.y + 0.2) * T * z - cam.y;
+  const frame = still ? 2 : Math.floor(age / 120) % 4;
+  // Anillo que late alrededor.
+  ctx.strokeStyle = P(12);
+  ctx.lineWidth = 2 * z;
+  const r = (T * 0.8 + (still ? 0 : (Math.floor(age / 250) % 2) * 3)) * z;
+  ctx.strokeRect(Math.round(cx - r), Math.round(cy - r), Math.round(r * 2), Math.round(r * 2.4));
+  const img = sparkleSprite(frame);
+  ctx.drawImage(img, cx - 8 * z, cy - 26 * z, 16 * z, 16 * z);
 }

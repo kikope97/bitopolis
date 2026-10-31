@@ -1,7 +1,10 @@
 import { canMeetAssociation, meetAssociation } from './associations.ts';
+import { canUpgradeBuilding, startUpgrade } from './levels.ts';
+import { serviceCounts } from './economy.ts';
+import { BUILD_LEVEL, canUpgradeTownhall, plenoUnlocked, townLevel, upgradeTownhall, zonesUnlocked } from './townhall.ts';
 import { answerGrant, canAnswerGrant, canHoldFestival, canProposeBudget, holdFestival, materialsCost, proposeBudget } from './civic.ts';
-import { Command, tickToDate, type BuildKind, type ZoneKind } from '@bitopolis/shared';
-import { BUILD, DEBT_LIMIT, TERRAIN, WAGE_OUTSIDE, ZONE_COST_PER_TILE, ZONE_UNLOCK_POP } from './balance.ts';
+import { Command, TICKS_PER_DAY, tickToDate, type BuildKind, type ZoneKind } from '@bitopolis/shared';
+import { ASSOCIATIONS, BUILD, DEBT_LIMIT, TERRAIN, WAGE_OUTSIDE, ZONE_COST_PER_TILE } from './balance.ts';
 import { isWater, Terrain } from './terrain.ts';
 import { applyDecision, canApplyDecision } from './decisions.ts';
 import { campaign, canCampaign, canMotion, motion } from './politics.ts';
@@ -36,6 +39,7 @@ export const BUILD_NAMES: Record<string, string> = {
   cemetery: 'Cementerio',
   library: 'Biblioteca',
   sports: 'Polideportivo',
+  jail: 'Cárcel',
   clinic: 'Centro de salud',
   police: 'Comisaría',
   plaza: 'Plaza Mayor',
@@ -130,7 +134,6 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
   const parsed = Command.safeParse(raw);
   if (!parsed.success) return { ok: false, error: 'comando mal formado' };
   const cmd = parsed.data;
-  const pop = state.citizens.length;
   const pol = state.politics;
   if (pol && pol.mayor !== 'player' && !governing && !OPPOSITION_ALLOWED.has(cmd.type)) {
     const year = tickToDate(pol.nextElection).year;
@@ -148,11 +151,12 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
     case 'Build': {
       if (cmd.kind === 'road') return validateCommand(state, { type: 'BuildRoad', x: cmd.x, y: cmd.y, x2: cmd.x, y2: cmd.y });
       if (!inBounds(state, cmd.x, cmd.y)) return { ok: false, error: 'Fuera del mapa' };
-      const spec = BUILD[cmd.kind];
+      // v1.8: lo desbloquea el nivel del ayuntamiento (la Plaza y el Mercado, además, su hito).
+      if (townLevel(state) < BUILD_LEVEL[cmd.kind]) return { ok: false, error: `Se desbloquea con el ayuntamiento de nivel ${BUILD_LEVEL[cmd.kind]}` };
       if ((cmd.kind === 'plaza' || cmd.kind === 'market') && !state.unlocked.includes(cmd.kind)) {
         return { ok: false, error: cmd.kind === 'plaza' ? 'La Plaza Mayor se desbloquea con el hito de 50 vecinos' : 'El Mercado se desbloquea con el hito de 200 vecinos' };
       }
-      if (pop < spec.unlockPop && cmd.kind !== 'plaza' && cmd.kind !== 'market') return { ok: false, error: `Se desbloquea con ${spec.unlockPop} vecinos` };
+      if (state.citizens.length < BUILD[cmd.kind].unlockPop && cmd.kind !== 'plaza' && cmd.kind !== 'market') return { ok: false, error: `Se desbloquea con ${BUILD[cmd.kind].unlockPop} vecinos` };
       const t = state.map.tiles[tileIndex(state, cmd.x, cmd.y)];
       const ter = terrainAt(state, cmd.x, cmd.y);
       if (isWater(ter)) return { ok: false, error: ter === Terrain.Sea ? 'Ahí está el mar' : 'Ahí pasa el río: solo se puede cruzar con un puente (Carretera)' };
@@ -171,7 +175,7 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       return { ok: true };
     }
     case 'Zone': {
-      if (cmd.zone !== 'none' && pop < ZONE_UNLOCK_POP) return { ok: false, error: `Las zonas se desbloquean con ${ZONE_UNLOCK_POP} vecinos` };
+      if (cmd.zone !== 'none' && !zonesUnlocked(state)) return { ok: false, error: 'Las zonas se desbloquean con el ayuntamiento de nivel 2' };
       if (!inBounds(state, cmd.x, cmd.y) || !inBounds(state, cmd.x + cmd.w - 1, cmd.y + cmd.h - 1)) {
         return { ok: false, error: 'Fuera del mapa' };
       }
@@ -193,7 +197,21 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       return canApplyDecision(state, cmd.citizenId, cmd.action) ? { ok: true } : { ok: false, error: 'Decisión ya no válida' };
     case 'MeetAssociation':
       return canMeetAssociation(state, cmd.associationId);
+    case 'RepairBuilding': {
+      const b = buildingById(state, cmd.buildingId);
+      if (!b?.damaged) return { ok: false, error: 'Ese edificio no necesita reparación' };
+      if (b.damaged.repairUntil >= 0) return { ok: false, error: 'Ya se está reparando' };
+      if (state.treasury < b.damaged.cost) return { ok: false, error: 'No hay dinero suficiente' };
+      return { ok: true };
+    }
+    case 'UpgradeTownhall':
+      return canUpgradeTownhall(state);
+    case 'UpgradeBuilding': {
+      const b = state.buildings.find((x) => x.id === cmd.buildingId);
+      return canUpgradeBuilding(state, b, b ? serviceCounts(state).get(b.id) : undefined);
+    }
     case 'ConvenePleno': {
+      if (!plenoUnlocked(state)) return { ok: false, error: 'Los plenos llegan con el ayuntamiento de nivel 2' };
       const r = canConvenePleno(state);
       return r.ok ? { ok: true } : { ok: false, error: r.error! };
     }
@@ -330,6 +348,23 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
     case 'MeetAssociation':
       meetAssociation(state, cmd.associationId);
       break;
+    case 'UpgradeTownhall':
+      upgradeTownhall(state);
+      break;
+    case 'UpgradeBuilding': {
+      const b = state.buildings.find((x) => x.id === cmd.buildingId)!;
+      startUpgrade(state, b);
+      pushEvent(state, 'info', `Empieza la mejora de ${b.name ?? BUILD_NAMES[b.kind] ?? b.kind} al nivel ${(b.level ?? 1) + 1}: sigue abierto mientras dura la obra`, { ref: b.id });
+      break;
+    }
+    case 'RepairBuilding': {
+      // v1.8: el ayuntamiento paga la reparación de lo que rompieron los disturbios.
+      const b = buildingById(state, cmd.buildingId)!;
+      transfer(state, TREASURY, OUTSIDE, b.damaged!.cost, 'reparaciones (disturbios)');
+      b.damaged!.repairUntil = state.tick + ASSOCIATIONS.repairDays * TICKS_PER_DAY;
+      pushEvent(state, 'info', `Empieza la reparación de ${b.name ?? BUILD_NAMES[b.kind]?.toLowerCase()}: abrirá en ${ASSOCIATIONS.repairDays} días`, { ref: b.id });
+      break;
+    }
     case 'NotifyProject': {
       const p = state.projects.find((x) => x.buildingId === cmd.buildingId);
       if (p) p.notify = cmd.on;

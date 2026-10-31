@@ -8,9 +8,11 @@ import type { Weather } from './weather.ts';
 import type { Association } from './associations.ts';
 import type { Moment } from './album.ts';
 import type { Departed } from './family.ts';
+// Solo el tipo: importar crime.ts aquí crea un ciclo al cargar (crime → social → commands → state).
+import type { Justice } from './crime.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
-export const FORMAT_VERSION = 10;
+export const FORMAT_VERSION = 11;
 
 export const MAP_W = 48;
 export const MAP_H = 48;
@@ -39,6 +41,7 @@ export type BuildingKind =
   | 'cemetery'
   | 'library'
   | 'sports'
+  | 'jail'
   | 'house'
   /** Crecen solos sobre zonas. */
   | 'res'
@@ -59,6 +62,14 @@ export interface Building {
   /** Servicios recibidos por red (se recalculan cada día). */
   hasWater: boolean;
   hasPower: boolean;
+  /** v1.8: días seguidos sin agua / sin luz (para el icono de problema duradero). */
+  dryDays?: number;
+  darkDays?: number;
+  /** v1.8: dañado en unos disturbios: no funciona hasta que se repara. */
+  damaged?: { cost: number; repairUntil: number };
+  /** v1.8: nivel del servicio (1–3; sin definir = 1) y fin de la obra de mejora. */
+  level?: number;
+  upgradeUntil?: number;
   /** Meses seguidos sin poder pagar nóminas (empresas). */
   unpaidMonths: number;
   /** Nombre propio (empresas fundadas por vecinos: «Panadería de Lucía»). */
@@ -189,6 +200,8 @@ export type EventKind =
   | 'election'
   /** v1.7: manifestación ante el ayuntamiento (ref = id de la asociación). */
   | 'protest'
+  /** v1.8: robos, detenciones y disturbios. */
+  | 'crime'
   | 'info';
 
 export interface GameEvent {
@@ -280,6 +293,10 @@ export interface GameState {
   /** v1.7: momentos del álbum y fichas de quien ya no está (árbol genealógico). */
   album: Moment[];
   departed: Departed[];
+  /** v1.8: nivel del ayuntamiento (1–5): desbloquea edificios y partes del juego. */
+  townhallLevel: number;
+  /** v1.8: calabozos, cárcel y robos. */
+  justice: Justice;
   /** Última despedida (como mucho una por semana). */
   lastDeathTick?: number;
 }
@@ -372,6 +389,8 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20 }: Ne
     associations: [],
     album: [],
     departed: [],
+    justice: { cells: [], jail: [], hot: [], robberies: 0, arrests: 0, fullWarned: -1 },
+    townhallLevel: 1,
   };
   // Árboles dispersos (se talan gratis al construir encima).
   for (let i = 0; i < tiles.length; i++) {

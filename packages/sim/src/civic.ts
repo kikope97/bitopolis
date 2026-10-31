@@ -22,6 +22,8 @@ import { pick } from './prng.ts';
 import { addMemory } from './social.ts';
 import type { Building, BuildingKind, BudgetPlan, GameState } from './state.ts';
 import { pushEvent, terrainAt } from './state.ts';
+import type { BuildKind } from '@bitopolis/shared';
+import { isUnlocked, townLevel } from './townhall.ts';
 import { Terrain } from './terrain.ts';
 
 /**
@@ -147,11 +149,11 @@ export function festivalMood(state: GameState): { label: string; value: number }
 
 const GRANT_KINDS: BuildingKind[] = ['school', 'clinic', 'police', 'park', 'library', 'sports'];
 // Solo se ofrece lo que ya se puede construir (ronda 11: salían comisarías imposibles).
-const unlockOf = (k: BuildingKind) => BUILD[k as keyof typeof BUILD].unlockPop ?? 0;
+
 
 function offerGrant(state: GameState): void {
   const options = GRANT_KINDS.filter(
-    (k) => state.citizens.length >= unlockOf(k) && (!state.buildings.some((b) => b.kind === k) || saturated(state, k)),
+    (k) => isUnlocked(state, k as BuildKind) && (!state.buildings.some((b) => b.kind === k) || saturated(state, k)),
   );
   if (!options.length) return;
   const kind = pick(state.rng, options);
@@ -254,7 +256,9 @@ export function civicDay(state: GameState): void {
   if (state.grants.length > 20) state.grants = state.grants.slice(-20);
   const active = state.grants.some((g) => g.status === 'offered' || g.status === 'accepted');
   const last = Math.max(0, ...state.grants.map((g) => g.offeredTick));
-  if (!active && state.citizens.length >= 10 && state.tick - last >= GRANT_EVERY_DAYS * TICKS_PER_DAY) offerGrant(state);
+  // Con el Palacio Municipal (nivel 5), la Diputación ofrece más a menudo (v1.8).
+  const every = GRANT_EVERY_DAYS * (townLevel(state) >= 5 ? 0.6 : 1);
+  if (!active && state.citizens.length >= 10 && state.tick - last >= every * TICKS_PER_DAY) offerGrant(state);
 }
 
 /** El gobierno rival también presenta presupuesto (el que gusta a su facción). */

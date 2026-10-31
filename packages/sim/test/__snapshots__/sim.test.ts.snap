@@ -4,10 +4,10 @@ exports[`golden > snapshot del día 90 (seed 42, casual) 1`] = `
 {
   "final": {
     "bankrupt": false,
-    "happiness": 67,
-    "population": 30,
-    "treasury": 13304,
+    "happiness": 68,
+    "population": 21,
+    "treasury": 7663,
   },
-  "hash": "ebddb9789b7120fd",
+  "hash": "548ed6e84ba28364",
 }
 `;
