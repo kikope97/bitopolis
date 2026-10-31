@@ -1,6 +1,6 @@
 import { tickToDate, TICKS_PER_DAY } from '@bitopolis/shared';
 import { averageHappiness, freeHomes, happinessFactors, vacancies } from './tick.ts';
-import { activeObjectives, NEED_TEXT, needOf } from './social.ts';
+import { activeObjectives, lowerFirst, NEED_TEXT, needOf } from './social.ts';
 import { daysToElection, FACTION_TEXT, politicsActive } from './politics.ts';
 import type { GameEvent, GameState } from './state.ts';
 
@@ -37,7 +37,7 @@ export function ruleAdvice(state: GameState, q: AdvisorQuestion): string[] {
       `${f.poblacion === 1 ? 'Somos 1 vecino' : `Somos ${f.poblacion} vecinos`} y la felicidad media es ${f.felicidad_media} sobre 100.`,
       f.saldo_ultimo_mes >= 0 ? `La caja ganó ${f.saldo_ultimo_mes} € el mes pasado.` : `La caja perdió ${-f.saldo_ultimo_mes} € el mes pasado.`,
     ];
-    if (f.preocupaciones[0]) lines.push(`Lo que más se oye en la calle: ${f.preocupaciones[0].problema.toLowerCase()} (${f.preocupaciones[0].vecinos} ${f.preocupaciones[0].vecinos === 1 ? 'vecino' : 'vecinos'}).`);
+    if (f.preocupaciones[0]) lines.push(`Lo que más se oye en la calle: ${lowerFirst(f.preocupaciones[0].problema)} (${f.preocupaciones[0].vecinos} ${f.preocupaciones[0].vecinos === 1 ? 'vecino' : 'vecinos'}).`);
     return lines;
   }
   const lines: string[] = [];
@@ -53,7 +53,7 @@ export function ruleAdvice(state: GameState, q: AdvisorQuestion): string[] {
   else if (worry === 'Contaminación') lines.push('La contaminación pesa: aleja la industria de las casas o pon un parque entre medias.');
   else if (worry === 'Inseguridad') lines.push('La gente no se siente segura: una comisaría cerca de las casas ayudaría.');
   else if (worry === 'Trabaja fuera') lines.push('Mucha gente trabaja fuera: crea empleo con zonas comerciales o industriales.');
-  else if (worry) lines.push(`Ataca lo que más molesta: ${worry.toLowerCase()}.`);
+  else if (worry) lines.push(`Ataca lo que más molesta: ${lowerFirst(worry)}.`);
   if (f.demanda.R > 40 && f.viviendas_libres < 3) lines.push('Hay demanda de vivienda: pinta más zona residencial con agua y luz.');
   // Elecciones: la facción más descontenta y lo que pide.
   if (politicsActive(state)) {
