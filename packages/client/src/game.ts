@@ -761,7 +761,7 @@ export function startGame(opts: GameOptions): void {
         return refreshStrip();
       }
       const people = b ? occupants(state, b).length + state.citizens.filter((c) => c.jobId === b.id).length : 0;
-      return proposePlace(tile, tile, `¿Derribar ${what.toLowerCase()}? ${people > 0 ? `Afecta a ${plural(people, 'vecino', 'vecinos')}. ` : ''}No se puede deshacer.`);
+      return proposePlace(tile, tile, `¿Derribar ${what.toLowerCase()}? No se puede deshacer.${people > 0 ? ` Afecta a ${plural(people, 'vecino', 'vecinos')}.` : ''}`);
     }
     // Carretera y zonas: además de arrastrar, se puede tocar el inicio y luego el final.
     if (tool.shape !== 'tap') {
@@ -819,6 +819,7 @@ export function startGame(opts: GameOptions): void {
   function proposePlace(a: { x: number; y: number }, b: { x: number; y: number }, demolishText?: string) {
     const cmd = commandFor(tool, a, b);
     if (!cmd) return;
+    if (isSheetOpen()) closeSheet();
     pendingPlace = { a, b };
     anchor = null;
     pendingEnd = null;
@@ -1101,6 +1102,8 @@ export function startGame(opts: GameOptions): void {
     if (pendingPlace) cancelPlace();
     showBar(false);
     closeTray();
+    // Ronda 12: una hoja abierta tapaba la barra de confirmar (no se podía ni confirmar ni cancelar).
+    if (isSheetOpen() && id !== 'inspect') closeSheet();
     tutorial.update(state, tool.id);
   }
 

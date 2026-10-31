@@ -46,6 +46,9 @@ export async function skipTutorial(page: Page) {
   try {
     await b.waitFor({ state: 'visible', timeout: 1500 });
     await b.click();
+    // v1.6: «Saltar» pide confirmación (un toque al mapa no lo salta sin querer).
+    const yes = page.getByRole('alertdialog').getByRole('button', { name: 'Saltar' });
+    if (await yes.waitFor({ state: 'visible', timeout: 1000 }).then(() => true, () => false)) await yes.click();
   } catch {
     /* sin tutorial */
   }

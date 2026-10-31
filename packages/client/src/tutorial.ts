@@ -1,6 +1,6 @@
 import type { GameState } from '@bitopolis/sim';
 import type { ToolId } from './tools.ts';
-import { $, h } from './ui.ts';
+import { $, confirmDialog, h } from './ui.ts';
 
 /** Tutorial guiado (~3 min): una flecha señala qué tocar. */
 interface Step {
@@ -74,7 +74,10 @@ export class Tutorial {
   constructor(private storageKey: string) {
     this.arrow = h('div', { class: 'tut-arrow', 'aria-hidden': 'true' }, '▼');
     this.skip = h('button', { class: 'tut-skip' }, 'Saltar');
-    this.skip.addEventListener('click', () => this.finish());
+    // Ronda 12: un toque al mapa caía en «Saltar» y el tutorial se perdía; ahora se pregunta.
+    this.skip.addEventListener('click', async () => {
+      if (this.step >= STEPS.length - 1 || (await confirmDialog('¿Saltar el tutorial?', 'Puedes repetirlo desde Pueblo › Repetir tutorial.', 'Saltar'))) this.finish();
+    });
     this.box = h('div', { class: 'tut-box', role: 'status', 'aria-live': 'polite' }, h('p', {}), this.skip);
     try {
       const v = localStorage.getItem(storageKey);

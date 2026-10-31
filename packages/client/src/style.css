@@ -837,3 +837,13 @@ html[data-font='pixel'] body #hud-date, html[data-font='pixel'] body .bar-num, h
 .legend { bottom: calc(8px + var(--tut-h, 0px)); }
 .tab.pulse { animation: pulse 0.6s steps(2) 8; }
 @keyframes pulse { 50% { background: var(--accent); } }
+
+/* Ronda 12 (pantallas pequeñas): las cifras de arriba no se cortan; el derribo se lee entero. */
+.tb-stat, .tb-stat .tb-text { overflow: visible; text-overflow: clip; }
+.tb-speed { min-width: 44px; }
+.confirm-bar.danger p { -webkit-line-clamp: 3; }
+@media (max-width: 420px) {
+  html[data-text='150'] .tb-stat .px-icon, html[data-text='200'] .tb-stat .px-icon, html[data-font='pixel'] .tb-stat .px-icon,
+  html[data-text='200'] .trend, html[data-font='pixel'] .trend { display: none; }
+  html[data-text='200'] .tb-btn, html[data-font='pixel'] .tb-btn { padding: 0 2px; }
+}
