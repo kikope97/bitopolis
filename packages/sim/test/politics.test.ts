@@ -16,6 +16,7 @@ import {
   runSimulation,
   step,
   validActions,
+  validateCommand,
 } from '../src/index.ts';
 
 function town(days = 420): GameState {
@@ -137,7 +138,8 @@ describe('elecciones (v1.0)', () => {
 
   it('desde la oposición: una moción al mes; aprobada compromete al gobierno, rechazada acerca la facción', () => {
     const s = rivalTown();
-    const f = (Object.keys(s.politics.factions) as (keyof typeof s.politics.factions)[]).find((k) => s.politics.factions[k].demand)!;
+    // Una facción con la que la moción sea posible (no vale si el gobierno ya se comprometió a eso).
+    const f = (Object.keys(s.politics.factions) as (keyof typeof s.politics.factions)[]).find((k) => validateCommand(s, { type: 'Motion', faction: k }).ok)!;
     if (!f) return;
     const before = s.politics.campaign[f];
     const promisesBefore = s.politics.party!.promises.length;
@@ -207,7 +209,7 @@ describe('elecciones (v1.0)', () => {
     v7.formatVersion = 7;
     delete v7.politics.log;
     const m = migrate(v7);
-    expect(m.formatVersion).toBe(8);
+    expect(m.formatVersion).toBeGreaterThanOrEqual(8);
     expect(m.politics.log).toEqual([]);
   });
 

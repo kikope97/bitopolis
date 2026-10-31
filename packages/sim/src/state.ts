@@ -5,7 +5,7 @@ import type { Goal, Hook, Memory, Pleno, PromiseRecord, Relation } from './socia
 import { emptyPolitics, type Politics } from './politics-core.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
-export const FORMAT_VERSION = 8;
+export const FORMAT_VERSION = 9;
 
 export const MAP_W = 48;
 export const MAP_H = 48;
@@ -114,6 +114,8 @@ export interface Citizen {
   mortgageTo: number;
   /** Su vivienda fue municipal: la reventa tiene precio máximo. */
   subsidized: boolean;
+  /** v1.5: hijos que viven en casa (tick de nacimiento); a los 18 se independizan. */
+  kids?: number[];
   /** Tick en que compró (no se revende con ganancia antes de 90 días). */
   boughtTick: number;
   /** Memoria de las subidas de impuestos (0–40): resta felicidad y se olvida despacio. */
@@ -249,6 +251,42 @@ export interface GameState {
   unlocked: string[];
   /** Elecciones, facciones y oposición (v1.0). */
   politics: Politics;
+  /** v1.5: presupuesto del año, fiestas del pueblo y subvenciones de la Diputación. */
+  budget: Budget;
+  festival: Festival;
+  grants: Grant[];
+}
+
+export type BudgetPlan = 'austero' | 'equilibrado' | 'inversor';
+export interface Budget {
+  year: number;
+  /** El plan en vigor (el aprobado o, si no, el prorrogado). */
+  plan: BudgetPlan;
+  /** open: enero, por aprobar; approved; prorrogado (rechazado o sin presentar). */
+  status: 'open' | 'approved' | 'prorrogado';
+  votesFor: number;
+  votesAgainst: number;
+}
+export interface Festival {
+  /** Nombre que le pusieron los vecinos (la primera vez). */
+  name: string | null;
+  /** Último año con fiestas. */
+  year: number;
+  size: 'none' | 'pequena' | 'grande' | 'popular';
+  /** Mientras dure el buen recuerdo de las fiestas. */
+  until: number;
+}
+export interface Grant {
+  id: number;
+  kind: BuildingKind;
+  /** Parte del coste que paga la Diputación (0–1). */
+  share: number;
+  offeredTick: number;
+  deadline: number;
+  status: 'offered' | 'accepted' | 'paid' | 'expired' | 'declined';
+  advance: number;
+  /** Solo cuentan las obras empezadas después de aceptar (ids desde aquí). */
+  minId: number;
 }
 
 export interface NewGameOptions {
@@ -298,6 +336,9 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20 }: Ne
     objectivesDone: [],
     unlocked: [],
     politics: emptyPolitics(),
+    budget: { year: 1, plan: 'equilibrado', status: 'approved', votesFor: 0, votesAgainst: 0 },
+    festival: { name: null, year: 0, size: 'none', until: 0 },
+    grants: [],
   };
   // Árboles dispersos (se talan gratis al construir encima).
   for (let i = 0; i < tiles.length; i++) {

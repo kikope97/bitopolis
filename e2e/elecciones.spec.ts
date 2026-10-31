@@ -26,7 +26,8 @@ test('v1.0: intención de voto, facciones, noche electoral y oposición', async 
   await expect(page.locator('#hud-poll')).toHaveText(/· \d+ d$/);
   await page.locator('#hud-poll').click();
   await expect(page.locator('.sheet')).toContainText('Intención de voto');
-  await expect(page.locator('.sheet')).toContainText('Jóvenes por Bitópolis');
+  // El partido rival depende de la semilla: basta con que la hoja lo enseñe.
+  await expect(page.locator('.sheet')).toContainText(/Oposición«|«.+»/);
   await expect(page.locator('.faction')).toHaveCount(4);
   await shot('1-politica');
   await page.getByRole('button', { name: /Hacer campaña con/ }).first().click();

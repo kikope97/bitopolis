@@ -17,6 +17,7 @@ import {
 import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
 import { openNeighbours, openReport, openTaxes as openTaxesSheet } from './economy-ui.ts';
 import { LAYERS, type LayerId } from './layers.ts';
+import { openTownHall } from './civic-ui.ts';
 import { openAdvisor, openCitizen, openDiary, openPleno, rememberSeen, renderObjectives, resumeSummary, type SocialCtx } from './social-ui.ts';
 import { api, ApiError } from './api.ts';
 import { nextHint } from './hints.ts';
@@ -386,6 +387,11 @@ export function startGame(opts: GameOptions): void {
         vibrate(150);
         calmPause();
         openElectionNight(social);
+      } else if (e.kind === 'info' && /Diputación|fiestas|Subvención/.test(e.text)) {
+        // v1.5: ofertas de subvención y fiestas: llevan a la hoja del Ayuntamiento.
+        toast(e.text, { kind: 'info', onClick: () => openTownHall(social) });
+      } else if (e.kind === 'politics' && /presupuesto/i.test(e.text)) {
+        toast(e.text, { kind: e.text.includes('rechaza') ? 'warn' : 'info', onClick: () => openTownHall(social) });
       } else if (e.kind === 'politics') {
         // Lo que responde a una acción tuya (moción, campaña) se avisa siempre.
         if (quiet && !e.text.startsWith('Faltan') && !/moción|campaña/i.test(e.text)) continue;
@@ -1120,6 +1126,7 @@ export function startGame(opts: GameOptions): void {
       item('Consejero', () => openAdvisor(social)),
       item('Diario del pueblo', () => openDiary(social)),
       item('Política y elecciones', () => openPolitics(social)),
+      item('Ayuntamiento', () => openTownHall(social)),
       ...(state.aiMode
         ? [
             item('Gasto de la IA', () => void openUsage(token)),

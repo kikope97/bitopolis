@@ -49,6 +49,11 @@ export const MEMORY_KINDS = [
   'paso_pagina',
   'se_reconcilio',
   'sigue_en_paro',
+  // v1.5: ciclo vital y fiestas.
+  'fue_a_las_fiestas',
+  'nacio_hijo',
+  'perdio_a',
+  'heredo',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -194,6 +199,14 @@ export function memoryText(state: GameState, m: Memory): string {
       return `Hizo las paces con ${who}`;
     case 'sigue_en_paro':
       return 'Sigue sin trabajo y con la hipoteca encima';
+    case 'fue_a_las_fiestas':
+      return 'Disfrutó de las fiestas del pueblo';
+    case 'nacio_hijo':
+      return 'Tuvo un bebé';
+    case 'perdio_a':
+      return `Perdió a ${who}`;
+    case 'heredo':
+      return `Heredó de ${who}`;
   }
 }
 
@@ -331,7 +344,9 @@ function updateRelations(state: GameState): void {
       // (antes se soltaba la más débil y se rehacía al día siguiente, en bucle).
       const room = a.relations.length < RELATIONS_MAX && b.relations.length < RELATIONS_MAX;
       if (!r && room) {
-        const p = (place ? 0.015 : 0.04) + (a.traits.social + b.traits.social) / 4000;
+        // En fiestas, el doble de fácil (v1.5).
+        const party = state.festival.until > state.tick ? 2 : 1;
+        const p = ((place ? 0.015 : 0.04) + (a.traits.social + b.traits.social) / 4000) * party;
         if (chance(state.rng, p)) {
           setRelation(state, a, b, 'amistad', 30);
           addMemory(state, a, 'nueva_amistad', 2, 2, [b.id]);
@@ -750,6 +765,10 @@ const MEMORY_LINE: Partial<Record<MemoryKind, (who: string) => string>> = {
   se_reconcilio: (who) => `Al final hice las paces con ${who}.`,
   le_quitaron_el_local: (who) => `Todavía me escuece que ${who} se quedara el local.`,
   sigue_en_paro: () => 'Sigo sin trabajo y la hipoteca no perdona.',
+  fue_a_las_fiestas: () => 'Las fiestas de este año fueron una maravilla.',
+  nacio_hijo: () => 'Con el bebé en casa no paro, pero estoy feliz.',
+  perdio_a: (who) => `No me hago a la idea de que ${who} ya no esté.`,
+  heredo: (who) => `Lo que me dejó ${who} me ha ayudado mucho.`,
   compro_casa: () => 'Con la casa ya en mis manos, duermo con más calma.',
   abrio_negocio: () => 'Con mi negocio en marcha, ganas no me faltan.',
   subida_impuestos: () => 'Y la última subida de impuestos no ayuda.',

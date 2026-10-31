@@ -407,7 +407,8 @@ export function serviceLoads(state: GameState): Map<number, number> {
       const best = nearest.get(b.kind);
       if (!best || d < best.d || (d === best.d && b.id < best.id)) nearest.set(b.kind, { id: b.id, d });
     }
-    for (const { id } of nearest.values()) count.set(id, count.get(id)! + 1);
+    // Al colegio van los niños de la casa (v1.5); a los demás servicios, cada vecino.
+    for (const [kind, { id }] of nearest) count.set(id, count.get(id)! + (kind === 'school' ? 1 + (c.kids?.length ?? 0) : 1));
   }
   const loads = new Map<number, number>();
   for (const b of served) loads.set(b.id, Math.min(1, SERVICE_CAPACITY[b.kind]! / Math.max(1, count.get(b.id)!)));

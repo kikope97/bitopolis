@@ -15,6 +15,7 @@ import {
   VOTE_ABSTENTION_BASE,
 } from './balance.ts';
 import { BUILD_NAMES, buildCost, governmentCommand } from './commands.ts';
+import { rivalBudget } from './civic.ts';
 import { felt, saturated, taxLevels, updateFeltTaxes } from './economy.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { hash32 } from './hash.ts';
@@ -269,6 +270,7 @@ function rivalGovern(state: GameState): void {
   const p = state.politics;
   if (p.mayor === 'player' || !p.party) return;
   const f = p.party.faction;
+  rivalBudget(state, f);
   const taxesBefore = JSON.stringify(taxLevels(state));
   // Impuestos según la facción; con déficit y la caja baja, como cualquier gobierno, los sube.
   const last = state.stats.at(-1);
