@@ -996,6 +996,8 @@ body.cal-on .legend { top: 86px; }
 .turn-source { font-size: 0.8rem; padding: 0 6px; border: 1px solid var(--line); }
 .turn-source.ia { color: #ffcd75; border-color: #ffcd75; }
 .turn-focus { font-weight: 600; }
+.brewing .turn-line { cursor: default; }
+.brewing.bad .turn-line { color: var(--bad); }
 /* v1.9.1: con poca altura (móvil en horizontal), la leyenda no pasa del 45 % del ancho y se desplaza si no cabe. */
 @media (max-height: 500px) {
   .legend { max-width: min(45%, calc(100% - 180px)); max-height: calc(100% - 16px - var(--tut-h, 0px)); overflow-y: auto; }

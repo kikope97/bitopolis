@@ -132,8 +132,8 @@ export function directorMenu(state: GameState): DirectorCandidate[] {
   if (recent) {
     out.push(
       recent.big
-        ? { id: 'rumor:malo', kind: 'rumor', bad: true, text: `Corre el rumor de que habrá más medidas como esta: «${recent.text}»`, why: 'lo último que ha hecho el alcalde' }
-        : { id: 'rumor:bueno', kind: 'rumor', bad: false, text: `Se comenta en el bar que «${recent.text}» traerá cosas buenas`, why: 'lo último que ha hecho el alcalde' },
+        ? { id: 'rumor:malo', kind: 'rumor', bad: true, text: `Corre el rumor de que, después de que el alcalde ${recent.text}, vendrán más medidas así`, why: 'lo último que ha hecho el alcalde' }
+        : { id: 'rumor:bueno', kind: 'rumor', bad: false, text: `En el bar se comenta que el alcalde ${recent.text} y que eso traerá cosas buenas`, why: 'lo último que ha hecho el alcalde' },
     );
   }
 

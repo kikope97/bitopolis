@@ -41,6 +41,10 @@ test('2.0: un turno del pueblo con IA llega, se aplica y se ve en «Qué está p
   await page.locator('#menu').click();
   await page.getByRole('button', { name: /Qué está pasando/ }).click();
   await expect(page.locator('.sheet')).toContainText('✦ IA');
+  // El director (también el LLM falso) pone foco y crónica a la semana.
+  const directed = (await state(page)).ai.log.find((l: { source: string; chronicle?: string }) => l.source === 'ia' && l.chronicle);
+  if (directed) await expect(page.locator('.sheet')).toContainText('Semana movida');
+  expect((await state(page)).ai.log.some((l: { chronicle?: string }) => l.chronicle)).toBe(true);
   await page.screenshot({ path: `test-results/capturas/${info.project.name}-ia-turno.png` });
   expect(errors).toEqual([]);
 });

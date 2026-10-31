@@ -1,5 +1,5 @@
 import { tickToDate } from '@bitopolis/shared';
-import { type Citizen, type GameState, planText } from '@bitopolis/sim';
+import { brewingNow, type Citizen, type GameState, planText } from '@bitopolis/sim';
 import { formatDate } from './i18n.ts';
 import type { SocialCtx } from './social-ui.ts';
 import { h, sheet } from './ui.ts';
@@ -20,9 +20,12 @@ export function openWhatsHappening(ctx: SocialCtx, onCitizen: (id: number) => vo
   const who = (id: number) => s.citizens.find((c) => c.id === id);
   // Planes y ultimátums en marcha: lo que el jugador aún puede evitar.
   const plans = s.citizens.filter((c) => c.plan).sort((a, b) => a.plan!.until - b.plan!.until);
-  if (plans.length) {
+  // Avisos del director: lo malo siempre se anuncia antes, para que se pueda reaccionar.
+  const brewing = brewingNow(s);
+  if (plans.length || brewing.length) {
     body.push(h('h3', {}, 'Se está cociendo'));
     const ul = h('ul', { class: 'turn-lines' });
+    for (const b of brewing) ul.append(h('li', { class: b.bad ? 'brewing bad' : 'brewing' }, h('span', { class: 'turn-line' }, `${b.bad ? '⚠ ' : ''}${b.text}`)));
     for (const c of plans.slice(0, 8)) {
       const days = Math.max(0, Math.ceil((c.plan!.until - s.tick) / 24));
       const b = h('button', { class: 'turn-line' }, h('strong', {}, c.name), ` ${planText(c.plan!)}`, h('span', { class: 'muted small' }, ` · quedan ${days} ${days === 1 ? 'día' : 'días'}`));
@@ -67,6 +70,8 @@ export function openWhatsHappening(ctx: SocialCtx, onCitizen: (id: number) => vo
 export function turnHeadline(s: GameState): string | null {
   const t = s.ai?.log.at(-1);
   if (!t) return null;
+  // El foco del director, si lo hay, va primero.
+  if (t.focus) return `${t.kind === 'rapida' ? 'El pueblo reacciona' : 'Esta semana en Bitópolis'}: ${t.focus}.`;
   const top = t.lines.slice(0, 2).map((l) => l.text);
   const head = t.kind === 'rapida' ? 'El pueblo reacciona' : 'Esta semana en Bitópolis';
   const body = top.length ? top.join('; ') : 'semana tranquila';
