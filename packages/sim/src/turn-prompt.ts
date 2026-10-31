@@ -3,10 +3,12 @@ import { z } from 'zod';
 import { CAUSE_ASK } from './associations.ts';
 import { MIN_WAGE } from './balance.ts';
 import { BUILD_NAMES } from './commands.ts';
+import { freeShopLot } from './economy.ts';
 import { debtBand, pocketOf } from './household.ts';
+import { jobsOf } from './levels.ts';
 import { daysToElection, FACTION_TEXT, factionOf, politicsActive } from './politics.ts';
 import { brewingNow, type DirectorChoice, directorMenu, dramaBudget } from './director.ts';
-import { inventedName, toneOf } from './prompt.ts';
+import { inventedName, inventedNumber, toneOf } from './prompt.ts';
 import { GOAL_TEXT, HOOK_TEXT, hookFor, memoryText, NEED_TEXT, NEEDS, needsOf } from './social.ts';
 import type { Citizen, GameState } from './state.ts';
 import { averageHappiness } from './tick.ts';
@@ -20,7 +22,7 @@ import { GESTURES, gestureCandidates, isAiCitizen, PLANS, planText, SPEND, type 
  * La salida tiene un esquema fijo (sin uniones por vecino); cada parte se valida
  * en el motor con el menú del vecino. Nunca va texto libre del jugador.
  */
-export const TURN_PROMPT_VERSION = 7;
+export const TURN_PROMPT_VERSION = 8;
 
 export const TURN_SYSTEM = `Eres la mente de los vecinos de Bitópolis, un pueblo español pequeño. Cada semana decides, a la vez, qué hace cada vecino de la lista. Ellos viven de verdad: trabajan, compran, se enamoran, se enfadan, ahorran o se arruinan, y reaccionan a lo que hace el alcalde (el jugador).
 
@@ -40,6 +42,8 @@ Reglas:
 - Coherencia: recuerda lo que pensaba, sus notas y lo que hizo la semana pasada; si tenía un plan, actúa en consecuencia.
 - Variedad: no todos hacen lo mismo ni suenan igual. Que pasen cosas, buenas y malas, pero creíbles. "seguir" es válido, pero en cada lote algunos vecinos deberían hacer algo (cambiar de trabajo, mudarse, abrir o cerrar un negocio, contratar, unirse a una asociación, pedir, quejarse, tener un hijo, acercarse a alguien…) si su situación lo justifica.
 - No repitas lo que pensaba la semana pasada ("pensaba"): cuenta algo nuevo de su vida, del pueblo o de otro vecino.
+- No repitas "pedir" lo mismo si está en "ya_pidio" hace menos de 4 semanas: espera, quéjate o ponle un plazo con "plan".
+- Mira "oportunidades" del pueblo: quien está en paro, cobra poco o tiene un negocio que pierde dinero debería pensar en aceptar un trabajo, mudarse, despedir o cerrar; quien tiene dinero y ambición alta, en abrir un negocio o contratar.
 - Dinero con cabeza: con deudas, sin trabajo o "no llega", el ocio sobra; con dinero de sobra, puede gastar, invertir o ayudar al negocio del pueblo.
 - "robar" solo existe para quien está desesperado; es una decisión grave y rara.
 - No menciones a nadie que no esté en los datos, ni cifras inventadas, ni que eres una IA. Sin comillas ni emojis.
@@ -87,15 +91,42 @@ export function turnShared(state: GameState): string {
         }
       : {}),
     lo_que_ha_hecho_el_alcalde: ai.mayor.slice(-12).map((m) => `el alcalde ${m.text}`),
-    la_semana_pasada: ai.log.at(-1)?.lines.slice(0, 10).map((l) => l.text) ?? [],
+    // Solo lo que cuenta (lo que decidió la costumbre, «ahorrar» o «seguir», no dice nada).
+    la_semana_pasada: ai.log.at(-1)?.source === 'ia' ? ai.log.at(-1)!.lines.slice(0, 10).map((l) => l.text) : [],
+    oportunidades: opportunities(state),
   };
   return `Así está el pueblo:\n${JSON.stringify(data)}`;
+}
+
+/** Ronda 16: lo que se puede aprovechar en el pueblo (para que haya decisiones económicas). */
+function opportunities(state: GameState) {
+  const used = new Map<number, number>();
+  for (const x of state.citizens) if (x.jobId !== null) used.set(x.jobId, (used.get(x.jobId) ?? 0) + 1);
+  const jobs = state.buildings.filter((b) => b.built && !b.damaged && Math.min(jobsOf(b), b.staff ?? Infinity) > (used.get(b.id) ?? 0));
+  const homes = new Map<number, number>();
+  for (const x of state.citizens) if (x.homeId !== null) homes.set(x.homeId, (homes.get(x.homeId) ?? 0) + 1);
+  return {
+    puestos_libres: jobs.reduce((a, b) => a + Math.min(jobsOf(b), b.staff ?? Infinity) - (used.get(b.id) ?? 0), 0),
+    donde_se_contrata: jobs.slice(0, 5).map((b) => b.name ?? BUILD_NAMES[b.kind] ?? b.kind),
+    viviendas_libres: state.buildings.filter((b) => b.built && (b.kind === 'house' || b.kind === 'res') && (homes.get(b.id) ?? 0) < (b.kind === 'house' ? 3 : 4)).length,
+    local_comercial_libre: freeShopLot(state) !== null,
+    tiendas_que_ganan_dinero: state.buildings.filter((b) => b.kind === 'shop' && b.built && (b.books?.sales ?? 0) > (b.books?.wages ?? 0) + (b.books?.taxes ?? 0)).length,
+  };
+}
+
+/** Lo que este vecino ya pidió al alcalde en las últimas semanas (para no repetirse). */
+function askedBefore(state: GameState, c: Citizen) {
+  const out: { pidio: string; hace_semanas: number }[] = [];
+  const logs = state.ai?.log ?? [];
+  for (let i = logs.length - 1, weeks = 0; i >= 0 && weeks < 6; i--, weeks++) {
+    for (const l of logs[i]!.lines) if (l.id === c.id && l.text.includes(' pide ')) out.push({ pidio: l.text.slice(l.text.indexOf(' pide ') + 6, l.text.indexOf(' pide ') + 70).split(';')[0]!, hace_semanas: weeks + 1 });
+  }
+  return out.slice(0, 3);
 }
 
 function citizenBrief(state: GameState, c: Citizen) {
   const job = state.buildings.find((b) => b.id === c.jobId);
   const home = state.buildings.find((b) => b.id === c.homeId);
-  const nameOf = (id: number) => state.citizens.find((x) => x.id === id)?.name.split(' ')[0] ?? '?';
   const lastLine = [...(state.ai?.log ?? [])].reverse().flatMap((l) => l.lines).find((l) => l.id === c.id);
   const hook = hookFor(state, c.id);
   return {
@@ -117,7 +148,7 @@ function citizenBrief(state: GameState, c: Citizen) {
     trabajo: job ? (job.name ?? BUILD_NAMES[job.kind] ?? job.kind) : c.unemployedSince !== undefined ? 'en paro' : 'fuera del pueblo',
     casa: home ? (c.owns ? 'vivienda en propiedad' : home.kind === 'house' ? 'casa municipal de alquiler' : 'piso de alquiler') : 'sin casa',
     hijos: c.kids?.length ?? 0,
-    relaciones: c.relations.map((r) => ({ con: nameOf(r.id), tipo: r.kind, intensidad: r.strength >= 70 ? 'fuerte' : r.strength >= 40 ? 'media' : 'leve' })),
+
     recuerdos: [...c.memories].sort((a, b) => b.importance - a.importance).slice(0, 3).map((m) => memoryText(state, m)),
     ...(hook ? { gancho: HOOK_TEXT[hook.kind] } : {}),
     ...(c.thought ? { pensaba: c.thought } : {}),
@@ -127,9 +158,11 @@ function citizenBrief(state: GameState, c: Citizen) {
     actitud_anterior: c.attitude ?? 0,
     necesidades: needsOf(state, c).slice(0, 3),
     acciones: turnMenu(state, c).map((m) => (m.detalle ? `${m.accion} (${m.detalle})` : m.accion)),
+    ...(askedBefore(state, c).length ? { ya_pidio: askedBefore(state, c) } : {}),
+    // Ronda 16: una sola lista de gente (antes «relaciones» y «con_quien» repetían a los mismos).
     con_quien: gestureCandidates(state, c).map((x) => {
       const r = c.relations.find((y) => y.id === x.id);
-      return { id: x.id, nombre: x.name, relacion: r?.kind ?? 'conocido' };
+      return { id: x.id, nombre: x.name, relacion: r?.kind ?? 'conocido', ...(r ? { intensidad: r.strength >= 70 ? 'fuerte' : r.strength >= 40 ? 'media' : 'leve' } : {}) };
     }),
   };
 }
@@ -247,10 +280,12 @@ export function parseTurn(text: string, ids: number[], sent: string): { acts: Tu
     const accion = (a.accion.split(' ')[0] ?? 'seguir').toLowerCase();
     let pensamiento = clean(a.pensamiento, 160);
     let motivo = clean(a.motivo, 160);
-    if (inventedName(pensamiento, sent)) pensamiento = '';
-    if (inventedName(motivo, sent)) motivo = '';
+    // Ni nombres ni cifras que no estén en los datos (ronda 16).
+    const bad = (t: string) => !!inventedName(t, sent) || inventedNumber(t, sent);
+    if (bad(pensamiento)) pensamiento = '';
+    if (bad(motivo)) motivo = '';
     let recuerdo = clean(a.recuerdo ?? '', 120);
-    if (inventedName(recuerdo, sent)) recuerdo = '';
+    if (bad(recuerdo)) recuerdo = '';
     acts.push({
       vecino: a.vecino,
       accion: /^[a-z_]+(:[a-z0-9_]+)?$/.test(accion) ? accion : 'seguir',
@@ -344,11 +379,12 @@ export function parseDirector(text: string, ids: string[], sent: string): { dire
     for (const p of list) {
       if (!ids.includes(p.id) || out.some((x) => x.id === p.id) || out.length >= 3) continue;
       const motivo = clean(p.motivo, 160);
-      out.push({ id: p.id, motivo: inventedName(motivo, sent) ? '' : motivo });
+      out.push({ id: p.id, motivo: inventedName(motivo, sent) || inventedNumber(motivo, sent) ? '' : motivo });
     }
     return out;
   };
   const focus = clean(r.data.foco, 120);
   const chronicle = clean(r.data.cronica, 500);
-  return { director: { sucesos: pick(r.data.sucesos), avisos: pick(r.data.avisos) }, focus: inventedName(focus, sent) ? '' : focus, chronicle: inventedName(chronicle, sent) ? '' : chronicle };
+  const bad = (t: string) => !!inventedName(t, sent) || inventedNumber(t, sent);
+  return { director: { sucesos: pick(r.data.sucesos), avisos: pick(r.data.avisos) }, focus: bad(focus) ? '' : focus, chronicle: bad(chronicle) ? '' : chronicle };
 }

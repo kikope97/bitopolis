@@ -15,7 +15,7 @@ import { robbery, homeRobbery } from './crime.ts';
 import type { Brewing } from './director-core.ts';
 import { canFound, freeShopLot } from './economy.ts';
 import { hash32 } from './hash.ts';
-import { totalDebt } from './household.ts';
+import { debtBand, totalDebt } from './household.ts';
 import { transfer } from './money.ts';
 import { factionOf } from './politics.ts';
 import { FACTION_TEXT, FACTIONS, type Faction } from './politics-core.ts';
@@ -115,7 +115,7 @@ export function directorMenu(state: GameState): DirectorCandidate[] {
     if (b.money >= 50 && totalDebt(b) === 0) continue;
     const r = b.relations.find((x) => (x.kind === 'amistad' || x.kind === 'pareja') && (byId(state, x.id)?.money ?? 0) >= DIRECTOR.helpAmount * 4);
     const a = r ? byId(state, r.id) : undefined;
-    if (a) help.push({ id: `ayuda:${a.id}_${b.id}`, kind: 'ayuda', bad: false, text: `${first(a)} le echa una mano a ${first(b)}, que no llega a fin de mes`, why: `${first(b)} tiene ${b.money} € y debe ${totalDebt(b)} €` });
+    if (a) help.push({ id: `ayuda:${a.id}_${b.id}`, kind: 'ayuda', bad: false, text: `${first(a)} le echa una mano a ${first(b)}, que no llega a fin de mes`, why: `${first(b)} va muy justo y tiene deudas (${debtBand(b)})` });
   }
   add(help);
 
