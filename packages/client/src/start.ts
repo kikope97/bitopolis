@@ -26,8 +26,8 @@ export async function showStart(token: string): Promise<void> {
   const url = `${meta.publicUrl || location.origin}/p/${token}`;
   // Sin partidas nuevas (se decide en /admin), un enlace sin partida no lleva a nada.
   const closed = !info.exists && !meta.newGames;
-  // Con key de servidor solo existe el Modo IA (spec §10.2).
-  let mode: 'normal' | 'ai' = meta.serverKey ? 'ai' : 'normal';
+  // Siempre se puede elegir Modo normal, también con IA del servidor (decisión del creador, spec §10.2).
+  let mode: 'normal' | 'ai' = 'normal';
   const body = $('#start-body');
   body.replaceChildren();
   if (info.exists) {
@@ -114,14 +114,14 @@ export async function showStart(token: string): Promise<void> {
       return b;
     };
     const list = h('div', { class: 'radio-list', role: 'radiogroup', 'aria-label': 'Modo de juego' });
-    if (!meta.serverKey) list.append(choice('normal', t('modeNormal'), 'Los vecinos deciden con reglas. Sin coste.'));
+    list.append(choice('normal', t('modeNormal'), 'Los vecinos deciden con reglas. Sin coste.'));
     // Sin IA del servidor ni keys propias, solo queda el Modo normal.
     if (meta.serverKey || meta.playerKeys) list.append(
       choice(
         'ai',
         t('modeAi'),
         meta.serverKey
-          ? `Los vecinos con nombre deciden con IA. Configurada por el servidor.`
+          ? `Los vecinos con nombre deciden con IA. Configurada por el servidor: no tienes que poner nada.`
           : 'Los vecinos con nombre deciden con IA. Necesita una API key y tiene coste.',
       ),
     );
