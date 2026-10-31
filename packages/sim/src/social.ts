@@ -1,4 +1,5 @@
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
+import { rememberDeparted } from './family.ts';
 import { CAMPAIGN_MONTHS, SERVICE } from './balance.ts';
 import { BUILD_NAMES } from './commands.ts';
 import { canFound, freeShopLot, saturated, taxLevels } from './economy.ts';
@@ -402,6 +403,7 @@ function updateRelations(state: GameState): void {
 
 /** Cuando un vecino se va, sus amistades lo recuerdan. */
 export function onCitizenLeaves(state: GameState, leaving: Citizen): void {
+  rememberDeparted(state, leaving, 'se_fue');
   for (const c of state.citizens) {
     const r = relation(c, leaving.id);
     if (!r) continue;

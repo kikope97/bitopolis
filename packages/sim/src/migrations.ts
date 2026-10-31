@@ -112,6 +112,8 @@ export const MIGRATIONS: Record<number, Migration> = {
     map: { ...s.map, terrain: s.map?.terrain ?? new Array((s.map?.w ?? 48) * (s.map?.h ?? 48)).fill(0) },
     weather: s.weather ?? { kind: 'sol', until: (s.tick ?? 0) + 24 },
     associations: s.associations ?? [],
+    album: s.album ?? [],
+    departed: s.departed ?? [],
   }),
 };
 

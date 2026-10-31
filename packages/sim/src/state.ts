@@ -6,6 +6,8 @@ import { emptyPolitics, type Politics } from './politics-core.ts';
 import { generateTerrain, isWater, Terrain } from './terrain.ts';
 import type { Weather } from './weather.ts';
 import type { Association } from './associations.ts';
+import type { Moment } from './album.ts';
+import type { Departed } from './family.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
 export const FORMAT_VERSION = 10;
@@ -131,6 +133,8 @@ export interface Citizen {
   grudge: number;
   /** Voto decidido antes de las elecciones (solo vecinos con nombre; se borra al votar). */
   vote?: 'gobierno' | 'oposicion' | 'abstencion';
+  /** v1.7: padres (si nació en el pueblo), para el árbol genealógico. */
+  parents?: number[];
   /** v1.7: decisión sobre la manifestación de la asociación `id`: `id` si va, `-id` si no. */
   protest?: number;
 }
@@ -273,6 +277,9 @@ export interface GameState {
   weather: Weather;
   /** v1.7: asociaciones vecinales. */
   associations: Association[];
+  /** v1.7: momentos del álbum y fichas de quien ya no está (árbol genealógico). */
+  album: Moment[];
+  departed: Departed[];
   /** Última despedida (como mucho una por semana). */
   lastDeathTick?: number;
 }
@@ -363,6 +370,8 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20 }: Ne
     grants: [],
     weather: { kind: 'sol', until: 2 * 24 },
     associations: [],
+    album: [],
+    departed: [],
   };
   // Árboles dispersos (se talan gratis al construir encima).
   for (let i = 0; i < tiles.length; i++) {

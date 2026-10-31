@@ -50,6 +50,7 @@ import { updateFields } from './fields.ts';
 import { Terrain } from './terrain.ts';
 import { weatherDay, weatherFx, weatherMood } from './weather.ts';
 import { associationsDay, associationsMonth } from './associations.ts';
+import { albumDay } from './album.ts';
 import { lifeDay, lifeMonth, lifeYear } from './lifecycle.ts';
 import { FIRST_NAMES, SURNAMES } from './names.ts';
 import { goalFor, memoryMood, onCitizenLeaves, PROFESSIONS, relationMood, socialDay } from './social.ts';
@@ -505,6 +506,7 @@ function endOfDay(state: GameState): void {
   if (d.month === 1 && d.day === 1 && state.tick > 0) lifeYear(state);
   lifeDay(state);
   associationsDay(state);
+  albumDay(state);
   accumulateRates(state);
 }
 

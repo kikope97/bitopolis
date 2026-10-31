@@ -1,6 +1,7 @@
 import { DAYS_PER_YEAR, TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { hash32 } from './hash.ts';
 import { SOCIAL_PLACES } from './balance.ts';
+import { rememberDeparted } from './family.ts';
 import {
   ADULT_AGE,
   BIRTH_CHANCE_ADULT,
@@ -78,6 +79,7 @@ export function dies(state: GameState, c: Citizen): void {
     o.relations = o.relations.filter((x) => x.id !== c.id);
   }
   state.pending = state.pending.filter((p) => p.citizenId !== c.id);
+  rememberDeparted(state, c, 'fallecio');
   state.citizens = state.citizens.filter((x) => x !== c);
   const keeps = heir && heir.owns && heir.homeId === c.homeId ? `Su casa queda con ${first(heir)}` : heir ? `Lo suyo queda con ${first(heir)}` : 'Lo deja todo a su familia de fuera';
   pushEvent(state, 'departure', `Nos ha dejado ${c.name}, a los ${c.age} años. El pueblo le despide ${cemetery ? 'en el cementerio' : 'en la plaza'}. ${keeps}`, heir ? { ref: heir.id } : {});
@@ -96,6 +98,9 @@ export function lifeYear(state: GameState): void {
     for (let i = 0; i < grown.length; i++) {
       if (freeHomes(state) > 0) {
         const kid = newResident(state, { age: ADULT_AGE, surname: surname(c) });
+        // v1.7: árbol genealógico: los padres son quien lo crió y su pareja.
+        const partner = c.relations.find((r) => r.kind === 'pareja')?.id;
+        kid.parents = partner !== undefined ? [c.id, partner] : [c.id];
         state.citizens.push(kid);
         transfer(state, c.id, kid.id, Math.min(c.money, 500));
         pushEvent(state, 'arrival', `${first(kid)}, de casa de ${first(c)}, cumple 18, se independiza y se queda en el pueblo`, { ref: kid.id });
