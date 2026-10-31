@@ -149,7 +149,7 @@ describe('ajustes', () => {
     await put({ access: { enabled: false } });
   });
 
-  it('API key del servidor: cifrada, nunca vuelve, y hace de Modo IA a todas las partidas', async () => {
+  it('API key del servidor: cifrada, nunca vuelve; cada partida elige Modo normal o Modo IA', async () => {
     const KEY = 'sk-ant-api03-SECRETA-abcd';
     const r = await put({ ai: { key: KEY, maxCitizens: 8, serverMonthly: 10, gameDaily: 0.5 } });
     expect(r.statusCode).toBe(200);
@@ -160,8 +160,11 @@ describe('ajustes', () => {
     expect(all.body).not.toContain('SECRETA');
     const meta = (await app.inject({ method: 'GET', url: '/api/ai/meta' })).json();
     expect([meta.serverKey, meta.maxCitizens]).toEqual([true, 8]);
+    // Decisión del creador (v1.3.1): el Modo normal sigue disponible con IA del servidor.
+    const normal = await app.inject({ method: 'POST', url: `/api/games/${newGameToken()}`, payload: { mode: 'normal', sessionId: SID } });
+    expect(normal.json().state.aiMode).toBe(false);
     const t = newGameToken();
-    const g = await app.inject({ method: 'POST', url: `/api/games/${t}`, payload: { mode: 'normal', sessionId: SID } });
+    const g = await app.inject({ method: 'POST', url: `/api/games/${t}`, payload: { mode: 'ai', sessionId: SID } });
     expect(g.json().state.aiMode).toBe(true);
     const cfg = (await app.inject({ method: 'GET', url: `/api/games/${t}/ai-config` })).json();
     expect(cfg).toMatchObject({ provider: 'anthropic', model: 'claude-haiku-5-5', capDay: 0.5, serverMonthly: 10 });

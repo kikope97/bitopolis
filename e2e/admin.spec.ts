@@ -99,7 +99,12 @@ test('admin: primer acceso, ajustes que valen al momento y vista móvil', async 
   await expect(page.locator('.toast').last()).toContainText('Funciona');
   await visitor.goto(`${ADMIN}/`);
   await expect(visitor.getByText('Configurada por el servidor')).toBeVisible();
-  await expect(visitor.getByRole('radio', { name: /Modo normal/ })).toHaveCount(0);
+  // Decisión del creador (v1.3.1): con IA del servidor también se puede elegir Modo normal.
+  await expect(visitor.getByRole('radio', { name: /Modo normal/ })).toHaveCount(1);
+  await visitor.getByRole('radio', { name: /Modo IA/ }).click();
+  await visitor.getByRole('button', { name: 'Jugar' }).click();
+  await expect(visitor.locator('#game')).toBeVisible();
+  expect(await visitor.evaluate(() => (window as unknown as { __bitopolis: { state: { aiMode: boolean } } }).__bitopolis.state.aiMode)).toBe(true);
   await shot('3-ia');
   await page.getByRole('region', { name: 'IA' }).getByText('Avanzado: endpoint propio y precios').click();
   await page.getByRole('region', { name: 'IA' }).getByLabel('Endpoint propio (Ollama, LM Studio…)').fill('');
@@ -118,7 +123,11 @@ test('admin: primer acceso, ajustes que valen al momento y vista móvil', async 
   await partidas.getByRole('button', { name: 'Borrar' }).first().click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Borrar' }).click();
   await expect(partidas.locator('li')).toHaveCount(before - 1);
-  await expect(partidas.getByRole('heading', { name: 'Partidas' }).or(partidas.getByRole('button', { name: 'Borrar' }).first())).toBeFocused();
+  // El foco va al siguiente «Borrar» o, si no queda ninguno, al título de la tarjeta.
+  expect(await page.evaluate(() => {
+    const a = document.activeElement as HTMLElement | null;
+    return !!a && (a.dataset.title === 'Partidas' || (a.matches('.btn.danger') && a.textContent === 'Borrar'));
+  })).toBe(true);
   const copias = page.getByRole('region', { name: 'Copias de seguridad' });
   await copias.getByRole('button', { name: 'Hacer una copia ahora' }).click();
   await expect(copias.getByRole('link', { name: 'Descargar' }).first()).toBeVisible();

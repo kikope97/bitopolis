@@ -41,7 +41,7 @@ Solo hace falta una **API key de Anthropic o de OpenAI**. No hay que elegir prov
 
 Hay dos maneras de dar la key. Sin key se juega en Modo normal.
 
-1. **Para todo el servidor, en `/admin` → IA.** Todas las partidas pasan a Modo IA con esa key; en el juego solo hay que aceptar el aviso de gasto, y lo que fijes en el panel aparece en el juego como «definido por el servidor».
+1. **Para todo el servidor, en `/admin` → IA.** Al empezar una partida se sigue eligiendo Modo normal o Modo IA; en Modo IA no hay que poner nada, porque usa la key del servidor. Lo que fijes en el panel aparece en el juego como «definido por el servidor».
 2. **Por partida, desde el juego.** Sin key del servidor (y si el panel lo permite), en **Configurar → Modo IA** hay un campo «API key». Debajo pone que se acepta key de Anthropic o de OpenAI, y al escribirla indica cuál ha detectado.
 
 En los dos casos la key se guarda cifrada en el servidor y nunca vuelve al navegador; solo se ve enmascarada, por ejemplo `sk-ant-…abcd`. Tampoco sale en logs ni exportaciones.

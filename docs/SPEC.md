@@ -201,9 +201,9 @@ Mudarse al pueblo o no, irse y vender la casa, comprar o alquilar casa, buscar o
 - Arriba, un botón **Configurar**.
 - Selector de **modo**:
   - Sin API configurada: se ven **Modo normal** y **Modo IA**. Al pulsar Modo IA se abre la configuración de la IA (proveedor, modelo, key y topes de gasto).
-  - Con API configurada (en la partida o en el panel `/admin`): **solo Modo IA**.
+  - Con la IA configurada en el panel `/admin`: **se siguen viendo los dos modos**. Modo IA no pide nada: usa la IA del servidor. *(Decisión del creador, v1.3.1; antes solo se veía Modo IA.)*
 - **El modo se elige antes de empezar y queda fijo** para toda la partida.
-- Flujo previsto: el creador entra, se genera la URL, configura la IA y le pasa la URL a un amigo. El amigo abre el enlace, ve Jugar en Modo IA y juega sin configurar nada.
+- Flujo previsto: el creador configura la IA en `/admin` y pasa el enlace a sus amigos. Cada uno elige Modo normal o Modo IA y juega sin configurar nada.
 
 ## 11. API key y seguridad *(decisión del creador)*
 

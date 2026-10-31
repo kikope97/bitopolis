@@ -324,7 +324,7 @@ async function renderPanel(focus?: string): Promise<void> {
   /* --- IA --- */
   const a = v.ai;
   const key = input({ type: 'password', autocomplete: 'off', spellcheck: 'false', placeholder: a.hasKey ? `guardada: ${a.keyMask}` : 'sk-ant-… o sk-…' });
-  const status = h('p', { class: 'server-ai' }, a.hasKey ? `API key del servidor: ${a.keyMask} (${PROVIDER_LABEL[a.provider ?? ''] ?? a.provider}). Todas las partidas son de Modo IA.` : a.baseUrl ? `Endpoint propio: ${a.baseUrl}. Todas las partidas son de Modo IA.` : 'Sin IA del servidor: cada partida elige Modo normal o pone su propia key.');
+  const status = h('p', { class: 'server-ai' }, a.hasKey ? `API key del servidor: ${a.keyMask} (${PROVIDER_LABEL[a.provider ?? ''] ?? a.provider}). Quien empiece una partida puede elegir Modo IA sin poner nada, o Modo normal.` : a.baseUrl ? `Endpoint propio: ${a.baseUrl}. Quien empiece una partida puede elegir Modo IA sin poner nada, o Modo normal.` : 'Sin IA del servidor: cada partida elige Modo normal o pone su propia key.');
   const prov = a.provider ?? 'anthropic';
   const listId = 'admin-models';
   const datalist = h('datalist', { id: listId }, ...Object.values(v.defaults.models).flatMap((m) => m.models.map((x) => h('option', { value: x }))));

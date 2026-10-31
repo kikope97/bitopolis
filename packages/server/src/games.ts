@@ -90,8 +90,8 @@ export async function registerGameRoutes(app: FastifyInstance, db: Db, store: Se
     if (!p.success || !b.success) return bad(reply, 'petición no válida');
     if (await load(p.data.token)) return bad(reply, 'la partida ya existe', 409);
     if (!store.get().newGames) return bad(reply, closed, 403);
-    // Con IA del servidor, todas las partidas son de Modo IA.
-    const mode = (await ai.settings(null)).locked.includes('provider') ? 'ai' : b.data.mode;
+    // Siempre se elige: también con IA del servidor se puede jugar en Modo normal (decisión del creador, v1.3.1).
+    const mode = b.data.mode;
     if (mode === 'ai' && !(await ai.settings(null)).configured) return bad(reply, 'Configura la IA antes de jugar en Modo IA');
     const seed = newSeed();
     const state = createInitialState({ seed, aiMode: mode === 'ai', namedLimit: store.get().ai.maxCitizens });
