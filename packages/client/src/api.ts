@@ -54,8 +54,8 @@ export const api = {
     draft
       ? call<{ provider: string; models: ListedModel[] }>('POST', `/api/games/${token}/ai/models`, draft)
       : call<{ provider: string; models: ListedModel[] }>('GET', `/api/games/${token}/ai/models`),
-  estimate: (provider: string, model: string, citizens: number) =>
-    call<{ eurPerHour: Record<string, number>; known: boolean }>('GET', `/api/ai/estimate?provider=${encodeURIComponent(provider)}&model=${encodeURIComponent(model)}&citizens=${citizens}`),
+  estimate: (provider: string, model: string, share: number) =>
+    call<{ eurPerHour: Record<string, number>; citizens: number; known: boolean }>('GET', `/api/ai/estimate?provider=${encodeURIComponent(provider)}&model=${encodeURIComponent(model)}&share=${share}`),
   decisions: (token: string) =>
     call<{ decisions: { citizenId: number; createdTick: number; action: string; motivo: string }[]; capped: boolean; notice?: string; budgetFraction: number }>(
       'GET',
@@ -94,6 +94,8 @@ export interface AiMeta {
   maxCitizens: number;
   /** 2.0: % de vecinos con IA por defecto (o fijo, con key del servidor). */
   aiShare: number;
+  /** 2.0: modelo de los vecinos por defecto: el bueno (calidad) o el barato (ahorro). */
+  turnQuality?: 'calidad' | 'ahorro';
   /** Sin IA del servidor, ¿puede cada partida poner su propia key? */
   playerKeys: boolean;
   newGames: boolean;

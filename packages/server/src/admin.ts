@@ -8,7 +8,7 @@ import { migrate } from '@bitopolis/sim';
 import { DEFAULT_PRICES, PROVIDER_INFO, providerFromKey } from './ai/catalog.ts';
 import { encryptSecret, maskKey } from './ai/crypto.ts';
 import { makeProvider } from './ai/providers.ts';
-import { estimatePerGameDay } from './ai/routes.ts';
+import { aiCitizensFor, estimatePerGameDay } from './ai/routes.ts';
 import { type AiService, ModelsError } from './ai/service.ts';
 import { lockout, safeEqual, setCookie, signedCookie } from './auth.ts';
 import type { Config } from './config.ts';
@@ -45,6 +45,7 @@ const Patch = z.object({
       modelPremium: z.string().trim().max(128).optional(),
       maxCitizens: z.number().int().min(1).max(20).optional(),
       aiShare: z.number().int().min(0).max(100).optional(),
+      turnQuality: z.enum(['calidad', 'ahorro']).optional(),
       serverMonthly: Money.optional(),
       gameMonthly: Money.optional(),
       gameDaily: Money.optional(),
@@ -80,6 +81,7 @@ export function adminView(s: ServerSettings, version: string) {
       modelPremium: s.ai.modelPremium ?? '',
       maxCitizens: s.ai.maxCitizens,
       aiShare: s.ai.aiShare ?? 50,
+      turnQuality: s.ai.turnQuality ?? 'calidad',
       serverMonthly: s.ai.serverMonthly ?? null,
       gameMonthly: s.ai.gameMonthly ?? null,
       gameDaily: s.ai.gameDaily ?? null,
@@ -105,7 +107,7 @@ export async function registerAdminRoutes(
   /** Coste orientativo con lo guardado: un mes de juego (30 días) y una hora real a x1. */
   const estimate = async () => {
     const s = await ai.settings(null);
-    const n = store.get().ai.maxCitizens;
+    const n = aiCitizensFor(store.get().ai.aiShare ?? 50);
     const day = estimatePerGameDay(ai, s.provider, s.model, s.modelPremium, n);
     return { citizens: n, provider: s.provider, eurPerGameMonth: day * 30, eurPerHourX1: day * 180, known: s.model in ai.prices || s.provider === 'openai-compatible' };
   };
@@ -198,6 +200,7 @@ export async function registerAdminRoutes(
         if (a.modelPremium !== undefined) s.ai.modelPremium = opt(a.modelPremium);
         if (a.maxCitizens !== undefined) s.ai.maxCitizens = a.maxCitizens;
         if (a.aiShare !== undefined) s.ai.aiShare = a.aiShare;
+        if (a.turnQuality !== undefined) s.ai.turnQuality = a.turnQuality;
         if (a.serverMonthly !== undefined) s.ai.serverMonthly = opt(a.serverMonthly);
         if (a.gameMonthly !== undefined) s.ai.gameMonthly = opt(a.gameMonthly);
         if (a.gameDaily !== undefined) s.ai.gameDaily = opt(a.gameDaily);

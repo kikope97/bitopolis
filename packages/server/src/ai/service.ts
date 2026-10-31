@@ -2,7 +2,7 @@ import { buildDecisionRequest, buildTurnRequest, type GameState, parseDecisions,
 import type { Config } from '../config.ts';
 import type { Db } from '../db/index.ts';
 import type { SettingsStore } from '../settings.ts';
-import { costEur, modelFor, priceTable, providerFromKey, type ProviderId } from './catalog.ts';
+import { costEur, modelFor, priceTable, PROVIDER_INFO, providerFromKey, type ProviderId } from './catalog.ts';
 import { decryptSecret } from './crypto.ts';
 import { type ListedModel, listModels, type LLMProvider, makeProvider, ProviderError } from './providers.ts';
 
@@ -17,6 +17,8 @@ export interface AiSettings {
   capDay?: number;
   capMonth?: number;
   serverMonthly?: number;
+  /** 2.0: modelo de los vecinos por defecto: el bueno (calidad) o el barato (ahorro). */
+  turnQuality: 'calidad' | 'ahorro';
   /** Campos fijados por el servidor (solo lectura en Configurar). */
   locked: string[];
   configured: boolean;
@@ -48,7 +50,12 @@ export interface TurnResult {
   requested: number;
   answered: number;
   reason?: string;
+  /** Escalón de gasto con el que se pidió: calidad, ahorro o ahorro por estar cerca de un tope. */
+  rung?: 'calidad' | 'ahorro' | 'cerca del tope';
 }
+
+/** Con este % de cualquier tope gastado, los turnos bajan al modelo de ahorro. */
+export const SAVING_AT = 0.7;
 
 /** 2.0: vecinos por lote y lotes en paralelo (el primero va solo para escribir la caché). */
 export const TURN_BATCH = 15;
@@ -129,7 +136,7 @@ export class AiService {
     // El proveedor no se elige: sale de la key (o del endpoint propio).
     const provider = providerFromKey(key, baseUrl);
     if (env.key || env.baseUrl) locked.push('provider');
-    const model = modelFor(provider, pick('model', env.model, row?.model), 'cheap');
+    const model = modelFor(provider, pick('model', env.model, row?.model), (srv.turnQuality ?? 'calidad') === 'calidad' ? 'premium' : 'cheap');
     return {
       provider,
       model,
@@ -140,6 +147,7 @@ export class AiService {
       capDay: pick('capDay', env.gameDaily, row?.cap_day),
       capMonth: pick('capMonth', env.gameMonthly, row?.cap_month),
       serverMonthly: env.serverMonthly,
+      turnQuality: srv.turnQuality ?? 'calidad',
       locked,
       configured: !!key || (provider === 'openai-compatible' && !!baseUrl),
     };
@@ -164,6 +172,21 @@ export class AiService {
   private estimate(s: AiSettings, system: string, user: string, n: number): number {
     const tokensIn = Math.ceil((system.length + user.length) / 3.2);
     return costEur(this.prices, s.model, s.provider, { in: tokensIn, cachedIn: 0, out: n * MAX_OUT_PER_CITIZEN }) * 2; // ×2: margen para el reintento
+  }
+
+  /**
+   * Escalera de gasto de los turnos (2.0): el modelo de los vecinos (en
+   * «Calidad», Sonnet por defecto) → el barato del proveedor al pasar del 70 %
+   * de un tope → reglas al llegar al tope.
+   */
+  async turnModel(gameId: number, s: AiSettings): Promise<{ model: string; rung: NonNullable<TurnResult['rung']> }> {
+    const cheap = PROVIDER_INFO[s.provider].cheap;
+    const rung = s.model === cheap ? 'ahorro' : 'calidad';
+    if (s.model === cheap || s.provider === 'openai-compatible') return { model: s.model, rung };
+    const spent = await this.spend(gameId);
+    const near = (used: number, cap?: number) => cap !== undefined && used >= cap * SAVING_AT;
+    if (near(spent.gameDay, s.capDay) || near(spent.gameMonth, s.capMonth) || near(spent.serverMonth, s.serverMonthly)) return { model: cheap, rung: 'cerca del tope' };
+    return { model: s.model, rung };
   }
 
   /** ¿Cabe este gasto en todos los topes? Devuelve el tope que lo impide. */
@@ -227,11 +250,13 @@ export class AiService {
       return;
     }
     const shared = turnShared(state);
+    const { model, rung } = await this.turnModel(gameId, s);
+    result.rung = rung;
     /** Pide un lote; a los vecinos que la IA se haya dejado se les pregunta una vez más, solos. */
     const one = async (ids: number[], retry = true): Promise<void> => {
       let missing: number[] = [];
       const req = buildTurnRequest(state, ids, shared);
-      const est = costEur(this.prices, s.model, s.provider, { in: Math.ceil((req.system.length + req.shared.length + req.user.length) / 3.2), cachedIn: 0, out: ids.length * TURN_OUT_PER_CITIZEN }) * 1.5;
+      const est = costEur(this.prices, model, s.provider, { in: Math.ceil((req.system.length + req.shared.length + req.user.length) / 3.2), cachedIn: 0, out: ids.length * TURN_OUT_PER_CITIZEN }) * 1.5;
       const blocked = await this.reserve(gameId, s, est);
       if (blocked) {
         g.capped = true;
@@ -245,7 +270,7 @@ export class AiService {
       try {
         const provider = this.providerOverride ? this.providerOverride(s) : makeProvider(s.provider, s.key, s.baseUrl);
         const r = await provider.complete(
-          { system: req.system, shared: req.shared, user: req.user, schema: req.schema, model: s.model, maxTokens: 300 + ids.length * TURN_OUT_PER_CITIZEN },
+          { system: req.system, shared: req.shared, user: req.user, schema: req.schema, model, maxTokens: 300 + ids.length * TURN_OUT_PER_CITIZEN },
           AbortSignal.timeout(TURN_TIMEOUT_MS),
         );
         usage.in = r.usage.in;
@@ -271,11 +296,11 @@ export class AiService {
             day: day(now),
             month: month(now),
             kind: 'turno',
-            model: s.model,
+            model,
             tokens_in: usage.in,
             tokens_cached: usage.cachedIn,
             tokens_out: usage.out,
-            eur: costEur(this.prices, s.model, s.provider, usage),
+            eur: costEur(this.prices, model, s.provider, usage),
             requested: ids.length,
             valid,
             retried: retry ? 0 : 1,

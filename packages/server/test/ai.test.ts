@@ -194,13 +194,15 @@ describe('el proveedor sale de la key', () => {
       return new AiService(db, config, st);
     };
     const a = await (await svc({ key: 'sk-ant-api03-abcdef' })).settings(null);
-    expect([a.provider, a.model, a.modelPremium]).toEqual(['anthropic', 'claude-haiku-5-5', 'claude-sonnet-5-5']);
+    expect([a.provider, a.model, a.modelPremium]).toEqual(['anthropic', 'claude-sonnet-5-5', 'claude-sonnet-5-5']);
     expect(a.locked).toContain('provider');
     const o = await (await svc({ key: 'sk-proj-abcdef' })).settings(null);
-    expect([o.provider, o.model]).toEqual(['openai', 'gpt-5.4-nano']);
+    expect([o.provider, o.model]).toEqual(['openai', 'gpt-5.4-mini']);
+    const h = await (await svc({ key: 'sk-ant-api03-abcdef', turnQuality: 'ahorro' })).settings(null);
+    expect(h.model).toBe('claude-haiku-5-5');
     // Un modelo de otro proveedor no se usa con esta key.
-    const m = await (await svc({ key: 'sk-ant-api03-abcdef', model: 'gpt-5.4-nano' })).settings(null);
-    expect(m.model).toBe('claude-haiku-5-5');
+    const m = await (await svc({ key: 'sk-ant-api03-abcdef', model: 'gpt-5.4-nano', turnQuality: 'calidad' })).settings(null);
+    expect(m.model).toBe('claude-sonnet-5-5');
     const l = await (await svc({ baseUrl: 'http://localhost:11434/v1' })).settings(null);
     expect([l.provider, l.configured]).toEqual(['openai-compatible', true]);
   });
@@ -210,7 +212,7 @@ describe('el proveedor sale de la key', () => {
     const r = await app.inject({ method: 'PUT', url: `/api/games/${token}/ai-config`, payload: { sessionId: SID, key: 'sk-ant-api03-xyz123456', accepted: true } });
     expect(r.statusCode).toBe(200);
     const s = r.json();
-    expect([s.provider, s.model, s.keyMask]).toEqual(['anthropic', 'claude-haiku-5-5', expect.stringMatching(/^sk-ant/)]);
+    expect([s.provider, s.model, s.keyMask]).toEqual(['anthropic', 'claude-sonnet-5-5', expect.stringMatching(/^sk-ant/)]);
     expect(JSON.stringify(s)).not.toContain('xyz123456');
   });
 });

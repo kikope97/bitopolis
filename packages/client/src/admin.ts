@@ -28,6 +28,8 @@ interface View {
     model: string;
     modelPremium: string;
     maxCitizens: number;
+    aiShare: number;
+    turnQuality: 'calidad' | 'ahorro';
     serverMonthly: number | null;
     gameMonthly: number | null;
     gameDaily: number | null;
@@ -331,7 +333,9 @@ async function renderPanel(focus?: string): Promise<void> {
   const prov = a.provider ?? 'anthropic';
   // Modelos: desplegable con los que da la API key, «Otro…» para escribir uno (petición del creador).
   const defaults = v.defaults.models[prov];
-  const model = modelPicker({ id: 'admin-model', value: a.model, placeholder: `por defecto: ${defaults?.cheap ?? ''}`, auto: `Por defecto (${defaults?.cheap ?? 'según la key'})` });
+  // 2.0: «Calidad» pone por defecto el modelo bueno para los vecinos; «Ahorro», el barato.
+  const neighboursDefault = a.turnQuality === 'ahorro' ? defaults?.cheap : defaults?.premium;
+  const model = modelPicker({ id: 'admin-model', value: a.model, placeholder: `por defecto: ${neighboursDefault ?? ''}`, auto: `Por defecto (${neighboursDefault ?? 'según la key'})` });
   const premium = modelPicker({ id: 'admin-premium', value: a.modelPremium, placeholder: `por defecto: ${defaults?.premium ?? ''}`, auto: `Por defecto (${defaults?.premium ?? 'según la key'})` });
   const modelsStatus = h('p', { class: 'help models-status', 'aria-live': 'polite' });
   /** Sin borrador, la key y el endpoint guardados; con borrador, los escritos (sin guardarlos). */
@@ -344,7 +348,14 @@ async function renderPanel(focus?: string): Promise<void> {
   };
   const reload = action('Recargar modelos', async () => ((await reloadModels(draft())) ? 'Modelos cargados' : undefined));
   const baseUrl = input({ type: 'url', value: a.baseUrl, placeholder: 'http://ollama:11434/v1', inputmode: 'url', autocomplete: 'off' });
-  const citizens = input({ type: 'number', min: '1', max: '20', step: '1', value: String(a.maxCitizens), inputmode: 'numeric' });
+  const citizens = input({ id: 'admin-named', type: 'number', min: '1', max: '20', step: '1', value: String(a.maxCitizens), inputmode: 'numeric' });
+  const share = input({ id: 'admin-share', type: 'number', min: '0', max: '100', step: '5', value: String(a.aiShare), inputmode: 'numeric' });
+  const quality = h(
+    'select',
+    { id: 'admin-quality' },
+    h('option', { value: 'calidad', ...(a.turnQuality !== 'ahorro' ? { selected: true } : {}) }, 'Calidad (Claude Sonnet o GPT mini)'),
+    h('option', { value: 'ahorro', ...(a.turnQuality === 'ahorro' ? { selected: true } : {}) }, 'Ahorro (Claude Haiku o GPT nano)'),
+  ) as HTMLSelectElement;
   const capServer = moneyInput(a.serverMonthly);
   const capGameMonth = moneyInput(a.gameMonthly);
   const capGameDay = moneyInput(a.gameDaily);
@@ -356,10 +367,10 @@ async function renderPanel(focus?: string): Promise<void> {
   // Coste orientativo con lo guardado (v1.3): ayuda a elegir los topes.
   const costLine = h('p', { class: 'estimate', 'aria-live': 'polite' });
   const showCost = (e: View['estimate']) => {
-    costLine.textContent = `Con ${e.citizens} vecinos con IA, un mes de juego cuesta unos ${eur(e.eurPerGameMonth)} (unos ${eur(e.eurPerHourX1)} por hora jugando a x1). Incluye reintentos y la crónica mensual.${e.known ? '' : ' Modelo sin precio en la tabla: se estima con uno caro.'}`;
+    costLine.textContent = `En un pueblo de 60 vecinos (${e.citizens} con IA), un mes de juego cuesta unos ${eur(e.eurPerGameMonth)} (unos ${eur(e.eurPerHourX1)} por hora jugando a x1). Incluye segundas preguntas y la crónica mensual.${e.known ? '' : ' Modelo sin precio en la tabla: se estima con uno caro.'}`;
   };
   if (a.hasKey || a.baseUrl) showCost(v.estimate);
-  else costLine.textContent = 'Con una API key de Anthropic y Claude Haiku, un mes de juego con 20 vecinos cuesta céntimos. Pon la key para ver la estimación exacta.';
+  else costLine.textContent = 'Pon la API key para ver cuánto cuesta un mes de juego con estos ajustes.';
   const advanced = () => prices.closest('details')!;
   // Al pegar otra key (o cambiar el endpoint), su lista; al abrir, la de lo guardado.
   key.addEventListener('change', () => {
@@ -390,6 +401,8 @@ async function renderPanel(focus?: string): Promise<void> {
         modelPremium: premium.value(),
         baseUrl: baseUrl.value.trim(),
         maxCitizens: Number(citizens.value),
+        aiShare: Math.max(0, Math.min(100, Math.round(Number(share.value) || 0))),
+        turnQuality: quality.value === 'ahorro' ? 'ahorro' : 'calidad',
         serverMonthly: money(capServer),
         gameMonthly: money(capGameMonth),
         gameDaily: money(capGameDay),
@@ -427,10 +440,12 @@ async function renderPanel(focus?: string): Promise<void> {
           )
         : '',
     ),
-    field('Modelo de los vecinos (lotes)', model.root, 'Las decisiones diarias. Por defecto: Claude Haiku con key de Anthropic, GPT nano con key de OpenAI.'),
-    field('Modelo del director (y consejero)', premium.root, 'Plenos, consejero y diario. Por defecto: Claude Sonnet o GPT mini.'),
+    field('Turnos del pueblo', quality, 'Cada semana de juego la IA decide qué hace cada vecino. «Calidad» usa por defecto el modelo bueno; «Ahorro», el barato. Al pasar del 70 % de un tope, los turnos bajan solos al barato.'),
+    field('Modelo de los vecinos (lotes)', model.root, 'Los turnos del pueblo: qué hace, piensa y gasta cada vecino.'),
+    field('Modelo del director (y consejero)', premium.root, 'Director del pueblo, consejero y diario. Por defecto: Claude Sonnet o GPT mini.'),
     h('div', { class: 'row wrap models-row' }, reload, modelsStatus),
-    field('Vecinos con IA por partida (1–20)', citizens),
+    field('Vecinos que piensan con IA (%)', share, 'En las partidas nuevas con la IA del servidor. Con una key propia, lo elige quien juega.'),
+    field('Vecinos con nombre en Modo normal (1–20)', citizens),
     h('h3', {}, 'Topes de gasto (€)'),
     h('div', { class: 'row wrap' }, field('Servidor al mes', capServer), field('Cada partida al mes', capGameMonth), field('Cada partida al día', capGameDay)),
     h('p', { class: 'help' }, 'Al llegar a un tope, la IA se pausa y deciden las reglas. Pon también un límite en el panel de tu proveedor.'),

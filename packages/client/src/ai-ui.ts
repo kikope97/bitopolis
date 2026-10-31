@@ -23,7 +23,7 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
   const providerOf = (k: string, base: string) => (base ? 'openai-compatible' : k.startsWith('sk-ant-') ? 'anthropic' : k ? 'openai' : cur.provider);
   // Modelos en blanco = automáticos según la key. Con «Cargar modelos», un desplegable con los
   // que da la key y «Otro…» para escribir uno a mano (petición del creador).
-  const explicit = (m: string, kind: 'cheap' | 'premium') => (meta.providers.some((p) => p[kind] === m) ? '' : m);
+  const explicit = (m: string, kind: 'cheap' | 'premium') => (meta.providers.some((p) => p[kind] === m || (kind === 'cheap' && p.premium === m)) ? '' : m);
   const model = modelPicker({ id: 'ai-model', value: explicit(cur.model, 'cheap'), placeholder: `Automático (${cur.model})`, auto: `Automático (${cur.model})`, disabled: locked.has('model') });
   const premium = modelPicker({ id: 'ai-premium', value: explicit(cur.modelPremium, 'premium'), placeholder: `Automático (${cur.modelPremium})`, auto: `Automático (${cur.modelPremium})`, disabled: locked.has('modelPremium') });
   const pickers = [model, premium].filter((_, i) => !locked.has(i ? 'modelPremium' : 'model'));
@@ -48,6 +48,7 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
   share.addEventListener('input', () => {
     shareOut.textContent = `${share.value} %`;
   });
+  share.addEventListener('change', () => void refresh());
   const accept = h('input', { type: 'checkbox', id: 'ai-accept' }) as HTMLInputElement;
   const estimate = h('p', { class: 'estimate', 'aria-live': 'polite' });
   const detected = h('span', { class: 'help', 'aria-live': 'polite' });
@@ -56,12 +57,12 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
     const provider = providerOf(key.value.trim(), baseUrl.value.trim());
     const info = meta.providers.find((p) => p.id === provider)!;
     detected.textContent = key.value.trim() ? `Detectada: ${info.label}.` : '';
-    const m = model.value() || info.cheap;
+    const m = model.value() || (provider === cur.provider ? cur.model : meta.turnQuality === 'ahorro' ? info.cheap : info.premium);
     try {
-      const e = await api.estimate(provider, m, meta.maxCitizens);
-      estimate.textContent = `≈ ${eur(e.eurPerHour.x1! * 30)} al mes jugando 1 hora al día a x1 (${eur(e.eurPerHour.x10! * 30)} a x10), con ${meta.maxCitizens} vecinos con nombre.${
+      const e = await api.estimate(provider, m, Number(share.value));
+      estimate.textContent = `≈ ${eur(e.eurPerHour.x1! * 30)} al mes jugando 1 hora al día a x1 (${eur(e.eurPerHour.x10! * 30)} a x10), en un pueblo de 60 vecinos con ${e.citizens} que piensan con IA.${
         e.known ? '' : ' (Modelo sin precio en la tabla: se estima con uno caro.)'
-      } Incluye reintentos y la crónica del mes.`;
+      } Incluye segundas preguntas y la crónica del mes.`;
     } catch {
       estimate.textContent = '';
     }
@@ -126,7 +127,7 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
     'details',
     { class: 'advanced' },
     h('summary', {}, 'Opciones avanzadas (modelos, tope diario, endpoint propio)'),
-    h('div', { class: 'field' }, h('label', { for: 'ai-model' }, 'Modelo de los vecinos (lotes)', serverNote('model')), model.root, h('span', { class: 'help' }, 'Automático: Claude Haiku con key de Anthropic, GPT nano con key de OpenAI.')),
+    h('div', { class: 'field' }, h('label', { for: 'ai-model' }, 'Modelo de los vecinos (lotes)', serverNote('model')), model.root, h('span', { class: 'help' }, meta.turnQuality === 'ahorro' ? 'Automático: Claude Haiku con key de Anthropic, GPT nano con key de OpenAI.' : 'Automático: Claude Sonnet con key de Anthropic, GPT mini con key de OpenAI. Decide qué hace cada vecino cada semana.')),
     h('div', { class: 'field' }, h('label', { for: 'ai-premium' }, 'Modelo del director (y consejero)', serverNote('modelPremium')), premium.root),
     pickers.length && locked.has('key') ? loadRow : '',
     h('label', { class: 'field' }, 'Tope diario (€)', serverNote('capDay'), capDay),
@@ -212,7 +213,7 @@ export function makeBubble(name: string, motivo: string, ai: boolean): HTMLEleme
   const layer = $('#bubbles');
   const el = h(
     'button',
-    { class: 'bubble', type: 'button', 'aria-label': `${name}${ai ? ' (decidido por la IA)' : ''}: ${motivo}. Abrir su ficha.` },
+    { class: 'bubble', type: 'button', 'aria-label': `${name}${ai ? ' (decidido por la IA)' : ''}: ${motivo.replace(/[.!?…]+$/, '')}. Abrir su ficha.` },
     h('strong', {}, name, ai ? h('span', { class: 'ai-badge' }, 'IA', h('span', { class: 'visually-hidden' }, ' (decidido por la IA)')) : ''),
     h('span', { class: 'bubble-text' }, `«${motivo}»`),
   );
