@@ -187,6 +187,14 @@ Mudarse al pueblo o no, irse y vender la casa, comprar o alquilar casa, buscar o
 - Panel de gasto desglosado por uso (decisiones, plenos, consejero, diario).
 - Pantalla **"Qué se envía"** con un ejemplo real de prompt. Sin telemetría.
 
+### 9.6 La superIA del pueblo (v2.0, pedido por el creador)
+- En Modo IA, el pueblo decide **por turnos semanales** (2 a x3, 4 a x10): todos los vecinos con IA a la vez, por lotes de 15 con un bloque común cacheado. Cada vecino elige una acción de su menú (también las económicas: trabajo, negocio, mudanza, dónde gasta), un gesto social, su actitud hacia el alcalde, un plan o ultimátum, un pensamiento y una nota de su semana. Lo que no vale lo decide el motor; sin respuesta, la costumbre (reglas). Reacción rápida tras una medida gorda.
+- **% de vecinos con IA** (0–100, por defecto 50): en `/admin` con la IA del servidor; en Ajustes de la partida con key propia. Al subirlo solo se añaden.
+- **Director del pueblo**: elige qué sucesos reales pasan (robos, asociaciones, manifestaciones, peleas, reconciliaciones, ayudas, gratitud, rumores, mitin de la oposición, historias), con presupuesto de drama según el descontento, aviso previo de todo lo malo y topes al mes. Escribe el foco y la crónica de la semana.
+- **Gasto**: «Calidad» (modelo bueno) o «Ahorro»; al 70 % de un tope baja solo al barato y el director va un turno sí y otro no; en el tope, reglas.
+- El juego no se adelanta al turno: espera hasta 45 s a la IA («El pueblo está pensando…»).
+- Plan completo: `docs/propuestas/v2.0-superia.md`.
+
 ## 10. Partidas y pantalla de inicio *(decisión del creador)*
 
 ### 10.1 Partida por URL (sin cuentas)
@@ -283,6 +291,8 @@ El alcance está congelado hasta la v1.0. Todo lo de la sección 15 solo entra s
 - **v1.8 — Ayuntamiento, delincuencia y animaciones** (ronda 14, pedido por el creador): el ayuntamiento sube de nivel (1–5) y desbloquea zonas, plenos y edificios junto con la población; los servicios suben a nivel 2 y 3 (más alcance y capacidad, con requisitos de ayuntamiento, vecinos y uso, y mejor aspecto); panel «Gestión del pueblo» a pantalla completa al tocarlo; robos en tiendas, comisarías con calabozos limitados y cárcel; manifestaciones que crecen y acaban en disturbios que destrozan tiendas (se pagan para repararlas); todo animado (marcha con pancartas, policía, ladrón); calendario a x3/x10 y vuelta a x1 con temblor y destello cuando algo pide atención; ficha de casa con servicios y vecinos; número de versión en Ajustes.
 
 - **v1.9 — Economía de cada vecino** (ronda 15, pedido por el creador): balance y deudas de cada vecino (impuestos, alquiler, hipoteca, multas), desahucios y embargos, paro real con prestación, sueldo mínimo para las empresas con su efecto en trabajadores y empresarios, salud de las empresas, aplazar o perdonar deudas y microcréditos, robos en casas y ladrones del propio pueblo, capa «Bolsillo de los vecinos». Ver `docs/propuestas/v1.9-economia-personal.md`.
+
+- **v2.0 — La superIA del pueblo** (ronda 16, pedido por el creador): turnos semanales con IA para un % de vecinos, decisiones económicas por lotes, director del pueblo con presupuesto de drama, notas y contagio de actitud, modelos desde la API key y escalera de gasto. Ver §9.6.
 
 ## 15. Después de la v1.0 (backlog, no implementar antes)
 
