@@ -6,7 +6,8 @@ import { expect, test } from '@playwright/test';
  * partidas nuevas, IA del servidor.
  */
 const ADMIN = 'http://localhost:8091';
-test.describe.configure({ mode: 'serial' });
+// Sin reintentos: el primer intento ya cambia la cuenta y un reintento no puede repetirlo.
+test.describe.configure({ mode: 'serial', retries: 0 });
 
 test('admin: primer acceso, ajustes que valen al momento y vista móvil', async ({ page, browser }, info) => {
   test.skip(info.project.name !== 'escritorio', 'un solo proyecto: los ajustes son globales');
@@ -37,6 +38,12 @@ test('admin: primer acceso, ajustes que valen al momento y vista móvil', async 
   await shot('2-panel');
 
   const acceso = page.getByRole('region', { name: 'Partidas y acceso' });
+  /** Pulsa y espera a que el servidor haya guardado (los avisos anteriores pueden seguir en pantalla). */
+  const saved = async (button: ReturnType<typeof page.getByRole>) => {
+    const done = page.waitForResponse((r) => r.url().endsWith('/api/admin/settings') && r.request().method() === 'PUT' && r.ok());
+    await button.click();
+    await done;
+  };
 
   // Enlace para invitar (la raíz, no el de una partida).
   await expect(acceso.locator('.invite .mono')).toHaveText(`${ADMIN}/`);
@@ -45,16 +52,14 @@ test('admin: primer acceso, ajustes que valen al momento y vista móvil', async 
 
   // Partidas nuevas desactivadas: el enlace nuevo no lleva a ninguna partida.
   await acceso.getByLabel('Permitir partidas nuevas').uncheck();
-  await acceso.getByRole('button', { name: 'Guardar acceso' }).click();
-  await expect(page.locator('.toast').last()).toContainText('Guardado');
+  await saved(acceso.getByRole('button', { name: 'Guardar acceso' }));
   const visitor = await browser.newPage();
   await visitor.goto(`${ADMIN}/`);
   await expect(visitor.locator('.notice.closed')).toContainText('no se pueden empezar partidas nuevas');
   await expect(visitor.getByRole('button', { name: 'Jugar' })).toBeHidden();
   await acceso.getByLabel('Permitir partidas nuevas').check();
   await acceso.getByLabel('URL pública').fill('https://bitopolis.example.com');
-  await acceso.getByRole('button', { name: 'Guardar acceso' }).click();
-  await expect(page.locator('.toast').last()).toContainText('Guardado');
+  await saved(acceso.getByRole('button', { name: 'Guardar acceso' }));
   await visitor.reload();
   await expect(visitor.getByRole('button', { name: 'Jugar' })).toBeVisible();
   await expect(visitor.locator('#link-text')).toContainText('https://bitopolis.example.com/p/');
@@ -63,8 +68,7 @@ test('admin: primer acceso, ajustes que valen al momento y vista móvil', async 
   await acceso.getByLabel('URL pública').fill('');
   await acceso.getByLabel('Pedir contraseña para jugar').check();
   await acceso.getByRole('textbox', { name: 'Contraseña para jugar' }).fill('amigos');
-  await acceso.getByRole('button', { name: 'Guardar acceso' }).click();
-  await expect(page.locator('.toast').last()).toContainText('Guardado');
+  await saved(acceso.getByRole('button', { name: 'Guardar acceso' }));
   const friend = await (await browser.newContext()).newPage();
   await friend.goto(`${ADMIN}/`);
   await expect(friend).toHaveURL(/\/login\.html/);
@@ -75,8 +79,7 @@ test('admin: primer acceso, ajustes que valen al momento y vista móvil', async 
   await friend.getByRole('button', { name: 'Jugar' }).click();
   await expect(friend.locator('#game')).toBeVisible();
   await acceso.getByLabel('Pedir contraseña para jugar').uncheck();
-  await acceso.getByRole('button', { name: 'Guardar acceso' }).click();
-  await expect(page.locator('.toast').last()).toContainText('Guardado');
+  await saved(acceso.getByRole('button', { name: 'Guardar acceso' }));
 
   // IA del servidor: un endpoint propio (el LLM falso) y probar la conexión.
   const ia = page.getByRole('region', { name: 'IA' });
@@ -84,7 +87,7 @@ test('admin: primer acceso, ajustes que valen al momento y vista móvil', async 
   await ia.getByLabel('Endpoint propio (Ollama, LM Studio…)').fill('http://localhost:8099/v1');
   await ia.getByLabel('Vecinos con IA por partida (1–20)').fill('6');
   await ia.getByLabel('Servidor al mes').fill('5');
-  await ia.getByRole('button', { name: 'Guardar la IA' }).click();
+  await saved(ia.getByRole('button', { name: 'Guardar la IA' }));
   await expect(page.locator('.server-ai')).toContainText('Endpoint propio');
   await page.getByRole('button', { name: 'Guardar y probar' }).click();
   await expect(page.locator('.toast').last()).toContainText('Funciona');
