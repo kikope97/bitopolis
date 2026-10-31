@@ -19,7 +19,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 type Seen = { url: string; headers: Headers };
 function fakeFetch(handler: (url: URL, seen: Seen[]) => Response | Promise<Response>) {
   const seen: Seen[] = [];
-  const f = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  const f = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
     seen.push({ url: url.href, headers: new Headers(init?.headers) });
     return handler(url, seen);
@@ -69,7 +69,7 @@ describe('listModels (OpenAI y compatibles)', () => {
   });
 
   it('se rinde si el proveedor no contesta a tiempo', async () => {
-    const hang = (async (_i: RequestInfo | URL, init?: RequestInit) =>
+    const hang = (async (_i: string | URL | Request, init?: RequestInit) =>
       new Promise<Response>((_res, rej) => init?.signal?.addEventListener('abort', () => rej(new DOMException('abortado', 'AbortError'))))) as typeof fetch;
     const e = await listModels('openai', OPENAI_KEY, undefined, { fetch: hang, signal: AbortSignal.timeout(30) }).catch((x) => x);
     expect(e).toBeInstanceOf(ProviderError);
