@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { state, tap, setSpeed, skipTutorial } from './helpers.ts';
+import { pickTool, state, tap, setSpeed, skipTutorial } from './helpers.ts';
 
 test('Modo IA: configurar, jugar y ver un motivo de la IA', async ({ page }, info) => {
   test.setTimeout(120_000);
@@ -30,7 +30,7 @@ test('Modo IA: configurar, jugar y ver un motivo de la IA', async ({ page }, inf
   expect(s0.aiMode).toBe(true);
   const cx = s0.map.w / 2;
   const cy = s0.map.h / 2;
-  await page.locator('[data-tool="house"]').click();
+  await pickTool(page, 'house');
   await tap(page, cx + 2, cy + 1);
   await setSpeed(page, 3);
   // La primera decisión (opinión o llegada) debe venir de la IA.

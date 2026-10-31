@@ -16,7 +16,7 @@ test('v1.5: en enero se presenta el presupuesto y el pleno lo vota', async ({ pa
   await page.getByRole('button', { name: 'Continuar' }).click();
   await skipTutorial(page);
   await page.locator('#menu').click();
-  await page.locator('.menu-grid').getByRole('button', { name: 'Ayuntamiento', exact: true }).click();
+  await page.locator('.hub-grid').getByRole('button', { name: 'Ayuntamiento', exact: true }).click();
   await expect(page.locator('.sheet h2')).toHaveText('Ayuntamiento');
   await expect(page.locator('.sheet')).toContainText('por aprobar');
   await expect(page.locator('.sheet')).toContainText('Censo');

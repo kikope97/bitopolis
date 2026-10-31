@@ -93,12 +93,7 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
   const last = [...state.decisionLog].reverse().filter((d) => d.citizenId === c.id).slice(0, 3);
   const hook = hookFor(state, c.id);
   // Retrato pixel art (12×18) ampliado ×4.
-  const face = h('canvas', { class: 'portrait', width: '48', height: '72', 'aria-hidden': 'true' }) as HTMLCanvasElement;
-  const g = face.getContext('2d');
-  if (g) {
-    g.imageSmoothingEnabled = false;
-    g.drawImage(portraitSprite(c.id % 64), 0, 0, 48, 72);
-  }
+  const face = portraitCanvas(c.id, 4);
   sheet(
     h('span', {}, h('span', { 'aria-hidden': 'true' }, '★ '), c.name),
     face,
@@ -121,12 +116,24 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
     h('h3', {}, 'Relaciones'),
     c.relations.length ? h('ul', { class: 'people' }, ...c.relations.map((r) => h('li', {}, `${nameOf(r.id)}: ${RELATION_TEXT[r.kind]}`))) : h('p', { class: 'muted' }, 'Aún no tiene relaciones en el pueblo.'),
     h('h3', {}, 'Recuerdos'),
-    c.memories.length ? h('ul', { class: 'people' }, ...[...c.memories].reverse().map((m) => h('li', {}, memoryText(state, m)))) : h('p', { class: 'muted' }, 'Nada que contar todavía.'),
+    c.memories.length ? h('ul', { class: 'people' }, ...memoryLines(state, c).map((t) => h('li', {}, t))) : h('p', { class: 'muted' }, 'Nada que contar todavía.'),
     worries.length ? h('p', {}, `Le preocupa: ${worries.slice(0, 3).join(', ').toLowerCase()}.`) : '',
     last.length ? h('h3', {}, 'Lo último que ha dicho') : '',
     ...last.map((d) => h('p', { class: 'quote' }, `«${d.motivo}» `, d.source === 'ai' ? h('span', { class: 'ai-badge' }, 'IA') : '')),
     h('details', { class: 'advanced' }, h('summary', {}, 'Personalidad'), traits, c.summary ? h('p', {}, c.summary) : ''),
   );
+}
+
+/** Recuerdos sin repetir (ronda 12: salía la misma frase varias veces seguidas). */
+function memoryLines(state: GameState, c: GameState['citizens'][number]): string[] {
+  const out: { text: string; n: number }[] = [];
+  for (const m of [...c.memories].reverse()) {
+    const text = memoryText(state, m);
+    const same = out.find((o) => o.text === text);
+    if (same) same.n++;
+    else out.push({ text, n: 1 });
+  }
+  return out.map((o) => (o.n > 1 ? `${o.text} (×${o.n})` : o.text));
 }
 
 /** Pleno municipal (§7): peticiones, votos y promesas registradas. */
@@ -259,40 +266,36 @@ export function openDiary(ctx: SocialCtx): void {
 }
 
 /** Tarjeta de objetivos (1–3 visibles, con recompensa). Se pliega para no tapar el mapa. */
+/**
+ * v1.6: los objetivos ya no flotan sobre el mapa; viven en el panel «Pueblo».
+ * Aquí solo se anuncia al lector de pantalla cuando se cumple uno.
+ */
+let lastObjectives: string | undefined;
 export function renderObjectives(state: GameState): void {
-  const box = $('#objectives');
   const list = activeObjectives(state);
-  const folded = (() => {
-    try {
-      const v = localStorage.getItem('bitopolis.objectives');
-      return v ? v === 'plegado' : window.innerWidth < 720 || window.innerHeight < 500;
-    } catch {
-      return window.innerWidth < 720 || window.innerHeight < 500;
-    }
-  })();
-  const sig = `${list.map((o) => o.id).join(',')}|${folded}`;
-  if (box.dataset.sig === sig) return;
-  // Al cumplirse uno, se anuncia al lector de pantalla.
-  if (box.dataset.sig !== undefined) {
-    const before = box.dataset.sig.split('|')[0]!.split(',');
-    const gone = before.filter((id) => id && !list.some((o) => o.id === id));
+  const sig = list.map((o) => o.id).join(',');
+  if (lastObjectives !== undefined && sig !== lastObjectives) {
+    const gone = lastObjectives.split(',').filter((id) => id && !list.some((o) => o.id === id));
     if (gone.length) $('#sr-live').textContent = `Objetivo cumplido. Nuevos objetivos: ${list.map((o) => o.text).join('; ')}`;
   }
-  box.dataset.sig = sig;
-  const toggle = h('button', { class: 'obj-toggle', 'aria-expanded': String(!folded) }, folded ? `Objetivos (${list.length}) ▸` : 'Objetivos ▾');
-  toggle.addEventListener('click', () => {
-    try {
-      localStorage.setItem('bitopolis.objectives', folded ? 'abierto' : 'plegado');
-    } catch {
-      /* sin almacenamiento */
-    }
-    renderObjectives(state);
-  });
-  box.classList.toggle('folded', folded);
-  box.replaceChildren(
-    toggle,
-    ...(folded ? [] : list.map((o) => h('span', { class: 'obj' }, `○ ${o.text}`, h('small', {}, ` +${money(o.reward)}${o.unlock ? ' y un edificio' : ''}`)))),
-  );
+  lastObjectives = sig;
+}
+
+export function objectivesNode(state: GameState): HTMLElement {
+  const list = activeObjectives(state);
+  if (!list.length) return h('p', { class: 'muted' }, 'Todos los objetivos cumplidos.');
+  return h('ul', { class: 'obj-list' }, ...list.map((o) => h('li', {}, `○ ${o.text}`, h('small', {}, ` +${money(o.reward)}${o.unlock ? ' y un edificio' : ''}`))));
+}
+
+/** Retrato de un vecino (12×18 píxeles) a la escala pedida. */
+export function portraitCanvas(id: number, scale: number, cls = 'portrait'): HTMLCanvasElement {
+  const face = h('canvas', { class: cls, width: String(12 * scale), height: String(18 * scale), 'aria-hidden': 'true' }) as HTMLCanvasElement;
+  const g = face.getContext('2d');
+  if (g) {
+    g.imageSmoothingEnabled = false;
+    g.drawImage(portraitSprite(id % 64), 0, 0, 12 * scale, 18 * scale);
+  }
+  return face;
 }
 
 /** «Mientras no estabas»: cambios desde la última visita en este navegador. */

@@ -50,3 +50,10 @@ export async function skipTutorial(page: Page) {
     /* sin tutorial */
   }
 }
+
+/** v1.6: Mirar, Carretera y Derribar son pestañas; el resto, en la bandeja «Construir». */
+export async function pickTool(page: Page, id: string) {
+  if (['inspect', 'road', 'demolish'].includes(id)) return page.locator(`#tab-${id}`).click();
+  if (await page.locator('#tray').isHidden()) await page.locator('#tab-build').click();
+  await page.locator(`#tray [data-tool="${id}"]`).click();
+}

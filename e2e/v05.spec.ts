@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { state, tap, skipTutorial } from './helpers.ts';
+import { pickTool, state, tap, skipTutorial } from './helpers.ts';
 
 test('v0.5: ajustes de accesibilidad, teclado y carretera con dos toques', async ({ page }, info) => {
   const errors: string[] = [];
@@ -14,7 +14,7 @@ test('v0.5: ajustes de accesibilidad, teclado y carretera con dos toques', async
   const cy = Math.floor(s0.map.h / 2);
 
   // Carretera: toque de inicio y toque de fin (sin arrastrar).
-  await page.locator('[data-tool="road"]').click();
+  await pickTool(page, 'road');
   await tap(page, cx + 3, cy);
   await expect(page.locator('#tool-info')).toContainText('toca dónde termina');
   await tap(page, cx + 3, cy + 3);
@@ -23,7 +23,7 @@ test('v0.5: ajustes de accesibilidad, teclado y carretera con dos toques', async
   await expect.poll(async () => (await state(page)).map.tiles.filter((t: number) => t === 1).length).toBeGreaterThan(s0.map.tiles.filter((t: number) => t === 1).length + 2);
 
   // Teclado: el mapa enfocado con un cursor de casilla que se anuncia.
-  await page.locator('[data-tool="inspect"]').click();
+  await pickTool(page, 'inspect');
   await page.locator('#map').focus();
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('#sr-live')).toContainText('Casilla');

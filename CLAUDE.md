@@ -56,7 +56,7 @@ Monorepo pnpm + TypeScript:
 
 ## Móvil y táctil (v1.4) — la norma principal: se juega bien en el móvil
 - `game.ts`: `ResizeObserver` en el canvas; en táctil toda obra pasa por `proposePlace` y la barra `#confirm-bar` («Construir / ✕», ignora sus primeros 350 ms; el canvas cancela `touchend` para evitar el clic fantasma). Con carretera o zona, un dedo mueve el mapa (se traza con dos toques o arrastrando desde el inicio). `pickTile` (tejados), inercia, `minZoom` de 24 px CSS.
-- Una sola barra `#dock`: `#play-pause`, `#speed` (x1→x3→x10), herramientas, `#menu`. En los e2e, usa `setSpeed(page, n)` de `e2e/helpers.ts`.
+- `#play-pause` y `#speed` (x1→x3→x10) están en la barra de arriba (v1.6). En los e2e, usa `setSpeed(page, n)` de `e2e/helpers.ts`.
 - Hojas (`ui.ts`): solo se refresca la que está abierta (`currentSheet()`); atrás cierra la hoja (`history`).
 - A x10 no hay burbujas ni avisos menores. Los toques reales se prueban por CDP en `e2e/tactil.spec.ts`.
 
@@ -64,6 +64,14 @@ Monorepo pnpm + TypeScript:
 - `sim/src/lifecycle.ts`: `lifeYear` (cumpleaños, hijos que se independizan a los `KID_YEARS`), `lifeDay` (despedidas repartidas por el año, una por semana como mucho), `lifeMonth` (nacimientos), `dies` y `heirOf` (herencia a la pareja con plusvalía; si no, a la familia de fuera). `Citizen.kids` son ticks de nacimiento; cuentan para el colegio.
 - `sim/src/civic.ts`: presupuesto anual (`ProposeBudget`, votado por facciones o, sin ellas, por felicidad; `BUDGET` en balance.ts), fiestas (`HoldFestival`, `FESTIVAL`) y subvenciones (`AnswerGrant`; anticipo, resto en plazo, reintegro). Formato de partida 9.
 - Cliente: `civic-ui.ts` (hoja «Ayuntamiento»; `openTownHall(ctx, sección)`).
+
+## Rediseño de la interfaz (v1.6) — ronda 12, revisada en 5 dispositivos
+- Pantalla: `.topbar` (⏯, velocidad, 💰, 👥, ☺, 🔔; cada dato se toca), mapa sin nada fijo encima (solo el chip de capas y «?»; el zoom +/− solo con ratón), `#strip` (franja de contexto con `data-mode` info/tool/confirm: fecha y R/C/I o progreso a las zonas, ayuda de la herramienta, barra «Construir / ✕»; el derribo también se confirma ahí, en rojo) y `#dock` con 5 pestañas (`#tab-inspect`, `#tab-road`, `#tab-build`, `#tab-demolish`, `#menu` = Pueblo).
+- `#tray`: bandeja «Construir» por categorías (`TRAY` en tools.ts) con precio; lo bloqueado explica qué falta. En los e2e, `pickTool(page, id)`.
+- Panel «Pueblo» (`openHub`): Dinero, Ayuntamiento, Gente, Objetivos, Ajustes. Las hojas abiertas desde ahí llevan «‹» (`withBack` en ui.ts). Hojas `.half` para fichas; `revealTile` deja el edificio a la vista. En tableta (≥720×540) y en horizontal, las hojas son un panel lateral.
+- Avisos: uno a la vez bajo la barra de arriba; todos quedan en la campana (`toastLog`, `openLog`).
+- Iconos de píxeles 12×12 en `icons.ts` (`pixelIcon`). Escala de la interfaz con `--ui` (texto 150/200 %).
+- La sesión es del dispositivo (`localStorage`), no de la pestaña.
 
 ## Comandos
 ```

@@ -15,9 +15,9 @@ export function nextHint(state: GameState): Hint {
     // Ronda 12: no pedir que suban los impuestos si ya están en «Alto».
     const allHigh = Object.values(taxLevels(state)).every((l) => l === 'high');
     if (allHigh) {
-      return { text: 'La caja está en negativo y los impuestos ya están altos. No construyas; prueba un presupuesto austero (☰ › Ayuntamiento) o derriba lo que no se usa.' };
+      return { text: 'La caja está en negativo y los impuestos ya están altos. No construyas; prueba un presupuesto austero (Pueblo › Ayuntamiento) o derriba lo que no se usa.' };
     }
-    return { text: 'La caja está en negativo. Sube un poco los impuestos (menú ☰) y espera a que lleguen ingresos antes de construir.' };
+    return { text: 'La caja está en negativo. Sube un poco los impuestos (Pueblo › Impuestos) y espera a que lleguen ingresos antes de construir.' };
   }
   if (roads <= 7) return { text: 'Alarga la calle: elige Carretera y arrastra desde la calle del ayuntamiento.', tool: 'road' };
   if (!has('water')) return { text: 'Sin agua nadie quiere vivir aquí. Construye una bomba de agua junto a una carretera.', tool: 'water' };

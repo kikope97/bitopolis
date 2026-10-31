@@ -61,6 +61,22 @@ export function shortCost(tool: Tool): string {
   return tool.build && tool.build !== 'road' ? `hasta ${money(buildCost(tool.build))}` : costText(tool);
 }
 
+/** Precio en una línea para la bandeja «Construir» (v1.6). */
+export function trayCost(tool: Tool): string {
+  if (tool.build && tool.build !== 'road') return money(buildCost(tool.build));
+  if (tool.zone && tool.zone !== 'none') return `${money(ZONE_COST_PER_TILE)}/casilla`;
+  if (tool.zone === 'none') return 'gratis';
+  return '';
+}
+
+/** Categorías de la bandeja «Construir»; Mirar, Carretera y Derribar van en las pestañas. */
+export const TRAY: { title: string; tools: ToolId[] }[] = [
+  { title: 'Lo básico', tools: ['house', 'water', 'power'] },
+  { title: 'Zonas (los vecinos construyen)', tools: ['zoneR', 'zoneC', 'zoneI', 'dezone'] },
+  { title: 'Servicios', tools: ['park', 'school', 'clinic', 'police'] },
+  { title: 'Premios de los hitos', tools: ['plaza', 'market'] },
+];
+
 export function costText(tool: Tool): string {
   if (tool.build === 'road') return `${money(BUILD.road.materials)} por casilla`;
   if (tool.build) {

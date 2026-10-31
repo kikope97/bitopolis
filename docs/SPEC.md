@@ -278,6 +278,7 @@ El alcance está congelado hasta la v1.0. Todo lo de la sección 15 solo entra s
 - **v1.4 — Auditoría táctil** (ronda 10): obras con confirmación en táctil, dock único, menú sin bucle, x10 jugable, mapa al 77–85 % de la pantalla.
 
 - **v1.5 — Ayuntamiento y ciclo vital** (ronda 11): presupuesto anual votado, fiestas del pueblo, subvenciones con plazo y cofinanciación, y ciclo vital (nacimientos, herencias y fallecimientos). Pedido por el creador, del backlog §15.
+- **v1.6 — Rediseño de la interfaz** (ronda 12): revisión crítica en cinco tamaños (iPhone mini, 17, 17 Pro Max, Android 360 px con horizontal, iPad). Barra de datos arriba, franja de contexto, cinco pestañas con bandeja «Construir» por categorías, panel «Pueblo», avisos en una línea con campana, fichas a media pantalla y panel lateral en tableta y horizontal.
 
 ## 15. Después de la v1.0 (backlog, no implementar antes)
 

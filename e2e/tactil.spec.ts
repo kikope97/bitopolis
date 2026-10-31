@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { state, tile, setSpeed, skipTutorial } from './helpers.ts';
+import { pickTool, state, tile, setSpeed, skipTutorial } from './helpers.ts';
 
 /**
  * v1.4: juego con el dedo de verdad (eventos táctiles por CDP, no ratón).
@@ -38,7 +38,7 @@ test('táctil: tocar enseña la obra y solo se construye al confirmar, en la cas
   const s0 = await state(page);
   const th = s0.buildings.find((b: { kind: string }) => b.kind === 'townhall');
   const target = { x: th.x + 1, y: th.y + 2 };
-  await page.locator('[data-tool="house"]').click();
+  await pickTool(page, 'house');
   // La ayuda de la herramienta cambia de alto: el toque tiene que seguir cayendo donde se ve.
   const p = await tile(page, target.x, target.y);
   await t.tap(p.x, p.y);
@@ -55,7 +55,7 @@ test('táctil: con un edificio elegido, arrastrar mueve el mapa y no construye n
   await start(page);
   const t = await touch(page);
   const n0 = (await state(page)).buildings.length;
-  await page.locator('[data-tool="water"]').click();
+  await pickTool(page, 'water');
   const box = (await page.locator('#map').boundingBox())!;
   const cx = box.x + box.width / 2;
   const cy = box.y + box.height / 2;
@@ -64,7 +64,7 @@ test('táctil: con un edificio elegido, arrastrar mueve el mapa y no construye n
   expect((await state(page)).buildings.length).toBe(n0);
   await expect(page.locator('#confirm-bar')).toBeHidden();
   // ✕ cancela una obra propuesta.
-  await page.locator('[data-tool="house"]').click();
+  await pickTool(page, 'house');
   await t.tap(cx, cy);
   await expect(page.locator('#confirm-bar')).toBeVisible();
   await page.waitForTimeout(400); // la barra ignora toques en sus primeros 350 ms
@@ -78,7 +78,7 @@ test('táctil: carretera con dos toques (un dedo arrastrando mueve el mapa) se e
   const t = await touch(page);
   const s0 = await state(page);
   const th = s0.buildings.find((b: { kind: string }) => b.kind === 'townhall');
-  await page.locator('[data-tool="road"]').click();
+  await pickTool(page, 'road');
   const a = await tile(page, th.x - 2, th.y + 3);
   // Arrastrar sin inicio marcado mueve el mapa, no traza.
   await t.drag({ x: a.x, y: a.y }, { x: a.x - 60, y: a.y });
@@ -98,16 +98,16 @@ test('el menú ☰ no se cambia solo por la última ficha mirada (el «menú en 
   await start(page);
   const s0 = await state(page);
   const th = s0.buildings.find((b: { kind: string }) => b.kind === 'townhall');
-  await page.locator('[data-tool="inspect"]').click();
+  await pickTool(page, 'inspect');
   const p = await tile(page, th.x, th.y);
   await page.mouse.click(p.x, p.y);
   await expect(page.locator('.sheet h2')).toHaveText('Ayuntamiento');
   await page.locator('.sheet-close').click();
   await setSpeed(page, 3);
   await page.locator('#menu').click();
-  await expect(page.locator('.sheet h2')).toHaveText('Menú');
+  await expect(page.locator('.sheet h2')).toHaveText('Pueblo');
   await page.waitForTimeout(2500);
-  await expect(page.locator('.sheet h2')).toHaveText('Menú');
+  await expect(page.locator('.sheet h2')).toHaveText('Pueblo');
   await page.getByRole('button', { name: 'Impuestos' }).click();
   await page.waitForTimeout(2000);
   await expect(page.locator('.sheet h2')).not.toHaveText('Ayuntamiento');
@@ -135,7 +135,7 @@ test('táctil: un solo toque junto al borde de abajo no construye (el clic fanta
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] } as never);
     await page.waitForTimeout(150);
   }
-  await page.locator('[data-tool="house"]').click();
+  await pickTool(page, 'house');
   const p = await tile(page, target.x, target.y);
   const n0 = (await state(page)).buildings.length;
   await t.tap(p.x, p.y);
@@ -148,7 +148,7 @@ test('táctil: con el inicio de una carretera marcado, la barra dice qué hacer 
   await start(page);
   const t = await touch(page);
   const th = (await state(page)).buildings.find((b: { kind: string }) => b.kind === 'townhall');
-  await page.locator('[data-tool="road"]').click();
+  await pickTool(page, 'road');
   const a = await tile(page, th.x - 2, th.y + 3);
   await t.tap(a.x, a.y);
   await expect(page.locator('#confirm-text')).toContainText('Toca dónde termina');

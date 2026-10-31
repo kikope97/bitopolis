@@ -15,41 +15,43 @@ interface Ctx {
 }
 
 const roadCount = (s: GameState) => s.map.tiles.filter((t) => t === 1).length;
+/** v1.6: las obras están en la bandeja «Construir»: primero la pestaña, luego la casilla. */
+const inTray = (id: string) => (document.querySelector('#tray:not([hidden])') ? `#tray [data-tool="${id}"]` : '#tab-build');
 const has = (s: GameState, k: string) => s.buildings.some((b) => b.kind === k);
 
 const STEPS: Step[] = [
   {
-    text: 'Bienvenido, alcalde. El tiempo está parado. Toca «Carretera» (abajo).',
+    text: 'Bienvenido, alcalde. El tiempo está parado. Toca «Carretera», abajo.',
     target: () => '[data-tool="road"]',
     done: (s, tool, c) => tool === 'road' || roadCount(s) > c.roads0,
   },
   {
-    text: 'Toca el final de la calle del ayuntamiento y luego dónde quieres que acabe (con ratón, también puedes arrastrar).',
+    text: 'Toca el final de la calle del ayuntamiento y luego dónde quieres que acabe. Confirma con «Construir».',
     target: () => null,
     done: (s, _t, c) => roadCount(s) > c.roads0,
   },
   {
-    text: 'Ahora el agua: toca «Agua» (abajo) y luego una casilla junto a la carretera.',
-    target: (tool) => (tool === 'water' ? null : '[data-tool="water"]'),
+    text: 'Ahora el agua: abre «Construir», elige «Agua» y toca una casilla junto a la carretera.',
+    target: (tool) => (tool === 'water' ? null : inTray('water')),
     done: (s) => has(s, 'water'),
   },
   {
-    text: 'Y la luz: «Luz», junto a la carretera.',
-    target: (tool) => (tool === 'power' ? null : '[data-tool="power"]'),
+    text: 'Y la luz: «Construir» › «Luz», junto a la carretera.',
+    target: (tool) => (tool === 'power' ? null : inTray('power')),
     done: (s) => has(s, 'power'),
   },
   {
-    text: 'Construye una «Casa» para que llegue gente.',
-    target: (tool) => (tool === 'house' ? null : '[data-tool="house"]'),
+    text: 'Construye una «Casa» (en «Construir») para que llegue gente.',
+    target: (tool) => (tool === 'house' ? null : inTray('house')),
     done: (s) => has(s, 'house'),
   },
   {
-    text: 'Las obras tardan unos días. Pon el tiempo en marcha con ▶ (abajo a la izquierda); el botón de al lado lo acelera.',
+    text: 'Las obras tardan unos días. Pon el tiempo en marcha con ▶ (arriba); el botón de al lado lo acelera.',
     target: () => '#play-pause',
     done: (s) => s.citizens.length >= 2,
   },
   {
-    text: '¡Ya tienes vecinos! Con 10 se desbloquean las zonas R, C e I. Si dudas, pulsa «?» (a la derecha).',
+    text: '¡Ya tienes vecinos! Con 10 se desbloquean las zonas R, C e I (abajo ves cuántos faltan). Si dudas, pulsa «?».',
     target: () => '#whatnow',
     done: () => false,
   },
@@ -89,6 +91,9 @@ export class Tutorial {
     }
     this.started = true;
     this.ctx.roads0 = roadCount(state);
+    // v1.6: al volver, se saltan los pasos que el pueblo ya tiene hechos (antes empezaba en «Bienvenido»).
+    if (!fromScratch && (has(state, 'water') || has(state, 'power') || has(state, 'house'))) this.step = Math.max(this.step, 2);
+    while (!fromScratch && this.step > 1 && this.active && this.step < STEPS.length - 1 && STEPS[this.step]!.done(state, 'inspect', this.ctx)) this.step++;
     if (this.active) {
       $('#app').append(this.box, this.arrow);
     }
@@ -132,6 +137,9 @@ export class Tutorial {
     const r = target.getBoundingClientRect();
     this.arrow.hidden = false;
     this.arrow.style.left = `${Math.round(r.left + r.width / 2 - 12)}px`;
-    this.arrow.style.top = `${Math.round(r.top - 30)}px`;
+    // Botones de arriba (▶): la flecha apunta hacia arriba, por debajo del botón.
+    const up = r.top < window.innerHeight / 3;
+    this.arrow.textContent = up ? '▲' : '▼';
+    this.arrow.style.top = `${Math.round(up ? r.bottom + 6 : r.top - 30)}px`;
   }
 }

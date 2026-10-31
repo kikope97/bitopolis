@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { drag, state, tap, setSpeed, skipTutorial } from './helpers.ts';
+import { pickTool, drag, state, tap, setSpeed, skipTutorial } from './helpers.ts';
 
 test('/healthz responde', async ({ request }) => {
   const r = await request.get('/healthz');
@@ -20,21 +20,22 @@ test('partida nueva: tutorial, obras, guardado y continuar', async ({ page }, in
   await page.getByRole('button', { name: 'Jugar' }).click();
   await expect(page.locator('#game')).toBeVisible();
   await expect(page.locator('.tut-box')).toContainText('Carretera');
-  await expect(page.locator('#hud-pop')).toHaveText('1 vecino');
+  await expect(page.locator('#hud-pop')).toHaveText('1');
+  await expect(page.locator('#hud-pop')).toHaveAttribute('aria-label', /Habitantes: 1/);
   await shot('2-tutorial');
 
   const s0 = await state(page);
   const cx = Math.floor(s0.map.w / 2);
   const cy = Math.floor(s0.map.h / 2);
 
-  await page.locator('[data-tool="road"]').click();
+  await pickTool(page, 'road');
   await drag(page, [cx + 3, cy], [cx + 3, cy + 3]);
   await expect(page.locator('.tut-box')).toContainText('agua');
-  await page.locator('[data-tool="water"]').click();
+  await pickTool(page, 'water');
   await tap(page, cx - 2, cy + 1);
-  await page.locator('[data-tool="power"]').click();
+  await pickTool(page, 'power');
   await tap(page, cx + 2, cy + 1);
-  await page.locator('[data-tool="house"]').click();
+  await pickTool(page, 'house');
   await tap(page, cx + 4, cy + 2);
   await expect(page.locator('.tut-box')).toContainText('▶');
   const s1 = await state(page);
@@ -42,16 +43,17 @@ test('partida nueva: tutorial, obras, guardado y continuar', async ({ page }, in
   await shot('3-obras');
 
   await setSpeed(page, 10);
-  await expect(page.locator('#hud-pop')).not.toHaveText('1 vecino', { timeout: 25_000 });
+  await expect(page.locator('#hud-pop')).not.toHaveText('1', { timeout: 25_000 });
   await setSpeed(page, 0);
-  await page.locator('[data-tool="inspect"]').click();
+  await pickTool(page, 'inspect');
   await tap(page, cx + 4, cy + 2);
   await expect(page.locator('.sheet')).toContainText('Viven aquí');
   await shot('4-ficha');
   await page.locator('.sheet-close').click();
 
+  // «?»: el consejo sale en la franja de abajo (v1.6).
   await page.locator('#whatnow').click();
-  await expect(page.locator('.toast').last()).toBeVisible();
+  await expect(page.locator('#tool-info')).toContainText('¿Qué hago?');
 
   // Volver al inicio guarda y muestra las mini estadísticas.
   await page.locator('#menu').click();
@@ -74,7 +76,12 @@ test('el mapa se mueve arrastrando y hace zoom con botones', async ({ page }) =>
   await page.mouse.up();
   const after = await page.evaluate(() => (window as any).__bitopolis.tileCenter(0, 0));
   expect(Math.abs(after.x - before.x - 60)).toBeLessThanOrEqual(2);
-  await page.getByRole('button', { name: 'Acercar' }).click();
+  // v1.6: en táctil no hay botones de zoom (se pellizca); con ratón, sí. El atajo «+» vale en los dos.
+  if (await page.getByRole('button', { name: 'Acercar' }).isVisible()) await page.getByRole('button', { name: 'Acercar' }).click();
+  else {
+    await page.locator('#map').focus();
+    await page.keyboard.press('+');
+  }
   const zoomed = await page.evaluate(() => (window as any).__bitopolis.tileCenter(1, 0).x - (window as any).__bitopolis.tileCenter(0, 0).x);
   expect(zoomed).toBeGreaterThan(32);
 });
