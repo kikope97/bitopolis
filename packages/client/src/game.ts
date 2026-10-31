@@ -8,6 +8,12 @@ import {
   type GameState,
   cellsUsed,
   coverageSummary,
+  TRASH,
+  trashActive,
+  trashServed,
+  trashStateOf,
+  truckRouteOf,
+  truckRoutes,
   CRIME,
   jailCapacity,
   canUpgradeBuilding,
@@ -1544,6 +1550,7 @@ export function startGame(opts: GameOptions): void {
     if (plantCapacityOf(b)) gives.push(`da ${b.kind === 'water' ? 'agua' : 'luz'} a ${plantCapacityOf(b)} edificios`);
     if (b.kind === 'police') gives.push(`${cellsOf(b)} calabozos`);
     if (b.kind === 'jail') gives.push(`${jailPlacesOf(b)} plazas`);
+    if (b.kind === 'cleanpoint') gives.push(`su camión recorre ${truckRouteOf(b)} casillas de calle al día`);
     if (gives.length) box.append(h('p', { class: 'muted small' }, `Ahora ${gives.join(', ')}.`));
     if (b.upgradeUntil !== undefined) {
       box.append(h('p', {}, `Mejorando a nivel ${lv + 1}: termina el ${formatDate(tickToDate(b.upgradeUntil))}. Sigue abierto mientras tanto.`));
@@ -1663,6 +1670,9 @@ export function startGame(opts: GameOptions): void {
           pills.push(h('span', { class: `pill ${b.hasPower ? 'good' : 'bad'}` }, b.hasPower ? 'Luz ✓' : `SIN LUZ${b.darkDays ? ` (${plural(b.darkDays, 'día', 'días')})` : ''}`));
         }
         if (b.kind === 'shop' || b.kind === 'factory') pills.push(h('span', { class: 'pill' }, money(unitValue(state, b))));
+        // 2.1: basura sin recoger.
+        const dirty = trashStateOf(b);
+        if (dirty !== 'limpio') pills.push(h('span', { class: 'pill bad' }, dirty === 'ratas' ? `RATAS · ${bagsText(b)}` : `Basura: ${bagsText(b)}`));
         // v1.9: las cuentas de la empresa el mes pasado (salud de las empresas).
         if ((b.kind === 'shop' || b.kind === 'factory') && b.books) {
           const k = b.books;
@@ -1678,6 +1688,15 @@ export function startGame(opts: GameOptions): void {
         if (used >= cellsOf(b)) content.push(h('p', { class: 'pol-tag' }, jailCapacity(state) ? 'Llenos: esperan sitio en la cárcel.' : 'Llenos: hace falta una cárcel para poder detener a más.'));
       }
       if (b.kind === 'jail') content.push(h('p', {}, `Presos: ${state.justice?.jail.length ?? 0} de ${jailCapacity(state)} plazas.`));
+      // 2.1: punto limpio: por dónde pasa su camión y qué hace en cada nivel.
+      if (b.kind === 'cleanpoint' && b.built) {
+        const route = truckRoutes(state).find((r) => r.id === b.id)?.roads.length ?? 0;
+        const served = [...trashServed(state).values()].filter((p) => p.id === b.id).length;
+        content.push(h('p', {}, `El camión recorre ${route} de ${truckRouteOf(b)} casillas de calle al día y recoge la basura de ${plural(served, 'edificio', 'edificios')}. Con nieve llega a la mitad.`));
+        content.push(h('p', { class: 'muted small' }, 'Solo pagan la tasa de basuras los vecinos por cuya calle pasa el camión. Mira la capa «Limpieza».'));
+        if (levelOf(b) >= 2) content.push(h('p', {}, `Reciclaje: la tasa de basuras es un ${Math.round(TRASH.recyclingDiscount * 100)} % más barata para los suyos, y los ecologistas lo agradecen.`));
+        if (levelOf(b) >= 3) content.push(h('p', {}, `Compostaje: vende el abono fuera (${money(TRASH.compostPerResident)} por vecino atendido al mes).`));
+      }
       // v1.8 (petición del creador): los servicios suben de nivel.
       if (UPGRADABLE.includes(b.kind)) content.push(levelBox(b));
       const res = occupants(state, b);
@@ -1743,9 +1762,26 @@ export function startGame(opts: GameOptions): void {
       row('police', 'Seguridad', crime < 20 ? true : crime < 40 ? 'warn' : false, `${crime < 20 ? 'Tranquilo' : crime < 40 ? 'Algo de delincuencia' : 'Inseguro'}${police ? ' · comisaría cerca' : pop >= 20 ? ' · sin comisaría cerca' : ''}`),
       ...(pop >= 25 ? [svc('colegio', 'school', 'Colegio'), svc('salud', 'health', 'Salud')] : []),
       ...(pop >= 10 ? [svc('ocio', 'leaf', 'Parque o plaza')] : []),
+      ...(trashActive(state) || state.buildings.some((s) => s.kind === 'cleanpoint') ? [trashRow(b, row)] : []),
       row('bar', 'Tienda', state.buildings.some((s) => s.kind === 'shop' && s.built && !s.damaged && Math.abs(s.x - b.x) + Math.abs(s.y - b.y) <= 6), state.buildings.some((s) => s.kind === 'shop' && s.built && !s.damaged && Math.abs(s.x - b.x) + Math.abs(s.y - b.y) <= 6) ? 'Cerca' : 'Lejos'),
     ];
     return h('div', {}, h('dl', { class: 'svc-table', 'aria-label': 'Servicios de la vivienda' }, ...rows), h('p', { class: 'muted small' }, `Valor: ${money(unitValue(state, b))} por vivienda`));
+  }
+
+  /** 2.1: bolsas de basura que tiene un edificio (cada 10 unidades, una bolsa). */
+  function bagsText(b: Building): string {
+    const n = Math.max(1, Math.round((b.trash ?? 0) / 10));
+    return plural(n, 'bolsa', 'bolsas');
+  }
+
+  /** 2.1: fila «Basura» de la tabla de servicios. */
+  function trashRow(b: Building, row: (icon: string, label: string, ok: boolean | 'warn', text: string) => HTMLElement): HTMLElement {
+    const st = trashStateOf(b);
+    const by = trashServed(state).get(b.id);
+    if (st === 'ratas') return row('rat', 'Basura', false, `Ratas: ${bagsText(b)} sin recoger`);
+    if (st === 'bolsas') return row('trash', 'Basura', 'warn', `${bagsText(b)} en la calle${by ? '' : ' · no pasa el camión'}`);
+    if (by) return row('trash', 'Basura', true, `Pasa el camión${levelOf(by) >= 2 ? ' · reciclaje' : ''}`);
+    return row('trash', 'Basura', 'warn', 'No pasa el camión (no paga la tasa)');
   }
 
   /** Vecinos de un edificio: una fila por persona con retrato y lo esencial (v1.6). */
@@ -1954,7 +1990,7 @@ export function startGame(opts: GameOptions): void {
     legendDay = Math.floor(state.tick / 24);
     // Ronda 13: ordenada por lo que más falta, con «Construir» al lado; plegable para ver el mapa.
     const sum = coverageSummary(state).sort((a, b) => b.falta - a.falta || b.lleno - a.lleno);
-    const TOOL_FOR: Record<string, ToolId> = { agua: 'water', luz: 'power', colegio: 'school', salud: 'clinic', policia: 'police', ocio: 'park' };
+    const TOOL_FOR: Record<string, ToolId> = { agua: 'water', luz: 'power', colegio: 'school', salud: 'clinic', policia: 'police', ocio: 'park', basuras: 'cleanpoint' };
     const rows = sum.map((r) => {
       const name = `${NEED_LABEL[r.key][0]!.toUpperCase()}${NEED_LABEL[r.key].slice(1)}`;
       const count = r.falta ? `falta en ${plural(r.falta, 'casa', 'casas')}` : `lleno en ${plural(r.lleno, 'casa', 'casas')}`;

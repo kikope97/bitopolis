@@ -1,4 +1,4 @@
-import { coverageCtx, type GameState, homeSites, missingServices, pocketOf, radiusOf, type CoverageNeed, type NeedKey, SERVICE } from '@bitopolis/sim';
+import { coverageCtx, type GameState, homeSites, missingServices, pocketOf, radiusOf, type CoverageNeed, type NeedKey, SERVICE, trashServed, trashStateOf, truckRoutes } from '@bitopolis/sim';
 import { PALETTE } from './palette.ts';
 import { prefs } from './prefs.ts';
 import { T } from './sprites.ts';
@@ -8,7 +8,7 @@ import { T } from './sprites.ts';
  * servicios y contaminación. Cada nivel usa una trama distinta además del
  * color, para que el color nunca sea la única señal.
  */
-export type LayerId = 'none' | 'missing' | 'happiness' | 'pocket' | 'land' | 'services' | 'pollution';
+export type LayerId = 'none' | 'missing' | 'happiness' | 'pocket' | 'land' | 'services' | 'pollution' | 'clean';
 
 interface LayerDef {
   id: LayerId;
@@ -40,6 +40,8 @@ export const LAYERS: LayerDef[] = [
   { id: 'land', label: 'Valor del suelo', colors: GOOD, legend: legend(['Muy bajo', 'Bajo', 'Alto', 'Muy alto'], 'good') },
   { id: 'services', label: 'Cobertura de servicios', colors: GOOD, legend: legend(['Ninguno', '1 servicio', '2 servicios', '3 o más'], 'good') },
   { id: 'pollution', label: 'Contaminación', colors: BAD, legend: legend(['Limpio', 'Algo', 'Bastante', 'Mucha'], 'bad') },
+  // 2.1: basura. Por dónde pasa el camión y cómo está cada edificio.
+  { id: 'clean', label: 'Limpieza', colors: GOOD, legend: legend(['Ratas', 'Bolsas en la calle', 'Sin camión', 'Pasa el camión'], 'good') },
 ];
 
 function legend(names: string[], kind: string) {
@@ -56,6 +58,22 @@ function values(state: GameState, layer: LayerId): (number | null)[] {
     for (const m of missingMarks(state)) {
       const weight = m.needs.reduce((a, x) => a + (x.status === 'falta' ? 1 : 0.5), 0);
       out[m.y * w + m.x] = weight === 0 ? 100 : weight <= 1 ? 60 : weight <= 2 ? 30 : 0;
+    }
+    return out;
+  }
+  if (layer === 'clean') {
+    const out: (number | null)[] = new Array(n).fill(null);
+    for (const r of truckRoutes(state)) for (const i of r.roads) out[i] = 90;
+    const served = trashServed(state);
+    const people = new Set<number>();
+    for (const c of state.citizens) {
+      if (c.homeId !== null) people.add(c.homeId);
+      if (c.jobId !== null) people.add(c.jobId);
+    }
+    for (const b of state.buildings) {
+      if (!b.built || (!people.has(b.id) && !b.trash)) continue;
+      const st = trashStateOf(b);
+      out[b.y * w + b.x] = st === 'ratas' ? 0 : st === 'bolsas' ? 30 : served.has(b.id) ? 100 : 60;
     }
     return out;
   }
@@ -145,7 +163,7 @@ export function happinessMarks(state: GameState): { x: number; y: number; lv: nu
 }
 
 /** Icono de cada necesidad (icons.ts). */
-export const NEED_ICON: Record<NeedKey, string> = { agua: 'drop', luz: 'bolt', colegio: 'school', salud: 'health', policia: 'police', ocio: 'leaf' };
+export const NEED_ICON: Record<NeedKey, string> = { agua: 'drop', luz: 'bolt', colegio: 'school', salud: 'health', policia: 'police', ocio: 'leaf', basuras: 'trash' };
 
 let marksCache: { key: string; marks: { x: number; y: number; needs: CoverageNeed[] }[] } | null = null;
 /** Lo que falta en cada vivienda o solar R (se rehace cada día de juego y al construir). */

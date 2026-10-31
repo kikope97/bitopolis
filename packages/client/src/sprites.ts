@@ -1895,6 +1895,211 @@ function jail3(seed: number): Pix {
   return p;
 }
 
+/* ---------------- 2.1: punto limpio, bolsas, ratas y camión ---------------- */
+
+/** Contenedor de 6×6 con tapa, cantos y ruedas. */
+function bin(p: Pix, x: number, y: number, m: Mat) {
+  p.shadow(x + 1, y + 6, 6, 1);
+  p.hline(x, y, 6, m[3]); // tapa
+  p.hline(x + 1, y - 1, 4, m[2]);
+  p.rect(x, y + 1, 6, 4, m[1]);
+  p.vline(x, y + 1, 4, m[0]);
+  p.vline(x + 5, y + 1, 4, m[2]);
+  p.hline(x + 1, y + 2, 4, m[2]); // boca
+  p.set(x + 1, y + 5, 0);
+  p.set(x + 4, y + 5, 0);
+}
+
+/** Iglú del vidrio (verde). */
+function igloo(p: Pix, x: number, y: number) {
+  p.shadow(x + 1, y + 6, 7, 1);
+  p.ellipse(x + 3.5, y + 4, 3.6, 3.2, MAT.moss[1]);
+  p.ellipse(x + 2.5, y + 3, 1.6, 1.4, MAT.moss[0]);
+  p.hline(x + 1, y + 6, 6, MAT.moss[3]);
+  p.rect(x + 3, y + 1, 2, 1, 0); // boca
+}
+
+/** Flechas del reciclaje (cartel de 7×7 sobre un poste). */
+function recycleSign(p: Pix, x: number, y: number, post: number) {
+  p.vline(x + 3, y + 7, post, MAT.metal[3]);
+  p.rect(x, y, 7, 7, 12);
+  p.frame(x, y, 7, 7, MAT.moss[2]);
+  for (const [dx, dy] of [[3, 1], [2, 2], [4, 2], [1, 4], [5, 4], [2, 5], [3, 5], [4, 5]] as const) p.set(x + dx, y + dy, MAT.moss[1]);
+  p.set(x + 3, y + 3, MAT.moss[3]);
+}
+
+/** Montón de compost: tierra oscura con restos verdes y vapor. */
+function compostPile(p: Pix, x: number, y: number, w: number, seed: number) {
+  p.shadow(x + 1, y + 5, w, 1);
+  p.ellipse(x + w / 2, y + 3, w / 2, 2.6, MAT.dirt[2]);
+  p.ellipse(x + w / 2 - 1, y + 2.4, w / 2 - 1.5, 1.4, MAT.dirt[1]);
+  for (let i = 0; i < w; i++) if (hash(i, seed, 7) > 0.6) p.set(x + i, y + 2 + Math.floor(hash(seed, i) * 3), hash(i, seed) > 0.5 ? 23 : MAT.dirt[3]);
+}
+
+/** Recinto de hormigón con valla metálica (todos los niveles). */
+function cleanYard(p: Pix, seed: number, top: number) {
+  p.rect(0, top, 32, 46 - top, CONCRETE[1]);
+  p.dither(0, top, 32, 46 - top, CONCRETE[2], seed % 2);
+  for (let i = 0; i < 18; i++) p.set(Math.floor(hash(i, seed, 2) * 32), top + Math.floor(hash(seed, i, 3) * (46 - top)), CONCRETE[3]);
+  // Marcas amarillas en el suelo (circulación de coches).
+  for (let x = 4; x < 28; x += 4) p.hline(x, 44, 2, MAT.yellow[1]);
+  // Valla: postes y malla a los lados y delante (hueco de entrada en el centro).
+  for (let y = top; y < 46; y += 4) {
+    p.vline(0, y, 3, MAT.metal[2]);
+    p.vline(31, y, 3, MAT.metal[2]);
+  }
+  for (const [x0, x1] of [[0, 11], [21, 32]] as const) {
+    p.hline(x0, 42, x1 - x0, MAT.metal[2]);
+    for (let x = x0; x < x1; x += 3) p.vline(x, 42, 4, MAT.metal[3]);
+    p.dither(x0, 43, x1 - x0, 2, MAT.metal[1], 0);
+  }
+}
+
+/** Nivel 1: nave de chapa, contenedores de colores y el camión aparcado. */
+function cleanPoint(seed: number): Pix {
+  const p = new Pix(T, BH);
+  cleanYard(p, seed, 24);
+  // Nave de chapa con portón enrollable.
+  castShadow(p, 2, 10, 20, 17);
+  flatRoof(p, 2, 8, 20, 5, MAT.metal, seed);
+  facade(p, 3, 13, 18, 13, MAT.moss, 'metal', seed);
+  p.rect(6, 17, 9, 9, MAT.metal[2]);
+  for (let y = 18; y < 26; y += 2) p.hline(6, y, 9, MAT.metal[3]);
+  p.hline(6, 17, 9, MAT.metal[0]);
+  windowAt(p, 17, 17, 2, 3, { frame: MAT.metal[3] });
+  // Rótulo blanco «PUNTO LIMPIO» (dos rayas) sobre el portón.
+  p.rect(5, 14, 12, 2, 12);
+  p.hline(6, 14, 4, MAT.moss[2]);
+  p.hline(11, 15, 5, MAT.moss[2]);
+  recycleSign(p, 23, 12, 10);
+  // Contenedores: amarillo (envases), azul (papel), verde (vidrio) y marrón (orgánico).
+  bin(p, 2, 32, MAT.yellow);
+  bin(p, 9, 32, MAT.blue);
+  bin(p, 16, 32, MAT.moss);
+  bin(p, 23, 32, MAT.wood);
+  return p;
+}
+
+/** Nivel 2 (reciclaje): más contenedores, iglús del vidrio y una prensa. */
+function cleanPoint2(seed: number): Pix {
+  const p = new Pix(T, BH);
+  cleanYard(p, seed, 20);
+  castShadow(p, 1, 6, 20, 16);
+  flatRoof(p, 1, 4, 20, 5, MAT.metal, seed);
+  facade(p, 2, 9, 18, 12, MAT.moss, 'metal', seed);
+  p.rect(4, 13, 8, 8, MAT.metal[2]);
+  for (let y = 14; y < 21; y += 2) p.hline(4, y, 8, MAT.metal[3]);
+  p.rect(13, 10, 6, 2, 12);
+  p.hline(14, 10, 4, MAT.moss[2]);
+  windowAt(p, 15, 14, 3, 3, { frame: MAT.metal[3] });
+  // Prensa de cartón: cajón gris con balas atadas.
+  castShadow(p, 22, 14, 9, 8);
+  p.rect(22, 14, 9, 8, MAT.metal[1]);
+  p.hline(22, 14, 9, MAT.metal[0]);
+  p.vline(30, 14, 8, MAT.metal[3]);
+  for (const y of [16, 19]) {
+    p.rect(23, y, 6, 2, MAT.wood[1]);
+    p.hline(23, y, 6, MAT.wood[0]);
+    p.set(25, y, MAT.wood[3]);
+  }
+  recycleSign(p, 24, 4, 9);
+  bin(p, 2, 26, MAT.yellow);
+  bin(p, 9, 26, MAT.yellow);
+  bin(p, 16, 26, MAT.blue);
+  bin(p, 23, 26, MAT.blue);
+  igloo(p, 3, 34);
+  igloo(p, 12, 34);
+  bin(p, 22, 35, MAT.wood);
+  return p;
+}
+
+/** Nivel 3 (compostaje): planta con montones de compost y sacos de abono. */
+function cleanPoint3(seed: number): Pix {
+  const p = cleanPoint2(seed);
+  // Los montones de compost sustituyen a la mitad de los contenedores del frente.
+  p.rect(1, 33, 30, 9, CONCRETE[1]);
+  p.dither(1, 33, 30, 9, CONCRETE[2], 1);
+  compostPile(p, 1, 34, 10, seed);
+  compostPile(p, 12, 35, 9, seed + 1);
+  // Sacos de abono apilados (verde con franja blanca).
+  for (const [x, y] of [[23, 37], [27, 37], [25, 34]] as const) {
+    p.rect(x, y, 4, 3, MAT.moss[2]);
+    p.hline(x, y, 4, MAT.moss[1]);
+    p.hline(x, y + 1, 4, 12);
+  }
+  // Vapor del compost (dos volutas).
+  if (!nightLights) {
+    p.set(5, 31, 12);
+    p.set(6, 30, 31);
+    p.set(16, 32, 12);
+    p.set(15, 31, 31);
+  }
+  return p;
+}
+
+/** Bolsas de basura amontonadas (n = 1–3), 12×8. */
+function trashBags(n: number): Pix {
+  const p = new Pix(12, 8);
+  const spots: [number, number, number][] = [
+    [3, 5, 0],
+    [8, 5, 1],
+    [5.5, 2.6, 2],
+  ];
+  p.ellipse(6, 7, 6, 1, 24); // sombra
+  for (const [x, y, k] of spots.slice(0, Math.max(1, Math.min(3, n)))) {
+    const m: Mat = k === 1 ? [53, 55, 0, 0] : [55, 0, 0, 0];
+    p.ellipse(x, y, 2.6, 2.2, m[1]);
+    p.set(Math.floor(x) - 1, Math.floor(y) - 1, m[0]);
+    p.set(Math.floor(x), Math.floor(y) - 2, MAT.yellow[1]); // nudo
+  }
+  return p;
+}
+
+/** Rata de 6×4 (2 fotogramas: la cola se mueve). */
+function rat(frame: number, dir: 1 | -1): Pix {
+  const p = new Pix(6, 4);
+  const set = (x: number, y: number, c: number) => p.set(dir === 1 ? x : 5 - x, y, c);
+  for (const [x, y] of [[1, 1], [2, 1], [3, 1], [1, 2], [2, 2], [3, 2], [4, 2], [4, 1]] as const) set(x, y, 53);
+  set(5, 2, 61); // hocico
+  set(4, 0, 61); // oreja
+  set(4, 1, 0); // ojo
+  set(0, frame % 2 ? 1 : 2, 61); // cola
+  set(1, 3, 55);
+  set(3, 3, 55);
+  return p;
+}
+
+/** Camión de la basura de 16×11 (2 fotogramas: ruedas y rotativo). */
+function garbageTruck(frame: number, dir: 1 | -1): Pix {
+  const p = new Pix(16, 11);
+  const set = (x: number, y: number, c: number) => p.set(dir === 1 ? x : 15 - x, y, c);
+  const rect = (x: number, y: number, w: number, h: number, c: number) => {
+    for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) set(i, j, c);
+  };
+  rect(1, 10, 14, 1, 24); // sombra
+  // Caja compactadora verde con franja blanca.
+  rect(0, 2, 10, 6, MAT.moss[1]);
+  rect(0, 2, 10, 1, MAT.moss[0]);
+  rect(0, 5, 10, 1, 12);
+  rect(0, 7, 10, 1, MAT.moss[3]);
+  set(0, 3, MAT.moss[3]);
+  set(0, 4, MAT.moss[3]);
+  // Cabina blanca con luna azul.
+  rect(10, 3, 5, 5, 12);
+  rect(11, 4, 3, 2, MAT.glass[1]);
+  set(13, 4, MAT.glass[0]);
+  rect(10, 7, 6, 1, MAT.metal[2]);
+  set(15, 6, MAT.yellow[1]); // faro
+  // Rotativo naranja que parpadea.
+  set(12, 2, frame % 2 ? 3 : 20);
+  // Ruedas.
+  for (const x of [2, 11]) {
+    rect(x, 8, 3, 2, 0);
+    set(x + 1, 8 + (frame % 2), MAT.metal[2]);
+  }
+  return p;
+}
+
 /** Farola de parque. */
 function lampPost(p: Pix, x: number, y: number) {
   p.vline(x, y, 7, MAT.metal[3]);
@@ -2097,6 +2302,7 @@ const UPGRADES: Record<string, readonly [() => Pix, () => Pix]> = {
   park: [() => park2(11), () => park3(11)],
   library: [() => library2(15), () => library3(15)],
   sports: [() => sports2(16), () => sports3(16)],
+  cleanpoint: [() => cleanPoint2(18), () => cleanPoint3(18)],
 };
 
 /**
@@ -2816,6 +3022,8 @@ function buildingSpec(kind: string, id: number): [string, () => Pix] | null {
       return ['sports', () => sports(16)];
     case 'jail':
       return ['jail', () => jail(17)];
+    case 'cleanpoint':
+      return ['cleanpoint', () => cleanPoint(18)];
     case 'factory':
       return [`factory${id % 4}`, () => factory(id % 4)];
     case 'shop':
@@ -3265,6 +3473,11 @@ export function policeWalker(frame: number, dir: 1 | -1): Pix {
   set(rx, 8 + ry, 0);
   return p;
 }
+
+/** 2.1: bolsas de basura, ratas y el camión de la basura. */
+export const trashBagsSprite = (n: number, tod: TimeOfDay = 'day') => sprite(`bolsas-${n}`, () => trashBags(n), tod);
+export const ratSprite = (frame: number, dir: 1 | -1, tod: TimeOfDay = 'day') => sprite(`rata-${frame % 2}-${dir}`, () => rat(frame, dir), tod);
+export const truckSprite = (frame: number, dir: 1 | -1, tod: TimeOfDay = 'day') => sprite(`camion-${frame % 2}-${dir}`, () => garbageTruck(frame, dir), tod);
 
 export const policeSprite = (frame: number, dir: 1 | -1, tod: TimeOfDay = 'day') =>
   sprite(`policia-${frame}-${dir}`, () => policeWalker(frame, dir), tod);

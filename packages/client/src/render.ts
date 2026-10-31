@@ -1,4 +1,4 @@
-import { type GameState, isWater, Terrain, Tile, Zone } from '@bitopolis/sim';
+import { type GameState, isWater, Terrain, Tile, trashStateOf, truckRoutes, Zone } from '@bitopolis/sim';
 import { happinessMarks, type LayerId, layerCanvas, missingMarks, NEED_ICON } from './layers.ts';
 import { pixelIcon } from './icons.ts';
 
@@ -31,6 +31,9 @@ import {
   damagedSprite,
   marcherSprite,
   policeSprite,
+  ratSprite,
+  trashBagsSprite,
+  truckSprite,
   serviceSprite,
   sparkleSprite,
   thiefSprite,
@@ -509,6 +512,18 @@ export function render(
         }
         if (!b.hasPower && show(b.darkDays)) ctx.drawImage(iconSprite('noPower'), ix, iy, 11 * z, 13 * z);
       }
+      // 2.1: basura sin recoger: bolsas al pie del edificio y, con ratas, una que corretea y el icono en el tejado.
+      const dirty = trashStateOf(b);
+      if (dirty !== 'limpio') {
+        const fy = y * ts - cam.y + ts - 9 * z;
+        ctx.drawImage(trashBagsSprite(dirty === 'ratas' ? 3 : 2, tod), px + 19 * z, fy, 12 * z, 8 * z);
+        if (dirty === 'ratas') {
+          const t = still ? 0 : Math.floor(opts.time / 110 + b.id) % 36;
+          const off = t < 18 ? t : 36 - t;
+          ctx.drawImage(ratSprite(t, t < 18 ? 1 : -1, tod), px + (2 + off) * z, fy + 4 * z, 6 * z, 4 * z);
+          if (blink) ctx.drawImage(icon('rat'), px + 2 * z, py + 2 * z, 12 * z, 12 * z);
+        }
+      }
     }
   }
 
@@ -590,6 +605,7 @@ export function render(
 
   drawProtest(ctx, state, cam, opts.time, opts.reducedMotion, tod);
   drawPolice(ctx, state, cam, opts.time, opts.reducedMotion, tod);
+  drawTrucks(ctx, state, cam, opts.time, opts.reducedMotion, tod);
   drawThief(ctx, state, cam, opts.time, opts.reducedMotion, tod);
   if (opts.highlight) drawHighlight(ctx, cam, opts.highlight, opts.time, opts.reducedMotion);
   drawWeather(ctx, state, opts.time, opts.reducedMotion);
@@ -823,6 +839,51 @@ function drawPolice(ctx: CanvasRenderingContext2D, state: GameState, cam: Camera
     const img = policeSprite(Math.floor(time / 150 + k) % 4, p.dir, tod);
     ctx.drawImage(img, (p.fx - 3 + off) * z - cam.x, (p.fy - 11) * z - cam.y, img.width * z, img.height * z);
   }
+}
+
+/**
+ * 2.1: recorrido del camión de cada punto limpio: un paseo continuo por sus
+ * calles de hoy (ida y vuelta por cada ramal). Se rehace cada día de juego.
+ */
+let truckCache: { key: string; paths: { x: number; y: number }[][] } | null = null;
+export function truckPaths(state: GameState): { x: number; y: number }[][] {
+  const snow = state.weather?.kind === 'nieve';
+  const key = `${Math.floor(state.tick / 24)}:${mapSignature(state)}:${state.buildings.length}:${+snow}`;
+  if (truckCache?.key === key) return truckCache.paths;
+  const { w } = state.map;
+  const paths: { x: number; y: number }[][] = [];
+  for (const r of truckRoutes(state, snow)) {
+    if (r.roads.length < 2) continue;
+    const set = new Set(r.roads);
+    const seen = new Set<number>([r.roads[0]!]);
+    const walk: number[] = [r.roads[0]!];
+    const stack: number[] = [r.roads[0]!];
+    while (stack.length) {
+      const i = stack[stack.length - 1]!;
+      const next = [i + 1, i - 1, i + w, i - w].find((j) => set.has(j) && !seen.has(j) && (j === i + w || j === i - w || Math.floor(j / w) === Math.floor(i / w)));
+      if (next !== undefined) {
+        seen.add(next);
+        stack.push(next);
+        walk.push(next);
+      } else {
+        stack.pop();
+        if (stack.length) walk.push(stack[stack.length - 1]!);
+      }
+    }
+    paths.push(walk.map((i) => ({ x: i % w, y: Math.floor(i / w) })));
+  }
+  truckCache = { key, paths };
+  return paths;
+}
+
+function drawTrucks(ctx: CanvasRenderingContext2D, state: GameState, cam: Camera, time: number, still: boolean, tod: TimeOfDay): void {
+  const z = cam.zoom;
+  truckPaths(state).forEach((path, k) => {
+    const d = still ? 0 : ((time / 1000) * 2.5 + k * 7) % (path.length - 1);
+    const p = along(path, d);
+    const img = truckSprite(Math.floor(time / 250), p.dir, tod);
+    ctx.drawImage(img, (p.fx - 8) * z - cam.x, (p.fy - 10) * z - cam.y, 16 * z, 11 * z);
+  });
 }
 
 /**
