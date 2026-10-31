@@ -114,7 +114,7 @@ test('admin: primer acceso, ajustes que valen al momento y vista móvil', async 
   await expect(copias.getByRole('link', { name: 'Descargar' }).first()).toBeVisible();
 
   // Móvil: sin desbordes horizontales.
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 320, height: 720 });
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Resumen' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
