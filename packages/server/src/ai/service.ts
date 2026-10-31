@@ -1,11 +1,12 @@
 import { buildDecisionRequest, type GameState, parseDecisions, parseText, type Pending, type TextRequest } from '@bitopolis/sim';
 import type { Config } from '../config.ts';
 import type { Db } from '../db/index.ts';
+import type { SettingsStore } from '../settings.ts';
 import { costEur, modelFor, priceTable, providerFromKey, type ProviderId } from './catalog.ts';
 import { decryptSecret } from './crypto.ts';
 import { type LLMProvider, makeProvider } from './providers.ts';
 
-/** Ajustes efectivos de IA de una partida (variables de entorno > partida). */
+/** Ajustes efectivos de IA de una partida (lo fijado en /admin > partida). */
 export interface AiSettings {
   provider: ProviderId;
   model: string;
@@ -47,19 +48,34 @@ export class AiService {
   private games = new Map<number, GameAiState>();
   /** Reservas en curso (€), para que dos peticiones no se pasen del tope. */
   private reserved = new Map<number, number>();
-  readonly prices;
   /** Para tests: sustituye al proveedor real. */
   providerOverride?: (s: AiSettings) => LLMProvider;
 
   constructor(
     private db: Db,
     private config: Config,
-  ) {
-    this.prices = priceTable(config.ai.pricesJson);
+    private store: SettingsStore,
+  ) {}
+
+  /** Precios (los de /admin sobre la tabla incluida). */
+  get prices() {
+    return priceTable(this.store.get().ai.prices);
+  }
+
+  /** API key del servidor descifrada (nunca sale de aquí hacia el cliente). */
+  serverKey(): string | undefined {
+    const enc = this.store.get().ai.keyEnc;
+    if (!enc) return undefined;
+    try {
+      return decryptSecret(enc, this.config.secret);
+    } catch {
+      return undefined;
+    }
   }
 
   async settings(gameId: number | null): Promise<AiSettings> {
-    const env = this.config.ai;
+    const srv = this.store.get().ai;
+    const env = { ...srv, key: this.serverKey() };
     const row = gameId ? await this.db.selectFrom('ai_config').selectAll().where('game_id', '=', gameId).executeTakeFirst() : undefined;
     const locked: string[] = [];
     const pick = <T>(name: string, envVal: T | undefined, rowVal: T | null | undefined): T | undefined => {
@@ -75,15 +91,20 @@ export class AiService {
       locked.push('key');
       key = env.key;
       keyMask = 'definida por el servidor';
-    } else if (row?.key_enc && this.config.masterKey) {
+    } else if (row?.key_enc && srv.playerKeys) {
       try {
-        key = decryptSecret(row.key_enc, this.config.masterKey);
+        key = decryptSecret(row.key_enc, this.config.secret);
         keyMask = row.key_mask ?? '…';
       } catch {
         key = undefined;
       }
     }
-    const baseUrl = pick('baseUrl', env.baseUrl, row?.base_url);
+    // Sin permiso para keys propias, la partida tampoco elige endpoint.
+    if (!env.key && !srv.playerKeys) locked.push('key');
+    // Con key del servidor, la partida no elige endpoint: podría mandar la key a otro sitio.
+    const ownEndpoint = srv.playerKeys && !env.key;
+    const baseUrl = pick('baseUrl', env.baseUrl, ownEndpoint ? row?.base_url : undefined);
+    if (!ownEndpoint && !locked.includes('baseUrl')) locked.push('baseUrl');
     // El proveedor no se elige: sale de la key (o del endpoint propio).
     const provider = providerFromKey(key, baseUrl);
     if (env.key || env.baseUrl) locked.push('provider');

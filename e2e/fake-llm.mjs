@@ -19,6 +19,12 @@ createServer((req, res) => {
     } catch {
       parsed = {};
     }
+    // «Probar la IA» del panel /admin.
+    if (userText.startsWith('Devuelve {"ok"')) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ choices: [{ message: { content: '{"ok": true}' } }], usage: { prompt_tokens: 20, completion_tokens: 5 } }));
+      return;
+    }
     const isText = !Array.isArray(parsed.vecinos);
     if (isText) {
       const texto = 'Pues aquí andamos, alcalde, con ganas de que el pueblo siga creciendo.';

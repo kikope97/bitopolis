@@ -15,14 +15,20 @@ Monorepo pnpm + TypeScript:
 - `POST /api/games/:token/claim` (423 si otra sesión la tiene; `force` la toma), `/release`.
 - `PUT /api/games/:token/save`: el servidor **reproduce** los comandos sobre su estado y compara el hash; si no coincide, 409 con el estado bueno.
 - `POST /api/games/:token/regenerate`, `GET /api/games/:token/export` (.bitopolis = JSON gzip sin API key), `POST /api/import`.
-- Acceso con contraseña opcional (`auth.ts`) si hay `BITOPOLIS_PASSWORD` (solo contraseña, sin usuario: decisión del creador).
+- Acceso con contraseña opcional (`auth.ts`), activable en `/admin` (solo contraseña, sin usuario: decisión del creador).
+
+## Panel /admin (v1.2) — sin variables de entorno (decisión del creador)
+- `server/src/settings.ts`: `SettingsStore` (una fila JSON en la tabla `settings`, en memoria; los cambios valen al momento), scrypt, `loadSecret` (`/data/secret.key`, cifra keys y firma cookies), `resetAdminIfAsked` (`/data/reset-admin`).
+- `server/src/admin.ts`: `/api/admin/*` (login con bloqueo, `admin`/`admin` con cambio obligatorio, ajustes, probar IA, partidas, copias). Cliente: `admin.html` + `client/src/admin.ts`.
+- `config.ts` solo tiene lo interno de la imagen (PORT, DATA_DIR, CLIENT_DIR, VERSION). No añadas variables de entorno: añade el ajuste a `ServerSettings` y al panel.
+- e2e: `e2e/admin.spec.ts` usa su propio servidor (puerto 8091) porque cambia ajustes globales.
 - Equilibrio del juego: todos los números en `packages/sim/src/balance.ts`.
 
 ## IA de los vecinos (v0.2)
 - Motor: `sim/src/decisions.ts` (detonantes, acciones válidas, `CitizenAct`, reglas de fallback con motivos) y `sim/src/prompt.ts` (prompt con prefijo fijo, esquema con enums, validación zod). Una decisión pendiente vence a mediodía del día siguiente: si no ha llegado la de la IA, deciden las reglas.
-- Proveedor deducido de la key (`providerFromKey`: `sk-ant-…` Anthropic, resto OpenAI; con `BITOPOLIS_AI_BASE_URL`, compatible con OpenAI). No hay variable ni selector de proveedor (decisión del creador). Variables documentadas en el README.
+- Proveedor deducido de la key (`providerFromKey`: `sk-ant-…` Anthropic, resto OpenAI; con endpoint propio, compatible con OpenAI). No hay selector de proveedor (decisión del creador). La IA del servidor se configura en `/admin`.
 - Servidor: `server/src/ai/` — `crypto.ts` (AES-256-GCM), `catalog.ts` (proveedores, modelos y precios orientativos), `providers.ts` (OpenAI-compatible, Anthropic con el SDK oficial `@anthropic-ai/sdk` y `output_config` (salida estructurada, esfuerzo bajo; sin `tool_choice` forzado ni `temperature`), `ReplayProvider`), `service.ts` (petición anticipada al guardar, reintento, topes y reserva), `routes.ts`.
-- `pnpm ai-eval` mide coste por mes de juego y % de válidas (simulador, `--replay` o `--live` con `BITOPOLIS_API_KEY`). El CI lo ejecuta con `e2e/fixtures/ia-replay.json`; si cambia el prompt, regenera con `--record`.
+- `pnpm ai-eval` mide coste por mes de juego y % de válidas (simulador, `--replay` o `--live` con `BITOPOLIS_API_KEY`, solo herramienta de desarrollo). El CI lo ejecuta con `e2e/fixtures/ia-replay.json`; si cambia el prompt, regenera con `--record`.
 - Playwright usa `e2e/fake-llm.mjs` (LLM falso compatible con OpenAI) para el Modo IA.
 
 ## Economía (v0.3)

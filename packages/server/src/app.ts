@@ -3,13 +3,16 @@ import fastifyStatic from '@fastify/static';
 import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { sql } from 'kysely';
+import type Database from 'better-sqlite3';
 import type { HealthResponse } from '@bitopolis/shared';
+import { registerAdminRoutes } from './admin.ts';
 import type { Config } from './config.ts';
 import type { Db } from './db/index.ts';
 import { registerAuth } from './auth.ts';
 import { registerAiRoutes } from './ai/routes.ts';
 import { AiService } from './ai/service.ts';
 import { registerGameRoutes } from './games.ts';
+import { SettingsStore } from './settings.ts';
 import { newGameToken } from './tokens.ts';
 
 const CSP = [
@@ -26,14 +29,24 @@ const CSP = [
   "frame-ancestors 'none'",
 ].join('; ');
 
-export async function buildApp(config: Config, db: Db, ai = new AiService(db, config)): Promise<FastifyInstance> {
+export interface AppDeps {
+  store?: SettingsStore;
+  ai?: AiService;
+  /** Conexión SQLite directa, para las copias desde /admin. */
+  raw?: Database.Database;
+}
+
+export async function buildApp(config: Config, db: Db, deps: AppDeps = {}): Promise<FastifyInstance> {
+  const store = deps.store ?? (await SettingsStore.open(db));
+  const ai = deps.ai ?? new AiService(db, config, store);
   const app = Fastify({
     logger: {
       level: process.env.LOG_LEVEL ?? 'info',
       // La URL de la partida es una contraseña: no se escribe en los logs.
       serializers: { req: (req) => ({ method: req.method, url: req.url.replace(/\/p\/[^/?]+|\/api\/games\/[^/?]+/g, (m) => m.replace(/[^/]+$/, '…')) }) },
     },
-    trustProxy: true,
+    // Solo se cree X-Forwarded-For si viene de un proxy local (Docker, LAN): desde fuera se podría falsear la IP.
+    trustProxy: ['loopback', 'linklocal', 'uniquelocal'],
     bodyLimit: 8 * 1024 * 1024,
   });
 
@@ -48,9 +61,8 @@ export async function buildApp(config: Config, db: Db, ai = new AiService(db, co
   const STATIC = /^\/(assets|icons)\/|^\/(sw\.js|manifest\.webmanifest|healthz)$/;
   await app.register(rateLimit, { max: 300, timeWindow: '1 minute', allowList: (req) => STATIC.test(req.url.split('?')[0]!) });
 
-  if (config.password) {
-    await registerAuth(app, { password: config.password, secret: config.masterKey ?? 'bitopolis' });
-  }
+  // La contraseña de las partidas se activa o quita en /admin sin reiniciar.
+  await registerAuth(app, store, config.secret);
 
   // Entrar en / crea una URL nueva. La partida no se guarda hasta pulsar Jugar.
   // Desde el icono instalado (PWA) se abre la app y ella vuelve a la última partida del dispositivo.
@@ -58,8 +70,9 @@ export async function buildApp(config: Config, db: Db, ai = new AiService(db, co
     if ((req.query as Record<string, string>).pwa !== undefined && existsSync(config.clientDir)) return reply.type('text/html').sendFile('index.html');
     return reply.redirect(`/p/${newGameToken()}`);
   });
-  await registerGameRoutes(app, db, config, ai);
-  await registerAiRoutes(app, db, config, ai);
+  await registerGameRoutes(app, db, store, ai);
+  await registerAiRoutes(app, db, config, ai, store);
+  await registerAdminRoutes(app, { db, raw: deps.raw, config, store, ai });
 
   app.get('/healthz', async (): Promise<HealthResponse> => {
     await sql`select 1`.execute(db);
@@ -68,6 +81,7 @@ export async function buildApp(config: Config, db: Db, ai = new AiService(db, co
 
   if (existsSync(config.clientDir)) {
     await app.register(fastifyStatic, { root: config.clientDir, wildcard: false, index: false });
+    app.get('/admin', async (_req, reply) => reply.type('text/html').sendFile('admin.html'));
     // SPA: cualquier ruta que no sea de la API devuelve index.html.
     app.setNotFoundHandler((req, reply) => {
       if (req.url.startsWith('/api/')) return reply.code(404).send({ error: 'no encontrado' });

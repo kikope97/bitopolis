@@ -73,6 +73,19 @@ const migrations: Record<string, Migration> = {
       await db.schema.dropTable('ai_config').execute();
     },
   },
+  // v1.2: ajustes del servidor editables desde /admin (sin variables de entorno).
+  '0004_settings': {
+    async up(db: Kysely<unknown>) {
+      await db.schema
+        .createTable('settings')
+        .addColumn('key', 'varchar(64)', (c) => c.primaryKey())
+        .addColumn('value', 'text', (c) => c.notNull())
+        .execute();
+    },
+    async down(db: Kysely<unknown>) {
+      await db.schema.dropTable('settings').execute();
+    },
+  },
 };
 
 class InCodeProvider implements MigrationProvider {

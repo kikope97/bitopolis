@@ -14,8 +14,8 @@ import {
   step,
 } from '@bitopolis/sim';
 import type { AiService } from './ai/service.ts';
-import type { Config } from './config.ts';
 import type { Db } from './db/index.ts';
+import type { SettingsStore } from './settings.ts';
 import { newGameToken, newSeed } from './tokens.ts';
 
 /** Tiempo que una pestaña conserva la partida sin dar señales. */
@@ -69,7 +69,8 @@ export function replayOnto(state: GameState, commands: z.infer<typeof TimedComma
   return state;
 }
 
-export async function registerGameRoutes(app: FastifyInstance, db: Db, config: Config, ai: AiService): Promise<void> {
+export async function registerGameRoutes(app: FastifyInstance, db: Db, store: SettingsStore, ai: AiService): Promise<void> {
+  const closed = 'Este servidor no admite partidas nuevas';
   const load = (token: string) => db.selectFrom('games').selectAll().where('token', '=', token).executeTakeFirst();
   const bad = (reply: FastifyReply, error: string, code = 400) => reply.code(code).send({ error });
   const now = () => Date.now();
@@ -88,11 +89,12 @@ export async function registerGameRoutes(app: FastifyInstance, db: Db, config: C
     const b = CreateBody.safeParse(req.body);
     if (!p.success || !b.success) return bad(reply, 'petición no válida');
     if (await load(p.data.token)) return bad(reply, 'la partida ya existe', 409);
-    // Con key de servidor, todas las partidas son de Modo IA.
-    const mode = config.ai.key ? 'ai' : b.data.mode;
+    if (!store.get().newGames) return bad(reply, closed, 403);
+    // Con IA del servidor, todas las partidas son de Modo IA.
+    const mode = (await ai.settings(null)).locked.includes('provider') ? 'ai' : b.data.mode;
     if (mode === 'ai' && !(await ai.settings(null)).configured) return bad(reply, 'Configura la IA antes de jugar en Modo IA');
     const seed = newSeed();
-    const state = createInitialState({ seed, aiMode: mode === 'ai', namedLimit: config.ai.maxCitizens });
+    const state = createInitialState({ seed, aiMode: mode === 'ai', namedLimit: store.get().ai.maxCitizens });
     const ts = new Date().toISOString();
     await db
       .insertInto('games')
@@ -216,6 +218,7 @@ export async function registerGameRoutes(app: FastifyInstance, db: Db, config: C
   );
 
   app.post('/api/import', async (req, reply) => {
+    if (!store.get().newGames) return bad(reply, closed, 403);
     if (!Buffer.isBuffer(req.body)) return bad(reply, 'archivo no válido');
     let file: ExportFile;
     try {

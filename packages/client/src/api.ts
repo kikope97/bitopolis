@@ -28,7 +28,7 @@ async function call<T>(method: string, url: string, body?: unknown, keepalive = 
   });
   const data = await r.json().catch(() => null);
   if (r.status === 401) {
-    location.href = `/login.html?next=${encodeURIComponent(location.pathname)}`;
+    location.href = `/login.html?caducada=1&next=${encodeURIComponent(location.pathname)}`;
   }
   if (!r.ok) throw new ApiError(r.status, data?.error ?? `Error ${r.status}`, data);
   return data as T;
@@ -70,9 +70,14 @@ export const api = {
 
 export interface AiMeta {
   providers: { id: string; label: string; cheap: string; premium: string; baseUrl: string; needsKey: boolean; models?: string[] }[];
+  /** La IA la pone el servidor (/admin): todas las partidas son de Modo IA. */
   serverKey: boolean;
   maxCitizens: number;
-  canStoreKeys: boolean;
+  /** Sin IA del servidor, ¿puede cada partida poner su propia key? */
+  playerKeys: boolean;
+  newGames: boolean;
+  /** URL pública para los enlaces (vacía: la del navegador). */
+  publicUrl: string;
 }
 
 export interface AiSettings {

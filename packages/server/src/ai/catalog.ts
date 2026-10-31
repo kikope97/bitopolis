@@ -3,7 +3,7 @@
  *
  * Precios ORIENTATIVOS, consultados en octubre de 2026 en agregadores de
  * precios (las fuentes no coinciden entre sí). Revísalos en la página de cada
- * proveedor y sustitúyelos con BITOPOLIS_AI_PRICES_JSON si cambian.
+ * proveedor y sustitúyelos en /admin si cambian.
  */
 export const PROVIDERS = ['anthropic', 'openai', 'gemini', 'deepseek', 'mistral', 'openrouter', 'openai-compatible'] as const;
 export type ProviderId = (typeof PROVIDERS)[number];
@@ -77,7 +77,7 @@ export interface Price {
   out: number;
 }
 
-/** Tabla incluida (≈ USD × 0,92). Editable con BITOPOLIS_AI_PRICES_JSON. */
+/** Tabla incluida (≈ USD × 0,92). Editable en /admin. */
 export const DEFAULT_PRICES: Record<string, Price> = {
   'gpt-5.4-nano': { in: 0.19, cachedIn: 0.02, out: 1.15 },
   'gpt-5.4-mini': { in: 0.7, cachedIn: 0.07, out: 4.2 },
@@ -97,13 +97,8 @@ export const DEFAULT_PRICES: Record<string, Price> = {
 /** Precio de un modelo desconocido: se asume uno caro para no quedarse corto. */
 export const UNKNOWN_PRICE: Price = { in: 3, out: 15 };
 
-export function priceTable(env: string | undefined): Record<string, Price> {
-  if (!env) return DEFAULT_PRICES;
-  try {
-    return { ...DEFAULT_PRICES, ...(JSON.parse(env) as Record<string, Price>) };
-  } catch {
-    return DEFAULT_PRICES;
-  }
+export function priceTable(custom: Record<string, Price> | undefined): Record<string, Price> {
+  return custom ? { ...DEFAULT_PRICES, ...custom } : DEFAULT_PRICES;
 }
 
 export function costEur(prices: Record<string, Price>, model: string, provider: ProviderId, u: { in: number; cachedIn: number; out: number }): number {

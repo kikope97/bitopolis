@@ -5,7 +5,7 @@ export default defineConfig({
     outDir: 'dist',
     target: 'es2022',
     assetsInlineLimit: 0,
-    rollupOptions: { input: { main: 'index.html', login: 'login.html' } },
+    rollupOptions: { input: { main: 'index.html', login: 'login.html', admin: 'admin.html' } },
   },
   worker: { format: 'es' },
   server: {

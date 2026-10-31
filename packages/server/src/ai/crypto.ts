@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 
 /**
- * Cifrado de API keys con AES-256-GCM. La clave sale de BITOPOLIS_MASTER_KEY
+ * Cifrado de API keys con AES-256-GCM. La clave sale de <dataDir>/secret.key
  * (nunca se guarda en la BD). Formato: v1.<iv>.<tag>.<datos> en base64url.
  */
 function keyFrom(master: string): Buffer {

@@ -477,3 +477,38 @@ html[data-font='pixel'] .sheet-head h2, html[data-font='pixel'] .sheet h3, html[
 #toasts { left: max(8px, env(safe-area-inset-left)); right: calc(64px + max(8px, env(safe-area-inset-right))); }
 .sheet-head, .sheet-body { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
 .start { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+
+/* ---------- panel /admin (v1.2) ---------- */
+.admin {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+.admin-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-bottom: 12px; }
+.admin-head .logo.small-logo { font-size: 1.75rem; margin: 0; text-shadow: 2px 2px 0 #b13e53; text-align: left; }
+.admin-head #logout { margin-left: auto; }
+.admin-card { background: var(--panel); border: 2px solid var(--line); padding: 12px 16px; margin: 0 0 16px; }
+.admin-card h2 { margin: 0 0 8px; font-size: 1.15rem; color: var(--accent); font-family: ui-monospace, 'Cascadia Mono', Menlo, monospace; }
+.admin-card h3 { margin: 12px 0 0; font-size: 1rem; }
+.admin-card .stats-card { margin: 0; }
+.admin-card textarea { width: 100%; min-height: 120px; padding: 8px; background: var(--bg); color: var(--text); border: 2px solid var(--line); }
+.admin-card .field input { background: var(--bg); }
+.admin-card .server-ai { padding: 8px; border-left: 4px solid var(--blue); background: var(--panel-2); margin: 0 0 8px; }
+.admin-card .advanced { margin: 8px 0; }
+.admin-card .advanced summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+.admin-login { max-width: 420px; margin: 24px auto 0; }
+.admin-login h2 { margin: 0; color: var(--accent); }
+.row.wrap { flex-wrap: wrap; }
+.row.wrap > .field { min-width: 140px; }
+.row.between { justify-content: space-between; align-items: center; }
+.admin-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.admin-list li { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; border-top: 1px solid var(--line); }
+.admin-list li.row { flex-direction: row; }
+.notice.closed { padding: 12px; border: 2px dashed var(--accent); text-align: center; }
+/* En el panel, los avisos abajo a la derecha: no tapan el formulario. */
+.admin-page #toasts { left: auto; right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); width: min(360px, calc(100vw - 32px)); }
+.admin-list a { display: inline-flex; align-items: center; min-height: 44px; }
+.admin-card h2:focus { outline: none; }
+.admin-card h2:focus-visible { outline: 3px solid var(--accent); }
+.invite { padding: 8px 12px; border-left: 4px solid var(--good); background: var(--panel-2); margin: 0 0 12px; }
+.invite p { margin: 4px 0; }
