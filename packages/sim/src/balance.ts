@@ -32,6 +32,9 @@ export const BUILD: Record<BuildKind, BuildSpec> = {
   sports: { materials: 5_500, workers: 5, days: 4, unlockPop: 35 },
   // v1.8: la cárcel (los vecinos no la quieren cerca).
   jail: { materials: 9_000, workers: 6, days: 5, unlockPop: 60 },
+  // 2.1: emergencias.
+  firestation: { materials: 4_500, workers: 4, days: 3, unlockPop: 20 },
+  civilprotection: { materials: 2_500, workers: 3, days: 2, unlockPop: 30 },
 };
 
 /** Obras que crecen solas sobre zonas (las paga un inversor de fuera). */
@@ -64,6 +67,8 @@ export const JOBS: Record<BuildingKind, number> = {
   library: 2,
   sports: 2,
   jail: 1, // ronda 14: con 4 empleos costaba ~4.100 €/mes sin beneficio medible
+  firestation: 3,
+  civilprotection: 1,
   house: 0,
   res: 0,
   shop: 3,
@@ -88,6 +93,8 @@ export const MAINTENANCE: Record<BuildingKind, number> = {
   library: 300,
   sports: 350,
   jail: 500,
+  firestation: 350,
+  civilprotection: 120,
   house: 20,
   res: 0,
   shop: 0,
@@ -107,6 +114,9 @@ export const SERVICE: Partial<Record<BuildingKind, { radius: number; happiness: 
   chapel: { radius: 8, happiness: 3 },
   library: { radius: 8, happiness: 3 },
   sports: { radius: 8, happiness: 4 },
+  // 2.1: los bomberos y la protección civil dan tranquilidad (poca) en su radio.
+  firestation: { radius: 9, happiness: 2 },
+  civilprotection: { radius: 10, happiness: 1 },
 };
 
 /** v1.7: efectos propios de los lugares de vida social. */
@@ -566,4 +576,74 @@ export const DIRECTOR = {
   helpAmount: 120,
   /** Vecinos a los que llega un rumor. */
   rumorReach: 6,
+} as const;
+
+/**
+ * 2.1 (hoja de ruta, petición del creador): incendios y bomberos. Cada día,
+ * cada edificio puede entrar en riesgo (más las fábricas, con calor y con las
+ * estufas del invierno); al día siguiente el riesgo puede acabar en fuego. Con
+ * un parque de bomberos en su radio se apaga en pocas horas; sin él, el
+ * edificio queda destrozado (se repara, nunca se pierde). Ver fire.ts.
+ */
+export const FIRE = {
+  /** Población mínima para que haya incendios. */
+  minPop: 20,
+  /** Probabilidad diaria de que un edificio entre en riesgo. */
+  riskBase: 0.0003,
+  /** Multiplicadores: fábricas, ola de calor y estufas en invierno (viviendas, bar y tiendas). */
+  factory: 4,
+  heat: 2.5,
+  stoves: 2,
+  /** Horas de aviso antes de que el riesgo pueda acabar en fuego (Modo normal) y probabilidad de que prenda. */
+  riskHours: 24,
+  ignite: 0.5,
+  /** Con director (Modo IA), días que dura un riesgo esperando a que el director lo elija. */
+  riskDaysAi: 42,
+  /** Horas que arde: con bomberos en su radio, y sin ellos. */
+  coveredHours: [2, 4],
+  uncoveredHours: [8, 14],
+  /** Probabilidad por hora de saltar a cada edificio vecino (también en diagonal). */
+  spreadCovered: 0.003,
+  spreadUncovered: 0.008,
+  /** Como mucho, edificios ardiendo a la vez. */
+  maxBurning: 5,
+  /** Reparación tras el fuego: fracción de los materiales (mínimo) y días de obra. */
+  repair: 0.35,
+  repairMin: 800,
+  repairDays: 3,
+  /** El nivel 2 (cisterna) llega a las colinas; el 3 ayuda en las riadas (reparaciones a la mitad en su radio). */
+  hillLevel: 2,
+  floodLevel: 3,
+  floodRepairCut: 0.5,
+  /** Felicidad: casa destrozada por el fuego; y horas que ahorra cada vecino que ayuda a apagarlo. */
+  burntHomeMood: 10,
+  helpHours: 1,
+  /** Lo que da (como mucho) un vecino a quien se ha quedado sin casa por el fuego. */
+  helpAmount: 100,
+} as const;
+
+/** 2.1: protección civil (caseta de voluntarios) y diques. */
+export const CIVIL = {
+  /** En el radio de una caseta, la probabilidad de riada baja un 60 % y el quitanieves cuesta la mitad. */
+  floodCut: 0.6,
+  snowCut: 0.5,
+  /** Dique en una casilla de la orilla: lo que cuesta y a cuántas casillas protege (también en diagonal). */
+  dikeCost: 900,
+  dikeReach: 1,
+  /** Voluntarios por caseta (parados que se apuntan), felicidad que les da y probabilidad mensual (Modo normal). */
+  volunteersPer: 6,
+  volunteerMood: 3,
+  volunteerChance: 0.25,
+} as const;
+
+/** 2.1: la ambulancia (nivel 2 del centro de salud) llega a las urgencias de los mayores. */
+export const AMBULANCE = {
+  /** Nivel del centro de salud que la tiene y alcance (× su radio). */
+  level: 2,
+  reach: 1.5,
+  /** Probabilidad de llegar a tiempo (con nieve, × snow). */
+  save: 0.6,
+  snow: 0.5,
+  /** Mayores en el menú del director para un susto que acaba bien. */
+  scareAge: 75,
 } as const;

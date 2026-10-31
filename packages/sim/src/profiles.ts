@@ -113,7 +113,7 @@ function planner(name: string, o: PlannerOpts): Profile {
       if (built.some((b) => !b.hasPower) && !enough('power') && !state.projects.some((p) => buildingKindOf(state, p.buildingId) === 'power')) {
         if (tryBuild('power')) return out;
       }
-      // v1.8: repara lo que rompieron los disturbios si la caja lo permite.
+      // v1.8: repara lo que rompieron los disturbios (2.1: o el fuego) si la caja lo permite.
       const broken = state.buildings.find((b) => b.damaged && b.damaged.repairUntil < 0);
       if (broken && state.treasury > broken.damaged!.cost + o.reserve) {
         out.push({ type: 'RepairBuilding', buildingId: broken.id });
@@ -186,7 +186,8 @@ export const PROFILES: Record<string, Profile> = {
     tax: 'medium',
     reserve: 0,
     activity: 1,
-    services: ['park', 'school', 'clinic', 'police'],
+    // 2.1: el constructor también pone bomberos.
+    services: ['park', 'school', 'clinic', 'police', 'firestation'],
     municipalHousing: true,
   }),
 };

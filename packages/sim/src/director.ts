@@ -14,6 +14,7 @@ import { ASSOCIATIONS, CRIME, DIRECTOR } from './balance.ts';
 
 const CRIME_HOT_DAYS = CRIME.hotDays;
 import { homeRobbery, robbery, stationsFor } from './crime.ts';
+import { burnable, fireCovered, ignite, placeName, scare, scareCandidates } from './fire.ts';
 import type { Brewing } from './director-core.ts';
 import { canFound, freeShopLot } from './economy.ts';
 import { hash32 } from './hash.ts';
@@ -25,7 +26,7 @@ import { addHook, addMemory, relation, setRelation } from './social.ts';
 import { type Citizen, type GameState, pushEvent } from './state.ts';
 import { setDirectorImpl, type TurnLog } from './turns.ts';
 
-export const DIRECTOR_KINDS = ['robo_tienda', 'robo_casa', 'asociacion', 'manifestacion', 'pelea', 'reconciliacion', 'gratitud', 'rumor', 'oposicion', 'local', 'encuentro', 'ayuda'] as const;
+export const DIRECTOR_KINDS = ['robo_tienda', 'robo_casa', 'asociacion', 'manifestacion', 'pelea', 'reconciliacion', 'gratitud', 'rumor', 'oposicion', 'local', 'encuentro', 'ayuda', 'incendio', 'susto'] as const;
 export type DirectorKind = (typeof DIRECTOR_KINDS)[number];
 
 export interface DirectorCandidate {
@@ -88,6 +89,29 @@ export function directorMenu(state: GameState): DirectorCandidate[] {
         const who = state.citizens.filter((c) => c.homeId === b.id).sort((x, y) => y.money - x.money)[0]!;
         return { id: `robo_casa:${b.id}`, kind: 'robo_casa', bad: true, text: `Entran a robar en casa de ${who.name}`, why: `delincuencia ${Math.round(crimeAt(state, b.x, b.y))} en su calle` };
       }),
+  );
+
+  // 2.1: incendios (solo en edificios en riesgo, que ya se avisó en el registro) y sustos que acaban bien.
+  add(
+    state.buildings
+      .filter((b) => b.risk && burnable(b) && !b.fire && !b.damaged)
+      .sort((a, b) => a.risk!.since - b.risk!.since || a.id - b.id)
+      .map((b) => ({
+        id: `incendio:${b.id}`,
+        kind: 'incendio',
+        bad: true,
+        text: `Se declara un incendio en ${placeName(b)}`,
+        why: `riesgo de incendio por ${b.risk!.why}${fireCovered(state, b) ? ' (los bomberos llegan)' : ' y sin bomberos cerca'}`,
+      })),
+  );
+  add(
+    scareCandidates(state).map((c) => ({
+      id: `susto:${c.id}`,
+      kind: 'susto',
+      bad: false,
+      text: `${c.name} se pone mal y la ambulancia llega a tiempo`,
+      why: `tiene ${c.age} años y vive cerca del centro de salud con ambulancia`,
+    })),
   );
 
   // Asociaciones y manifestaciones.
@@ -275,6 +299,8 @@ function brewingText(c: DirectorCandidate): string {
       return `${c.text.replace('da', 'prepara')} (${c.why})`;
     case 'rumor':
       return 'Se oyen comentarios en el bar sobre el ayuntamiento';
+    case 'incendio':
+      return `Huele a humo: ${c.why}`;
     default:
       return c.text;
   }
@@ -381,6 +407,16 @@ function perform(state: GameState, c: DirectorCandidate): { id: number; text: st
       }
       pushEvent(state, 'politics', `«${p.party.name}» da un mitin entre ${FACTION_TEXT[f].toLowerCase()}: ${fans.length ? `acuden ${fans.length} vecinos conocidos` : 'va poca gente'}`);
       return { id: fans[0]?.id ?? 0, text: c.text };
+    }
+    case 'incendio': {
+      const b = state.buildings.find((x) => x.id === Number(arg));
+      if (!b || !ignite(state, b)) return null;
+      return { id: state.citizens.find((x) => x.homeId === b.id || x.jobId === b.id)?.id ?? 0, text: c.text };
+    }
+    case 'susto': {
+      const x = byId(state, Number(arg));
+      if (!x || !scare(state, x)) return null;
+      return { id: x.id, text: c.text };
     }
     case 'local': {
       const [a, b] = pair();

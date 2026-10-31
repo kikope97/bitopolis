@@ -5,7 +5,7 @@ export const TaxLevel = z.enum(['low', 'medium', 'high']);
 export type TaxLevel = z.infer<typeof TaxLevel>;
 
 /** Lo que el alcalde puede construir directamente. */
-export const BuildKind = z.enum(['road', 'water', 'power', 'park', 'school', 'clinic', 'police', 'house', 'plaza', 'market', 'bar', 'chapel', 'cemetery', 'library', 'sports', 'jail']);
+export const BuildKind = z.enum(['road', 'water', 'power', 'park', 'school', 'clinic', 'police', 'house', 'plaza', 'market', 'bar', 'chapel', 'cemetery', 'library', 'sports', 'jail', 'firestation', 'civilprotection']);
 export type BuildKind = z.infer<typeof BuildKind>;
 
 export const ZoneKind = z.enum(['none', 'R', 'C', 'I']);
@@ -31,6 +31,8 @@ export const Command = z.discriminatedUnion('type', [
   z.object({ type: z.literal('ConvenePleno') }),
   z.object({ type: z.literal('MeetAssociation'), associationId: z.number().int() }),
   z.object({ type: z.literal('RepairBuilding'), buildingId: z.number().int() }),
+  /** 2.1: dique en una casilla de la orilla del río (anula la riada ahí). */
+  z.object({ type: z.literal('BuildDike'), x: Coord, y: Coord }),
   z.object({ type: z.literal('UpgradeTownhall') }),
   z.object({ type: z.literal('UpgradeBuilding'), buildingId: z.number().int() }),
   // v1.9: economía de cada vecino.

@@ -14,7 +14,7 @@ import type { Departed } from './family.ts';
 import type { Justice } from './crime.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
-export const FORMAT_VERSION = 13;
+export const FORMAT_VERSION = 14;
 
 export const MAP_W = 48;
 export const MAP_H = 48;
@@ -44,6 +44,9 @@ export type BuildingKind =
   | 'library'
   | 'sports'
   | 'jail'
+  /** 2.1: emergencias. */
+  | 'firestation'
+  | 'civilprotection'
   | 'house'
   /** Crecen solos sobre zonas. */
   | 'res'
@@ -72,8 +75,11 @@ export interface Building {
   /** v1.8: días seguidos sin agua / sin luz (para el icono de problema duradero). */
   dryDays?: number;
   darkDays?: number;
-  /** v1.8: dañado en unos disturbios: no funciona hasta que se repara. */
-  damaged?: { cost: number; repairUntil: number };
+  /** v1.8: dañado en unos disturbios (o, en la 2.1, por el fuego): no funciona hasta que se repara. */
+  damaged?: { cost: number; repairUntil: number; cause?: 'fuego' };
+  /** 2.1: en riesgo de incendio (desde cuándo y por qué) y ardiendo (hasta cuándo; con bomberos en su radio o no). */
+  risk?: { since: number; why: string };
+  fire?: { since: number; until: number; covered: boolean };
   /** v1.8: nivel del servicio (1–3; sin definir = 1) y fin de la obra de mejora. */
   level?: number;
   upgradeUntil?: number;
@@ -183,6 +189,8 @@ export interface Citizen {
   thought?: string;
   /** 2.0: lo que el propio vecino (la IA) apunta de cada semana; lo lee la semana siguiente. */
   notes?: { tick: number; text: string }[];
+  /** 2.1: voluntario de protección civil. */
+  volunteer?: boolean;
 }
 
 export interface CitizenDebt {
@@ -253,6 +261,8 @@ export type EventKind =
   | 'protest'
   /** v1.8: robos, detenciones y disturbios. */
   | 'crime'
+  /** 2.1: riesgos, incendios y urgencias (ref = edificio, o vecino en las urgencias). */
+  | 'fire'
   | 'info';
 
 export interface GameEvent {
@@ -374,6 +384,20 @@ export interface GameState {
   justice: Justice;
   /** Última despedida (como mucho una por semana). */
   lastDeathTick?: number;
+  /** 2.1: diques (índices de casilla) y contadores de emergencias. */
+  dikes: number[];
+  emergencies: Emergencies;
+}
+
+export interface Emergencies {
+  /** Incendios, los que apagaron los bomberos a tiempo y urgencias que salvó la ambulancia. */
+  fires: number;
+  putOut: number;
+  saved: number;
+  /** Riadas que no llegaron a pasar por la protección civil o un dique. */
+  floodsAvoided: number;
+  /** Último susto del director por vecino (para no repetirlo). */
+  scares?: Record<number, number>;
 }
 
 export type BudgetPlan = 'austero' | 'equilibrado' | 'inversor';
@@ -474,6 +498,8 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiSh
       : {}),
     minWage: 'none',
     debtLedger: { created: 0, repaid: 0, written: 0, forgiven: 0 },
+    dikes: [],
+    emergencies: { fires: 0, putOut: 0, saved: 0, floodsAvoided: 0 },
   };
   // Árboles dispersos (se talan gratis al construir encima).
   for (let i = 0; i < tiles.length; i++) {
