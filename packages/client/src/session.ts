@@ -1,4 +1,8 @@
-/** Identificador de esta pestaña (para saber quién tiene la partida abierta). */
+/**
+ * Identificador de este dispositivo (para saber quién tiene la partida abierta).
+ * v1.6: en localStorage; antes era de la pestaña y, al cerrar y volver a abrir
+ * el enlace en el mismo móvil, salía «Partida abierta en otro dispositivo».
+ */
 const ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
 export function randomBase62(n: number): string {
@@ -15,10 +19,10 @@ export function randomBase62(n: number): string {
 
 export function sessionId(): string {
   try {
-    let id = sessionStorage.getItem('bitopolis.session');
+    let id = localStorage.getItem('bitopolis.device');
     if (!id) {
       id = randomBase62(24);
-      sessionStorage.setItem('bitopolis.session', id);
+      localStorage.setItem('bitopolis.device', id);
     }
     return id;
   } catch {

@@ -18,8 +18,11 @@ test('v0.4: ficha y hablar, pleno con promesa, consejero, diario y objetivos', a
   await page.goto(`/p/${token}`);
   await page.getByRole('button', { name: 'Continuar' }).click();
   await skipTutorial(page);
-  await expect(page.locator('#objectives')).toContainText('Objetivos');
+  // v1.6: los objetivos están en el panel «Pueblo» (ya no flotan sobre el mapa).
+  await page.locator('#menu').click();
+  await expect(page.locator('.sheet')).toContainText('Objetivos');
   await shot('1-objetivos');
+  await page.locator('.sheet-close').click();
 
   // Vecinos → ficha → hablar.
   await page.locator('#menu').click();

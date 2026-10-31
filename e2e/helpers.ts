@@ -31,7 +31,7 @@ export async function drag(page: Page, a: [number, number], b: [number, number])
 
 /** Velocidad con el dock de la v1.4: ⏯ (#play) y el botón x1 → x3 → x10 (#speed). */
 export async function setSpeed(page: Page, n: 0 | 1 | 3 | 10) {
-  const paused = async () => (await page.locator('#play-pause').getAttribute('aria-pressed')) === 'true';
+  const paused = async () => (await page.locator('#play-pause').getAttribute('data-paused')) === 'true';
   if (n === 0) {
     if (!(await paused())) await page.locator('#play-pause').click();
     return;
@@ -46,7 +46,17 @@ export async function skipTutorial(page: Page) {
   try {
     await b.waitFor({ state: 'visible', timeout: 1500 });
     await b.click();
+    // v1.6: «Saltar» pide confirmación (un toque al mapa no lo salta sin querer).
+    const yes = page.getByRole('alertdialog').getByRole('button', { name: 'Saltar' });
+    if (await yes.waitFor({ state: 'visible', timeout: 1000 }).then(() => true, () => false)) await yes.click();
   } catch {
     /* sin tutorial */
   }
+}
+
+/** v1.6: Mirar, Carretera y Derribar son pestañas; el resto, en la bandeja «Construir». */
+export async function pickTool(page: Page, id: string) {
+  if (['inspect', 'road', 'demolish'].includes(id)) return page.locator(`#tab-${id}`).click();
+  if (await page.locator('#tray').isHidden()) await page.locator('#tab-build').click();
+  await page.locator(`#tray [data-tool="${id}"]`).click();
 }

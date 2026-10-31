@@ -22,8 +22,55 @@ export function h<K extends keyof HTMLElementTagNameMap>(
   return el;
 }
 
-export function toast(text: string, opts: { sticky?: boolean; kind?: 'info' | 'warn' | 'good'; onClick?: () => void } = {}) {
+export type ToastKind = 'info' | 'warn' | 'good';
+export interface LogEntry {
+  text: string;
+  kind: ToastKind;
+  at: number;
+  /** Fecha del juego cuando llegó. */
+  when: string;
+  onClick?: () => void;
+  /** Importante (fijo o con algo que hacer): cuenta en la campana hasta que se mira. */
+  important: boolean;
+}
+/** v1.6: todos los avisos quedan en la campana (los 40 últimos). */
+const log: LogEntry[] = [];
+let unread = 0;
+let logListener: ((unread: number) => void) | null = null;
+let fallback: (() => void) | null = null;
+let stamp: () => string = () => '';
+export function toastLog(): readonly LogEntry[] {
+  return log;
+}
+export function onToastLog(fn: (unread: number) => void, open: () => void, when: () => string): void {
+  logListener = fn;
+  fallback = open;
+  stamp = when;
+}
+export function markLogRead(): void {
+  unread = 0;
+  logListener?.(0);
+}
+export function clearToastLog(): void {
+  log.length = 0;
+  unread = 0;
+  logListener = null;
+  fallback = null;
+}
+
+export function toast(text: string, opts: { sticky?: boolean; kind?: ToastKind; onClick?: () => void } = {}) {
   const box = $('#toasts');
+  const important = !!opts.sticky || !!opts.onClick;
+  const prev = log[0];
+  if (prev && prev.text === text) prev.at = Date.now();
+  else {
+    log.unshift({ text, kind: opts.kind ?? 'info', at: Date.now(), when: stamp(), onClick: opts.onClick, important });
+    if (log.length > 40) log.pop();
+    if (important) {
+      unread++;
+      logListener?.(unread);
+    }
+  }
   // Compactos (v1.3): el mismo aviso otra vez no se apila; sube su contador «×2».
   const same = [...box.querySelectorAll<HTMLElement>('.toast')].find((t) => t.dataset.text === text && !t.classList.contains('clickable'));
   if (same) {
@@ -44,44 +91,53 @@ export function toast(text: string, opts: { sticky?: boolean; kind?: 'info' | 'w
   }
   const icon = { info: 'ℹ', warn: '⚠', good: '✔' }[opts.kind ?? 'info'];
   // Sin role propio: el contenedor #toasts ya es aria-live (evita anuncios dobles).
-  const body = opts.onClick ? h('button', { class: 'toast-text toast-action' }, text) : h('span', { class: 'toast-text' }, text);
+  // En la partida, tocar un aviso sin acción abre la campana para leerlo entero (v1.6).
+  const action = opts.onClick ?? fallback ?? undefined;
+  const body = action ? h('button', { class: 'toast-text toast-action' }, text) : h('span', { class: 'toast-text' }, text);
   const el = h('div', { class: `toast ${opts.kind ?? 'info'}` }, h('span', { class: 'toast-icon', 'aria-hidden': 'true' }, icon), body);
   el.dataset.text = text;
-  if (opts.onClick) {
+  if (action) {
     el.classList.add('clickable');
     // Un botón de verdad: funciona con teclado (Enter/Espacio) y con lector de pantalla.
     body.addEventListener('click', () => {
-      opts.onClick!();
+      action();
       el.remove();
     });
   }
-  if (opts.sticky) {
-    el.classList.add('sticky');
-    // v1.4: fuera del modo tranquilo, también los fijos se van solos (se acumulaban y tapaban el mapa).
-    if (!prefs().calm) el.dataset.timer = String(setTimeout(() => el.remove(), 15000));
+  const closeBtn = () => {
     const x = h('button', { class: 'toast-close', 'aria-label': 'Cerrar aviso' }, '✕');
     x.addEventListener('click', (e) => {
       e.stopPropagation();
       el.remove();
     });
     el.append(x);
+  };
+  if (opts.sticky) {
+    el.classList.add('sticky');
+    // v1.4: fuera del modo tranquilo, también los fijos se van solos (siguen en la campana).
+    if (!prefs().calm) el.dataset.timer = String(setTimeout(() => el.remove(), 15000));
+    closeBtn();
   } else if (prefs().calm) {
     // Modo tranquilo: los avisos no caducan; se cierran a mano.
     el.classList.add('sticky');
-    const x = h('button', { class: 'toast-close', 'aria-label': 'Cerrar aviso' }, '✕');
-    x.addEventListener('click', (e) => {
-      e.stopPropagation();
-      el.remove();
-    });
-    el.append(x);
+    closeBtn();
   } else {
     el.dataset.timer = String(setTimeout(() => el.remove(), 6000));
   }
   box.append(el);
-  // Como mucho 2 avisos a la vista; los fijos (con ✕) se conservan antes.
-  while (box.children.length > 2) {
-    const victim = [...box.children].find((c) => !c.classList.contains('sticky')) ?? box.firstElementChild;
-    victim?.remove();
+  // v1.6: en la partida, un solo aviso a la vista (el más nuevo); fuera, como mucho 2.
+  const max = document.body.classList.contains('in-game') ? 1 : 2;
+  while (box.children.length > max) box.firstElementChild?.remove();
+}
+
+/** Lo que hará la próxima hoja con su botón «‹» (volver al panel del que se abrió). */
+let pendingBack: { label: string; fn: () => void } | null = null;
+export function withBack(label: string, back: () => void, open: () => void): void {
+  pendingBack = { label, fn: back };
+  try {
+    open();
+  } finally {
+    pendingBack = null;
   }
 }
 
@@ -110,6 +166,8 @@ export function closeSheet(fromBack = false) {
   document.body.classList.remove('election-night');
   openSheetEl.remove();
   openSheetEl = null;
+  document.body.classList.remove('sheet-open');
+  sheetWatch?.(null);
   // Si lo que tenía el foco ya no existe (p. ej. el aviso que abrió la hoja), al mapa.
   (lastFocus?.isConnected ? lastFocus : document.querySelector<HTMLElement>('#map'))?.focus();
 }
@@ -148,15 +206,22 @@ export function sheet(title: string | Node, ...content: (Node | string)[]): HTML
   if (!history.state?.sheet) history.pushState({ ...(history.state ?? {}), sheet: true }, '');
   const close = h('button', { class: 'sheet-close', 'aria-label': 'Cerrar' }, '✕');
   close.addEventListener('click', () => closeSheet());
+  let back: HTMLElement | null = null;
+  if (pendingBack) {
+    const go = pendingBack.fn;
+    back = h('button', { class: 'sheet-back', 'aria-label': `Volver a ${pendingBack.label}` }, '‹');
+    back.addEventListener('click', go);
+  }
   const el = h(
     'section',
-    { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'sheet-title' },
-    h('header', { class: 'sheet-head' }, h('h2', { id: 'sheet-title' }, title), close),
+    { class: 'sheet', role: 'dialog', 'aria-modal': String(!sidePanel()), 'aria-labelledby': 'sheet-title' },
+    h('header', { class: 'sheet-head' }, back, h('h2', { id: 'sheet-title' }, title), close),
     h('div', { class: 'sheet-body' }, ...content),
   );
   // Trampa de foco: con el teclado, Tab no sale de la hoja hasta cerrarla (Esc o ✕).
   el.addEventListener('keydown', (e) => {
-    if (e.key !== 'Tab') return;
+    // Como panel lateral (tableta, horizontal) no es modal: Tab puede salir al mapa (ronda 12).
+    if (e.key !== 'Tab' || sidePanel()) return;
     const items = [...el.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])')].filter((x) => !x.hasAttribute('disabled') && x.tabIndex >= 0 && x.offsetParent !== null);
     if (!items.length) return;
     const first = items[0]!;
@@ -170,9 +235,22 @@ export function sheet(title: string | Node, ...content: (Node | string)[]): HTML
     }
   });
   document.body.append(el);
+  document.body.classList.add('sheet-open');
   openSheetEl = el;
+  sheetWatch?.(titleText);
   close.focus();
   return el;
+}
+
+/** En tableta y en horizontal la hoja es un panel al lado del mapa (ver style.css). */
+function sidePanel(): boolean {
+  return matchMedia('(min-width: 720px) and (min-height: 540px), (orientation: landscape) and (max-height: 500px)').matches;
+}
+
+let sheetWatch: ((title: string | null) => void) | null = null;
+/** Avisa al abrir o cerrar hojas (para marcar la pestaña «Pueblo»). */
+export function onSheetChange(fn: ((title: string | null) => void) | null): void {
+  sheetWatch = fn;
 }
 
 export function isSheetOpen() {

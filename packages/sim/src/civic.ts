@@ -160,7 +160,7 @@ function offerGrant(state: GameState): void {
     minId: 0,
   });
   const until = tickToDate(state.tick + GRANT_OFFER_DAYS * TICKS_PER_DAY);
-  pushEvent(state, 'info', `La Diputación ofrece pagar el ${Math.round(share * 100)} % de ${GRANT_NAME[kind]}. Responde antes del ${until.day}/${until.month} (☰ › Ayuntamiento)`);
+  pushEvent(state, 'info', `La Diputación ofrece pagar el ${Math.round(share * 100)} % de ${GRANT_NAME[kind]}. Responde antes del ${until.day}/${until.month} (Pueblo › Ayuntamiento)`);
 }
 
 export const GRANT_NAME: Partial<Record<BuildingKind, string>> = { school: 'un colegio', clinic: 'un centro de salud', police: 'una comisaría', park: 'un parque' };
@@ -207,7 +207,7 @@ export function civicDay(state: GameState): void {
     b.status = 'open';
     b.votesFor = 0;
     b.votesAgainst = 0;
-    pushEvent(state, 'politics', `Toca presentar el presupuesto del año ${d.year} antes de febrero (☰ › Ayuntamiento). Si no, se prorroga el ${b.plan}`);
+    pushEvent(state, 'politics', `Toca presentar el presupuesto del año ${d.year} antes de febrero (Pueblo › Ayuntamiento). Si no, se prorroga el ${b.plan}`);
   }
   if (b.status === 'open' && d.month > 1) {
     b.status = 'prorrogado';
@@ -220,7 +220,7 @@ export function civicDay(state: GameState): void {
       state.festival.name = PATRONS[hash32(state.seed, 7) % PATRONS.length]!;
       if (social) pushEvent(state, 'info', `${social.name.split(' ')[0]} propone llamarlas «Fiestas de ${state.festival.name}»`, { ref: social.id });
     }
-    pushEvent(state, 'info', `Se acercan las fiestas de ${state.festival.name}: puedes organizarlas en julio o agosto (☰ › Fiestas)`);
+    pushEvent(state, 'info', `Se acercan las fiestas de ${state.festival.name}: puedes organizarlas en julio o agosto (Pueblo › Ayuntamiento)`);
   }
   // Septiembre sin fiestas: las montan los vecinos (pequeñas y gratis).
   if (d.month === FESTIVAL_MONTH + 1 && d.day === 1 && state.festival.year !== d.year && state.citizens.length >= 5) {

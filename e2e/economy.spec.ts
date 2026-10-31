@@ -39,13 +39,17 @@ test('v0.3: tributos separados, capas, venta de vivienda, parte y vecinos', asyn
   await page.locator('.sheet-close').click();
 
   // Capas de datos con leyenda.
+  // v1.6: el chip abre una lista y se elige la capa por su nombre.
   for (const label of ['Felicidad', 'Valor del suelo', 'Cobertura', 'Contaminación']) {
     await page.locator('#layers').click();
+    await page.getByRole('radio', { name: label }).click();
     await expect(page.locator('#legend')).toContainText(label);
+    await expect(page.locator('#layers')).toContainText(label);
     if (label === 'Valor del suelo') await shot('3-capa-suelo');
     if (label === 'Felicidad') await shot('3-capa-felicidad');
   }
   await page.locator('#layers').click();
+  await page.getByRole('radio', { name: 'Sin capa' }).click();
   await expect(page.locator('#legend')).toBeHidden();
 
   // Casa municipal: poner a la venta.
@@ -53,7 +57,7 @@ test('v0.3: tributos separados, capas, venta de vivienda, parte y vecinos', asyn
   const house = st.buildings.find((b: { kind: string; built: boolean }) => b.kind === 'house' && b.built);
   const p = await page.evaluate(([x, y]) => (window as any).__bitopolis.tileCenter(x, y), [house.x, house.y]);
   await page.mouse.click(p.x, p.y);
-  await expect(page.locator('.sheet')).toContainText('Valor de mercado');
+  await expect(page.locator('.sheet')).toContainText('€/vivienda');
   await page.getByRole('button', { name: 'Poner a la venta' }).click();
   await expect(page.getByRole('button', { name: 'Pasar a alquiler' })).toBeVisible();
   await shot('4-venta');

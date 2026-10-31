@@ -869,7 +869,7 @@ export const OBJECTIVES: ObjectiveDef[] = [
   { id: 'diez', text: 'Llega a 10 vecinos', reward: 1_000, done: (s) => s.citizens.length >= 10 },
   { id: 'zonas', text: 'Crea zonas R, C e I', reward: 1_000, done: (s) => [1, 2, 3].every((z) => s.map.zones.includes(z)) },
   { id: 'parque', text: 'Construye un parque', reward: 800, done: (s) => has(s, 'park') },
-  { id: 'pleno', text: 'Celebra un pleno (menú ☰ › Pleno municipal)', reward: 500, done: (s) => s.lastPlenoTick >= 0 },
+  { id: 'pleno', text: 'Celebra un pleno (Pueblo › Pleno municipal)', reward: 500, done: (s) => s.lastPlenoTick >= 0 },
   { id: 'empresa', text: 'Que un vecino abra su negocio', reward: 1_000, done: (s) => s.buildings.some((b) => b.owner > 0) },
   { id: 'propietarios', text: 'Ten 5 vecinos propietarios', reward: 1_500, done: (s) => s.citizens.filter((c) => c.owns).length >= 5 },
   { id: 'cincuenta', text: 'Llega a 50 vecinos', reward: 5_000, unlock: 'plaza', done: (s) => s.citizens.length >= 50 },

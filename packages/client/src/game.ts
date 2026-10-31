@@ -18,7 +18,7 @@ import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
 import { openNeighbours, openReport, openTaxes as openTaxesSheet } from './economy-ui.ts';
 import { LAYERS, type LayerId } from './layers.ts';
 import { openTownHall } from './civic-ui.ts';
-import { openAdvisor, openCitizen, openDiary, openPleno, rememberSeen, renderObjectives, resumeSummary, type SocialCtx } from './social-ui.ts';
+import { objectivesNode, openAdvisor, openCitizen, openDiary, openPleno, portraitCanvas, rememberSeen, renderObjectives, resumeSummary, type SocialCtx } from './social-ui.ts';
 import { api, ApiError } from './api.ts';
 import { nextHint } from './hints.ts';
 import { formatDate, money, plural, shortDate, t } from './i18n.ts';
@@ -26,9 +26,10 @@ import { type Camera, type Preview, render } from './render.ts';
 import type { FromWorker, SaveBatch, ToWorker } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
 import { buildingSprite, letterSprite, T } from './sprites.ts';
-import { commandFor, costText, isLocked, shortCost, type Tool, type ToolId, TOOLS, tilesOf, unlockPop } from './tools.ts';
+import { commandFor, costText, isLocked, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayCost, unlockPop } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
-import { $, closeSheet, confirmDialog, currentSheet, h, isSheetOpen, reducedMotion, sheet, toast, vibrate } from './ui.ts';
+import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, h, isSheetOpen, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack } from './ui.ts';
+import { pixelIcon } from './icons.ts';
 import { duck, sfx, startAmbience, startMusic, stopMusic, unlockAudio } from './audio.ts';
 import { coins, dust, pop, shake, shakeOffset } from './fx.ts';
 import { onPrefs, prefs } from './prefs.ts';
@@ -47,7 +48,6 @@ const DESIRE_TEXT: Record<string, string> = {
   tranquilidad: 'tranquilidad',
   prosperar: 'prosperar',
 };
-const FEAR_TEXT: Record<string, string> = { paro: 'el paro', impuestos: 'los impuestos', soledad: 'la soledad', ruido: 'el ruido', deudas: 'las deudas' };
 
 export interface GameOptions {
   token: string;
@@ -60,6 +60,7 @@ export function startGame(opts: GameOptions): void {
   const { token, sessionId } = opts;
   $('#start').hidden = true;
   $('#game').hidden = false;
+  document.body.classList.add('in-game');
 
   const canvas = $('#map') as HTMLCanvasElement;
   const ctx = canvas.getContext('2d')!;
@@ -222,9 +223,26 @@ export function startGame(opts: GameOptions): void {
     }
   }
 
-  /* ---------- HUD ---------- */
+  /* ---------- HUD (v1.6: iconos de píxeles y cifras; cada dato se toca) ---------- */
+  const moneyText = h('span', { class: 'tb-text' });
+  const moneyTrend = h('span', { class: 'trend', 'aria-hidden': 'true' });
+  $('#hud-money').replaceChildren(pixelIcon('coin'), moneyText, moneyTrend);
+  const popText = h('span', { class: 'tb-text' });
+  $('#hud-pop').replaceChildren(pixelIcon('people'), popText);
+  const happyText = h('span', { class: 'tb-text' });
+  $('#hud-happy').replaceChildren(pixelIcon('smile'), happyText);
   let lastStats = state.stats.length;
+  let lastPop = state.citizens.length;
   function onState() {
+    // Ronda 12: al llegar a 10 vecinos, un momento de desbloqueo que lleva a la bandeja.
+    if (lastPop < ZONE_UNLOCK_POP && state.citizens.length >= ZONE_UNLOCK_POP) {
+      sfx.milestone();
+      vibrate(120);
+      toast('¡Zonas desbloqueadas! Toca aquí o «Construir» para pintar zonas R, C e I junto a la carretera.', { kind: 'good', sticky: true, onClick: () => openTray() });
+      tabBuild.classList.add('pulse');
+      setTimeout(() => tabBuild.classList.remove('pulse'), 8000);
+    }
+    lastPop = state.citizens.length;
     if (state.stats.length !== lastStats) {
       lastStats = state.stats.length;
       const m = state.stats.at(-1);
@@ -239,23 +257,24 @@ export function startGame(opts: GameOptions): void {
       }
     }
     const d = tickToDate(state.tick);
-    // En pantallas estrechas, cabecera en formato corto (v1.4: se salía por la derecha).
-    const narrow = window.innerWidth < 400;
-    $('#hud-date').textContent = narrow ? shortDate(d) : formatDate(d);
+    $('#hud-date').textContent = shortDate(d);
     $('#hud-date').setAttribute('aria-label', formatDate(d));
     if (d.hour === 0 || dayAgoTreasury.length === 0) {
       dayAgoTreasury.push(state.treasury);
       if (dayAgoTreasury.length > 2) dayAgoTreasury.shift();
     }
     const diff = state.treasury - (dayAgoTreasury[0] ?? state.treasury);
-    const arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : '';
-    const mEl = $('#hud-money');
-    mEl.textContent = `${money(state.treasury)} ${arrow}`;
-    mEl.classList.toggle('neg', state.treasury < 0);
-    $('#hud-pop').textContent = narrow ? `${state.citizens.length} hab.` : plural(state.citizens.length, 'vecino', 'vecinos');
-    $('#hud-pop').setAttribute('aria-label', plural(state.citizens.length, 'vecino', 'vecinos'));
+    moneyText.textContent = money(state.treasury);
+    moneyTrend.textContent = diff > 0 ? '▲' : diff < 0 ? '▼' : '';
+    moneyTrend.className = `trend ${diff > 0 ? 'up' : diff < 0 ? 'down' : ''}`;
+    $('#hud-money').classList.toggle('neg', state.treasury < 0);
+    $('#hud-money').setAttribute('aria-label', `Caja del ayuntamiento: ${money(state.treasury)}${diff > 0 ? ', subiendo' : diff < 0 ? ', bajando' : ''}. Ver cuentas`);
+    popText.textContent = String(state.citizens.length);
+    $('#hud-pop').setAttribute('aria-label', `Habitantes: ${state.citizens.length}. Ver la lista`);
     const happy = state.citizens.length ? Math.round(state.citizens.reduce((s, c) => s + c.happiness, 0) / state.citizens.length) : 0;
-    $('#hud-happy').textContent = `☺ ${happy}`;
+    happyText.textContent = String(happy);
+    $('#hud-happy').classList.toggle('neg', happy > 0 && happy < 45);
+    $('#hud-happy').setAttribute('aria-label', `Felicidad media ${happy} de 100: ver por qué`);
     renderPollChip(state, () => openPolitics(social));
     $('#game').classList.toggle('opposition', state.politics.mayor !== 'player');
     updateDemand();
@@ -278,45 +297,44 @@ export function startGame(opts: GameOptions): void {
     for (const k of ['R', 'C', 'I'] as const) {
       const row = box.querySelector<HTMLElement>(`[data-d="${k}"]`)!;
       const v = state.demand[k];
-      row.hidden = !unlocked && k !== 'R';
+      row.hidden = !unlocked;
       const bar = row.querySelector<HTMLElement>('.bar-fill')!;
       bar.style.width = `${Math.max(0, v)}%`;
       row.querySelector('.bar-num')!.textContent = v > 0 ? `+${v}` : String(v);
-      row.setAttribute('aria-label', `Demanda ${k === 'R' ? 'residencial' : k === 'C' ? 'comercial' : 'industrial'}: ${v}`);
+      row.setAttribute('aria-label', `Demanda de ${k === 'R' ? 'viviendas' : k === 'C' ? 'tiendas' : 'industria'}: ${v}`);
+    }
+    // Antes de las zonas, la franja enseña lo que falta para desbloquearlas (ronda 12: «R +47» no se entendía).
+    const next = $('#next-unlock');
+    next.hidden = unlocked;
+    if (!unlocked) {
+      const n = state.citizens.length;
+      const sig = `${n}`;
+      if (next.dataset.sig !== sig) {
+        next.dataset.sig = sig;
+        const fill = h('span', { class: 'bar-fill' });
+        // Con CSSOM (la CSP no deja atributos style).
+        fill.style.width = `${Math.round((100 * n) / ZONE_UNLOCK_POP)}%`;
+        next.replaceChildren(h('span', {}, `Zonas: ${n}/${ZONE_UNLOCK_POP} vecinos`), h('span', { class: 'bar', 'aria-hidden': 'true' }, fill));
+      }
     }
   }
 
-  let lockSig = '';
   function updateToolLocks() {
-    // Las bloqueadas, al final (y «Derribar», siempre lo último): la barra empieza por lo que se puede usar.
-    const sig = TOOLS.map((tl) => (isLocked(tl, state) ? 1 : 0)).join('');
-    if (sig !== lockSig) {
-      lockSig = sig;
-      const order = [...TOOLS].sort((a, b) => rank(a) - rank(b));
-      for (const tl of order) {
-        const btn = bar.querySelector(`[data-tool="${tl.id}"]`);
-        if (btn) bar.append(btn);
-      }
-      updateToolsHint();
-    }
     for (const tl of TOOLS) {
-      const btn = document.querySelector<HTMLButtonElement>(`[data-tool="${tl.id}"]`);
+      const btn = document.querySelector<HTMLButtonElement>(`#tray [data-tool="${tl.id}"]`);
       if (!btn) continue;
       const locked = isLocked(tl, state);
+      if (btn.classList.contains('locked') === locked && btn.dataset.ready) continue;
+      btn.dataset.ready = '1';
       btn.classList.toggle('locked', locked);
       btn.setAttribute('aria-disabled', String(locked));
-      const lock = btn.querySelector('.lock')!;
-      lock.textContent = locked ? `🔒${unlockPop(tl)}` : '';
+      btn.querySelector('.tool-cost')!.textContent = locked ? `🔒 ${lockText(tl)}` : trayCost(tl);
     }
   }
-
-  function rank(tl: Tool): number {
-    if (tl.id === 'demolish') return 99;
-    return (isLocked(tl, state) ? 50 : 0) + TOOLS.indexOf(tl);
-  }
-  /** Degradado a la derecha mientras queden herramientas por ver. */
-  function updateToolsHint() {
-    bar.classList.toggle('more', bar.scrollLeft + bar.clientWidth < bar.scrollWidth - 4);
+  /** Qué falta para desbloquear una herramienta, en pocas palabras. */
+  function lockText(tl: Tool): string {
+    if (tl.build === 'plaza' || tl.build === 'market') return `hito de ${unlockPop(tl)}`;
+    return `${unlockPop(tl)} vecinos`;
   }
 
   function announceEvents() {
@@ -366,9 +384,10 @@ export function startGame(opts: GameOptions): void {
         duck(1.5);
         if (e.kind === 'bankrupt') shake(4, 400);
         calmPause();
-        toast(e.kind === 'warning' ? `${e.text}. Prueba a subir los impuestos (☰ › Impuestos) o espera antes de construir.` : e.text, {
+        toast(e.kind === 'warning' ? `${e.text}. ${nextHint(state).text}` : e.text, {
           kind: 'warn',
           sticky: true,
+          onClick: openAccounts,
         });
       } else if (e.kind === 'milestone') {
         toast(e.text, { kind: 'good', sticky: true });
@@ -496,10 +515,12 @@ export function startGame(opts: GameOptions): void {
   /* ---------- cámara ---------- */
   function resize() {
     const r = canvas.getBoundingClientRect();
-    document.documentElement.style.setProperty('--dock-h', `${Math.round($('#dock').getBoundingClientRect().height)}px`);
-    updateToolsHint();
-    // El tutorial (fijo) se coloca justo debajo de donde empieza el mapa.
-    document.documentElement.style.setProperty('--map-top', `${Math.round(r.top)}px`);
+    // Alturas reales de las barras: las hojas, la bandeja y el tutorial se colocan con ellas.
+    const root = document.documentElement.style;
+    const side = matchMedia('(orientation: landscape) and (max-height: 500px)').matches;
+    root.setProperty('--top-h', `${Math.round($('.topbar').getBoundingClientRect().height)}px`);
+    root.setProperty('--dock-h', side ? '0px' : `${Math.round($('#dock').getBoundingClientRect().height)}px`);
+    root.setProperty('--strip-h', `${Math.round($('#strip').getBoundingClientRect().height)}px`);
     const oldCenter = { x: cam.x + canvas.width / 2, y: cam.y + canvas.height / 2, ts: tileSize() };
     canvas.width = Math.round(r.width * dpr());
     canvas.height = Math.round(r.height * dpr());
@@ -508,6 +529,24 @@ export function startGame(opts: GameOptions): void {
       cam.y = Math.round(oldCenter.y - canvas.height / 2);
     }
     clampCam();
+  }
+  /**
+   * Cámara inicial: todo el pueblo a la vista con el zoom más cercano que quepa
+   * (ronda 12: se veían 7 casillas de ancho). Nunca menos de 24 px por casilla.
+   */
+  function frameTown() {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    const add = (x: number, y: number) => {
+      x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+    };
+    for (const b of state.buildings) add(b.x, b.y);
+    state.map.tiles.forEach((t, i) => t === Tile.Road && add(i % state.map.w, Math.floor(i / state.map.w)));
+    if (!Number.isFinite(x0)) add(state.map.w / 2, state.map.h / 2);
+    const w = x1 - x0 + 5;
+    const hgt = y1 - y0 + 5;
+    const fit = Math.floor(Math.min(canvas.width / (w * T), canvas.height / (hgt * T)));
+    cam.zoom = Math.max(minZoom(), Math.min(Math.max(2, Math.round(dpr() * 1.25)), fit));
+    centerOn((x0 + x1) / 2, (y0 + y1) / 2);
   }
   function centerOn(tx: number, ty: number) {
     cam.x = Math.round((tx + 0.5) * tileSize() - canvas.width / 2);
@@ -599,6 +638,7 @@ export function startGame(opts: GameOptions): void {
   canvas.addEventListener('touchend', (e) => e.cancelable && e.preventDefault(), { passive: false });
   canvas.addEventListener('pointerdown', (e) => {
     cancelAnimationFrame(flingRaf);
+    closeTray();
     fling = { vx: 0, vy: 0, t: performance.now() };
     touchInput = e.pointerType !== 'mouse';
     canvas.setPointerCapture(e.pointerId);
@@ -713,16 +753,15 @@ export function startGame(opts: GameOptions): void {
       return;
     }
     if (tool.id === 'demolish') {
+      // v1.6: se confirma en la franja de abajo, en rojo (antes, una ventana que tapaba el mapa).
       const b = state.buildings.find((x) => x.x === tile.x && x.y === tile.y);
-      const what = b ? BUILD_NAMES[b.kind] : state.map.tiles[tile.y * state.map.w + tile.x] === Tile.Road ? 'Carretera' : null;
-      if (!what) return toast('No hay nada que derribar', { kind: 'warn' });
+      const what = b ? (b.name ?? BUILD_NAMES[b.kind]) : state.map.tiles[tile.y * state.map.w + tile.x] === Tile.Road ? 'Carretera' : null;
+      if (!what) {
+        $('#tool-info').replaceChildren(h('b', {}, 'Derribar'), ': ahí no hay nada que derribar. Toca un edificio o una carretera.');
+        return refreshStrip();
+      }
       const people = b ? occupants(state, b).length + state.citizens.filter((c) => c.jobId === b.id).length : 0;
-      const ok = await confirmDialog(
-        `¿Derribar ${what.toLowerCase()}?`,
-        people > 0 ? `Afecta a ${plural(people, 'vecino', 'vecinos')}. No se puede deshacer.` : 'No se puede deshacer.',
-        'Derribar',
-      );
-      if (!ok) return;
+      return proposePlace(tile, tile, `¿Derribar ${what.toLowerCase()}? No se puede deshacer.${people > 0 ? ` Afecta a ${plural(people, 'vecino', 'vecinos')}.` : ''}`);
     }
     // Carretera y zonas: además de arrastrar, se puede tocar el inicio y luego el final.
     if (tool.shape !== 'tap') {
@@ -732,12 +771,12 @@ export function startGame(opts: GameOptions): void {
         preview = previewFor(tile, tile);
         document.body.classList.add('placing');
         $('#tool-info').textContent = `${tool.label}: ahora toca dónde termina (o arrastra). Esc para cancelar.`;
+        refreshStrip();
         if (touchInput) {
-          // Con el dedo, la instrucción va en la barra (la ayuda de arriba se oculta al colocar).
+          // Con el dedo, la instrucción va en la barra, con ✕ para cancelar.
           $('#confirm-text').textContent = `${tool.label}: inicio marcado. Toca dónde termina.`;
           ($('#confirm-yes') as HTMLButtonElement).hidden = true;
-          if ($('#confirm-bar').hidden) barShownAt = performance.now();
-          $('#confirm-bar').hidden = false;
+          showBar(true);
         }
         $('#sr-live').textContent = `Inicio marcado en la casilla ${tile.x}, ${tile.y}. Elige el final.`;
         return;
@@ -756,6 +795,7 @@ export function startGame(opts: GameOptions): void {
           ? `${tool.label}: ${plural(n, 'casilla', 'casillas')}, ${money(cost)}. Toca otra vez el final para confirmar.`
           : `${tool.label}: no se puede (${v.error}). Elige otro final o pulsa Esc.`;
         $('#tool-info').textContent = msg;
+        refreshStrip();
         $('#sr-live').textContent = msg;
         return;
       }
@@ -776,9 +816,10 @@ export function startGame(opts: GameOptions): void {
   }
 
   /** Enseña la obra (fantasma) y la barra «Construir / ✕». Nada se gasta hasta confirmar. */
-  function proposePlace(a: { x: number; y: number }, b: { x: number; y: number }) {
+  function proposePlace(a: { x: number; y: number }, b: { x: number; y: number }, demolishText?: string) {
     const cmd = commandFor(tool, a, b);
     if (!cmd) return;
+    if (isSheetOpen()) closeSheet();
     pendingPlace = { a, b };
     anchor = null;
     pendingEnd = null;
@@ -786,15 +827,16 @@ export function startGame(opts: GameOptions): void {
     const v = validateCommand(state, cmd);
     const n = tilesOf(cmd).length;
     const cost = tool.build && tool.shape === 'tap' ? shortCost(tool) : `${plural(n, 'casilla', 'casillas')}, ${money(n * (tool.zone ? ZONE_COST_PER_TILE : BUILD.road.materials))}`;
-    const msg = v.ok ? `${tool.label} aquí${cost ? ` · ${cost}` : ''}` : `${tool.label}: no se puede (${v.error})`;
+    const msg = demolishText && v.ok ? demolishText : v.ok ? `${tool.label} aquí${cost ? ` · ${cost}` : ''}` : `${tool.label}: no se puede (${v.error})`;
     $('#confirm-text').textContent = msg;
     const yes = $('#confirm-yes') as HTMLButtonElement;
-    yes.textContent = tool.zone ? (tool.zone === 'none' ? 'Quitar zona' : 'Marcar zona') : 'Construir';
+    yes.textContent = demolishText ? 'Derribar' : tool.zone ? (tool.zone === 'none' ? 'Quitar zona' : 'Marcar zona') : 'Construir';
+    yes.className = demolishText ? 'btn danger' : 'btn primary';
     yes.disabled = !v.ok;
     // Si no se puede, no se ofrece «Construir»: solo el motivo y ✕ (ronda 11).
     yes.hidden = !v.ok;
-    if ($('#confirm-bar').hidden) barShownAt = performance.now();
-    $('#confirm-bar').hidden = false;
+    showBar(true);
+    $('#confirm-bar').classList.toggle('danger', !!demolishText);
     document.body.classList.add('placing');
   }
 
@@ -814,15 +856,13 @@ export function startGame(opts: GameOptions): void {
     anchor = null;
     pendingEnd = null;
     preview = null;
-    $('#confirm-bar').hidden = true;
-    document.body.classList.remove('placing');
+    selectTool(tool.id);
   }
 
   function cancelPlace() {
     pendingPlace = null;
     preview = null;
-    $('#confirm-bar').hidden = true;
-    document.body.classList.remove('placing');
+    showBar(false);
   }
   // Además, la barra no acepta toques en sus primeros 350 ms (por si algún clic llega tarde).
   let barShownAt = 0;
@@ -888,14 +928,15 @@ export function startGame(opts: GameOptions): void {
     else if (k === 'ArrowDown' || k === 's') cam.y += step;
     else if (k === '+' || k === '=') setZoom(cam.zoom + 1);
     else if (k === '-') setZoom(cam.zoom - 1);
-    else if (k === 'l') $('#layers').click();
+    else if (k === 'l') setLayer(LAYERS[(LAYERS.findIndex((l) => l.id === layer) + 1) % LAYERS.length]!.id);
     // Atajo de Ajustes: solo la tecla sola (Ctrl+O abre archivos en el navegador), con o sin mayúsculas.
     else if (k.toLowerCase() === 'o') openSettings();
     else if (k === ' ' && target.tagName !== 'BUTTON') {
       e.preventDefault();
       setSpeed(speed === 0 ? 1 : 0);
     } else if (k === 'Escape') {
-      if (isSheetOpen()) closeSheet();
+      if (!tray.hidden) closeTray();
+      else if (isSheetOpen()) closeSheet();
       else if (pendingPlace) cancelPlace();
       else if (anchor && touchInput) cancelAnchor();
       else if (anchor) {
@@ -913,7 +954,7 @@ export function startGame(opts: GameOptions): void {
     clampCam();
   });
 
-  /* ---------- herramientas ---------- */
+  /* ---------- herramientas (v1.6: cinco pestañas y la bandeja «Construir») ---------- */
   function toolIcon(tl: Tool): HTMLElement {
     const wrap = h('span', { class: 'tool-icon', 'aria-hidden': 'true' });
     if (tl.build && tl.build !== 'road') {
@@ -932,45 +973,137 @@ export function startGame(opts: GameOptions): void {
       img.classList.add('letter');
       wrap.append(img);
     } else {
-      wrap.textContent = { inspect: '🔍', road: '🛣', dezone: '⌫', demolish: '⛏' }[tl.id as string] ?? '•';
+      wrap.append(pixelIcon(tl.id === 'dezone' ? 'demolish' : tl.id));
     }
     return wrap;
   }
 
   const bar = $('#tools');
-  bar.replaceChildren();
-  bar.addEventListener('scroll', updateToolsHint, { passive: true });
-  for (const tl of TOOLS) {
-    const btn = h(
-      'button',
-      { class: 'tool', 'data-tool': tl.id, 'aria-pressed': String(tl.id === tool.id), title: `${tl.label} (${tl.key})` },
-      toolIcon(tl),
-      h('span', { class: 'tool-label' }, tl.label),
-      h('span', { class: 'lock', 'aria-hidden': 'true' }),
-    );
-    btn.addEventListener('click', () => selectTool(tl.id));
-    bar.append(btn);
+  const tray = $('#tray');
+  const coarse = matchMedia('(pointer: coarse)').matches;
+  const tab = (id: string, icon: string, label: string, cls = '') => {
+    const b = h('button', { class: `tab ${cls}`, id: `tab-${id}`, 'aria-label': label }, pixelIcon(icon), h('span', { class: 'tab-label', 'aria-hidden': 'true' }, label));
+    return b;
+  };
+  const tabInspect = tab('inspect', 'inspect', 'Mirar');
+  tabInspect.dataset.tool = 'inspect';
+  const tabRoad = tab('road', 'road', 'Carretera');
+  tabRoad.dataset.tool = 'road';
+  const tabBuild = tab('build', 'build', 'Construir');
+  tabBuild.setAttribute('aria-expanded', 'false');
+  tabBuild.setAttribute('aria-controls', 'tray');
+  const tabDemolish = tab('demolish', 'demolish', 'Derribar', 'danger');
+  tabDemolish.dataset.tool = 'demolish';
+  bar.replaceChildren(tabInspect, tabRoad, tabBuild, tabDemolish);
+  tabInspect.onclick = () => selectTool('inspect');
+  tabRoad.onclick = () => selectTool('road');
+  tabDemolish.onclick = () => selectTool('demolish');
+  tabBuild.onclick = () => (tray.hidden ? openTray() : closeTray());
+  $('#menu').replaceChildren(pixelIcon('town'), h('span', { class: 'tab-label', 'aria-hidden': 'true' }, 'Pueblo'));
+  $('#menu').classList.add('tab');
+
+  // La bandeja: por categorías, con precio y lo que falta para lo bloqueado.
+  const trayMsg = h('p', { class: 'tray-msg muted small', 'aria-live': 'polite' }, 'Elige qué construir. Los precios incluyen la obra.');
+  tray.replaceChildren(trayMsg);
+  for (const cat of TRAY) {
+    const grid = h('div', { class: 'tray-grid' });
+    for (const id of cat.tools) {
+      const tl = TOOLS.find((x) => x.id === id)!;
+      const btn = h(
+        'button',
+        { class: 'tool', 'data-tool': tl.id, 'aria-pressed': 'false', title: `${tl.label} (${tl.key})` },
+        toolIcon(tl),
+        h('span', { class: 'tool-label' }, tl.label),
+        h('span', { class: 'tool-cost' }, trayCost(tl)),
+      );
+      btn.addEventListener('click', () => {
+        if (isLocked(tl, state)) {
+          // Ronda 12: tocar algo bloqueado no hacía nada; ahora explica qué falta.
+          const need = unlockPop(tl);
+          trayMsg.textContent =
+            tl.build === 'plaza' || tl.build === 'market'
+              ? `${tl.label}: es el premio del hito de ${need} vecinos (tienes ${state.citizens.length}).`
+              : `${tl.label}: faltan ${need - state.citizens.length} vecinos (tienes ${state.citizens.length} de ${need}).`;
+          trayMsg.classList.remove('muted');
+          sfx.error();
+          vibrate(30);
+          return;
+        }
+        selectTool(tl.id);
+      });
+      grid.append(btn);
+    }
+    tray.append(h('h3', {}, cat.title), grid);
+  }
+
+  function openTray() {
+    if (isSheetOpen()) closeSheet();
+    trayMsg.textContent = 'Elige qué construir. Los precios incluyen la obra.';
+    trayMsg.classList.add('muted');
+    updateToolLocks();
+    tray.hidden = false;
+    tabBuild.setAttribute('aria-expanded', 'true');
+    document.body.classList.add('tray-open');
+    tutorial.update(state, tool.id);
+    (tray.querySelector<HTMLElement>('[aria-pressed="true"]') ?? tray.querySelector<HTMLElement>('.tool:not(.locked)'))?.focus();
+  }
+  function closeTray() {
+    if (tray.hidden) return;
+    tray.hidden = true;
+    tabBuild.setAttribute('aria-expanded', 'false');
+    document.body.classList.remove('tray-open');
+    tutorial.update(state, tool.id);
+  }
+
+  /** La franja de abajo: fecha y demanda, la ayuda de la herramienta o la barra de confirmar. */
+  function refreshStrip() {
+    const strip = $('#strip');
+    strip.dataset.mode = !$('#confirm-bar').hidden ? 'confirm' : $('#tool-info').textContent ? 'tool' : 'info';
+  }
+  function showBar(on: boolean) {
+    if (on && $('#confirm-bar').hidden) barShownAt = performance.now();
+    $('#confirm-bar').hidden = !on;
+    if (!on) {
+      $('#confirm-bar').classList.remove('danger');
+      document.body.classList.remove('placing');
+    }
+    refreshStrip();
+  }
+  function toolHelp(tl: Tool): string {
+    if (tl.id === 'road') return coarse ? 'toca el inicio y luego el final (o arrastra desde el inicio).' : 'arrastra en línea recta. Por debajo van el agua y la luz.';
+    if (tl.zone && tl.zone !== 'none') return coarse ? `${tl.help} Toca una esquina y luego la otra.` : tl.help;
+    if (tl.id === 'demolish') return 'toca lo que quieras derribar. Te pedirá confirmación.';
+    return tl.help;
   }
 
   function selectTool(id: ToolId) {
     const tl = TOOLS.find((x) => x.id === id)!;
     tool = tl;
-    for (const b of bar.querySelectorAll('.tool')) b.setAttribute('aria-pressed', String(b.getAttribute('data-tool') === id));
-    bar.querySelector(`[data-tool="${id}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    const inTray = TRAY.some((c) => c.tools.includes(id));
+    for (const b of [tabInspect, tabRoad, tabDemolish]) b.setAttribute('aria-pressed', String(b.dataset.tool === id));
+    tabBuild.setAttribute('aria-pressed', String(inTray));
+    for (const b of tray.querySelectorAll('.tool')) b.setAttribute('aria-pressed', String(b.getAttribute('data-tool') === id));
+    // La pestaña «Construir» enseña lo elegido: se ve qué hay en la mano.
+    if (inTray) tabBuild.replaceChildren(h('span', { class: 'tab-sprite' }, toolIcon(tl)), h('span', { class: 'tab-label', 'aria-hidden': 'true' }, tl.label));
+    else tabBuild.replaceChildren(pixelIcon('build'), h('span', { class: 'tab-label', 'aria-hidden': 'true' }, 'Construir'));
+    tabBuild.setAttribute('aria-label', inTray ? `Construir: ${tl.label} elegido. Cambiar` : 'Construir');
     const info = $('#tool-info');
     const locked = isLocked(tl, state);
-    // Con «Mirar» no hace falta la frase fija sobre el mapa (ronda 10: tapaba sitio).
-    info.textContent = locked
-      ? `${tl.label}: se desbloquea con ${unlockPop(tl)} vecinos.`
-      : tl.id === 'inspect'
-        ? ''
-        : `${tl.label}: ${tl.help}${costText(tl) ? ` · ${costText(tl)}` : ''}`;
+    // Con «Mirar», la franja enseña la fecha y la demanda.
+    if (locked) info.textContent = `${tl.label}: se desbloquea con ${unlockPop(tl)} vecinos.`;
+    else if (tl.id === 'inspect') info.textContent = '';
+    else {
+      const cost = trayCost(tl) || costText(tl);
+      info.replaceChildren(h('b', {}, tl.label), cost ? ` · ${cost} · ` : ': ', toolHelp(tl));
+    }
     selected = null;
     anchor = null;
     pendingEnd = null;
     if (pendingPlace) cancelPlace();
-    $('#confirm-bar').hidden = true;
-    document.body.classList.remove('placing');
+    showBar(false);
+    closeTray();
+    // Ronda 12: una hoja abierta tapaba la barra de confirmar (no se podía ni confirmar ni cancelar).
+    if (isSheetOpen() && id !== 'inspect') closeSheet();
     tutorial.update(state, tool.id);
   }
 
@@ -998,6 +1131,28 @@ export function startGame(opts: GameOptions): void {
       renderInspect(tile, fresh);
     };
     openInspect();
+    revealTile(tile);
+  }
+
+  /** Que la casilla quede a la vista, por encima (o al lado) de la hoja abierta (v1.6). */
+  function revealTile(t: { x: number; y: number }) {
+    const el = currentSheet();
+    if (!el) return;
+    const r = canvas.getBoundingClientRect();
+    const sr = el.getBoundingClientRect();
+    const { left, top } = r;
+    let { right, bottom } = r;
+    if (sr.left <= r.left + 8) bottom = Math.min(bottom, sr.top);
+    else right = Math.min(right, sr.left);
+    if (bottom - top < 40 || right - left < 40) return;
+    const [sx, sy] = screenOf(t.x, t.y);
+    // Si queda cerca del borde (o debajo de la hoja), se centra en lo que queda a la vista.
+    const mx = Math.max(2 * tileSize() / dpr(), (right - left) * 0.15);
+    const my = Math.max(2 * tileSize() / dpr(), (bottom - top) * 0.15);
+    if (sx > left + mx && sx < right - mx && sy > top + my && sy < bottom - my) return;
+    cam.x = Math.round((t.x + 0.5) * tileSize() - ((left + right) / 2 - r.left) * dpr());
+    cam.y = Math.round((t.y + 0.5) * tileSize() - ((top + bottom) / 2 - r.top) * dpr());
+    clampCam();
   }
 
   function renderInspect(tile: { x: number; y: number }, b: Building | undefined) {
@@ -1007,7 +1162,7 @@ export function startGame(opts: GameOptions): void {
       const tt = state.map.tiles[tile.y * state.map.w + tile.x];
       const name = tt === Tile.Road ? 'Carretera' : tt === Tile.Tree ? 'Árboles' : 'Solar';
       const zone = z ? `Zona ${['', 'residencial (R)', 'comercial (C)', 'industrial (I)'][z]}` : 'Sin zona';
-      sheet(name, h('p', {}, zone), h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`));
+      sheet(name, h('p', {}, zone), h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`)).classList.add('half');
       openInspect = null;
       inspectSheet = null;
       return;
@@ -1035,19 +1190,19 @@ export function startGame(opts: GameOptions): void {
         h('label', { class: 'check' }, notify, ' Avísame cuando acabe'),
       );
     } else {
-      const status: string[] = [];
+      const pills: HTMLElement[] = [];
       if (b.kind !== 'water' && b.kind !== 'power') {
-        status.push(b.hasWater ? '💧 Con agua' : '💧 SIN AGUA');
-        status.push(b.hasPower ? '⚡ Con luz' : '⚡ SIN LUZ');
+        pills.push(h('span', { class: `pill ${b.hasWater ? 'good' : 'bad'}` }, b.hasWater ? 'Agua ✓' : 'SIN AGUA'));
+        pills.push(h('span', { class: `pill ${b.hasPower ? 'good' : 'bad'}` }, b.hasPower ? 'Luz ✓' : 'SIN LUZ'));
       }
-      if (status.length) content.push(h('p', {}, status.join(' · ')));
+      if (b.kind === 'house' || b.kind === 'res' || b.kind === 'shop' || b.kind === 'factory') {
+        pills.push(h('span', { class: 'pill' }, `${money(unitValue(state, b))}${b.kind === 'house' || b.kind === 'res' ? '/vivienda' : ''}`));
+      }
+      if (pills.length) content.push(h('div', { class: 'status-row' }, ...pills));
       const res = occupants(state, b);
       if (res.length) content.push(h('h3', {}, 'Viven aquí'), citizenList(res));
       const workers = state.citizens.filter((c) => c.jobId === b.id);
       if (workers.length) content.push(h('h3', {}, 'Trabajan aquí'), citizenList(workers));
-      if (b.kind === 'house' || b.kind === 'res' || b.kind === 'shop' || b.kind === 'factory') {
-        content.push(h('p', {}, `Valor de mercado: ${money(unitValue(state, b))}${b.kind === 'house' || b.kind === 'res' ? ' por vivienda' : ''}.`));
-      }
       if (b.kind === 'house') {
         const sale = !!b.forSale;
         const toggle = h('button', { class: 'btn wide' }, sale ? 'Pasar a alquiler' : 'Poner a la venta');
@@ -1067,39 +1222,35 @@ export function startGame(opts: GameOptions): void {
     const owner = b.owner === 0 ? 'Municipal' : b.owner === -1 ? 'Privado (inversor de fuera)' : 'De un vecino';
     content.push(h('p', { class: 'muted' }, owner));
     inspectSheet = sheet(b.name ?? BUILD_NAMES[b.kind] ?? b.kind, ...content);
+    inspectSheet.classList.add('half');
     const body = document.querySelector('.sheet-body');
     if (body) body.scrollTop = prevScroll;
   }
 
+  /** Vecinos de un edificio: una fila por persona con retrato y lo esencial (v1.6). */
   function citizenList(all: GameState['citizens']) {
     const ul = h('ul', { class: 'people' });
     const list = all.filter((c) => c.named);
     const others = all.length - list.length;
     for (const c of list) {
-      const factors = happinessFactors(state, c)
-        .filter((f) => f.value < 0)
-        .map((f) => f.label.toLowerCase());
+      const worry = happinessFactors(state, c).filter((f) => f.value < 0).sort((x, y) => x.value - y.value)[0];
       const moodText = c.happiness >= 65 ? 'contento' : c.happiness >= 40 ? 'regular' : 'descontento';
-      const mood = c.happiness >= 65 ? '😊' : c.happiness >= 40 ? '😐' : '☹️';
       const last = [...state.decisionLog].reverse().find((d) => d.citizenId === c.id);
-      const row = h(
-        'li',
-        { class: 'person-click' },
+      const btn = h(
+        'button',
+        { class: 'person-row', 'aria-label': `Ficha de ${c.name}, ${c.age} años, ${moodText}` },
+        portraitCanvas(c.id, 2, 'mini-portrait'),
         h(
-          'button',
-          { class: 'person-row', 'aria-label': `Ficha de ${c.name}` },
-          h('span', { 'aria-hidden': 'true' }, `${mood} `),
-          h('strong', {}, `${c.named ? '★ ' : ''}${c.name}`),
-          ` (${moodText})`,
-          `, ${c.age} años · ${money(c.money)}`,
-          c.named ? h('span', { class: 'muted' }, ` · quiere ${DESIRE_TEXT[c.desire]}, teme ${FEAR_TEXT[c.fear]}`) : '',
-          last ? h('em', { class: 'quote' }, ` «${last.motivo}»`) : '',
-          c.owns ? h('span', { class: 'muted' }, ' · propietario') : '',
-          factors.length ? h('span', { class: 'muted' }, ` · le preocupa: ${factors.join(', ')}`) : '',
+          'span',
+          {},
+          h('span', { class: 'p-name' }, c.name),
+          h('span', { class: 'p-sub' }, `${c.age} años · ${c.owns ? 'propietario' : 'quiere ' + DESIRE_TEXT[c.desire]}${worry ? ` · le preocupa ${worry.label.toLowerCase()}` : ''}`),
+          last ? h('em', { class: 'p-sub quote' }, `«${last.motivo}»`) : '',
         ),
+        h('span', { class: `p-mood ${c.happiness >= 65 ? 'good' : c.happiness < 40 ? 'bad' : ''}`, 'aria-hidden': 'true' }, String(Math.round(c.happiness))),
       );
-      row.querySelector('button')!.addEventListener('click', () => openCitizen(social, c.id));
-      ul.append(row);
+      btn.addEventListener('click', () => withBack(currentSheetTitle(), () => openInspect?.(), () => openCitizen(social, c.id)));
+      ul.append(h('li', { class: 'person-click' }, btn));
     }
     if (others > 0) {
       const avg = Math.round(all.filter((c) => !c.named).reduce((a, c) => a + c.happiness, 0) / others);
@@ -1107,53 +1258,183 @@ export function startGame(opts: GameOptions): void {
     }
     return ul;
   }
+  const currentSheetTitle = () => currentSheet()?.querySelector('#sheet-title')?.textContent ?? 'la ficha';
 
   /* ---------- menú, impuestos y cuentas ---------- */
   const social: SocialCtx = { token, state: () => state, command };
   const openTaxes = () => openTaxesSheet(() => state, command);
   const openAccounts = () => openReport(state);
 
-  function openMenu() {
-    const item = (label: string, fn: () => void, cls = 'btn menu-item') => {
-      const b = h('button', { class: cls }, label);
+  /**
+   * v1.6: el panel «Pueblo» sustituye al menú plano. Cada sección resume cómo va
+   * y lleva a sus hojas, que tienen «‹» para volver aquí.
+   */
+  function openHub() {
+    closeTray();
+    const go = (fn: () => void) => () => withBack('Pueblo', openHub, fn);
+    const item = (label: string, fn: () => void, attn = false) => {
+      const b = h('button', { class: `btn${attn ? ' attn' : ''}` }, label);
       b.addEventListener('click', fn);
       return b;
     };
-    // Rejilla de 2 columnas (ronda 10): antes eran 11 botones apilados con scroll.
+    const card = (icon: string, title: string, sum: (Node | string)[], ...buttons: Node[]) =>
+      h('section', { class: 'hub-card' }, h('h3', {}, pixelIcon(icon), title), h('p', { class: 'hub-sum' }, ...sum), buttons.length ? h('div', { class: 'hub-grid' }, ...buttons) : '');
+    const last = state.stats.at(-1);
+    const net = last ? last.income - last.expenses : null;
+    const happy = state.citizens.length ? Math.round(state.citizens.reduce((a, c) => a + c.happiness, 0) / state.citizens.length) : 0;
+    const d = tickToDate(state.tick);
+    const budgetOpen = state.budget.status === 'open' && state.budget.year === d.year;
+    const offers = state.grants.filter((g) => g.status === 'offered').length;
+    const townSum: string[] = [budgetOpen ? `Presupuesto ${d.year} por aprobar` : `Presupuesto ${state.budget.plan}`];
+    if (offers) townSum.push(plural(offers, 'subvención por responder', 'subvenciones por responder'));
     sheet(
-      'Menú',
-      h(
-        'div',
-        { class: 'menu-grid' },
-      item('Impuestos', openTaxes),
-      item('Parte mensual', openAccounts),
-      item('Vecinos', () => openNeighbours(state, (c) => openCitizen(social, c.id))),
-      item('Pleno municipal', () => openPleno(social)),
-      item('Consejero', () => openAdvisor(social)),
-      item('Diario del pueblo', () => openDiary(social)),
-      item('Política y elecciones', () => openPolitics(social)),
-      item('Ayuntamiento', () => openTownHall(social)),
-      ...(state.aiMode
-        ? [
-            item('Gasto de la IA', () => void openUsage(token)),
-            item('Qué se envía a la IA', () => void openPreview(token)),
-          ]
-        : []),
-      item('Ajustes', openSettings),
+      'Pueblo',
+      card(
+        'coin',
+        'Dinero',
+        ['Caja: ', h('strong', {}, money(state.treasury)), net !== null ? ` · último mes: ${net >= 0 ? '+' : ''}${money(net)}` : ''],
+        item('Parte mensual', go(openAccounts)),
+        item('Impuestos', go(openTaxes)),
       ),
+      card(
+        'build',
+        'Ayuntamiento',
+        [townSum.join(' · ')],
+        item('Presupuesto y fiestas', go(() => openTownHall(social)), budgetOpen || offers > 0),
+        item('Pleno municipal', go(() => openPleno(social))),
+        item('Política y elecciones', go(() => openPolitics(social))),
+        item('Consejero', go(() => openAdvisor(social))),
+      ),
+      card(
+        'people',
+        'Gente',
+        [h('strong', {}, plural(state.citizens.length, 'vecino', 'vecinos')), ` · felicidad ${happy}`],
+        item('Vecinos', go(openPeople)),
+        item('Felicidad', go(openHappiness)),
+        item('Diario del pueblo', go(() => openDiary(social))),
+      ),
+      h('section', { class: 'hub-card' }, h('h3', {}, pixelIcon('smile'), 'Objetivos'), objectivesNode(state)),
+      ...(state.aiMode
+        ? [card('inspect', 'IA', ['Los vecinos con nombre deciden con la IA.'], item('Gasto de la IA', () => void openUsage(token)), item('Qué se envía a la IA', () => void openPreview(token)))]
+        : []),
       h(
         'div',
         { class: 'menu-foot' },
+        item('Ajustes', go(openSettings)),
         item('Repetir tutorial', () => {
           closeSheet();
           tutorial.start(state, true);
-        }, 'btn small'),
+        }),
         item('Volver al inicio', () => {
           closeSheet();
           exit();
-        }, 'btn small'),
+        }),
       ),
     );
+  }
+  // La pestaña «Pueblo» se marca mientras su panel (o una hoja abierta desde él) está a la vista.
+  onSheetChange((title) => $('#menu').setAttribute('aria-expanded', String(title === 'Pueblo')));
+  $('#menu').setAttribute('aria-expanded', 'false');
+  const openPeople = () => openNeighbours(state, (c) => withBack('Vecinos', () => withBack('Pueblo', openHub, openPeople), () => openCitizen(social, c.id)));
+
+  /** Por qué el pueblo está contento o no: causas medias y los vecinos más tristes (v1.6). */
+  function openHappiness() {
+    const people = state.citizens;
+    const sums = new Map<string, number>();
+    for (const c of people) for (const f of happinessFactors(state, c)) sums.set(f.label, (sums.get(f.label) ?? 0) + f.value);
+    const rows = [...sums.entries()].map(([label, v]) => ({ label, v: v / Math.max(1, people.length) })).filter((r) => Math.abs(r.v) >= 0.5).sort((a, b) => a.v - b.v);
+    const happy = people.length ? Math.round(people.reduce((a, c) => a + c.happiness, 0) / people.length) : 0;
+    const sad = people.filter((c) => c.named).sort((a, b) => a.happiness - b.happiness).slice(0, 5);
+    const list = h('ul', { class: 'accounts' }, ...rows.map((r) => h('li', { class: r.v < 0 ? 'neg' : 'pos' }, h('span', {}, r.label), h('span', {}, `${r.v > 0 ? '+' : ''}${Math.round(r.v)}`))));
+    const sadList = h('ul', { class: 'people' });
+    for (const c of sad) {
+      const worry = happinessFactors(state, c).filter((f) => f.value < 0).sort((x, y) => x.value - y.value)[0];
+      const btn = h('button', { class: 'person-row' }, portraitCanvas(c.id, 2, 'mini-portrait'), h('span', {}, h('span', { class: 'p-name' }, c.name), h('span', { class: 'p-sub' }, worry ? `le preocupa ${worry.label.toLowerCase()}` : 'sin quejas concretas')), h('span', { class: `p-mood ${c.happiness < 40 ? 'bad' : ''}` }, String(Math.round(c.happiness))));
+      btn.addEventListener('click', () => withBack('Felicidad', () => withBack('Pueblo', openHub, openHappiness), () => openCitizen(social, c.id)));
+      sadList.append(h('li', {}, btn));
+    }
+    sheet(
+      'Felicidad',
+      h('p', {}, `Felicidad media: `, h('strong', {}, `${happy} de 100`), happy < 45 ? '. Si baja mucho, la gente se va.' : '.'),
+      h('h3', {}, 'Qué suma y qué resta (media)'),
+      rows.length ? list : h('p', { class: 'muted' }, 'Aún no hay vecinos.'),
+      sad.length ? h('h3', {}, 'Los menos contentos') : '',
+      sad.length ? sadList : '',
+    );
+  }
+
+  /** La campana: todos los avisos recientes; los que llevan a algo, se tocan (v1.6). */
+  function openLog() {
+    markLogRead();
+    const items = toastLog();
+    const icon = { info: 'ℹ', warn: '⚠', good: '✔' };
+    const ul = h('ul', { class: 'log' });
+    for (const e of items) {
+      const btn = h('button', { class: 'log-item', ...(e.onClick ? { 'data-go': '1' } : {}) }, h('span', { class: 'toast-icon', 'aria-hidden': 'true' }, icon[e.kind]), h('span', {}, e.text, ' ', h('span', { class: 'when' }, e.when)));
+      if (e.onClick) btn.addEventListener('click', () => withBack('Avisos', openLog, e.onClick!));
+      else btn.setAttribute('tabindex', '-1');
+      ul.append(h('li', { class: e.kind }, btn));
+    }
+    sheet('Avisos', items.length ? ul : h('p', { class: 'muted' }, 'Sin avisos todavía.'));
+  }
+  const bellBadge = document.querySelector<HTMLElement>('#bell .bell-n')!;
+  $('#bell').prepend(pixelIcon('bell'));
+  onToastLog(
+    (n) => {
+      bellBadge.hidden = n === 0;
+      bellBadge.textContent = n > 9 ? '9+' : String(n);
+      $('#bell').setAttribute('aria-label', n ? `Avisos: ${n} sin mirar` : 'Avisos');
+    },
+    openLog,
+    () => shortDate(tickToDate(state.tick)),
+  );
+
+  /** Capas: el chip dice cuál está puesta; al tocarlo se elige de una lista (antes, se cambiaba a ciegas). */
+  function setLayer(id: LayerId) {
+    layer = id;
+    const def = LAYERS.find((l) => l.id === layer)!;
+    const legend = $('#legend');
+    legend.hidden = layer === 'none';
+    legend.replaceChildren(h('strong', {}, def.label), ...def.legend.map((x) => h('span', { class: `legend-item ${x.cls}` }, x.text)));
+    const chip = $('#layers');
+    chip.querySelector('.chip-text')!.textContent = layer === 'none' ? 'Capas' : def.label;
+    chip.setAttribute('aria-label', `Capas de datos: ${def.label}. Cambiar`);
+    chip.setAttribute('aria-pressed', String(layer !== 'none'));
+    $('#sr-live').textContent = layer === 'none' ? 'Capas desactivadas' : `Capa activa: ${def.label}`;
+  }
+  function openLayers() {
+    const list = h('div', { class: 'radio-list compact', role: 'radiogroup', 'aria-label': 'Capa' });
+    for (const l of LAYERS) {
+      const b = h('button', { class: 'btn choice', role: 'radio', 'aria-checked': String(l.id === layer) }, h('strong', {}, l.label));
+      b.addEventListener('click', () => {
+        setLayer(l.id);
+        closeSheet();
+      });
+      list.append(b);
+    }
+    sheet('Capas de datos', h('p', { class: 'muted small' }, 'Colorean el mapa según un dato. La leyenda sale abajo a la izquierda.'), list).classList.add('half');
+  }
+  $('#layers').prepend(pixelIcon('layers'));
+
+  /** Qué es R, C, I (o qué falta para las zonas): al tocar la franja. */
+  function openDemand() {
+    const unlocked = state.citizens.length >= ZONE_UNLOCK_POP;
+    const { R, C, I } = state.demand;
+    const line = (k: string, name: string, v: number, hint: string) => h('li', {}, h('span', {}, h('strong', {}, `${k} · ${name}`), h('span', { class: 'p-sub' }, hint)), h('span', {}, v > 0 ? `+${v}` : String(v)));
+    sheet(
+      'Qué pide el pueblo',
+      h('p', {}, `Hoy es ${formatDate(tickToDate(state.tick))}.`),
+      unlocked
+        ? h(
+            'ul',
+            { class: 'accounts' },
+            line('R', 'viviendas', R, R > 20 ? 'Falta sitio para vivir: pinta zona R.' : 'Hay casas de sobra.'),
+            line('C', 'tiendas', C, C > 20 ? 'Quieren comprar cerca: pinta zona C.' : 'Hay tiendas de sobra.'),
+            line('I', 'empleo e industria', I, I > 20 ? 'Hay gente sin trabajo: pinta zona I (lejos de las casas).' : 'Hay empleo de sobra.'),
+          )
+        : h('p', {}, `Con ${ZONE_UNLOCK_POP} vecinos se desbloquean las zonas R (viviendas), C (tiendas) e I (industria). Ahora hay ${state.citizens.length}. Construye casas con agua y luz.`),
+      h('p', { class: 'muted small' }, 'Cuanto más alta la barra, más falta hace. Si está en negativo, sobra.'),
+    ).classList.add('half');
   }
 
   /* ---------- velocidad y ciclo de vida ---------- */
@@ -1183,8 +1464,9 @@ export function startGame(opts: GameOptions): void {
   function paintSpeed() {
     const play = $('#play-pause');
     play.textContent = speed === 0 ? '▶' : '❚❚';
-    play.setAttribute('aria-label', speed === 0 ? `Poner en marcha (x${lastSpeed})` : 'Pausa');
-    play.setAttribute('aria-pressed', String(speed === 0));
+    // La etiqueta dice la acción; el estado va en data-paused (ronda 12: «pulsado» en pausa confundía).
+    play.setAttribute('aria-label', speed === 0 ? `Poner en marcha a x${lastSpeed}` : 'Pausar');
+    play.dataset.paused = String(speed === 0);
     const sp = $('#speed');
     sp.textContent = `x${lastSpeed}`;
     sp.dataset.speed = String(lastSpeed);
@@ -1237,6 +1519,9 @@ export function startGame(opts: GameOptions): void {
         window.removeEventListener('popstate', onBack);
         void api.release(token, sessionId);
         $('#game').hidden = true;
+        document.body.classList.remove('in-game', 'tray-open', 'sheet-open');
+        onSheetChange(null);
+        clearToastLog();
         opts.onExit();
       });
     }, 150);
@@ -1249,25 +1534,22 @@ export function startGame(opts: GameOptions): void {
     setSpeed(next);
   };
   paintSpeed();
-  $('#layers').onclick = () => {
-    const ids = LAYERS.map((l) => l.id);
-    layer = ids[(ids.indexOf(layer) + 1) % ids.length]!;
-    const def = LAYERS.find((l) => l.id === layer)!;
-    const legend = $('#legend');
-    legend.hidden = layer === 'none';
-    legend.replaceChildren(h('strong', {}, def.label), ...def.legend.map((x) => h('span', { class: `legend-item ${x.cls}` }, x.text)));
-    $('#layers').setAttribute('aria-label', `Capas de datos: ${def.label}`);
-    $('#layers').setAttribute('aria-pressed', String(layer !== 'none'));
-    $('#sr-live').textContent = layer === 'none' ? 'Capas desactivadas' : `Capa activa: ${def.label}`;
-  };
+  $('#layers').onclick = openLayers;
   $('#zoom-in').onclick = () => setZoom(cam.zoom + 1);
   $('#zoom-out').onclick = () => setZoom(cam.zoom - 1);
-  $('#menu').onclick = openMenu;
-  $('#hud-money').onclick = openAccounts;
+  $('#menu').onclick = () => (currentSheet()?.querySelector('#sheet-title')?.textContent === 'Pueblo' ? closeSheet() : openHub());
+  $('#hud-money').onclick = () => withBack('Pueblo', openHub, openAccounts);
+  $('#hud-pop').onclick = () => withBack('Pueblo', openHub, openPeople);
+  $('#hud-happy').onclick = () => withBack('Pueblo', openHub, openHappiness);
+  $('#bell').onclick = openLog;
+  $('#strip-info').onclick = openDemand;
   $('#whatnow').onclick = () => {
+    // v1.6: el consejo va en la franja de abajo (antes, un aviso más) y elige la herramienta.
     const hint = nextHint(state);
-    toast(hint.text, { sticky: true });
     if (hint.tool) selectTool(hint.tool);
+    $('#tool-info').replaceChildren(h('b', {}, '¿Qué hago? '), hint.text);
+    refreshStrip();
+    $('#sr-live').textContent = hint.text;
   };
 
   /* Gancho para las pruebas de Playwright (solo lectura). */
@@ -1299,18 +1581,16 @@ export function startGame(opts: GameOptions): void {
   const sizeWatch = new ResizeObserver(() => resize());
   sizeWatch.observe(canvas);
   resize();
-  // Un píxel del sprite ≈ 1,5 px CSS: se aprecia el detalle sin perder vista.
-  cam.zoom = Math.max(2, Math.round(dpr() * 1.5));
-  const hall = state.buildings.find((b) => b.kind === 'townhall');
-  centerOn(hall?.x ?? state.map.w / 2, (hall?.y ?? state.map.h / 2) + 1);
+  frameTown();
   selectTool('inspect');
   setSpeed(0);
   onState();
+  refreshStrip();
   const away = resumeSummary(token, state);
   if (away && away.length) toast(`Desde tu última visita: ${away.join(' · ')}`, { sticky: true });
   tutorial.start(state);
   tutorial.update(state, tool.id);
-  if (!tutorial.active) toast('En pausa. Pulsa ▶ (abajo a la izquierda) para que pase el tiempo.');
+  if (!tutorial.active) toast(`En pausa. Pulsa ▶ (${matchMedia('(orientation: landscape) and (max-height: 500px)').matches ? 'arriba' : 'arriba a la izquierda'}) para que pase el tiempo.`);
   // Sonido: se desbloquea con el primer gesto; el ambiente sigue la hora del juego.
   const unlock = () => unlockAudio();
   window.addEventListener('pointerdown', unlock, { once: true });
