@@ -54,6 +54,12 @@ Monorepo pnpm + TypeScript:
 - `prompt.ts`: `toneOf` e `inventedName` (lista de nombres en `names.ts`, palabras enteras sin tildes). PROMPT_VERSION 3.
 - Cliente: farolas en `render.ts`, `skyline.ts` animado, `icons.ts` (iconos de píxeles), avisos agrupados, atajos de una tecla desactivables (`prefs.shortcuts`).
 
+## Móvil y táctil (v1.4) — la norma principal: se juega bien en el móvil
+- `game.ts`: `ResizeObserver` en el canvas; en táctil toda obra pasa por `proposePlace` y la barra `#confirm-bar` («Construir / ✕», ignora sus primeros 350 ms; el canvas cancela `touchend` para evitar el clic fantasma). Con carretera o zona, un dedo mueve el mapa (se traza con dos toques o arrastrando desde el inicio). `pickTile` (tejados), inercia, `minZoom` de 24 px CSS.
+- Una sola barra `#dock`: `#play-pause`, `#speed` (x1→x3→x10), herramientas, `#menu`. En los e2e, usa `setSpeed(page, n)` de `e2e/helpers.ts`.
+- Hojas (`ui.ts`): solo se refresca la que está abierta (`currentSheet()`); atrás cierra la hoja (`history`).
+- A x10 no hay burbujas ni avisos menores. Los toques reales se prueban por CDP en `e2e/tactil.spec.ts`.
+
 ## Comandos
 ```
 pnpm install | pnpm dev | pnpm build | pnpm lint | pnpm typecheck | pnpm test
