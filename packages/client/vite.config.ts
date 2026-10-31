@@ -1,6 +1,11 @@
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 
+// Versión de la aplicación (la del package.json raíz), para enseñarla en Ajustes.
+const version = (JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string }).version;
+
 export default defineConfig({
+  define: { __APP_VERSION__: JSON.stringify(version) },
   build: {
     outDir: 'dist',
     target: 'es2022',

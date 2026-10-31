@@ -135,5 +135,7 @@ export function openSettings(): void {
     h('h3', {}, 'Teclado'),
     toggle('Atajos de una tecla', 'shortcuts', '(W A S D, L, O y las herramientas; con lector de pantalla puede ir mejor sin ellos)'),
     h('p', { class: 'muted small' }, 'Se guardan en este dispositivo.'),
+    // Petición del creador: la versión, abajo del todo.
+    h('p', { class: 'muted small app-version' }, `Bitópolis ${__APP_VERSION__}`),
   );
 }
