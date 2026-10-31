@@ -5,7 +5,7 @@ import { expect, test } from '@playwright/test';
  * playwright.config.ts) porque cambia ajustes globales: contraseña para jugar,
  * partidas nuevas, IA del servidor.
  */
-const ADMIN = 'http://localhost:8091';
+const ADMIN = `http://localhost:${process.env.PW_ADMIN_PORT ?? 8091}`;
 // Sin reintentos: el primer intento ya cambia la cuenta y un reintento no puede repetirlo.
 test.describe.configure({ mode: 'serial', retries: 0 });
 
@@ -91,10 +91,15 @@ test('admin: primer acceso, ajustes que valen al momento y vista móvil', async 
   const ia = page.getByRole('region', { name: 'IA' });
   await ia.getByText('Avanzado: endpoint propio y precios').click();
   await ia.getByLabel('Endpoint propio (Ollama, LM Studio…)').fill('http://localhost:8099/v1');
-  await ia.getByLabel('Vecinos con IA por partida (1–20)').fill('6');
+  await ia.getByLabel('Vecinos con nombre en Modo normal (1–20)').fill('6');
   await ia.getByLabel('Servidor al mes').fill('5');
+  // 2.0: % de vecinos que piensan con IA y modo de los turnos.
+  await ia.getByLabel('Vecinos que piensan con IA (%)').fill('70');
+  await ia.getByLabel('Turnos del pueblo').selectOption('ahorro');
   await saved(ia.getByRole('button', { name: 'Guardar la IA' }));
   await expect(page.locator('.server-ai')).toContainText('Endpoint propio');
+  await expect(ia.getByLabel('Vecinos que piensan con IA (%)')).toHaveValue('70');
+  await expect(ia.getByLabel('Turnos del pueblo')).toHaveValue('ahorro');
 
   // Modelos (petición del creador): desplegables con los que da la key/endpoint y «Recargar modelos».
   const vecinos = ia.getByLabel('Modelo de los vecinos (lotes)');
