@@ -26,7 +26,10 @@ import {
   Tile,
   validateCommand,
   ZONE_COST_PER_TILE,
-  ZONE_UNLOCK_POP,
+  canUpgradeTownhall,
+  TOWNHALL_LEVELS,
+  townLevel,
+  zonesUnlocked,
 } from '@bitopolis/sim';
 import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
 import { openNeighbours, openReport, openTaxes as openTaxesSheet } from './economy-ui.ts';
@@ -36,12 +39,13 @@ import { openAlbum, snapMoments } from './album-ui.ts';
 import { objectivesNode, openAdvisor, openCitizen, openDiary, openPleno, portraitCanvas, rememberSeen, renderObjectives, resumeSummary, type SocialCtx } from './social-ui.ts';
 import { api, ApiError } from './api.ts';
 import { nextHint } from './hints.ts';
-import { formatDate, money, plural, shortDate, t } from './i18n.ts';
+import { openManagement } from './manage-ui.ts';
+import { formatDate, money, MONTHS, plural, shortDate, t } from './i18n.ts';
 import { type Camera, type Preview, render } from './render.ts';
 import type { FromWorker, SaveBatch, ToWorker } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
 import { buildingSprite, letterSprite, T } from './sprites.ts';
-import { commandFor, costText, isLocked, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayCost, unlockPop } from './tools.ts';
+import { commandFor, costText, isLocked, lockLong, lockShort, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayCost } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
 import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, h, isSheetOpen, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack } from './ui.ts';
 import { pixelIcon } from './icons.ts';
@@ -278,6 +282,22 @@ export function startGame(opts: GameOptions): void {
       });
     }, 1500);
   }
+  /** v1.8: a x3/x10, un calendario arriba a la izquierda que pasa la hoja cada día. */
+  let calDay = -1;
+  function paintCalendar(d: { year: number; month: number; day: number }) {
+    const cal = $('#calendar');
+    const on = speed >= 3;
+    if (cal.hidden === on) cal.hidden = !on;
+    if (!on || d.day === calDay) return;
+    calDay = d.day;
+    cal.querySelector('.cal-m')!.textContent = `${MONTHS[d.month - 1]} A${d.year}`;
+    cal.querySelector('.cal-d')!.textContent = String(d.day);
+    if (!reducedMotion()) {
+      cal.classList.remove('flip');
+      void cal.offsetWidth;
+      cal.classList.add('flip');
+    }
+  }
   /** Desliza la cámara de `from` al destino que calcula `to` (en 1 s). */
   function glide(from: { x: number; y: number }, to: () => { x: number; y: number }, done: () => void) {
     const target = to();
@@ -301,6 +321,32 @@ export function startGame(opts: GameOptions): void {
     return [r.left + ((tx + 0.5) * 32 * cam.zoom - cam.x) / dpr(), r.top + ((ty + 0.2) * 32 * cam.zoom - cam.y) / dpr()];
   }
 
+  /**
+   * v1.8 (petición del creador): algo pide atención (robo sin resolver,
+   * calabozos llenos, manifestación, disturbios, riada). Siempre destella el
+   * sitio; a x3/x10 además vuelve a x1, tiembla el mapa y la cámara va allí.
+   * Como mucho una vez cada 45 s: que no se pare todo el rato.
+   */
+  let highlight: { x: number; y: number; since: number } | null = null;
+  let lastAttention = -Infinity;
+  function attention(at: { x: number; y: number } | undefined) {
+    const now = performance.now();
+    if (at) highlight = { x: at.x, y: at.y, since: now };
+    if (speed < 3 || now - lastAttention < 45_000) return;
+    lastAttention = now;
+    setSpeed(1);
+    shake(5, 450);
+    vibrate(100);
+    if (at && !reducedMotion()) {
+      glide({ x: cam.x, y: cam.y }, () => {
+        centerOn(at.x, at.y);
+        return { x: cam.x, y: cam.y };
+      }, () => {});
+    }
+  }
+  const hallSpot = () => state.buildings.find((b) => b.kind === 'townhall');
+  const refSpot = (ref?: number) => (ref !== undefined ? state.buildings.find((b) => b.id === ref) : undefined);
+
   /** Modo tranquilo: un evento importante pausa el juego. */
   function calmPause() {
     if (prefs().calm && speed > 0) {
@@ -318,21 +364,30 @@ export function startGame(opts: GameOptions): void {
   const happyText = h('span', { class: 'tb-text' });
   $('#hud-happy').replaceChildren(pixelIcon('smile'), happyText);
   let lastStats = state.stats.length;
-  let lastPop = state.citizens.length;
+  let lastLevel = townLevel(state);
+  let upgradeWarned = townLevel(state) - 1;
   const albumSeen = { n: state.album?.length ?? 0 };
   function onState() {
     // v1.7: foto de cada momento nuevo del álbum (en este navegador).
     snapMoments(token, state, albumSeen);
     if (layer === 'missing' && Math.floor(state.tick / 24) !== legendDay) missingLegend();
     // Ronda 12: al llegar a 10 vecinos, un momento de desbloqueo que lleva a la bandeja.
-    if (lastPop < ZONE_UNLOCK_POP && state.citizens.length >= ZONE_UNLOCK_POP) {
+    // v1.8: cuando se puede ampliar el ayuntamiento, se avisa una vez por nivel.
+    const lv = townLevel(state);
+    if (canUpgradeTownhall(state).ok && upgradeWarned < lv) {
+      upgradeWarned = lv;
+      const hall = hallSpot();
+      toast(`Ya puedes ampliar el ayuntamiento a nivel ${lv + 1}: toca el ayuntamiento para ver qué desbloquea.`, { kind: 'good', sticky: true, onClick: hall ? () => focusBuilding(hall.id) : undefined });
+      if (hall) highlight = { x: hall.x, y: hall.y, since: performance.now() };
+    }
+    if (lastLevel < 2 && lv >= 2) {
       sfx.milestone();
       vibrate(120);
       toast('¡Zonas desbloqueadas! Toca aquí o «Construir» para pintar zonas R, C e I junto a la carretera.', { kind: 'good', sticky: true, onClick: () => openTray() });
       tabBuild.classList.add('pulse');
       setTimeout(() => tabBuild.classList.remove('pulse'), 8000);
     }
-    lastPop = state.citizens.length;
+    lastLevel = lv;
     if (state.stats.length !== lastStats) {
       lastStats = state.stats.length;
       const m = state.stats.at(-1);
@@ -347,6 +402,7 @@ export function startGame(opts: GameOptions): void {
       }
     }
     const d = tickToDate(state.tick);
+    paintCalendar(d);
     $('#hud-date').textContent = shortDate(d);
     $('#hud-date').setAttribute('aria-label', formatDate(d));
     // v1.7: el tiempo de hoy junto a la fecha (icono y, en pantallas anchas, el nombre).
@@ -394,7 +450,7 @@ export function startGame(opts: GameOptions): void {
 
   function updateDemand() {
     const box = $('#demand');
-    const unlocked = state.citizens.length >= ZONE_UNLOCK_POP;
+    const unlocked = zonesUnlocked(state);
     for (const k of ['R', 'C', 'I'] as const) {
       const row = box.querySelector<HTMLElement>(`[data-d="${k}"]`)!;
       const v = state.demand[k];
@@ -409,13 +465,15 @@ export function startGame(opts: GameOptions): void {
     next.hidden = unlocked;
     if (!unlocked) {
       const n = state.citizens.length;
-      const sig = `${n}`;
+      const need = TOWNHALL_LEVELS[1]!.pop;
+      const sig = `${Math.min(n, need)}`;
       if (next.dataset.sig !== sig) {
         next.dataset.sig = sig;
         const fill = h('span', { class: 'bar-fill' });
         // Con CSSOM (la CSP no deja atributos style).
-        fill.style.width = `${Math.round((100 * n) / ZONE_UNLOCK_POP)}%`;
-        next.replaceChildren(h('span', {}, `Zonas: ${n}/${ZONE_UNLOCK_POP} vecinos`), h('span', { class: 'bar', 'aria-hidden': 'true' }, fill));
+        fill.style.width = `${Math.min(100, Math.round((100 * n) / need))}%`;
+        // v1.8: con los vecinos ya, falta ampliar el ayuntamiento.
+        next.replaceChildren(h('span', {}, n >= need ? 'Zonas: amplía el ayuntamiento' : `Zonas: ${n}/${need} vecinos`), h('span', { class: 'bar', 'aria-hidden': 'true' }, fill));
       }
     }
   }
@@ -433,10 +491,7 @@ export function startGame(opts: GameOptions): void {
     }
   }
   /** Qué falta para desbloquear una herramienta, en pocas palabras. */
-  function lockText(tl: Tool): string {
-    if (tl.build === 'plaza' || tl.build === 'market') return `hito de ${unlockPop(tl)}`;
-    return `${unlockPop(tl)} vecinos`;
-  }
+  const lockText = (tl: Tool) => lockShort(tl, state) ?? '';
 
   function announceEvents() {
     const fresh: GameEvent[] = [];
@@ -520,6 +575,7 @@ export function startGame(opts: GameOptions): void {
         sfx.warn();
         vibrate(80);
         calmPause();
+        attention(refSpot(e.ref));
         toast(e.text, { kind: 'warn', sticky: true, onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
       } else if (e.kind === 'crime') {
         // v1.8: robos, detenciones, calabozos llenos y disturbios.
@@ -528,17 +584,22 @@ export function startGame(opts: GameOptions): void {
         if (bad) {
           sfx.warn();
           calmPause();
+          attention(refSpot(e.ref) ?? state.buildings.find((b) => b.kind === 'police' && b.built));
         }
         toast(e.text, { kind: bad ? 'warn' : 'good', sticky: /Disturbios|llenos/.test(e.text), onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
       } else if (e.kind === 'protest') {
         sfx.warn();
         duck(1.5);
         calmPause();
+        attention(hallSpot());
         toast(e.text, { kind: 'warn', sticky: true, onClick: () => openTownHall(social, 'associations') });
       } else if (e.kind === 'politics' && /Asociación|asociación/.test(e.text)) {
         // v1.7: asociaciones. Si convocan una manifestación, hay 3 días para reunirse con ellos: baja a x1.
         const urgent = e.text.includes('convoca una manifestación');
-        if (urgent && speed >= 3) setSpeed(1);
+        if (urgent) {
+          const a = state.associations?.find((x) => x.id === e.ref);
+          attention(a?.x !== undefined && a.y !== undefined ? { x: a.x, y: a.y } : hallSpot());
+        }
         toast(e.text, { kind: urgent ? 'warn' : 'info', sticky: urgent || e.text.startsWith('Nace'), onClick: () => openTownHall(social, 'associations') });
       } else if (e.kind === 'politics' && /presupuesto/i.test(e.text)) {
         const decide = e.text.startsWith('Toca presentar');
@@ -886,7 +947,7 @@ export function startGame(opts: GameOptions): void {
   async function tapTile(tile: { x: number; y: number }) {
     if (tool.id === 'inspect') return inspect(tile);
     if (isLocked(tool, state)) {
-      toast(`${tool.label}: se desbloquea con ${unlockPop(tool)} vecinos`, { kind: 'warn' });
+      toast(lockLong(tool, state), { kind: 'warn' });
       return;
     }
     if (tool.id === 'demolish') {
@@ -1189,11 +1250,7 @@ export function startGame(opts: GameOptions): void {
       btn.addEventListener('click', () => {
         if (isLocked(tl, state)) {
           // Ronda 12: tocar algo bloqueado no hacía nada; ahora explica qué falta.
-          const need = unlockPop(tl);
-          trayMsg.textContent =
-            tl.build === 'plaza' || tl.build === 'market'
-              ? `${tl.label}: es el premio del hito de ${need} vecinos (tienes ${state.citizens.length}).`
-              : `${tl.label}: faltan ${need - state.citizens.length} vecinos (tienes ${state.citizens.length} de ${need}).`;
+          trayMsg.textContent = lockLong(tl, state);
           trayMsg.classList.remove('muted');
           sfx.error();
           vibrate(30);
@@ -1260,7 +1317,7 @@ export function startGame(opts: GameOptions): void {
     const info = $('#tool-info');
     const locked = isLocked(tl, state);
     // Con «Mirar», la franja enseña la fecha y la demanda.
-    if (locked) info.textContent = `${tl.label}: se desbloquea con ${unlockPop(tl)} vecinos.`;
+    if (locked) info.textContent = lockLong(tl, state);
     else if (tl.id === 'inspect') info.textContent = '';
     else {
       const cost = trayCost(tl) || costText(tl);
@@ -1339,6 +1396,21 @@ export function startGame(opts: GameOptions): void {
       sheet(name, h('p', {}, zone), h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`)).classList.add('half');
       openInspect = null;
       inspectSheet = null;
+      return;
+    }
+    // v1.8: el ayuntamiento abre el panel de gestión a pantalla completa.
+    if (b.kind === 'townhall' && b.built) {
+      openManagement(social, {
+        townHall: () => withBack('Gestión', () => focusBuilding(b.id), () => openTownHall(social)),
+        politics: () => withBack('Gestión', () => focusBuilding(b.id), () => openPolitics(social)),
+        accounts: () => withBack('Gestión', () => focusBuilding(b.id), openAccounts),
+        focus: (x, y) => {
+          closeSheet();
+          centerOn(x, y);
+          inspect({ x, y });
+        },
+      });
+      inspectSheet = currentSheet();
       return;
     }
     const content: (Node | string)[] = [];
@@ -1682,7 +1754,7 @@ export function startGame(opts: GameOptions): void {
 
   /** Qué es R, C, I (o qué falta para las zonas): al tocar la franja. */
   function openDemand() {
-    const unlocked = state.citizens.length >= ZONE_UNLOCK_POP;
+    const unlocked = zonesUnlocked(state);
     const { R, C, I } = state.demand;
     const line = (k: string, name: string, v: number, hint: string) => h('li', {}, h('span', {}, h('strong', {}, `${k} · ${name}`), h('span', { class: 'p-sub' }, hint)), h('span', {}, v > 0 ? `+${v}` : String(v)));
     sheet(
@@ -1696,7 +1768,7 @@ export function startGame(opts: GameOptions): void {
             line('C', 'tiendas', C, C > 20 ? 'Quieren comprar cerca: pinta zona C.' : 'Hay tiendas de sobra.'),
             line('I', 'empleo e industria', I, I > 20 ? 'Hay gente sin trabajo: pinta zona I (lejos de las casas).' : 'Hay empleo de sobra.'),
           )
-        : h('p', {}, `Con ${ZONE_UNLOCK_POP} vecinos se desbloquean las zonas R (viviendas), C (tiendas) e I (industria). Ahora hay ${state.citizens.length}. Construye casas con agua y luz.`),
+        : h('p', {}, `Las zonas R (viviendas), C (tiendas) e I (industria) llegan con el ayuntamiento de nivel 2: pide ${TOWNHALL_LEVELS[1]!.pop} vecinos (ahora hay ${state.citizens.length}) y ${money(TOWNHALL_LEVELS[1]!.cost)}. Toca el ayuntamiento para ampliarlo.`),
       h('p', { class: 'muted small' }, 'Cuanto más alta la barra, más falta hace. Si está en negativo, sobra.'),
     ).classList.add('half');
   }
@@ -1745,6 +1817,8 @@ export function startGame(opts: GameOptions): void {
     send({ type: 'speed', speed: s });
     $('#sr-live').textContent = s === 0 ? 'Juego en pausa' : `Velocidad x${s}`;
     paintSpeed();
+    calDay = -1;
+    paintCalendar(tickToDate(state.tick));
   }
   /** ⏯ y el botón de velocidad (x1 → x3 → x10) del dock (v1.4). */
   let lastSpeed = 1;
@@ -1864,7 +1938,7 @@ export function startGame(opts: GameOptions): void {
     // La sacudida se aplica a una copia de la cámara: no cambia dónde mira el jugador.
     const [sx, sy] = shakeOffset(time);
     const view = sx || sy ? { ...cam, x: cam.x + sx * dpr(), y: cam.y + sy * dpr() } : cam;
-    render(ctx, state, view, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer });
+    render(ctx, state, view, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer, highlight });
     placeBubbles();
     requestAnimationFrame(frame);
   }

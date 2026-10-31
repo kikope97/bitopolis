@@ -1,4 +1,4 @@
-import { coverageSummary, type GameState, NEED_LABEL, ZONE_UNLOCK_POP, freeHomes, taxLevels } from '@bitopolis/sim';
+import { canUpgradeTownhall, coverageSummary, type GameState, NEED_LABEL, TOWNHALL_LEVELS, freeHomes, taxLevels, zonesUnlocked } from '@bitopolis/sim';
 import type { ToolId } from './tools.ts';
 
 export interface Hint {
@@ -38,9 +38,15 @@ export function nextHint(state: GameState): Hint {
       tool: TOOL[gap.key],
     };
   }
-  if (pop < ZONE_UNLOCK_POP) {
+  if (!zonesUnlocked(state)) {
+    const need = TOWNHALL_LEVELS[1]!;
+    if (pop >= need.pop) {
+      return canUpgradeTownhall(state).ok
+        ? { text: 'Toca el ayuntamiento y amplíalo a nivel 2: desbloquea las zonas R, C e I, el colegio y la policía.' }
+        : { text: `Para ampliar el ayuntamiento hacen falta ${need.cost} € en la caja. Espera a cobrar los tributos del mes.` };
+    }
     if (freeHomes(state) === 0 && !state.projects.some((p) => p.payer === 0)) {
-      return { text: `Construye casas para que llegue gente. Con ${ZONE_UNLOCK_POP} vecinos se desbloquean las zonas.`, tool: 'house' };
+      return { text: `Construye casas para que llegue gente. Con ${need.pop} vecinos podrás ampliar el ayuntamiento y desbloquear las zonas.`, tool: 'house' };
     }
     return { text: 'Hay casas libres. Pon el tiempo en marcha (▶, y acelera a x3) y espera a que llegue gente.' };
   }

@@ -901,3 +901,32 @@ html[data-text='200'] .tray-grid { grid-template-columns: repeat(auto-fill, minm
 @media (max-width: 420px) { .poll-word { display: none; } }
 .album-more summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 600; }
 .album-more .album-card { margin-top: 8px; }
+
+/* v1.8: calendario a x3/x10 (pasa la hoja cada día). */
+.calendar { position: absolute; left: max(8px, env(safe-area-inset-left)); top: 30px; width: 54px; display: flex; flex-direction: column; align-items: stretch; background: #f4f4f4; border: 2px solid #1a1c2c; border-radius: 2px; box-shadow: 2px 2px 0 #1a1c2c; pointer-events: none; text-align: center; z-index: 2; perspective: 120px; }
+.calendar[hidden] { display: none; }
+.cal-m { background: #b13e53; color: #f4f4f4; font-size: 10px; line-height: 14px; letter-spacing: 0.5px; }
+.cal-d { color: #1a1c2c; font-size: 20px; line-height: 26px; font-weight: bold; transform-origin: top; }
+.calendar.flip .cal-d { animation: cal-flip 0.25s steps(4) both; }
+@keyframes cal-flip { 0% { transform: rotateX(80deg); opacity: 0.3; } 100% { transform: rotateX(0); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .calendar.flip .cal-d { animation: none; } }
+
+/* v1.8: panel de gestión del ayuntamiento, a pantalla completa. */
+.sheet.full { top: 0; bottom: 0; left: 0; right: 0; width: auto; max-height: none; border: 0; border-top: 3px solid var(--accent); }
+@media (min-width: 720px) {
+  .sheet.full { top: 16px; bottom: 16px; left: 16px; right: 16px; width: auto; border: 3px solid var(--accent); }
+}
+.mg { display: grid; gap: 12px; grid-template-columns: 1fr; }
+@media (min-width: 720px) { .mg { grid-template-columns: repeat(2, 1fr); } .mg-hero { grid-column: 1 / -1; } }
+@media (min-width: 1100px) { .mg { grid-template-columns: repeat(3, 1fr); } }
+.mg-card { background: var(--bg); border: 2px solid var(--line); padding: 8px 12px; }
+.mg-card h3 { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.mg-hero { display: flex; gap: 12px; align-items: flex-start; }
+.mg-hall { width: 96px; height: 144px; image-rendering: pixelated; flex: none; }
+.mg-level { margin: 0 0 6px; color: var(--muted); }
+.mg-row { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.mg-row.neg strong { color: var(--bad); }
+.mg-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.mg-chip { padding: 2px 8px; border: 1px solid var(--line); background: var(--panel); }
+.mg-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.mg-why { margin-top: 4px; }

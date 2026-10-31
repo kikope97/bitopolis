@@ -51,9 +51,15 @@ const STEPS: Step[] = [
     done: (s) => s.citizens.length >= 2,
   },
   {
-    text: '¡Ya tienes vecinos! Con 10 se desbloquean las zonas R, C e I: abajo ves cuántos faltan. Si dudas, pulsa «?».',
+    text: '¡Ya tienes vecinos! Con 10 podrás ampliar el ayuntamiento (el edificio del centro) y desbloquear las zonas R, C e I: abajo ves cuántos faltan. Si dudas, pulsa «?».',
     target: () => null,
     done: (s) => s.citizens.length >= 10,
+  },
+  {
+    // v1.8: el ayuntamiento por niveles.
+    text: 'Toca el ayuntamiento (en el centro) y pulsa «Ampliar a nivel 2»: desbloquea las zonas, el colegio, la policía y los plenos.',
+    target: () => null,
+    done: (s) => (s.townhallLevel ?? 1) >= 2,
   },
   {
     // Ronda 12: el paso anterior no se cerraba nunca; ahora llega el momento del desbloqueo.

@@ -1,5 +1,5 @@
 import type { BuildKind, Command, ZoneKind } from '@bitopolis/shared';
-import { BUILD, buildCost, type GameState, TERRAIN, ZONE_COST_PER_TILE, ZONE_UNLOCK_POP } from '@bitopolis/sim';
+import { BUILD, BUILD_LEVEL, buildCost, type GameState, TERRAIN, TOWNHALL_LEVELS, townLevel, ZONE_COST_PER_TILE } from '@bitopolis/sim';
 import { money } from './i18n.ts';
 
 export type ToolId =
@@ -64,10 +64,34 @@ export const TOOLS: Tool[] = [
   { id: 'demolish', label: 'Derribar', shape: 'tap', key: 'x', help: 'Derriba un edificio o una carretera. Pide confirmación.' },
 ];
 
+/** Vecinos del hito (Plaza Mayor y Mercado). */
 export function unlockPop(tool: Tool): number {
-  if (tool.build) return BUILD[tool.build].unlockPop;
-  if (tool.zone && tool.zone !== 'none') return ZONE_UNLOCK_POP;
-  return 0;
+  return tool.build ? BUILD[tool.build].unlockPop : 0;
+}
+
+/** v1.8: nivel del ayuntamiento que pide la herramienta (las zonas, el 2). */
+export function toolLevel(tool: Tool): number {
+  if (tool.build) return BUILD_LEVEL[tool.build];
+  if (tool.zone && tool.zone !== 'none') return 2;
+  return 1;
+}
+
+/** Qué falta, en dos palabras («nivel 3», «hito de 50»), o null si está libre. */
+export function lockShort(tool: Tool, state: GameState): string | null {
+  const lv = toolLevel(tool);
+  if (townLevel(state) < lv) return `ayto. nivel ${lv}`;
+  if ((tool.build === 'plaza' || tool.build === 'market') && !state.unlocked.includes(tool.build)) return `hito de ${unlockPop(tool)}`;
+  return null;
+}
+
+/** Qué falta, explicado (para la bandeja, la franja y los avisos). */
+export function lockLong(tool: Tool, state: GameState): string {
+  const lv = toolLevel(tool);
+  if (townLevel(state) < lv) {
+    const L = TOWNHALL_LEVELS[lv - 1]!;
+    return `${tool.label}: llega con el ayuntamiento de nivel ${lv} (${L.name}; pide ${L.pop} vecinos y ${money(L.cost)}). Toca el ayuntamiento para ampliarlo.`;
+  }
+  return `${tool.label}: es el premio del hito de ${unlockPop(tool)} vecinos (tienes ${state.citizens.length}).`;
 }
 
 /** Coste corto para la barra de confirmación: «hasta 3.500 €». */
@@ -103,8 +127,7 @@ export function costText(tool: Tool): string {
 }
 
 export function isLocked(tool: Tool, state: GameState): boolean {
-  if (tool.build === 'plaza' || tool.build === 'market') return !state.unlocked.includes(tool.build);
-  return state.citizens.length < unlockPop(tool);
+  return lockShort(tool, state) !== null;
 }
 
 /** Comando para un trazo del jugador entre dos tiles. */
