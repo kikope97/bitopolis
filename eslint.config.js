@@ -10,7 +10,7 @@ const SIM_FORBIDDEN_GLOBALS = [
 ].map((name) => ({ name, message: 'sim es puro: sin DOM, red, temporizadores ni Node.' }));
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/node_modules/**', 'test-results/**', 'playwright-report/**'] },
+  { ignores: ['**/dist/**', '**/node_modules/**', 'test-results/**', 'playwright-report/**', '.probe/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

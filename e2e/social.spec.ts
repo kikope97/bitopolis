@@ -35,6 +35,7 @@ test('v0.4: ficha y hablar, pleno con promesa, consejero, diario y objetivos', a
   await page.locator('#menu').click();
   await page.getByRole('button', { name: 'Pleno municipal' }).click();
   await page.getByRole('button', { name: /Convocar pleno/ }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Convocar' }).click();
   await expect(page.locator('.petition').first()).toContainText('pide');
   await expect(page.locator('.petition').first()).toContainText('Votos');
   await expect(page.locator('.petition').first()).toContainText('Si prometes: plazo hasta');

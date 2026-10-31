@@ -47,9 +47,10 @@ test('v0.5: ajustes de accesibilidad, teclado y carretera con dos toques', async
   await shot('ajustes');
   await page.keyboard.press('Escape');
   // Modo tranquilo: x10 se queda en x1.
-  await expect(page.locator('[data-speed="10"]')).toHaveAttribute('aria-disabled', 'true');
-  await page.locator('[data-speed="10"]').click({ force: true });
-  await expect(page.locator('[data-speed="1"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#speed')).toHaveAttribute('aria-disabled', 'true');
+  await page.locator('#speed').click({ force: true });
+  await expect(page.locator('#speed')).toHaveText('x1');
+  await expect(page.locator('#play-pause')).toHaveAttribute('aria-pressed', 'false');
   await shot('texto-200');
   // Las preferencias se recuerdan al recargar.
   await page.reload();

@@ -44,8 +44,8 @@ const STEPS: Step[] = [
     done: (s) => has(s, 'house'),
   },
   {
-    text: 'Las obras tardan unos días. Pon el tiempo en marcha con «x3» (abajo).',
-    target: () => '[data-speed="3"]',
+    text: 'Las obras tardan unos días. Pon el tiempo en marcha con ▶ (abajo a la izquierda); el botón de al lado lo acelera.',
+    target: () => '#play-pause',
     done: (s) => s.citizens.length >= 2,
   },
   {

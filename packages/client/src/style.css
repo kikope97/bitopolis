@@ -600,3 +600,89 @@ body.placing #toasts { bottom: calc(200px + env(safe-area-inset-bottom)); }
 .bubble { max-width: min(220px, 60vw); padding: 5px 8px; font-size: 0.8rem; line-height: 1.25; box-shadow: 3px 3px 0 #333c57; }
 .bubble-text { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 @media (pointer: coarse) { .bubble { pointer-events: none; } }
+
+/* ---------- v1.4 (auditoría táctil): dock único, pulgar abajo, nada tapa el mapa ---------- */
+.dock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
+  padding-left: max(6px, env(safe-area-inset-left));
+  padding-right: max(6px, env(safe-area-inset-right));
+  background: var(--panel);
+}
+.dock > .sp { flex: 0 0 auto; min-width: 48px; min-height: 52px; }
+.dock .tools { flex: 1; min-width: 0; padding: 0; background: none; gap: 8px; scroll-snap-type: x proximity; }
+.dock .tool { scroll-snap-align: start; }
+/* Hay más herramientas a la derecha. */
+.tools.more { -webkit-mask-image: linear-gradient(90deg, #1a1c2c 82%, transparent); mask-image: linear-gradient(90deg, #1a1c2c 82%, transparent); }
+#play-pause[aria-pressed='true'] { border-color: var(--accent); color: var(--accent); }
+/* Respuesta visible al tocar. */
+.tool:active, .sp:active, .fab:active, .hud-btn:active { box-shadow: inset 3px 3px 0 #1a1c2c; background: var(--panel-2); }
+.hud-btn, .obj-toggle { min-height: 44px; }
+/* Botones del mapa abajo a la derecha (zona del pulgar), por encima de la barra de obra. */
+.float-right { top: auto; bottom: 8px; gap: 8px; }
+body.placing .float-right { bottom: 76px; }
+/* La ayuda de la herramienta se quita mientras se confirma una obra (y nunca enseña media línea). */
+.tool-info { max-height: calc(2.6em + 10px); }
+body.placing .tool-info { display: none; }
+/* Tutorial abajo, junto al dock y a la izquierda de los botones; mientras hay tutorial, sin objetivos. */
+.tut-box { top: auto; bottom: calc(var(--dock-h, 64px) + 8px); }
+body:has(.tut-box) .objectives { display: none; }
+/* Leyenda de capas abajo a la izquierda, sin tapar los botones. */
+.legend { top: auto; bottom: 8px; max-width: calc(100% - 68px); }
+/* Avisos encima del dock. */
+#toasts { bottom: calc(var(--dock-h, 64px) + 8px + env(safe-area-inset-bottom)); }
+body.placing #toasts { bottom: calc(var(--dock-h, 64px) + 76px + env(safe-area-inset-bottom)); }
+/* Hojas por encima del dock: con una hoja abierta se puede pausar igual; asa para arrastrar. */
+.sheet { bottom: var(--dock-h, 0px); max-height: calc(88dvh - var(--dock-h, 0px)); padding-bottom: 0; }
+.sheet::before { content: ''; display: block; width: 40px; height: 4px; margin: 6px auto 0; background: var(--line); }
+.confirm-bar p { overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+@media (max-width: 719px) {
+  .sheet-head { padding: 2px 8px 2px 12px; }
+  .sheet-head h2 { font-size: 1.05rem; }
+  .dock .tool { width: 58px; }
+}
+/* Texto al 200 %: solo los iconos en el dock (el nombre sigue en title y en el lector). */
+html[data-text='200'] .dock .tool-label { display: none; }
+html[data-text='200'] .tut-box { max-height: 40dvh; overflow: auto; }
+
+/* Horizontal en móvil: herramientas en una columna a la izquierda y el mapa al resto. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .game { display: grid; grid-template-columns: 76px 1fr; grid-template-rows: auto auto 1fr; }
+  .hud { grid-column: 1 / 3; }
+  .demand { grid-column: 1 / 3; }
+  .map-wrap { grid-column: 2; grid-row: 3; }
+  .dock { grid-column: 1; grid-row: 3; flex-direction: column; align-items: stretch; padding: 4px; min-height: 0; overflow: hidden; }
+  .dock .tools { flex-direction: column; overflow-x: hidden; overflow-y: auto; }
+  .dock .tool { width: auto; }
+  .tools.more { -webkit-mask-image: none; mask-image: none; }
+  .sheet { bottom: 0; left: 76px; max-height: 90dvh; }
+  #toasts { bottom: 8px; left: 84px; }
+  .tut-box { bottom: 8px; left: 84px; }
+}
+/* Menú ☰ en rejilla (ronda 10). */
+.menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 12px; }
+.menu-grid .menu-item { min-height: 56px; padding: 6px 8px; font-size: 0.95rem; line-height: 1.2; }
+.menu-foot { display: flex; gap: 8px; justify-content: space-between; }
+.menu-foot .btn { flex: 1; }
+/* Horizontal compacto: cabecera fina, sin la barra de demanda (sigue en el parte), dock más bajo. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .hud { padding: 0 8px; font-size: 0.85rem; flex-wrap: nowrap; }
+  .demand { display: none; }
+  .dock > .sp { min-height: 44px; }
+  .dock .tool { min-height: 52px; }
+  .tool-icon { height: 26px; }
+  .tool-icon canvas { width: 22px; height: 33px; }
+  .tool-label { font-size: 0.68rem; }
+  .objectives { max-width: 45%; }
+}
+/* Pantallas de 320–360 px: herramientas algo más estrechas para que quepan tres. */
+@media (max-width: 380px) {
+  .dock { gap: 6px; padding-left: 4px; padding-right: 4px; }
+  .dock > .sp { min-width: 44px; }
+  .dock .tools { gap: 6px; }
+  .dock .tool { width: 54px; }
+  .tool-label { font-size: 0.66rem; }
+}

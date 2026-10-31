@@ -1,5 +1,6 @@
 import { gzipSync } from 'node:zlib';
 import { expect, test } from '@playwright/test';
+import { setSpeed } from './helpers.ts';
 import { runSimulation } from '../packages/sim/src/index.ts';
 
 /** Pueblo con impuestos altos a 4 días de votar: hay partido rival y la intención de voto es baja. */
@@ -28,12 +29,13 @@ test('v1.0: intención de voto, facciones, noche electoral y oposición', async 
   await expect(page.locator('.sheet')).toContainText('Jóvenes por Bitópolis');
   await expect(page.locator('.faction')).toHaveCount(4);
   await shot('1-politica');
-  await page.getByRole('button', { name: 'Hacer campaña' }).first().click();
+  await page.getByRole('button', { name: /Hacer campaña con/ }).first().click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Hacer campaña' }).click();
   await expect(page.locator('.sheet')).toContainText('Campaña: ●');
   await page.locator('.sheet-close').click();
 
   // Se juega hasta las elecciones.
-  await page.locator('[data-speed="10"]').click();
+  await setSpeed(page, 10);
   await expect(page.locator('.sheet h2')).toHaveText('Noche electoral', { timeout: 60_000 });
   await expect(page.locator('.sheet')).toContainText('votos');
   await page.waitForTimeout(1600);

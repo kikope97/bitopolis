@@ -26,7 +26,7 @@ import { tickToDate } from '@bitopolis/shared';
 import { api } from './api.ts';
 import { formatDate, money } from './i18n.ts';
 import { portraitSprite } from './sprites.ts';
-import { $, h, sheet, toast } from './ui.ts';
+import { $, confirmDialog, h, sheet, toast } from './ui.ts';
 
 type Cmd = (c: Command) => Promise<boolean>;
 
@@ -147,6 +147,8 @@ export function openPleno(ctx: SocialCtx): void {
   if (!state.pleno) {
     const go = h('button', { class: 'btn primary wide' }, `Convocar pleno (${money(PLENO_COST)})`);
     go.addEventListener('click', async () => {
+      // Cuesta dinero: se confirma (ronda 10).
+      if (!(await confirmDialog('Convocar pleno', `Cuesta ${money(PLENO_COST)} y solo hay uno al mes.`, 'Convocar'))) return;
       if (await ctx.command({ type: 'ConvenePleno' })) {
         toast(`Pleno convocado: −${money(PLENO_COST)}`, { kind: 'info' });
         reopen();
@@ -262,9 +264,9 @@ export function renderObjectives(state: GameState): void {
   const folded = (() => {
     try {
       const v = localStorage.getItem('bitopolis.objectives');
-      return v ? v === 'plegado' : window.innerWidth < 720;
+      return v ? v === 'plegado' : window.innerWidth < 720 || window.innerHeight < 500;
     } catch {
-      return window.innerWidth < 720;
+      return window.innerWidth < 720 || window.innerHeight < 500;
     }
   })();
   const sig = `${list.map((o) => o.id).join(',')}|${folded}`;

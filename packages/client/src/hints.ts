@@ -25,7 +25,7 @@ export function nextHint(state: GameState): Hint {
     if (freeHomes(state) === 0 && !state.projects.some((p) => p.payer === 0)) {
       return { text: `Construye casas para que llegue gente. Con ${ZONE_UNLOCK_POP} vecinos se desbloquean las zonas.`, tool: 'house' };
     }
-    return { text: 'Hay casas libres. Pon el tiempo a x3 y espera a que llegue gente.' };
+    return { text: 'Hay casas libres. Pon el tiempo en marcha (▶, y acelera a x3) y espera a que llegue gente.' };
   }
   const { R, C, I } = state.demand;
   const zoned = (z: number) => state.map.zones.some((v, i) => v === z && !state.buildings.some((b) => b.y * state.map.w + b.x === i));

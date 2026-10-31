@@ -20,7 +20,7 @@ import { LAYERS, type LayerId } from './layers.ts';
 import { openAdvisor, openCitizen, openDiary, openPleno, rememberSeen, renderObjectives, resumeSummary, type SocialCtx } from './social-ui.ts';
 import { api, ApiError } from './api.ts';
 import { nextHint } from './hints.ts';
-import { formatDate, money, plural, t } from './i18n.ts';
+import { formatDate, money, plural, shortDate, t } from './i18n.ts';
 import { type Camera, type Preview, render } from './render.ts';
 import type { FromWorker, SaveBatch, ToWorker } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
@@ -35,7 +35,9 @@ import { openSettings } from './settings-ui.ts';
 import { openElectionNight, openPolitics, renderPollChip } from './politics-ui.ts';
 import { timeOfDay } from './render.ts';
 
+/** Margen entre toque y arrastre: con el dedo, más (un temblor no es un arrastre). */
 const DRAG_PX = 10;
+const DRAG_PX_TOUCH = 18;
 const DESIRE_TEXT: Record<string, string> = {
   trabajo_cerca: 'trabajar cerca de casa',
   casa_propia: 'tener casa propia',
@@ -215,7 +217,7 @@ export function startGame(opts: GameOptions): void {
   function calmPause() {
     if (prefs().calm && speed > 0) {
       setSpeed(0);
-      toast('Modo tranquilo: juego en pausa. Pulsa x1 para seguir.', { kind: 'info' });
+      toast('Modo tranquilo: juego en pausa. Pulsa ▶ para seguir.', { kind: 'info' });
     }
   }
 
@@ -236,7 +238,10 @@ export function startGame(opts: GameOptions): void {
       }
     }
     const d = tickToDate(state.tick);
-    $('#hud-date').textContent = formatDate(d);
+    // En pantallas estrechas, cabecera en formato corto (v1.4: se salía por la derecha).
+    const narrow = window.innerWidth < 400;
+    $('#hud-date').textContent = narrow ? shortDate(d) : formatDate(d);
+    $('#hud-date').setAttribute('aria-label', formatDate(d));
     if (d.hour === 0 || dayAgoTreasury.length === 0) {
       dayAgoTreasury.push(state.treasury);
       if (dayAgoTreasury.length > 2) dayAgoTreasury.shift();
@@ -246,7 +251,8 @@ export function startGame(opts: GameOptions): void {
     const mEl = $('#hud-money');
     mEl.textContent = `${money(state.treasury)} ${arrow}`;
     mEl.classList.toggle('neg', state.treasury < 0);
-    $('#hud-pop').textContent = plural(state.citizens.length, 'vecino', 'vecinos');
+    $('#hud-pop').textContent = narrow ? `${state.citizens.length} hab.` : plural(state.citizens.length, 'vecino', 'vecinos');
+    $('#hud-pop').setAttribute('aria-label', plural(state.citizens.length, 'vecino', 'vecinos'));
     const happy = state.citizens.length ? Math.round(state.citizens.reduce((s, c) => s + c.happiness, 0) / state.citizens.length) : 0;
     $('#hud-happy').textContent = `☺ ${happy}`;
     renderPollChip(state, () => openPolitics(social));
@@ -279,7 +285,19 @@ export function startGame(opts: GameOptions): void {
     }
   }
 
+  let lockSig = '';
   function updateToolLocks() {
+    // Las bloqueadas, al final (y «Derribar», siempre lo último): la barra empieza por lo que se puede usar.
+    const sig = TOOLS.map((tl) => (isLocked(tl, state) ? 1 : 0)).join('');
+    if (sig !== lockSig) {
+      lockSig = sig;
+      const order = [...TOOLS].sort((a, b) => rank(a) - rank(b));
+      for (const tl of order) {
+        const btn = bar.querySelector(`[data-tool="${tl.id}"]`);
+        if (btn) bar.append(btn);
+      }
+      updateToolsHint();
+    }
     for (const tl of TOOLS) {
       const btn = document.querySelector<HTMLButtonElement>(`[data-tool="${tl.id}"]`);
       if (!btn) continue;
@@ -289,6 +307,15 @@ export function startGame(opts: GameOptions): void {
       const lock = btn.querySelector('.lock')!;
       lock.textContent = locked ? `🔒${unlockPop(tl)}` : '';
     }
+  }
+
+  function rank(tl: Tool): number {
+    if (tl.id === 'demolish') return 99;
+    return (isLocked(tl, state) ? 50 : 0) + TOOLS.indexOf(tl);
+  }
+  /** Degradado a la derecha mientras queden herramientas por ver. */
+  function updateToolsHint() {
+    bar.classList.toggle('more', bar.scrollLeft + bar.clientWidth < bar.scrollWidth - 4);
   }
 
   function announceEvents() {
@@ -360,7 +387,8 @@ export function startGame(opts: GameOptions): void {
         calmPause();
         openElectionNight(social);
       } else if (e.kind === 'politics') {
-        if (quiet && !e.text.startsWith('Faltan')) continue;
+        // Lo que responde a una acción tuya (moción, campaña) se avisa siempre.
+        if (quiet && !e.text.startsWith('Faltan') && !/moción|campaña/i.test(e.text)) continue;
         toast(e.text, { kind: e.text.startsWith('Faltan') && state.politics.approval < 50 ? 'warn' : 'info', sticky: e.text.startsWith('Faltan'), onClick: () => openPolitics(social) });
         if (e.text.startsWith('Faltan') || e.text.includes('funda')) calmPause();
       } else if (e.kind === 'departure' || e.kind === 'business') {
@@ -457,6 +485,8 @@ export function startGame(opts: GameOptions): void {
   /* ---------- cámara ---------- */
   function resize() {
     const r = canvas.getBoundingClientRect();
+    document.documentElement.style.setProperty('--dock-h', `${Math.round($('#dock').getBoundingClientRect().height)}px`);
+    updateToolsHint();
     // El tutorial (fijo) se coloca justo debajo de donde empieza el mapa.
     document.documentElement.style.setProperty('--map-top', `${Math.round(r.top)}px`);
     const oldCenter = { x: cam.x + canvas.width / 2, y: cam.y + canvas.height / 2, ts: tileSize() };
@@ -474,14 +504,15 @@ export function startGame(opts: GameOptions): void {
     clampCam();
   }
   function clampCam() {
-    const mw = state.map.w * tileSize();
-    const mh = state.map.h * tileSize();
-    const mx = canvas.width / 2;
-    const my = canvas.height / 2;
-    cam.x = Math.max(-mx, Math.min(mw - mx, cam.x));
-    cam.y = Math.max(-my, Math.min(mh - my, cam.y));
+    // Como mucho 2 casillas de borde (antes se podía dejar media pantalla vacía).
+    const pad = 2 * tileSize();
+    const axis = (pos: number, size: number, view: number) =>
+      size + 2 * pad <= view ? Math.round((size - view) / 2) : Math.max(-pad, Math.min(size - view + pad, pos));
+    cam.x = axis(cam.x, state.map.w * tileSize(), canvas.width);
+    cam.y = axis(cam.y, state.map.h * tileSize(), canvas.height);
   }
-  const minZoom = () => Math.max(1, Math.floor(dpr() / 2));
+  // Casillas de al menos 24 px en pantalla: más pequeñas no se aciertan con el dedo.
+  const minZoom = () => Math.max(1, Math.ceil((24 * dpr()) / T));
   const maxZoom = () => Math.round(dpr() * 4);
   function setZoom(z: number, ax = canvas.width / 2, ay = canvas.height / 2) {
     const nz = Math.max(minZoom(), Math.min(maxZoom(), Math.round(z)));
@@ -520,7 +551,41 @@ export function startGame(opts: GameOptions): void {
     return { tiles: tilesOf(cmd), ok: validateCommand(state, cmd).ok };
   }
 
+  /** Inercia al soltar un deslizamiento (v1.4); un toque la detiene. */
+  let fling = { vx: 0, vy: 0, t: 0 };
+  let flingRaf = 0;
+  function startFling() {
+    let { vx, vy } = fling;
+    let last = performance.now();
+    const step = (now: number) => {
+      const dt = now - last;
+      last = now;
+      cam.x -= Math.round(vx * dt * dpr());
+      cam.y -= Math.round(vy * dt * dpr());
+      clampCam();
+      vx *= Math.pow(0.94, dt / 16);
+      vy *= Math.pow(0.94, dt / 16);
+      if (Math.hypot(vx, vy) > 0.02) flingRaf = requestAnimationFrame(step);
+    };
+    if (Math.hypot(vx, vy) > 0.25 && !reducedMotion()) flingRaf = requestAnimationFrame(step);
+  }
+  /**
+   * Los edificios sobresalen media casilla por arriba: tocar el tejado debe
+   * elegir ese edificio, no la casilla vacía de encima (Mirar y Derribar).
+   */
+  function pickTile(cx: number, cy: number, t: { x: number; y: number }): { x: number; y: number } {
+    if (tool.id !== 'inspect' && tool.id !== 'demolish') return t;
+    const here = state.buildings.some((b) => b.x === t.x && b.y === t.y);
+    const below = state.buildings.some((b) => b.x === t.x && b.y === t.y + 1);
+    if (here || !below) return t;
+    const r = canvas.getBoundingClientRect();
+    const fy = (((cy - r.top) * dpr() + cam.y) / tileSize()) % 1;
+    return fy >= 0.5 ? { x: t.x, y: t.y + 1 } : t;
+  }
+
   canvas.addEventListener('pointerdown', (e) => {
+    cancelAnimationFrame(flingRaf);
+    fling = { vx: 0, vy: 0, t: performance.now() };
     touchInput = e.pointerType !== 'mouse';
     canvas.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -560,13 +625,22 @@ export function startGame(opts: GameOptions): void {
       return;
     }
     const moved = Math.hypot(e.clientX - gesture.sx, e.clientY - gesture.sy);
-    if (gesture.mode === 'pending' && moved > DRAG_PX) {
-      gesture.mode = tool.shape === 'tap' ? 'pan' : 'paint';
+    if (gesture.mode === 'pending' && moved > (touchInput ? DRAG_PX_TOUCH : DRAG_PX)) {
+      // Con el dedo, arrastrar mueve el mapa; solo traza si empieza en el inicio ya marcado
+      // (antes, con Carretera o Zona elegida no había forma de mover el mapa con un dedo).
+      const fromAnchor = !!anchor && !!gesture.startTile && anchor.x === gesture.startTile.x && anchor.y === gesture.startTile.y;
+      gesture.mode = tool.shape === 'tap' || (touchInput && !fromAnchor) ? 'pan' : 'paint';
     }
     if (gesture.mode === 'pan') {
-      cam.x -= Math.round((e.clientX - prev.x) * dpr());
-      cam.y -= Math.round((e.clientY - prev.y) * dpr());
+      const dx = e.clientX - prev.x;
+      const dy = e.clientY - prev.y;
+      cam.x -= Math.round(dx * dpr());
+      cam.y -= Math.round(dy * dpr());
       clampCam();
+      // Velocidad para la inercia (px CSS por ms, suavizada).
+      const now = performance.now();
+      const dt = Math.max(1, now - fling.t);
+      fling = { vx: fling.vx * 0.6 + (dx / dt) * 0.4, vy: fling.vy * 0.6 + (dy / dt) * 0.4, t: now };
     } else if (gesture.mode === 'paint' && gesture.startTile) {
       const t1 = tileAt(e.clientX, e.clientY);
       if (t1) preview = previewFor(gesture.startTile, t1);
@@ -586,8 +660,9 @@ export function startGame(opts: GameOptions): void {
       preview = null;
       return;
     }
+    if (g.mode === 'pan' && touchInput && performance.now() - fling.t < 80) startFling();
     const t1 = tileAt(e.clientX, e.clientY);
-    if (g.mode === 'pending' && t1) void tapTile(t1);
+    if (g.mode === 'pending' && t1 && performance.now() >= quietUntil) void tapTile(pickTile(e.clientX, e.clientY, t1));
     if (g.mode === 'paint' && g.startTile && t1) {
       // Con el dedo, el trazado se enseña y se confirma; con ratón, se hace al soltar.
       if (touchInput) proposePlace(g.startTile, t1);
@@ -667,8 +742,7 @@ export function startGame(opts: GameOptions): void {
       return;
     }
     if (touchInput && tool.build) {
-      // Mismo sitio otra vez: confirma. Otro sitio: mueve la obra.
-      if (pendingPlace && pendingPlace.a.x === tile.x && pendingPlace.a.y === tile.y) return confirmPlace();
+      // Con el dedo solo construye el botón «Construir»: un doble toque no gasta (ronda 10).
       return proposePlace(tile, tile);
     }
     const cmd = commandFor(tool, tile, tile);
@@ -695,8 +769,12 @@ export function startGame(opts: GameOptions): void {
     document.body.classList.add('placing');
   }
 
+  /** Tras confirmar, unos instantes sin toques en el mapa: los toques repetidos no proponen otra obra. */
+  let quietUntil = 0;
   async function confirmPlace() {
     const p = pendingPlace;
+    quietUntil = performance.now() + 500;
+    vibrate(15);
     cancelPlace();
     if (!p) return;
     const cmd = commandFor(tool, p.a, p.b);
@@ -816,6 +894,7 @@ export function startGame(opts: GameOptions): void {
 
   const bar = $('#tools');
   bar.replaceChildren();
+  bar.addEventListener('scroll', updateToolsHint, { passive: true });
   for (const tl of TOOLS) {
     const btn = h(
       'button',
@@ -834,9 +913,12 @@ export function startGame(opts: GameOptions): void {
     for (const b of bar.querySelectorAll('.tool')) b.setAttribute('aria-pressed', String(b.getAttribute('data-tool') === id));
     const info = $('#tool-info');
     const locked = isLocked(tl, state);
+    // Con «Mirar» no hace falta la frase fija sobre el mapa (ronda 10: tapaba sitio).
     info.textContent = locked
       ? `${tl.label}: se desbloquea con ${unlockPop(tl)} vecinos.`
-      : `${tl.label}: ${tl.help}${costText(tl) ? ` · ${costText(tl)}` : ''}`;
+      : tl.id === 'inspect'
+        ? ''
+        : `${tl.label}: ${tl.help}${costText(tl) ? ` · ${costText(tl)}` : ''}`;
     selected = null;
     anchor = null;
     pendingEnd = null;
@@ -985,13 +1067,17 @@ export function startGame(opts: GameOptions): void {
   const openAccounts = () => openReport(state);
 
   function openMenu() {
-    const item = (label: string, fn: () => void) => {
-      const b = h('button', { class: 'btn wide' }, label);
+    const item = (label: string, fn: () => void, cls = 'btn menu-item') => {
+      const b = h('button', { class: cls }, label);
       b.addEventListener('click', fn);
       return b;
     };
+    // Rejilla de 2 columnas (ronda 10): antes eran 11 botones apilados con scroll.
     sheet(
       'Menú',
+      h(
+        'div',
+        { class: 'menu-grid' },
       item('Impuestos', openTaxes),
       item('Parte mensual', openAccounts),
       item('Vecinos', () => openNeighbours(state, (c) => openCitizen(social, c.id))),
@@ -1005,15 +1091,20 @@ export function startGame(opts: GameOptions): void {
             item('Qué se envía a la IA', () => void openPreview(token)),
           ]
         : []),
-      item('Ajustes (sonido y accesibilidad) · tecla O', openSettings),
-      item('Repetir tutorial', () => {
-        closeSheet();
-        tutorial.start(state, true);
-      }),
-      item('Volver al inicio', () => {
-        closeSheet();
-        exit();
-      }),
+      item('Ajustes', openSettings),
+      ),
+      h(
+        'div',
+        { class: 'menu-foot' },
+        item('Repetir tutorial', () => {
+          closeSheet();
+          tutorial.start(state, true);
+        }, 'btn small'),
+        item('Volver al inicio', () => {
+          closeSheet();
+          exit();
+        }, 'btn small'),
+      ),
     );
   }
 
@@ -1034,9 +1125,22 @@ export function startGame(opts: GameOptions): void {
       );
     }
     speed = s;
+    if (s > 0) lastSpeed = s;
     send({ type: 'speed', speed: s });
     $('#sr-live').textContent = s === 0 ? 'Juego en pausa' : `Velocidad x${s}`;
-    for (const b of document.querySelectorAll('[data-speed]')) b.setAttribute('aria-pressed', String(Number(b.getAttribute('data-speed')) === s));
+    paintSpeed();
+  }
+  /** ⏯ y el botón de velocidad (x1 → x3 → x10) del dock (v1.4). */
+  let lastSpeed = 1;
+  function paintSpeed() {
+    const play = $('#play-pause');
+    play.textContent = speed === 0 ? '▶' : '❚❚';
+    play.setAttribute('aria-label', speed === 0 ? `Poner en marcha (x${lastSpeed})` : 'Pausa');
+    play.setAttribute('aria-pressed', String(speed === 0));
+    const sp = $('#speed');
+    sp.textContent = `x${lastSpeed}`;
+    sp.dataset.speed = String(lastSpeed);
+    sp.setAttribute('aria-label', `Velocidad x${lastSpeed}. Toca para cambiarla`);
   }
 
   const onVisibility = () => {
@@ -1075,9 +1179,13 @@ export function startGame(opts: GameOptions): void {
     }, 150);
   }
 
-  for (const b of document.querySelectorAll<HTMLButtonElement>('[data-speed]')) {
-    b.onclick = () => setSpeed(Number(b.dataset.speed));
-  }
+  $('#play-pause').onclick = () => setSpeed(speed === 0 ? lastSpeed : 0);
+  $('#speed').onclick = () => {
+    if (prefs().calm) return setSpeed(1);
+    const next = ({ 1: 3, 3: 10, 10: 1 } as Record<number, number>)[lastSpeed] ?? 1;
+    setSpeed(next);
+  };
+  paintSpeed();
   $('#layers').onclick = () => {
     const ids = LAYERS.map((l) => l.id);
     layer = ids[(ids.indexOf(layer) + 1) % ids.length]!;
@@ -1139,7 +1247,7 @@ export function startGame(opts: GameOptions): void {
   if (away && away.length) toast(`Desde tu última visita: ${away.join(' · ')}`, { sticky: true });
   tutorial.start(state);
   tutorial.update(state, tool.id);
-  if (!tutorial.active) toast('En pausa. Pulsa x1 para que pase el tiempo.');
+  if (!tutorial.active) toast('En pausa. Pulsa ▶ (abajo a la izquierda) para que pase el tiempo.');
   // Sonido: se desbloquea con el primer gesto; el ambiente sigue la hora del juego.
   const unlock = () => unlockAudio();
   window.addEventListener('pointerdown', unlock, { once: true });
@@ -1148,7 +1256,7 @@ export function startGame(opts: GameOptions): void {
   startAmbience(() => timeOfDay(state.tick) === 'night');
   // Al activar el modo tranquilo con x3/x10 puestos, se baja a x1.
   const markCalm = () => {
-    for (const b of document.querySelectorAll('[data-speed="3"], [data-speed="10"]')) b.setAttribute('aria-disabled', String(prefs().calm));
+    $('#speed').setAttribute('aria-disabled', String(prefs().calm));
   };
   markCalm();
   const offPrefs = onPrefs((p) => {

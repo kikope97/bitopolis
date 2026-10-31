@@ -93,8 +93,20 @@ export function currentSheet(): HTMLElement | null {
   return openSheetEl;
 }
 
-export function closeSheet() {
+let backBound = false;
+function bindBack() {
+  if (backBound) return;
+  backBound = true;
+  window.addEventListener('popstate', () => {
+    if (openSheetEl) closeSheet(true);
+  });
+}
+
+export function closeSheet(fromBack = false) {
+  bindBack();
   if (!openSheetEl) return;
+  // Cerrada con ✕ o Esc: se quita también la entrada del historial que puso la hoja.
+  if (!fromBack && history.state?.sheet) history.back();
   document.body.classList.remove('election-night');
   openSheetEl.remove();
   openSheetEl = null;
@@ -131,8 +143,11 @@ export function sheet(title: string | Node, ...content: (Node | string)[]): HTML
     openSheetEl = null;
   }
   lastFocus = keepFocus;
+  // El botón atrás del móvil cierra la hoja en vez de salir de la partida (ronda 10).
+  bindBack();
+  if (!history.state?.sheet) history.pushState({ ...(history.state ?? {}), sheet: true }, '');
   const close = h('button', { class: 'sheet-close', 'aria-label': 'Cerrar' }, '✕');
-  close.addEventListener('click', closeSheet);
+  close.addEventListener('click', () => closeSheet());
   const el = h(
     'section',
     { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'sheet-title' },

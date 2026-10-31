@@ -43,6 +43,11 @@ export function plural(n: number, one: string, many: string): string {
 
 export const money = (n: number) => `${new Intl.NumberFormat('es-ES').format(n)} €`;
 
+/** «1 ene A2»: para la cabecera en pantallas estrechas. */
+export function shortDate(d: { year: number; month: number; day: number }): string {
+  return `${d.day} ${MONTHS[d.month - 1]!.slice(0, 3).toLowerCase()} A${d.year}`;
+}
+
 export function formatDate(d: { year: number; month: number; day: number }): string {
   return `${d.day} ${MONTHS[d.month - 1]} · Año ${d.year}`;
 }

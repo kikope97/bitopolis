@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { state, tile } from './helpers.ts';
+import { state, tile, setSpeed } from './helpers.ts';
 
 /**
  * v1.4: juego con el dedo de verdad (eventos táctiles por CDP, no ratón).
@@ -71,15 +71,20 @@ test('táctil: con un edificio elegido, arrastrar mueve el mapa y no construye n
   expect((await state(page)).buildings.length).toBe(n0);
 });
 
-test('táctil: carretera arrastrando se enseña y se confirma', async ({ page }) => {
+test('táctil: carretera con dos toques (un dedo arrastrando mueve el mapa) se enseña y se confirma', async ({ page }) => {
   await start(page);
   const t = await touch(page);
   const s0 = await state(page);
   const th = s0.buildings.find((b: { kind: string }) => b.kind === 'townhall');
   await page.locator('[data-tool="road"]').click();
   const a = await tile(page, th.x - 2, th.y + 3);
-  const b = await tile(page, th.x + 2, th.y + 3);
-  await t.drag(a, b);
+  // Arrastrar sin inicio marcado mueve el mapa, no traza.
+  await t.drag({ x: a.x, y: a.y }, { x: a.x - 60, y: a.y });
+  await expect(page.locator('#confirm-bar')).toBeHidden();
+  const a2 = await tile(page, th.x - 2, th.y + 3);
+  const b2 = await tile(page, th.x + 2, th.y + 3);
+  await t.tap(a2.x, a2.y);
+  await t.tap(b2.x, b2.y);
   await expect(page.locator('#confirm-bar')).toBeVisible();
   await expect(page.locator('#confirm-text')).toContainText('5 casillas');
   await page.locator('#confirm-yes').click();
@@ -95,7 +100,7 @@ test('el menú ☰ no se cambia solo por la última ficha mirada (el «menú en 
   await page.mouse.click(p.x, p.y);
   await expect(page.locator('.sheet h2')).toHaveText('Ayuntamiento');
   await page.locator('.sheet-close').click();
-  await page.locator('[data-speed="3"]').click();
+  await setSpeed(page, 3);
   await page.locator('#menu').click();
   await expect(page.locator('.sheet h2')).toHaveText('Menú');
   await page.waitForTimeout(2500);
