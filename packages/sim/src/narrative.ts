@@ -88,9 +88,11 @@ export function diary(state: GameState, maxDays = 12): DiaryEntry[] {
   return days.map((d) => {
     const evs = byDay.get(d)!;
     const date = tickToDate(d * TICKS_PER_DAY);
-    const arrivals = evs.filter((e) => e.kind === 'arrival').length;
-    const lines = evs.filter((e) => e.kind !== 'arrival').map((e) => e.text);
-    if (arrivals === 1) lines.unshift(evs.find((e) => e.kind === 'arrival')!.text);
+    // Solo se agrupan los forasteros; bebés e hijos que se independizan, cada uno con su línea.
+    const own = (e: { kind: string; text: string }) => e.kind === 'arrival' && /bebé|independiza/.test(e.text);
+    const arrivals = evs.filter((e) => e.kind === 'arrival' && !own(e)).length;
+    const lines = evs.filter((e) => e.kind !== 'arrival' || own(e)).map((e) => e.text);
+    if (arrivals === 1) lines.unshift(evs.find((e) => e.kind === 'arrival' && !own(e))!.text);
     else if (arrivals > 1) lines.unshift(`Llegan ${arrivals} vecinos nuevos al pueblo`);
     return { tick: d * TICKS_PER_DAY, date: `${date.day}/${date.month}, año ${date.year}`, lines };
   });

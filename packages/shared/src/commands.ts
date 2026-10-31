@@ -29,6 +29,10 @@ export const Command = z.discriminatedUnion('type', [
   z.object({ type: z.literal('NotifyProject'), buildingId: z.number().int().min(1), on: z.boolean() }),
   /** Pleno municipal: convocar, responder a cada petición y cerrar. */
   z.object({ type: z.literal('ConvenePleno') }),
+  // v1.5: presupuesto anual, fiestas y subvenciones.
+  z.object({ type: z.literal('ProposeBudget'), plan: z.enum(['austero', 'equilibrado', 'inversor']) }),
+  z.object({ type: z.literal('HoldFestival'), size: z.enum(['pequena', 'grande']) }),
+  z.object({ type: z.literal('AnswerGrant'), grantId: z.number().int().min(1), accept: z.boolean() }),
   z.object({ type: z.literal('AnswerPetition'), petitionId: z.number().int().min(1), answer: z.enum(['promise', 'reject']) }),
   z.object({ type: z.literal('ClosePleno') }),
   /** Hablar con un vecino: solo preguntas predefinidas (nunca texto libre). */

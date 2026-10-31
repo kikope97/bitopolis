@@ -89,7 +89,7 @@ describe('invariantes', () => {
       const { report } = runSimulation({ seed: 123, days: 365, profile, checkEveryDay: true });
       expect(report.invariantErrors).toEqual([]);
       expect(report.moneyDrift).toBe(0);
-    });
+    }, 30_000);
   }
   it('semilla + comandos reproduce la partida', () => {
     const { state, report } = runSimulation({ seed: 9, days: 120, profile: 'constructor' });

@@ -97,6 +97,14 @@ export const MIGRATIONS: Record<number, Migration> = {
   }),
   // 7 → 8 (v1.3): registro de lo que hace el gobierno rival.
   7: (s) => ({ ...s, formatVersion: 8, politics: { ...s.politics, log: s.politics?.log ?? [] } }),
+  // 8 → 9 (v1.5): presupuesto anual, fiestas y subvenciones (los hijos son opcionales en cada vecino).
+  8: (s) => ({
+    ...s,
+    formatVersion: 9,
+    budget: s.budget ?? { year: 1, plan: 'equilibrado', status: 'approved', votesFor: 0, votesAgainst: 0 },
+    festival: s.festival ?? { name: null, year: 0, size: 'none', until: 0 },
+    grants: s.grants ?? [],
+  }),
 };
 
 export function migrate(raw: unknown): GameState {

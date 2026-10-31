@@ -1,3 +1,4 @@
+import { answerGrant, canAnswerGrant, canHoldFestival, canProposeBudget, holdFestival, materialsCost, proposeBudget } from './civic.ts';
 import { Command, tickToDate, type BuildKind, type ZoneKind } from '@bitopolis/shared';
 import { BUILD, DEBT_LIMIT, WAGE_OUTSIDE, ZONE_COST_PER_TILE, ZONE_UNLOCK_POP } from './balance.ts';
 import { applyDecision, canApplyDecision } from './decisions.ts';
@@ -149,6 +150,18 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       const r = canConvenePleno(state);
       return r.ok ? { ok: true } : { ok: false, error: r.error! };
     }
+    case 'ProposeBudget': {
+      const r = canProposeBudget(state);
+      return r.ok ? { ok: true } : { ok: false, error: r.error! };
+    }
+    case 'HoldFestival': {
+      const r = canHoldFestival(state, cmd.size);
+      return r.ok ? { ok: true } : { ok: false, error: r.error! };
+    }
+    case 'AnswerGrant': {
+      const r = canAnswerGrant(state, cmd.grantId);
+      return r.ok ? { ok: true } : { ok: false, error: r.error! };
+    }
     case 'AnswerPetition':
       return state.pleno?.petitions.some((p) => p.id === cmd.petitionId && !p.answer) ? { ok: true } : { ok: false, error: 'Esa petición ya está respondida' };
     case 'Campaign': {
@@ -216,7 +229,7 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
     case 'Build': {
       if (cmd.kind === 'road') return applyCommand(state, { type: 'BuildRoad', x: cmd.x, y: cmd.y, x2: cmd.x, y2: cmd.y });
       const spec = BUILD[cmd.kind];
-      transfer(state, TREASURY, OUTSIDE, spec.materials, 'obras');
+      transfer(state, TREASURY, OUTSIDE, materialsCost(state, cmd.kind), 'obras');
       const idx = tileIndex(state, cmd.x, cmd.y);
       state.map.tiles[idx] = Tile.Grass;
       state.map.zones[idx] = Zone.None;
@@ -275,6 +288,15 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       break;
     case 'ConvenePleno':
       convenePleno(state);
+      break;
+    case 'ProposeBudget':
+      proposeBudget(state, cmd.plan);
+      break;
+    case 'HoldFestival':
+      holdFestival(state, cmd.size);
+      break;
+    case 'AnswerGrant':
+      answerGrant(state, cmd.grantId, cmd.accept);
       break;
     case 'AnswerPetition':
       answerPetition(state, cmd.petitionId, cmd.answer);

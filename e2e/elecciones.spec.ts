@@ -1,6 +1,6 @@
 import { gzipSync } from 'node:zlib';
 import { expect, test } from '@playwright/test';
-import { setSpeed } from './helpers.ts';
+import { setSpeed, skipTutorial } from './helpers.ts';
 import { runSimulation } from '../packages/sim/src/index.ts';
 
 /** Pueblo con impuestos altos a 4 días de votar: hay partido rival y la intención de voto es baja. */
@@ -18,7 +18,7 @@ test('v1.0: intención de voto, facciones, noche electoral y oposición', async 
   const { token } = await r.json();
   await page.goto(`/p/${token}`);
   await page.getByRole('button', { name: 'Continuar' }).click();
-  await page.locator('.tut-box button').click();
+  await skipTutorial(page);
 
   // Indicador de intención de voto y hoja de política.
   await expect(page.locator('#hud-poll')).toContainText('%');
@@ -26,7 +26,8 @@ test('v1.0: intención de voto, facciones, noche electoral y oposición', async 
   await expect(page.locator('#hud-poll')).toHaveText(/· \d+ d$/);
   await page.locator('#hud-poll').click();
   await expect(page.locator('.sheet')).toContainText('Intención de voto');
-  await expect(page.locator('.sheet')).toContainText('Jóvenes por Bitópolis');
+  // El partido rival depende de la semilla: basta con que la hoja lo enseñe.
+  await expect(page.locator('.sheet')).toContainText(/Oposición«|«.+»/);
   await expect(page.locator('.faction')).toHaveCount(4);
   await shot('1-politica');
   await page.getByRole('button', { name: /Hacer campaña con/ }).first().click();

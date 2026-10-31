@@ -277,6 +277,8 @@ El alcance está congelado hasta la v1.0. Todo lo de la sección 15 solo entra s
 
 - **v1.4 — Auditoría táctil** (ronda 10): obras con confirmación en táctil, dock único, menú sin bucle, x10 jugable, mapa al 77–85 % de la pantalla.
 
+- **v1.5 — Ayuntamiento y ciclo vital** (ronda 11): presupuesto anual votado, fiestas del pueblo, subvenciones con plazo y cofinanciación, y ciclo vital (nacimientos, herencias y fallecimientos). Pedido por el creador, del backlog §15.
+
 ## 15. Después de la v1.0 (backlog, no implementar antes)
 
 Deuda municipal con límites reales y calificación crediticia; presupuesto anual votado; subvenciones con plazo y cofinanciación; funcionarios y externalización; PGOU y licitaciones; dificultad "Interventor" con toda la burocracia; sindicatos, asociaciones y huelgas; ciclo vital (nacimientos, herencias, muertes); cultura y fiestas inventadas por los vecinos; ciudades vecinas con alcalde IA y migración entre ellas; presidencia de varias ciudades; contenido nuevo propuesto por los agentes (como JSON validado y probado con `pnpm sim`); tarjetas compartibles y álbum del pueblo; visitar pueblos de amigos en solo lectura; árbol genealógico; mapas con terreno; modo acuario (el alcalde también es una IA); apps nativas de iOS y Android.

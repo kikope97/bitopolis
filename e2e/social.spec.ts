@@ -1,4 +1,5 @@
 import { gzipSync } from 'node:zlib';
+import { skipTutorial } from './helpers.ts';
 import { expect, test } from '@playwright/test';
 import { runSimulation } from '../packages/sim/src/index.ts';
 
@@ -16,7 +17,7 @@ test('v0.4: ficha y hablar, pleno con promesa, consejero, diario y objetivos', a
   const { token } = await r.json();
   await page.goto(`/p/${token}`);
   await page.getByRole('button', { name: 'Continuar' }).click();
-  await page.locator('.tut-box button').click();
+  await skipTutorial(page);
   await expect(page.locator('#objectives')).toContainText('Objetivos');
   await shot('1-objetivos');
 

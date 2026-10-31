@@ -60,6 +60,11 @@ Monorepo pnpm + TypeScript:
 - Hojas (`ui.ts`): solo se refresca la que está abierta (`currentSheet()`); atrás cierra la hoja (`history`).
 - A x10 no hay burbujas ni avisos menores. Los toques reales se prueban por CDP en `e2e/tactil.spec.ts`.
 
+## Ayuntamiento y ciclo vital (v1.5)
+- `sim/src/lifecycle.ts`: `lifeYear` (cumpleaños, hijos que se independizan a los `KID_YEARS`), `lifeDay` (despedidas repartidas por el año, una por semana como mucho), `lifeMonth` (nacimientos), `dies` y `heirOf` (herencia a la pareja con plusvalía; si no, a la familia de fuera). `Citizen.kids` son ticks de nacimiento; cuentan para el colegio.
+- `sim/src/civic.ts`: presupuesto anual (`ProposeBudget`, votado por facciones o, sin ellas, por felicidad; `BUDGET` en balance.ts), fiestas (`HoldFestival`, `FESTIVAL`) y subvenciones (`AnswerGrant`; anticipo, resto en plazo, reintegro). Formato de partida 9.
+- Cliente: `civic-ui.ts` (hoja «Ayuntamiento»; `openTownHall(ctx, sección)`).
+
 ## Comandos
 ```
 pnpm install | pnpm dev | pnpm build | pnpm lint | pnpm typecheck | pnpm test

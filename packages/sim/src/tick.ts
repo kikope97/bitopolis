@@ -1,4 +1,4 @@
-import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
+import { TICKS_PER_DAY, TICKS_PER_MONTH, tickToDate } from '@bitopolis/shared';
 import {
   BUSINESS_SEED_CASH,
   COMMUTER_DAILY,
@@ -43,7 +43,9 @@ import {
   updateGrudges,
   serviceSaturation,
 } from './economy.ts';
+import { budgetFx, civicDay, festivalMood, onBuildingDone } from './civic.ts';
 import { updateFields } from './fields.ts';
+import { lifeDay, lifeMonth, lifeYear } from './lifecycle.ts';
 import { FIRST_NAMES, SURNAMES } from './names.ts';
 import { goalFor, memoryMood, onCitizenLeaves, PROFESSIONS, relationMood, socialDay } from './social.ts';
 import { politicsDay } from './politics.ts';
@@ -214,7 +216,7 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
       // Un servicio saturado rinde en proporción a los vecinos que puede atender.
       const load = serviceSaturation(state, b.kind, b.id);
       if (load < 0.9) full.add(b.kind);
-      services += (seen.has(b.kind) ? s.happiness / 2 : s.happiness) * load;
+      services += (seen.has(b.kind) ? s.happiness / 2 : s.happiness) * load * budgetFx(state).services;
       seen.add(b.kind);
     }
     if (services > 0) {
@@ -238,6 +240,10 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
   const mem = memoryMood(state, c);
   if (mem) f.push({ label: mem > 0 ? 'Buenos recuerdos recientes' : 'Malos recuerdos recientes', value: mem });
   if (state.bankrupt) f.push({ label: 'Ayuntamiento en quiebra', value: -8 });
+  // v1.5: fiestas y familia.
+  const fest = festivalMood(state);
+  if (fest) f.push(fest);
+  if (c.kids?.length) f.push({ label: c.kids.length === 1 ? 'Un hijo en casa' : `${c.kids.length} hijos en casa`, value: 3 });
   return f;
 }
 
@@ -272,6 +278,7 @@ function progressProjects(state: GameState): void {
     if (!b) continue;
     b.built = true;
     pushEvent(state, 'built', `Terminada la obra: ${BUILD_NAMES[b.kind]}`, { ref: b.id, notify: p.notify });
+    onBuildingDone(state, b);
   }
   // Quien trabajó hoy en una obra no cobra como commuter.
   for (const c of state.citizens) {
@@ -379,11 +386,29 @@ function arrivals(state: GameState): void {
   if (free === 0 || state.demand.R <= 0) return;
   const n = Math.min(free, chance(state.rng, state.demand.R / 100) ? (state.demand.R > 60 ? 2 : 1) : 0);
   for (let k = 0; k < n; k++) {
+    const c = newResident(state, { age: nextInt(state.rng, 19, 72) });
+    state.citizens.push(c);
+    transfer(state, OUTSIDE, c.id, nextInt(state.rng, 600, 2_500));
+    pushEvent(state, 'arrival', `${c.name} se muda al pueblo`, { ref: c.id });
+    if (c.named) onNamedArrival(state, c);
+  }
+}
+
+/** Vecino nuevo (llega de fuera o se independiza de su familia, v1.5). No lo añade al pueblo. */
+export function newResident(state: GameState, opts: { age: number; surname?: string }): Citizen {
+  {
     const named = state.citizens.filter((x) => x.named).length < state.namedLimit;
+    let name = uniqueName(state);
+    // Con el apellido de la familia, que no se repita el nombre completo (ronda 11).
+    if (opts.surname) {
+      const used = new Set(state.citizens.map((x) => x.name));
+      for (let i = 0; i < 20 && (i === 0 || used.has(name)); i++) name = `${uniqueName(state).split(' ')[0]} ${opts.surname}`;
+      if (used.has(name)) name = `${name} ${state.nextId}`;
+    }
     const c: Citizen = {
       id: state.nextId++,
-      name: uniqueName(state),
-      age: nextInt(state.rng, 19, 72),
+      name,
+      age: opts.age,
       money: 0,
       homeId: null,
       jobId: null,
@@ -405,10 +430,7 @@ function arrivals(state: GameState): void {
       c.goal = goalFor(c.desire);
       c.memories.push({ tick: state.tick, kind: 'llego', about: [], importance: 2, valence: 1 });
     }
-    state.citizens.push(c);
-    transfer(state, OUTSIDE, c.id, nextInt(state.rng, 600, 2_500));
-    pushEvent(state, 'arrival', `${c.name} se muda al pueblo`, { ref: c.id });
-    if (named) onNamedArrival(state, c);
+    return c;
   }
 }
 
@@ -451,6 +473,11 @@ function endOfDay(state: GameState): void {
   detectTriggers(state);
   socialDay(state);
   politicsDay(state);
+  civicDay(state);
+  // 1 de enero: cumpleaños, hijos que se independizan y fallecimientos (v1.5).
+  const d = tickToDate(state.tick);
+  if (d.month === 1 && d.day === 1 && state.tick > 0) lifeYear(state);
+  lifeDay(state);
   accumulateRates(state);
 }
 
@@ -486,14 +513,15 @@ function endOfMonth(state: GameState): void {
   // Nóminas municipales (los sueldos no pagan impuesto municipal).
   for (const c of state.citizens) {
     const job = c.jobId !== null ? state.buildings.find((b) => b.id === c.jobId) : undefined;
-    if (job && !isBusiness(job)) transfer(state, TREASURY, c.id, SERVICE[job.kind] ? SERVICE_SALARY : PUBLIC_SALARY, 'sueldos');
+    if (job && !isBusiness(job)) transfer(state, TREASURY, c.id, Math.round((SERVICE[job.kind] ? SERVICE_SALARY : PUBLIC_SALARY) * budgetFx(state).salaries), 'sueldos');
   }
   monthlyHousing(state, r);
   payBusinesses(state, r);
   // PIE: el Estado paga por vecino empadronado, más si el pueblo está contento.
   const pie = Math.round(PIE_PER_CITIZEN * state.citizens.length * Math.max(0.6, Math.min(1.2, averageHappiness(state) / 60)));
   transfer(state, OUTSIDE, TREASURY, pie, 'PIE');
-  for (const b of state.buildings) if (b.built) transfer(state, TREASURY, OUTSIDE, MAINTENANCE[b.kind], 'mantenimiento');
+  for (const b of state.buildings) if (b.built) transfer(state, TREASURY, OUTSIDE, Math.round(MAINTENANCE[b.kind] * budgetFx(state).maintenance), 'mantenimiento');
+  lifeMonth(state);
   if (state.treasury < 0) {
     const debt = -state.treasury;
     const interest = Math.min(debt, DEBT_INTEREST_STEP) * DEBT_INTEREST + Math.max(0, debt - DEBT_INTEREST_STEP) * DEBT_INTEREST_HIGH;

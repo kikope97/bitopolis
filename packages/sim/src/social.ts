@@ -49,6 +49,11 @@ export const MEMORY_KINDS = [
   'paso_pagina',
   'se_reconcilio',
   'sigue_en_paro',
+  // v1.5: ciclo vital y fiestas.
+  'fue_a_las_fiestas',
+  'nacio_hijo',
+  'perdio_a',
+  'heredo',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -194,6 +199,14 @@ export function memoryText(state: GameState, m: Memory): string {
       return `Hizo las paces con ${who}`;
     case 'sigue_en_paro':
       return 'Sigue sin trabajo y con la hipoteca encima';
+    case 'fue_a_las_fiestas':
+      return 'Disfrutó de las fiestas del pueblo';
+    case 'nacio_hijo':
+      return 'Tuvo un bebé';
+    case 'perdio_a':
+      return `Perdió a ${who}`;
+    case 'heredo':
+      return `Heredó de ${who}`;
   }
 }
 
@@ -331,7 +344,9 @@ function updateRelations(state: GameState): void {
       // (antes se soltaba la más débil y se rehacía al día siguiente, en bucle).
       const room = a.relations.length < RELATIONS_MAX && b.relations.length < RELATIONS_MAX;
       if (!r && room) {
-        const p = (place ? 0.015 : 0.04) + (a.traits.social + b.traits.social) / 4000;
+        // En fiestas, el doble de fácil (v1.5).
+        const party = state.festival.until > state.tick ? 2 : 1;
+        const p = ((place ? 0.015 : 0.04) + (a.traits.social + b.traits.social) / 4000) * party;
         if (chance(state.rng, p)) {
           setRelation(state, a, b, 'amistad', 30);
           addMemory(state, a, 'nueva_amistad', 2, 2, [b.id]);
@@ -750,10 +765,27 @@ const MEMORY_LINE: Partial<Record<MemoryKind, (who: string) => string>> = {
   se_reconcilio: (who) => `Al final hice las paces con ${who}.`,
   le_quitaron_el_local: (who) => `Todavía me escuece que ${who} se quedara el local.`,
   sigue_en_paro: () => 'Sigo sin trabajo y la hipoteca no perdona.',
+  fue_a_las_fiestas: () => 'Las fiestas de este año fueron una maravilla.',
+  nacio_hijo: () => 'Con el bebé en casa no paro, pero estoy feliz.',
+  perdio_a: (who) => `No me hago a la idea de que ${who} ya no esté.`,
+  heredo: (who) => `Lo que me dejó ${who} me ha ayudado mucho.`,
   compro_casa: () => 'Con la casa ya en mis manos, duermo con más calma.',
   abrio_negocio: () => 'Con mi negocio en marcha, ganas no me faltan.',
   subida_impuestos: () => 'Y la última subida de impuestos no ayuda.',
 };
+
+/** Frase de un recuerdo; las pérdidas, distintas para la pareja y para una amistad (ronda 11). */
+function lineFor(state: GameState, m: Memory): string {
+  const who = memoryWho(state, m);
+  if (m.kind === 'perdio_a') {
+    const pareja = [`Sin ${who} la casa está muy callada.`, `Todavía pongo dos tazas por la mañana. Echo de menos a ${who}.`];
+    const amistad = [`Echo de menos los cafés con ${who}.`, `Cada vez que paso por su calle me acuerdo de ${who}.`, `No me hago a la idea de que ${who} ya no esté.`];
+    const list = m.importance >= 5 ? pareja : amistad;
+    return list[hash32(m.tick, m.about[0] ?? 0) % list.length]!;
+  }
+  if (m.kind === 'nacio_hijo') return ['Con el bebé en casa no paro, pero estoy feliz.', 'El bebé ya duerme del tirón… casi.', 'Desde que llegó el bebé, la casa es otra.'][hash32(m.tick, 3) % 3]!;
+  return MEMORY_LINE[m.kind]!(who);
+}
 
 function recentMemory(state: GameState, c: Citizen): Memory | undefined {
   return c.memories
@@ -763,7 +795,7 @@ function recentMemory(state: GameState, c: Citizen): Memory | undefined {
 
 export function memoryLine(state: GameState, c: Citizen): string | null {
   const recent = recentMemory(state, c);
-  return recent ? MEMORY_LINE[recent.kind]!(memoryWho(state, recent)) : null;
+  return recent ? lineFor(state, recent) : null;
 }
 
 function answerText(state: GameState, c: Citizen, q: Question, worst: string | undefined): string {
@@ -771,7 +803,7 @@ function answerText(state: GameState, c: Citizen, q: Question, worst: string | u
   if (q !== 'como_estas') return base;
   const m = recentMemory(state, c);
   if (!m) return base;
-  const line = MEMORY_LINE[m.kind]!(memoryWho(state, m));
+  const line = lineFor(state, m);
   // Si el recuerdo va en contra del ánimo, un enlace para que no suene incoherente.
   const lower = line.charAt(0).toLowerCase() + line.slice(1);
   if (c.happiness >= 70 && m.valence < 0) return `${base} Eso sí, ${lower}`;

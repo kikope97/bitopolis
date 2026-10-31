@@ -24,7 +24,7 @@ const STEPS: Step[] = [
     done: (s, tool, c) => tool === 'road' || roadCount(s) > c.roads0,
   },
   {
-    text: 'Arrastra desde la calle del ayuntamiento para alargarla.',
+    text: 'Toca el final de la calle del ayuntamiento y luego dónde quieres que acabe (con ratón, también puedes arrastrar).',
     target: () => null,
     done: (s, _t, c) => roadCount(s) > c.roads0,
   },
@@ -82,6 +82,11 @@ export class Tutorial {
 
   start(state: GameState, fromScratch = false) {
     if (fromScratch) this.step = 0;
+    // Un pueblo ya hecho (importado o de otra partida) no empieza el tutorial desde cero (ronda 11).
+    else if (this.step === 0 && state.citizens.length >= 10) {
+      this.finish();
+      return;
+    }
     this.started = true;
     this.ctx.roads0 = roadCount(state);
     if (this.active) {

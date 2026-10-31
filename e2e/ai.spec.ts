@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { state, tap, setSpeed } from './helpers.ts';
+import { state, tap, setSpeed, skipTutorial } from './helpers.ts';
 
 test('Modo IA: configurar, jugar y ver un motivo de la IA', async ({ page }, info) => {
   test.setTimeout(120_000);
@@ -24,7 +24,7 @@ test('Modo IA: configurar, jugar y ver un motivo de la IA', async ({ page }, inf
   await expect(page.locator('.stats-card')).toContainText('Modo IA');
   await page.getByRole('button', { name: 'Continuar' }).click();
   await expect(page.locator('#game')).toBeVisible();
-  await page.locator('.tut-box button').click();
+  await skipTutorial(page);
 
   const s0 = await state(page);
   expect(s0.aiMode).toBe(true);

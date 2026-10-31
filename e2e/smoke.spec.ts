@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { drag, state, tap, setSpeed } from './helpers.ts';
+import { drag, state, tap, setSpeed, skipTutorial } from './helpers.ts';
 
 test('/healthz responde', async ({ request }) => {
   const r = await request.get('/healthz');
@@ -65,7 +65,7 @@ test('partida nueva: tutorial, obras, guardado y continuar', async ({ page }, in
 test('el mapa se mueve arrastrando y hace zoom con botones', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Jugar' }).click();
-  await page.locator('.tut-box button').click();
+  await skipTutorial(page);
   const before = await page.evaluate(() => (window as any).__bitopolis.tileCenter(0, 0));
   const box = (await page.locator('#map').boundingBox())!;
   await page.mouse.move(box.x + 100, box.y + 200);

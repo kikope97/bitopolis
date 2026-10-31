@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { setSpeed } from './helpers.ts';
+import { setSpeed, skipTutorial } from './helpers.ts';
 
 test('audio: volúmenes en dB, ambiente y mute separados se guardan y no dan errores', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
   await page.getByRole('button', { name: 'Jugar' }).click();
-  await page.locator('.tut-box button').click();
+  await skipTutorial(page);
   await page.locator('#menu').click();
   await page.getByRole('button', { name: /Ajustes/ }).click();
   await page.getByLabel(/^Ambiente/).check();
