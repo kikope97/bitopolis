@@ -10,7 +10,8 @@ test('2.0: un turno del pueblo con IA llega, se aplica y se ve en «Qué está p
   await page.getByRole('radio', { name: /Modo IA/ }).click();
   await page.locator('details.advanced summary').first().click();
   await page.locator('#ai-base').fill('http://localhost:8099/v1');
-  await page.locator('#ai-model').fill('falso');
+  await page.getByRole('button', { name: 'Cargar modelos' }).click();
+  await page.locator('#ai-model-list').selectOption('falso-mini');
   await page.locator('#ai-accept').check();
   await page.getByRole('button', { name: 'Guardar y usar el Modo IA' }).click();
   await page.getByRole('button', { name: 'Continuar' }).click();

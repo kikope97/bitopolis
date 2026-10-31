@@ -4,7 +4,7 @@ import { JOBS, SHOP_NAMES } from './balance.ts';
 import { buyHome, canBuyHome, canFound, foundBusiness, sellOnDeparture, shopTypesFor } from './economy.ts';
 import { OUTSIDE, transfer } from './money.ts';
 import { hash32 } from './hash.ts';
-import { onCitizenLeaves } from './social.ts';
+import { NEED_TEXT as SOCIAL_NEED_TEXT, onCitizenLeaves } from './social.ts';
 import { factionOf, voteLean } from './politics.ts';
 import { protestFor } from './associations.ts';
 import { DEBT } from './balance.ts';
@@ -264,7 +264,7 @@ export function performAction(state: GameState, c: Citizen, trigger: Trigger, ac
       effect = 'se queja al ayuntamiento';
       break;
     case 'pedir':
-      effect = `pide al alcalde ${NEED_TEXT[arg ?? ''] ?? arg}`;
+      effect = `pide al alcalde ${NEED_TEXT[arg ?? ''] ?? SOCIAL_NEED_TEXT[arg as keyof typeof SOCIAL_NEED_TEXT] ?? arg}`;
       break;
     case 'votar_gobierno':
     case 'votar_oposicion':
