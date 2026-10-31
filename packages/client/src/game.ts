@@ -1505,7 +1505,7 @@ export function startGame(opts: GameOptions): void {
       // v1.8: destrozado en unos disturbios: no funciona hasta que se repara.
       if (b.damaged) {
         const dmg = b.damaged;
-        const box = h('div', { class: 'petition danger-box' }, h('p', {}, h('strong', {}, 'Destrozada en unos disturbios. '), 'No vende ni paga sueldos hasta repararla; si pasa mucho tiempo, cierra.'));
+        const box = h('div', { class: 'petition danger-box' }, h('p', {}, h('strong', {}, 'Destrozada en unos disturbios. '), 'No vende hasta repararla, pero sigue pagando sueldos e impuestos con sus ahorros: si dos meses seguidos no llega a las nóminas, cierra.'));
         if (dmg.repairUntil >= 0) box.append(h('p', { class: 'muted small' }, `En reparación: reabre el ${formatDate(tickToDate(dmg.repairUntil))}.`));
         else {
           const fix = h('button', { class: 'btn primary wide' }, `Reparar · ${money(dmg.cost)}`);
