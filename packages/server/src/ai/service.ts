@@ -4,7 +4,7 @@ import type { Db } from '../db/index.ts';
 import type { SettingsStore } from '../settings.ts';
 import { costEur, modelFor, priceTable, providerFromKey, type ProviderId } from './catalog.ts';
 import { decryptSecret } from './crypto.ts';
-import { type LLMProvider, makeProvider } from './providers.ts';
+import { type ListedModel, listModels, type LLMProvider, makeProvider, ProviderError } from './providers.ts';
 
 /** Ajustes efectivos de IA de una partida (lo fijado en /admin > partida). */
 export interface AiSettings {
@@ -50,6 +50,8 @@ export class AiService {
   private reserved = new Map<number, number>();
   /** Para tests: sustituye al proveedor real. */
   providerOverride?: (s: AiSettings) => LLMProvider;
+  /** Para tests: sustituye a la lista de modelos del proveedor (sin red). */
+  modelsOverride?: typeof listModels;
 
   constructor(
     private db: Db,
@@ -347,4 +349,44 @@ export class AiService {
     for (const r of rows) byKind[r.kind] = (byKind[r.kind] ?? 0) + r.eur;
     return { ...total, byKind, spend: await this.spend(gameId) };
   }
+
+  /**
+   * Modelos que ofrece una key, con aviso de los que no tienen precio en la
+   * tabla (el coste se estima con uno caro). Los errores salen en español y sin
+   * la key: el mensaje del proveedor no se reenvía.
+   */
+  async models(provider: ProviderId, key: string | undefined, baseUrl: string | undefined): Promise<{ provider: ProviderId; models: PricedModel[] }> {
+    let list: ListedModel[];
+    try {
+      list = await (this.modelsOverride ?? listModels)(provider, key, baseUrl);
+    } catch (e) {
+      throw new ModelsError(modelsErrorText(e));
+    }
+    const prices = this.prices;
+    // Los modelos locales no cuestan dinero: siempre «con precio».
+    const models = list.map(({ created: _c, ...m }) => ({ ...m, priced: provider === 'openai-compatible' || m.id in prices }));
+    return { provider, models };
+  }
+}
+
+export interface PricedModel {
+  id: string;
+  name?: string;
+  deprecated?: boolean;
+  /** false: no está en la tabla de precios, el coste es aproximado. */
+  priced: boolean;
+}
+
+export class ModelsError extends Error {}
+
+function modelsErrorText(e: unknown): string {
+  if (!(e instanceof ProviderError)) return 'No se pudo cargar la lista de modelos';
+  if (e.status === 401 || e.status === 403) return 'La API key no es válida o no puede ver la lista de modelos';
+  if (e.status === 404) return 'Ese endpoint no ofrece la lista de modelos (/models)';
+  if (e.status === 429) return 'El proveedor pide esperar un poco (demasiadas peticiones)';
+  if (e.status) return `El proveedor respondió con un error (${e.status})`;
+  if (e.message === 'falta la API key') return 'Falta la API key';
+  if (e.message.includes('a tiempo')) return 'El proveedor no respondió en 10 segundos';
+  if (e.message.includes('conectar')) return 'No se pudo conectar con el proveedor';
+  return 'La respuesta del proveedor no traía la lista de modelos';
 }

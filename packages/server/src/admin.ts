@@ -9,7 +9,7 @@ import { DEFAULT_PRICES, PROVIDER_INFO, providerFromKey } from './ai/catalog.ts'
 import { encryptSecret, maskKey } from './ai/crypto.ts';
 import { makeProvider } from './ai/providers.ts';
 import { estimatePerGameDay } from './ai/routes.ts';
-import type { AiService } from './ai/service.ts';
+import { type AiService, ModelsError } from './ai/service.ts';
 import { lockout, safeEqual, setCookie, signedCookie } from './auth.ts';
 import type { Config } from './config.ts';
 import { backupNow, BACKUP_RE } from './db/backup.ts';
@@ -54,6 +54,11 @@ const Patch = z.object({
   backups: z.object({ keep: z.number().int().min(1).max(60) }).optional(),
 });
 export type AdminPatch = z.infer<typeof Patch>;
+/** Probar una key (o un endpoint) aún sin guardar; lo que falte, lo guardado. */
+const ModelsBody = z.object({
+  key: z.string().trim().min(8, 'La API key es demasiado corta').max(400).optional(),
+  baseUrl: z.string().trim().url('El endpoint no es una URL válida').max(512).or(z.literal('')).optional(),
+});
 
 /** Lo que ve el panel: nada de hashes ni la key. */
 export function adminView(s: ServerSettings, version: string) {
@@ -224,6 +229,28 @@ export async function registerAdminRoutes(
       // El mensaje del proveedor no incluye la key; se recorta por si acaso.
       return { ok: false, provider: s.provider, model: s.model, ms: Date.now() - t0, error: String((e as Error).message).slice(0, 300) };
     }
+  });
+
+  /** Modelos que ofrece la key del servidor (GET) o una por guardar (POST). La key nunca vuelve. */
+  const listFor = async (reply: FastifyReply, key: string | undefined, baseUrl: string | undefined) => {
+    if (!key && !baseUrl) return bad(reply, 'No hay API key ni endpoint propio: pon la key primero');
+    try {
+      return await ai.models(providerFromKey(key, baseUrl), key, baseUrl);
+    } catch (e) {
+      if (e instanceof ModelsError) return bad(reply, e.message, 502);
+      throw e;
+    }
+  };
+  app.get('/api/admin/ai/models', async (_req, reply) => {
+    const s = await ai.settings(null);
+    return listFor(reply, s.key, s.baseUrl);
+  });
+  app.post('/api/admin/ai/models', async (req, reply) => {
+    const b = ModelsBody.safeParse(req.body ?? {});
+    if (!b.success) return bad(reply, zodError(b.error));
+    const s = await ai.settings(null);
+    const baseUrl = b.data.baseUrl === undefined ? s.baseUrl : opt(b.data.baseUrl);
+    return listFor(reply, b.data.key ?? s.key, baseUrl);
   });
 
   app.get('/api/admin/stats', async () => {
