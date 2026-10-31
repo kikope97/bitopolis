@@ -57,7 +57,7 @@ import { finishUpgrades, jobsOf, maintenanceOf, plantCapacityOf, radiusOf, servi
 import { lifeDay, lifeMonth, lifeYear } from './lifecycle.ts';
 import { basicLiving, drownedInDebt, economyStats, outsideJobsMonth, settleMonth, totalDebt } from './household.ts';
 import { FIRST_NAMES, SURNAMES } from './names.ts';
-import { goalFor, memoryMood, onCitizenLeaves, PROFESSIONS, relationMood, socialDay } from './social.ts';
+import { addMemory, goalFor, memoryMood, onCitizenLeaves, PROFESSIONS, relationMood, socialDay } from './social.ts';
 import { politicsDay } from './politics.ts';
 import {
   type Building,
@@ -88,7 +88,8 @@ export function homeCapacity(b: Building): number {
 }
 
 export function jobCapacity(b: Building): number {
-  return b.built ? jobsOf(b) : 0;
+  // Ronda 15: una empresa que pierde dinero recorta plantilla (b.staff) antes de cerrar.
+  return b.built ? Math.min(jobsOf(b), b.staff ?? Infinity) : 0;
 }
 
 export function occupants(state: GameState, b: Building): Citizen[] {
@@ -272,6 +273,9 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
     const employs = state.buildings.some((b) => b.owner === c.id && isBusiness(b) && state.citizens.some((x) => x.jobId === b.id));
     if (employs) f.push({ label: 'Le suben los costes (sueldo mínimo)', value: -MIN_WAGE_FX.ownerMood * step });
   }
+  // Ronda 15: su negocio pierde dinero (se nota, con o sin sueldo mínimo).
+  const losing = state.buildings.some((b) => b.owner === c.id && isBusiness(b) && b.books && b.books.sales - b.books.wages - b.books.taxes < 0);
+  if (losing) f.push({ label: 'Su negocio pierde dinero', value: -5 });
   f.push(...taxMood(state, c));
   f.push(...relationMood(c));
   const mem = memoryMood(state, c);
@@ -585,6 +589,15 @@ function businessPayroll(state: GameState, r: ReturnType<typeof monthRates>): vo
     businessTaxes(state, b, r);
     b.books = { sales: b.sales ?? 0, wages, taxes: before - b.cash };
     b.sales = 0;
+    // Ronda 15: si pierde dinero, despide a alguien en vez de ir a la quiebra; si va bien, vuelve a contratar.
+    const profit = b.books.sales - b.books.wages - b.books.taxes;
+    if (profit < 0 && workers.length > 1 && b.books.sales > 0) {
+      const out = workers[workers.length - 1]!;
+      out.jobId = null;
+      addMemory(state, out, 'perdio_trabajo', 4, -4);
+      b.staff = workers.length - 1;
+      state.month.layoffs = (state.month.layoffs ?? 0) + 1;
+    } else if (profit > wage && (b.staff ?? Infinity) < jobsOf(b)) b.staff = (b.staff ?? 0) + 1;
     b.unpaidMonths = paidAll ? 0 : b.unpaidMonths + 1;
   }
 }
@@ -594,7 +607,16 @@ function payBusinesses(state: GameState): void {
   for (const b of state.buildings) if (isBusiness(b) && b.built) payDividends(state, b);
   for (const b of [...state.buildings]) {
     if (isBusiness(b) && b.unpaidMonths >= 2) {
-      pushEvent(state, 'business', `Cierra ${b.name ?? BUILD_NAMES[b.kind]?.toLowerCase()}: no puede pagar las nóminas`, { ref: b.id });
+      const wage = MIN_WAGE_STEP[state.minWage ?? 'none'] > 0 ? ` (sueldo mínimo ${MIN_WAGE[state.minWage]} €)` : '';
+      pushEvent(state, 'business', `Cierra ${b.name ?? BUILD_NAMES[b.kind]?.toLowerCase()}: no puede pagar las nóminas${wage}`, { ref: b.id });
+      // Ronda 15: el dueño lo sufre y se acuerda del ayuntamiento; tarda en volver a intentarlo.
+      const owner = state.citizens.find((c) => c.id === b.owner);
+      if (owner) {
+        addMemory(state, owner, 'cerro_negocio', 5, -6);
+        owner.closedUntil = state.tick + 6 * TICKS_PER_MONTH;
+        if (wage) owner.grudge = Math.min(40, owner.grudge + 10);
+      }
+      state.month.closures = (state.month.closures ?? 0) + 1;
       removeBuilding(state, b.id);
     }
   }

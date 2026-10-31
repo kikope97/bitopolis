@@ -12,6 +12,7 @@ import {
   GRUDGE_MAX,
   GRUDGE_RAISE,
   HOMES,
+  JOBS,
   IBI_MOOD_OWNER,
   IBI_MOOD_RENTER,
   IBI_RATE,
@@ -34,6 +35,7 @@ import {
   BUY_CHANCE,
   SERVICE_CAPACITY,
   DEBT,
+  MIN_WAGE,
   MIN_WAGE_STEP,
   MIN_WAGE_FX,
 } from './balance.ts';
@@ -311,10 +313,21 @@ export function freeShopLot(state: GameState): number | null {
   return null;
 }
 
+/**
+ * v1.9 (ronda 15): la caja inicial de un negocio tiene que cubrir dos nóminas al
+ * sueldo vigente; con el sueldo mínimo alto hace falta más dinero para empezar y se
+ * abren menos (antes abrían y cerraban en bucle).
+ */
+export function foundSeed(state: GameState): number {
+  return Math.max(FOUND_SEED, 2 * MIN_WAGE[state.minWage ?? 'none'] * JOBS.shop);
+}
+
 export function canFound(state: GameState, c: Citizen): boolean {
-  // v1.9: con el sueldo mínimo alto, montar un negocio sale menos a cuenta (hace falta más demanda).
+  // Con el sueldo mínimo alto, montar un negocio sale menos a cuenta (hace falta más demanda).
   const step = MIN_WAGE_STEP[state.minWage ?? 'none'];
-  return c.money >= FOUND_MIN_MONEY && state.demand.C > 10 + step * 100 * MIN_WAGE_FX.foundPenalty && freeShopLot(state) !== null;
+  // Quien acaba de cerrar no vuelve a abrir enseguida.
+  if (c.closedUntil !== undefined && c.closedUntil > state.tick) return false;
+  return c.money >= Math.max(FOUND_MIN_MONEY, FOUND_COST + foundSeed(state)) && state.demand.C > 10 + step * 100 * MIN_WAGE_FX.foundPenalty && freeShopLot(state) !== null;
 }
 
 export function shopTypesFor(state: GameState, c: Citizen): string[] {
@@ -332,7 +345,7 @@ export function foundBusiness(state: GameState, c: Citizen, type: string): boole
   const b = newBuilding(state, 'shop', lot % w, Math.floor(lot / w), c.id);
   b.name = `${SHOP_NAMES[type] ?? 'Tienda'} de ${c.name.split(' ')[0]}`;
   transfer(state, c.id, OUTSIDE, FOUND_COST);
-  transfer(state, c.id, b.id, FOUND_SEED);
+  transfer(state, c.id, b.id, foundSeed(state));
   const g = GROWTH.shop;
   state.projects.push({
     buildingId: b.id,

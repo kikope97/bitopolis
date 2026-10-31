@@ -49,7 +49,17 @@ export function pocketBox(ctx: SocialCtx, c: Citizen, reopen: () => void): HTMLE
     box.append(h('p', {}, h('strong', {}, `Debe ${money(totalDebt(c))}`), ` (${parts}), desde el ${formatDate(tickToDate(d.since))}.`));
     // Ronda 15: «le sobraron 0 €» no contaba nada: si la deuda creció, se dice.
     if ((last?.grew ?? 0) > 0) box.append(h('p', { class: 'neg' }, `El mes pasado no le llegó: debe ${money(last!.grew!)} más.`));
-    if (d.plan && d.plan.until > state.tick) box.append(h('p', { class: 'muted small' }, `Aplazado: paga ${money(d.plan.perMonth)} al mes hasta el ${formatDate(tickToDate(d.plan.until))}, sin recargo.`));
+    if (d.plan && d.plan.until > state.tick) {
+      box.append(
+        h(
+          'p',
+          { class: 'muted small' },
+          d.plan.kind === 'microcredito'
+            ? `Microcrédito municipal: devuelve ${money(d.plan.perMonth)} al mes hasta el ${formatDate(tickToDate(d.plan.until))}, sin intereses.`
+            : `Aplazado: paga ${money(d.plan.perMonth)} al mes hasta el ${formatDate(tickToDate(d.plan.until))}, sin recargo.`,
+        ),
+      );
+    }
     else if (d.town > 0) box.append(h('p', { class: 'muted small' }, 'Lo que debe al ayuntamiento lleva un recargo del 10 % si pasa un mes sin pagarlo.'));
   }
   const actions = h('div', { class: 'pocket-actions' });
@@ -70,7 +80,9 @@ export function pocketBox(ctx: SocialCtx, c: Citizen, reopen: () => void): HTMLE
     });
     actions.append(b);
   };
-  if (d && d.town > 0) {
+  // Ronda 15: lo que ya no aplica (con un plan en marcha) no se enseña.
+  const inPlan = !!d?.plan && d.plan.until > state.tick;
+  if (d && d.town > 0 && !inPlan) {
     add('Aplazar (12 meses)', canSettleDebt(state, c, 'aplazar'), async () => {
       await ctx.command({ type: 'SettleDebt', citizenId: c.id, mode: 'aplazar' });
     });
@@ -81,7 +93,7 @@ export function pocketBox(ctx: SocialCtx, c: Citizen, reopen: () => void): HTMLE
     });
   }
   const mc = canMicrocredit(state, c);
-  if (totalDebt(c) > 0 || c.unemployedSince !== undefined) {
+  if ((totalDebt(c) > 0 || c.unemployedSince !== undefined) && !inPlan) {
     add(`Microcrédito ${money(MICROCREDIT.amount)}`, mc, async () => {
       if (await confirmDialog('Microcrédito municipal', `Le prestas ${money(MICROCREDIT.amount)} sin intereses; lo devolverá en ${MICROCREDIT.months} cuotas. Si se va del pueblo sin pagarlo, se pierde.`, 'Prestar')) {
         await ctx.command({ type: 'GrantMicrocredit', citizenId: c.id });
@@ -114,7 +126,9 @@ export function economyLines(state: GameState): { label: string; value: string; 
     out.push({ label: 'Impagos el mes pasado', value: money(last.unpaid ?? 0), bad: (last.unpaid ?? 0) > 0.03 * last.income });
     out.push({ label: 'Sueldo mínimo en las empresas', value: `${money(last.wage ?? 0)}/mes` });
     out.push({ label: 'Margen medio de las empresas', value: money(last.margin ?? 0), bad: (last.margin ?? 0) < 0 });
-    out.push({ label: 'Empresas que pierden dinero', value: String(last.losing ?? 0), bad: (last.losing ?? 0) > 0 });
+    out.push({ label: 'Empresas que pierden dinero', value: `${last.losing ?? 0} de ${last.businesses ?? 0}`, bad: (last.losing ?? 0) > 0 });
+    out.push({ label: 'Empresas que cerraron el mes pasado', value: String(last.closures ?? 0), bad: (last.closures ?? 0) > 0 });
+    out.push({ label: 'Despidos en las empresas el mes pasado', value: String(last.layoffs ?? 0), bad: (last.layoffs ?? 0) > 0 });
   }
   return out;
 }

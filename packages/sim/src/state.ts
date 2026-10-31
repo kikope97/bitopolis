@@ -61,6 +61,8 @@ export interface Building {
   /** v1.9: ventas del mes en curso y cuentas del mes pasado (salud de las empresas). */
   sales?: number;
   books?: { sales: number; wages: number; taxes: number };
+  /** Ronda 15: plantilla a la que se ha recortado (si pierde dinero). */
+  staff?: number;
   /** false mientras es una obra. */
   built: boolean;
   /** Servicios recibidos por red (se recalculan cada día). */
@@ -171,6 +173,8 @@ export interface Citizen {
   /** v1.9: tras un desahucio, nadie le alquila hasta este tick; tras un embargo, no puede comprar hasta este tick. */
   evictedUntil?: number;
   seizedUntil?: number;
+  /** v1.9 (ronda 15): tras cerrar su negocio, no abre otro hasta este tick. */
+  closedUntil?: number;
 }
 
 export interface CitizenDebt {
@@ -184,7 +188,7 @@ export interface CitizenDebt {
   fresh: number;
   aged: number;
   /** Aplazamiento concedido por el alcalde: cuota fija sin recargo hasta `until`. */
-  plan?: { perMonth: number; until: number };
+  plan?: { perMonth: number; until: number; kind?: 'aplazamiento' | 'microcredito' };
 }
 
 export type TaxKey = 'ibi' | 'tasas' | 'plusvalia';
@@ -269,6 +273,9 @@ export interface MonthStat {
   margin?: number;
   losing?: number;
   wage?: number;
+  businesses?: number;
+  closures?: number;
+  layoffs?: number;
 }
 
 export interface GameState {
@@ -296,6 +303,9 @@ export interface GameState {
     /** v1.9: lo que los vecinos no han podido pagar al ayuntamiento este mes, y lo que se da por perdido. */
     unpaid?: number;
     writtenOff?: number;
+    /** Ronda 15: empresas que cerraron y despidos de este mes. */
+    closures?: number;
+    layoffs?: number;
     /** Suma diaria de los tipos: el tipo efectivo del mes es la media. */
     rateSums: Record<TaxKey, number>;
     taxDays: number;

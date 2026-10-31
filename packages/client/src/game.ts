@@ -432,6 +432,11 @@ export function startGame(opts: GameOptions): void {
           const th = state.buildings.find((b) => b.kind === 'townhall');
           if (th) coins(...screenOf(th.x, th.y), Math.ceil(Math.min(net, 6000) / 600));
         } else sfx.warn();
+        // Ronda 15: los cierres del mes, juntos y también a x10, con la causa.
+        if ((m.closures ?? 0) > 0) {
+          const wage = (m.wage ?? 0) > 900 ? ` (sueldo mínimo ${money(m.wage ?? 0)})` : '';
+          toast(`${m.closures === 1 ? 'Cierra 1 empresa' : `Cierran ${m.closures} empresas`} este mes: no llegaban a las nóminas${wage}. Toca para ver el parte.`, { kind: 'warn', onClick: openAccounts });
+        }
         // v1.9: un solo aviso al mes con quien no ha podido pagar.
         if ((m.unpaid ?? 0) > 0 && (m.debtors ?? 0) > 0) {
           toast(`${m.debtors} ${m.debtors === 1 ? 'vecino debe' : 'vecinos deben'} dinero; este mes quedaron ${money(m.unpaid ?? 0)} sin pagar al ayuntamiento. Toca para verlos.`, {
@@ -632,11 +637,12 @@ export function startGame(opts: GameOptions): void {
           continue;
         }
         const bad = /Disturbios|llenos|escapa/.test(e.text);
+        // Ronda 15: un robo con el ladrón escapado se avisa, pero no para el juego (solo disturbios y calabozos llenos).
         if (quiet && !bad) continue;
         if (bad) {
           sfx.warn();
           calmPause();
-          attention(refSpot(e.ref) ?? state.buildings.find((b) => b.kind === 'police' && b.built));
+          if (/Disturbios|llenos/.test(e.text)) attention(refSpot(e.ref) ?? state.buildings.find((b) => b.kind === 'police' && b.built));
         }
         toast(e.text, { kind: bad ? 'warn' : 'good', sticky: /Disturbios|llenos/.test(e.text), onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
       } else if (e.kind === 'protest') {
@@ -663,8 +669,10 @@ export function startGame(opts: GameOptions): void {
         toast(e.text, { kind: e.text.startsWith('Faltan') && state.politics.approval < 50 ? 'warn' : 'info', sticky: e.text.startsWith('Faltan'), onClick: () => openPolitics(social) });
         if (e.text.startsWith('Faltan') || e.text.includes('funda')) calmPause();
       } else if (e.kind === 'departure' || e.kind === 'business') {
-        if (!quiet) toast(e.text, { kind: 'warn' });
-        calmPause();
+        // Ronda 15: una apertura es buena noticia; los cierres van además agrupados a fin de mes.
+        const opens = e.kind === 'business' && / abre /.test(e.text);
+        if (!quiet) toast(e.text, { kind: opens ? 'good' : 'warn', onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+        if (!opens) calmPause();
       }
     }
   }

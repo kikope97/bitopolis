@@ -149,7 +149,7 @@ export const LIVING_BASIC = 300;
 export const LIVING_EXTRA = 150;
 export const LIVING_CUSHION = 300;
 /** Parte del gasto que va a tiendas del pueblo si las hay. */
-export const LOCAL_SPEND_SHARE = 0.45;
+export const LOCAL_SPEND_SHARE = 0.6;
 export const FACTORY_REVENUE_PER_WORKER = 1_250;
 export const MUNICIPAL_RENT = 180;
 export const PRIVATE_RENT = 280;

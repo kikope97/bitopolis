@@ -100,7 +100,8 @@ describe('economía de cada vecino (v1.9)', () => {
   it('un vecino del pueblo que roba y es detenido: antecedentes, pierde el empleo y la multa se vuelve deuda', () => {
     const s = town();
     const police = s.buildings.find((b) => b.kind === 'police' && b.built)!;
-    const thief = s.citizens.find((c) => !c.named && c.jobId !== null)!;
+    const thief = s.citizens.find((c) => !c.named)!;
+    thief.jobId = police.id;
     transfer(s, thief.id, OUTSIDE, thief.money);
     s.justice.cells = [];
     expect(tryArrest(s, police.x, police.y, 1, [thief], 'theft')).toBe(1);

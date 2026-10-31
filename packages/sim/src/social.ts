@@ -72,6 +72,7 @@ export const MEMORY_KINDS = [
   'antecedentes',
   'en_paro',
   'deuda_perdonada',
+  'cerro_negocio',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -249,6 +250,8 @@ export function memoryText(state: GameState, m: Memory): string {
       return 'Se quedó sin trabajo';
     case 'deuda_perdonada':
       return 'El alcalde le perdonó lo que debía';
+    case 'cerro_negocio':
+      return 'Tuvo que cerrar su negocio';
   }
 }
 
@@ -834,6 +837,7 @@ const MEMORY_LINE: Partial<Record<MemoryKind, (who: string) => string>> = {
   robo_en_casa: () => 'Me entraron a robar en casa; ya no estoy tranquilo.',
   en_paro: () => 'Sigo buscando trabajo.',
   deuda_perdonada: () => 'El alcalde me perdonó lo que debía. No lo olvido.',
+  cerro_negocio: () => 'Tuve que cerrar mi negocio; las nóminas me comían.',
 };
 
 /** Frase de un recuerdo; las pérdidas, distintas para la pareja y para una amistad (ronda 11). */

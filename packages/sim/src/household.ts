@@ -104,7 +104,7 @@ export function settleDebt(state: GameState, c: Citizen, mode: 'aplazar' | 'perd
     tidy(c);
     return;
   }
-  d.plan = { perMonth: Math.ceil(d.town / DEBT.planMonths), until: state.tick + DEBT.planMonths * TICKS_PER_MONTH };
+  d.plan = { perMonth: Math.ceil(d.town / DEBT.planMonths), until: state.tick + DEBT.planMonths * TICKS_PER_MONTH, kind: 'aplazamiento' };
   d.fresh = 0;
   d.aged = 0;
 }
@@ -132,7 +132,8 @@ export function grantMicrocredit(state: GameState, c: Citizen): void {
   const d = c.debt!;
   // Es un préstamo, no un impago: sin recargo.
   d.fresh = Math.max(0, d.fresh - MICROCREDIT.amount);
-  d.plan = { perMonth: Math.ceil(d.town / MICROCREDIT.months), until: state.tick + MICROCREDIT.months * TICKS_PER_MONTH };
+  d.plan = { perMonth: Math.ceil(d.town / MICROCREDIT.months), until: state.tick + MICROCREDIT.months * TICKS_PER_MONTH, kind: 'microcredito' };
+  d.since = state.tick;
   // Con el dinero, primero salda lo que debe al banco o al casero.
   if (d.bank > 0) {
     const p = transfer(state, c.id, OUTSIDE, Math.min(d.bank, c.money));
@@ -255,6 +256,9 @@ export function economyStats(state: GameState): {
   margin: number;
   losing: number;
   wage: number;
+  businesses: number;
+  closures: number;
+  layoffs: number;
 } {
   let owed = 0;
   let debtors = 0;
@@ -276,6 +280,9 @@ export function economyStats(state: GameState): {
     margin: margins.length ? Math.round(margins.reduce((a, m) => a + m, 0) / margins.length) : 0,
     losing: margins.filter((m) => m < 0).length,
     wage: MIN_WAGE[state.minWage ?? 'none'],
+    businesses: biz.length,
+    closures: state.month.closures ?? 0,
+    layoffs: state.month.layoffs ?? 0,
   };
 }
 
