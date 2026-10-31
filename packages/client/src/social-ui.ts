@@ -2,7 +2,6 @@ import type { Command } from '@bitopolis/shared';
 import { pocketBox } from './money-ui.ts';
 import {
   activeObjectives,
-  BUILD_NAMES,
   type Citizen,
   diary,
   FACTION_TEXT,
@@ -16,6 +15,10 @@ import {
   hookFor,
   memoryText,
   NEED_TEXT,
+  isFemaleName,
+  lowerFirst,
+  professionOf,
+  workplaceText,
   PLENO_COST,
   QUESTION_TEXT,
   QUESTIONS,
@@ -98,12 +101,13 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
   const hook = hookFor(state, c.id);
   // Retrato pixel art (12×18) ampliado ×4.
   const face = portraitCanvas(c.id, 4);
+  const owner = isFemaleName(c.name) ? 'Propietaria' : 'Propietario';
   sheet(
     h('span', {}, h('span', { 'aria-hidden': 'true' }, '★ '), c.name),
     face,
-    h('p', {}, `${c.profession || 'Sin oficio conocido'}, ${c.age} años · ${moodWord(c.happiness)} (${Math.round(c.happiness)}) · ${money(c.money)}`),
+    h('p', {}, `${c.profession ? professionOf(c) : 'Sin oficio conocido'}, ${c.age} años · ${moodWord(c.happiness)} (${Math.round(c.happiness)}) · ${money(c.money)}`),
     c.kids?.length ? h('p', { class: 'muted small' }, c.kids.length === 1 ? 'Tiene un hijo en casa.' : `Tiene ${c.kids.length} hijos en casa.`) : '',
-    h('p', {}, `${c.owns ? (c.mortgage > 0 ? `Propietario (le quedan ${money(c.mortgage)} de hipoteca)` : 'Propietario') : c.homeId === null ? 'Sin casa' : 'De alquiler'} · ${job ? `trabaja en ${(job.name ?? BUILD_NAMES[job.kind] ?? '').toLowerCase()}` : c.unemployedSince !== undefined ? 'en paro' : 'trabaja fuera'}`),
+    h('p', {}, `${c.owns ? (c.mortgage > 0 ? `${owner} (le quedan ${money(c.mortgage)} de hipoteca)` : owner) : c.homeId === null ? 'Sin casa' : 'De alquiler'} · ${job ? `trabaja en ${workplaceText(job)}` : c.unemployedSince !== undefined ? 'en paro' : 'trabaja fuera'}`),
     // v1.9: su balance y sus deudas.
     h('h3', {}, 'Su bolsillo'),
     pocketBox(ctx, c, () => openCitizen(ctx, citizenId)),
@@ -125,7 +129,7 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
     c.relations.length ? h('ul', { class: 'people' }, ...c.relations.map((r) => h('li', {}, `${nameOf(r.id)}: ${RELATION_TEXT[r.kind]}`))) : h('p', { class: 'muted' }, 'Aún no tiene relaciones en el pueblo.'),
     h('h3', {}, 'Recuerdos'),
     c.memories.length ? h('ul', { class: 'people' }, ...memoryLines(state, c).map((t) => h('li', {}, t))) : h('p', { class: 'muted' }, 'Nada que contar todavía.'),
-    worries.length ? h('p', {}, `Le preocupa: ${worries.slice(0, 3).join(', ').toLowerCase()}.`) : '',
+    worries.length ? h('p', {}, `Le preocupa: ${worries.slice(0, 3).map(lowerFirst).join(', ')}.`) : '',
     last.length ? h('h3', {}, 'Lo último que ha dicho') : '',
     ...last.map((d) => h('p', { class: 'quote' }, `«${d.motivo}» `, d.source === 'ai' ? h('span', { class: 'ai-badge' }, 'IA') : '')),
     h('details', { class: 'advanced' }, h('summary', {}, 'Personalidad'), traits, c.summary ? h('p', {}, c.summary) : ''),
