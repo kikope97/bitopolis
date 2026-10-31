@@ -505,7 +505,7 @@ export function startGame(opts: GameOptions): void {
   }
   function clampCam() {
     // Como mucho 2 casillas de borde (antes se podía dejar media pantalla vacía).
-    const pad = 2 * tileSize();
+    const pad = Math.min(2 * tileSize(), Math.round(Math.min(canvas.width, canvas.height) * 0.15));
     const axis = (pos: number, size: number, view: number) =>
       size + 2 * pad <= view ? Math.round((size - view) / 2) : Math.max(-pad, Math.min(size - view + pad, pos));
     cam.x = axis(cam.x, state.map.w * tileSize(), canvas.width);
@@ -583,6 +583,9 @@ export function startGame(opts: GameOptions): void {
     return fy >= 0.5 ? { x: t.x, y: t.y + 1 } : t;
   }
 
+  // El navegador genera un «clic» tras el toque: caía sobre «Construir» recién aparecido
+  // (construía sin confirmar) o sobre hojas recién abiertas. El mapa se queda el toque (ronda 10).
+  canvas.addEventListener('touchend', (e) => e.cancelable && e.preventDefault(), { passive: false });
   canvas.addEventListener('pointerdown', (e) => {
     cancelAnimationFrame(flingRaf);
     fling = { vx: 0, vy: 0, t: performance.now() };
@@ -630,6 +633,11 @@ export function startGame(opts: GameOptions): void {
       // (antes, con Carretera o Zona elegida no había forma de mover el mapa con un dedo).
       const fromAnchor = !!anchor && !!gesture.startTile && anchor.x === gesture.startTile.x && anchor.y === gesture.startTile.y;
       gesture.mode = tool.shape === 'tap' || (touchInput && !fromAnchor) ? 'pan' : 'paint';
+      // Al empezar a arrastrar se recupera lo ya movido: el mapa va pegado al dedo.
+      if (gesture.mode === 'pan') {
+        cam.x -= Math.round((prev.x - gesture.sx) * dpr());
+        cam.y -= Math.round((prev.y - gesture.sy) * dpr());
+      }
     }
     if (gesture.mode === 'pan') {
       const dx = e.clientX - prev.x;
@@ -713,6 +721,13 @@ export function startGame(opts: GameOptions): void {
         preview = previewFor(tile, tile);
         document.body.classList.add('placing');
         $('#tool-info').textContent = `${tool.label}: ahora toca dónde termina (o arrastra). Esc para cancelar.`;
+        if (touchInput) {
+          // Con el dedo, la instrucción va en la barra (la ayuda de arriba se oculta al colocar).
+          $('#confirm-text').textContent = `${tool.label}: inicio marcado. Toca dónde termina.`;
+          ($('#confirm-yes') as HTMLButtonElement).hidden = true;
+          if ($('#confirm-bar').hidden) barShownAt = performance.now();
+          $('#confirm-bar').hidden = false;
+        }
         $('#sr-live').textContent = `Inicio marcado en la casilla ${tile.x}, ${tile.y}. Elige el final.`;
         return;
       }
@@ -765,6 +780,8 @@ export function startGame(opts: GameOptions): void {
     const yes = $('#confirm-yes') as HTMLButtonElement;
     yes.textContent = tool.zone ? (tool.zone === 'none' ? 'Quitar zona' : 'Marcar zona') : 'Construir';
     yes.disabled = !v.ok;
+    yes.hidden = false;
+    if ($('#confirm-bar').hidden) barShownAt = performance.now();
     $('#confirm-bar').hidden = false;
     document.body.classList.add('placing');
   }
@@ -781,14 +798,29 @@ export function startGame(opts: GameOptions): void {
     if (cmd) await command(cmd);
   }
 
+  function cancelAnchor() {
+    anchor = null;
+    pendingEnd = null;
+    preview = null;
+    $('#confirm-bar').hidden = true;
+    document.body.classList.remove('placing');
+  }
+
   function cancelPlace() {
     pendingPlace = null;
     preview = null;
     $('#confirm-bar').hidden = true;
     document.body.classList.remove('placing');
   }
-  $('#confirm-yes').onclick = () => void confirmPlace();
-  $('#confirm-no').onclick = () => cancelPlace();
+  // Además, la barra no acepta toques en sus primeros 350 ms (por si algún clic llega tarde).
+  let barShownAt = 0;
+  const barReady = () => performance.now() - barShownAt > 350;
+  $('#confirm-yes').onclick = () => barReady() && void confirmPlace();
+  $('#confirm-no').onclick = () => {
+    if (!barReady()) return;
+    if (anchor) cancelAnchor();
+    else cancelPlace();
+  };
 
   /** Qué hay en una casilla (para el lector de pantalla). */
   function describeTile(t: { x: number; y: number }): string {
@@ -853,6 +885,7 @@ export function startGame(opts: GameOptions): void {
     } else if (k === 'Escape') {
       if (isSheetOpen()) closeSheet();
       else if (pendingPlace) cancelPlace();
+      else if (anchor && touchInput) cancelAnchor();
       else if (anchor) {
         anchor = null;
         pendingEnd = null;
@@ -911,6 +944,7 @@ export function startGame(opts: GameOptions): void {
     const tl = TOOLS.find((x) => x.id === id)!;
     tool = tl;
     for (const b of bar.querySelectorAll('.tool')) b.setAttribute('aria-pressed', String(b.getAttribute('data-tool') === id));
+    bar.querySelector(`[data-tool="${id}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     const info = $('#tool-info');
     const locked = isLocked(tl, state);
     // Con «Mirar» no hace falta la frase fija sobre el mapa (ronda 10: tapaba sitio).
@@ -923,6 +957,7 @@ export function startGame(opts: GameOptions): void {
     anchor = null;
     pendingEnd = null;
     if (pendingPlace) cancelPlace();
+    $('#confirm-bar').hidden = true;
     document.body.classList.remove('placing');
     tutorial.update(state, tool.id);
   }
@@ -1159,6 +1194,20 @@ export function startGame(opts: GameOptions): void {
   window.addEventListener('pagehide', onPageHide);
   const heartbeat = setInterval(() => !document.hidden && !lost && send({ type: 'flush' }), 30_000);
 
+  // Atrás sin hojas abiertas: pausa y pregunta antes de salir de la partida (ronda 10).
+  history.pushState({ ...(history.state ?? {}), game: true }, '');
+  async function onBack(e: PopStateEvent) {
+    if ((e.state as { game?: boolean } | null)?.game) return; // cerró una hoja: lo hace ui.ts
+    const was = speed;
+    setSpeed(0);
+    if (await confirmDialog('¿Salir de la partida?', 'Se guarda sola. Puedes volver con tu enlace.', 'Salir')) exit();
+    else {
+      history.pushState({ game: true }, '');
+      if (was) setSpeed(was);
+    }
+  }
+  window.addEventListener('popstate', onBack);
+
   function exit() {
     rememberSeen(token, state);
     stopMusic();
@@ -1172,6 +1221,7 @@ export function startGame(opts: GameOptions): void {
         clearInterval(decisionTimer);
         document.removeEventListener('visibilitychange', onVisibility);
         window.removeEventListener('pagehide', onPageHide);
+        window.removeEventListener('popstate', onBack);
         void api.release(token, sessionId);
         $('#game').hidden = true;
         opts.onExit();

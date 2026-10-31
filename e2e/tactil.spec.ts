@@ -45,6 +45,7 @@ test('táctil: tocar enseña la obra y solo se construye al confirmar, en la cas
   await expect(page.locator('#confirm-bar')).toBeVisible();
   expect((await state(page)).buildings.length).toBe(s0.buildings.length);
   await page.screenshot({ path: `test-results/capturas/${info.project.name}-v14-confirmar.png` });
+  await page.waitForTimeout(400); // la barra ignora toques en sus primeros 350 ms
   await page.locator('#confirm-yes').click();
   await expect(page.locator('#confirm-bar')).toBeHidden();
   await expect.poll(async () => (await state(page)).buildings.some((b: { x: number; y: number; kind: string }) => b.kind === 'house' && b.x === target.x && b.y === target.y)).toBe(true);
@@ -66,6 +67,7 @@ test('táctil: con un edificio elegido, arrastrar mueve el mapa y no construye n
   await page.locator('[data-tool="house"]').click();
   await t.tap(cx, cy);
   await expect(page.locator('#confirm-bar')).toBeVisible();
+  await page.waitForTimeout(400); // la barra ignora toques en sus primeros 350 ms
   await page.locator('#confirm-no').click();
   await expect(page.locator('#confirm-bar')).toBeHidden();
   expect((await state(page)).buildings.length).toBe(n0);
@@ -87,6 +89,7 @@ test('táctil: carretera con dos toques (un dedo arrastrando mueve el mapa) se e
   await t.tap(b2.x, b2.y);
   await expect(page.locator('#confirm-bar')).toBeVisible();
   await expect(page.locator('#confirm-text')).toContainText('5 casillas');
+  await page.waitForTimeout(400); // la barra ignora toques en sus primeros 350 ms
   await page.locator('#confirm-yes').click();
   await expect.poll(async () => (await state(page)).map.tiles[(th.y + 3) * s0.map.w + th.x]).toBe(1);
 });
@@ -108,4 +111,49 @@ test('el menú ☰ no se cambia solo por la última ficha mirada (el «menú en 
   await page.getByRole('button', { name: 'Impuestos' }).click();
   await page.waitForTimeout(2000);
   await expect(page.locator('.sheet h2')).not.toHaveText('Ayuntamiento');
+});
+
+test('táctil: un solo toque junto al borde de abajo no construye (el clic fantasma caía en «Construir»)', async ({ page }) => {
+  await start(page);
+  const t = await touch(page);
+  const s0 = await state(page);
+  const th = s0.buildings.find((b: { kind: string }) => b.kind === 'townhall');
+  const target = { x: th.x + 1, y: th.y + 2 };
+  const box = (await page.locator('#map').boundingBox())!;
+  // Mover el mapa despacio (sin inercia) hasta que la casilla quede a ~35 px del borde inferior.
+  for (let i = 0; i < 6; i++) {
+    const p = await tile(page, target.x, target.y);
+    const dy = box.y + box.height - 35 - p.y;
+    if (Math.abs(dy) < 6) break;
+    const step = Math.max(-200, Math.min(200, dy));
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: cx, y: cy }] } as never);
+    for (let k = 1; k <= 20; k++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: cx, y: cy + (step * k) / 20 }] } as never);
+    await page.waitForTimeout(150);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] } as never);
+    await page.waitForTimeout(150);
+  }
+  await page.locator('[data-tool="house"]').click();
+  const p = await tile(page, target.x, target.y);
+  const n0 = (await state(page)).buildings.length;
+  await t.tap(p.x, p.y);
+  await page.waitForTimeout(600);
+  expect((await state(page)).buildings.length).toBe(n0);
+  await expect(page.locator('#confirm-bar')).toBeVisible();
+});
+
+test('táctil: con el inicio de una carretera marcado, la barra dice qué hacer y ✕ lo cancela', async ({ page }) => {
+  await start(page);
+  const t = await touch(page);
+  const th = (await state(page)).buildings.find((b: { kind: string }) => b.kind === 'townhall');
+  await page.locator('[data-tool="road"]').click();
+  const a = await tile(page, th.x - 2, th.y + 3);
+  await t.tap(a.x, a.y);
+  await expect(page.locator('#confirm-text')).toContainText('Toca dónde termina');
+  await expect(page.locator('#confirm-yes')).toBeHidden();
+  await page.waitForTimeout(400); // la barra ignora toques en sus primeros 350 ms
+  await page.locator('#confirm-no').click();
+  await expect(page.locator('#confirm-bar')).toBeHidden();
 });
