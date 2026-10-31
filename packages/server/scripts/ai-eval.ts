@@ -259,3 +259,9 @@ const report = {
 if (values.record) writeFileSync(values.record, JSON.stringify(Object.fromEntries(recordings), null, 1));
 if (values.out) writeFileSync(values.out, JSON.stringify(report, null, 2));
 console.log(JSON.stringify(report, null, 2));
+// Con respuestas grabadas, cualquier petición sin grabación (el prompt ha cambiado) o
+// inválida hace fallar el CI: hay que volver a grabar con `--live --record`.
+if (values.replay && (report.errors > 0 || report.validActionPct < 95 || report.director.validPct < 95)) {
+  console.error(`La grabación no cuadra con el prompt actual (errores: ${report.errors}, válidas: ${report.validActionPct} %, director: ${report.director.validPct} %). Vuelve a grabar con --live --record.`);
+  process.exit(1);
+}
