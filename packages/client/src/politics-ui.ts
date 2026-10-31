@@ -211,7 +211,6 @@ export function openElectionNight(ctx: SocialCtx): void {
   const won = r.winner === 'player';
   // El resultado se anuncia también al lector de pantalla.
   $('#sr-live').textContent = `Noche electoral. ${r.unopposed ? 'Sin rival: sigues de alcalde' : won ? 'Ganas las elecciones' : 'Pierdes las elecciones'}. ${resultText(r)}`;
-  document.body.classList.add('election-night');
   sheet(
     'Noche electoral',
     h('p', { class: 'big-number' }, r.unopposed ? 'Sin rival: sigues de alcalde' : won ? '¡Ganas las elecciones!' : 'Pierdes las elecciones'),
@@ -219,4 +218,5 @@ export function openElectionNight(ctx: SocialCtx): void {
     h('p', {}, resultText(r)),
     !won ? h('p', {}, 'Pasas a la oposición: no puedes gobernar, pero sí hablar con los vecinos y hacer campaña. No hay game over: en cuatro años vuelves a presentarte.') : '',
   );
+  document.body.classList.add('election-night');
 }

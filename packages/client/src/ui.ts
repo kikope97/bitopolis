@@ -88,6 +88,11 @@ export function toast(text: string, opts: { sticky?: boolean; kind?: 'info' | 'w
 let openSheetEl: HTMLElement | null = null;
 let lastFocus: HTMLElement | null = null;
 
+/** La hoja abierta ahora (para refrescar solo la que toca). */
+export function currentSheet(): HTMLElement | null {
+  return openSheetEl;
+}
+
 export function closeSheet() {
   if (!openSheetEl) return;
   document.body.classList.remove('election-night');
@@ -120,6 +125,8 @@ export function sheet(title: string | Node, ...content: (Node | string)[]): HTML
   }
   const keepFocus = openSheetEl ? lastFocus : (document.activeElement as HTMLElement | null);
   if (openSheetEl) {
+    // Sustituir la hoja también quita el ambiente de la noche electoral (lo pone esa hoja después).
+    document.body.classList.remove('election-night');
     openSheetEl.remove();
     openSheetEl = null;
   }

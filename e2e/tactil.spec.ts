@@ -85,3 +85,22 @@ test('táctil: carretera arrastrando se enseña y se confirma', async ({ page })
   await page.locator('#confirm-yes').click();
   await expect.poll(async () => (await state(page)).map.tiles[(th.y + 3) * s0.map.w + th.x]).toBe(1);
 });
+
+test('el menú ☰ no se cambia solo por la última ficha mirada (el «menú en bucle»)', async ({ page }) => {
+  await start(page);
+  const s0 = await state(page);
+  const th = s0.buildings.find((b: { kind: string }) => b.kind === 'townhall');
+  await page.locator('[data-tool="inspect"]').click();
+  const p = await tile(page, th.x, th.y);
+  await page.mouse.click(p.x, p.y);
+  await expect(page.locator('.sheet h2')).toHaveText('Ayuntamiento');
+  await page.locator('.sheet-close').click();
+  await page.locator('[data-speed="3"]').click();
+  await page.locator('#menu').click();
+  await expect(page.locator('.sheet h2')).toHaveText('Menú');
+  await page.waitForTimeout(2500);
+  await expect(page.locator('.sheet h2')).toHaveText('Menú');
+  await page.getByRole('button', { name: 'Impuestos' }).click();
+  await page.waitForTimeout(2000);
+  await expect(page.locator('.sheet h2')).not.toHaveText('Ayuntamiento');
+});

@@ -27,7 +27,7 @@ import SimWorker from './sim.worker.ts?worker';
 import { buildingSprite, letterSprite, T } from './sprites.ts';
 import { commandFor, costText, isLocked, shortCost, type Tool, type ToolId, TOOLS, tilesOf, unlockPop } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
-import { $, closeSheet, confirmDialog, h, isSheetOpen, reducedMotion, sheet, toast, vibrate } from './ui.ts';
+import { $, closeSheet, confirmDialog, currentSheet, h, isSheetOpen, reducedMotion, sheet, toast, vibrate } from './ui.ts';
 import { duck, sfx, startAmbience, startMusic, stopMusic, unlockAudio } from './audio.ts';
 import { coins, dust, pop, shake, shakeOffset } from './fx.ts';
 import { onPrefs, prefs } from './prefs.ts';
@@ -260,7 +260,9 @@ export function startGame(opts: GameOptions): void {
       'aria-label',
       `Mapa del pueblo: ${plural(state.buildings.filter((b) => b.built).length, 'edificio', 'edificios')}, ${plural(state.projects.length, 'obra', 'obras')}. Con el mapa enfocado, las flechas mueven un cursor e Intro usa la herramienta.`,
     );
-    if (isSheetOpen() && openInspect) openInspect();
+    // Solo se refresca la ficha que se está mirando; antes, cualquier hoja abierta
+    // (menú, impuestos, noche electoral…) se cambiaba por la última ficha vista (v1.4).
+    if (openInspect && inspectSheet && currentSheet() === inspectSheet) openInspect();
   }
 
   function updateDemand() {
@@ -845,6 +847,7 @@ export function startGame(opts: GameOptions): void {
 
   /* ---------- inspección ---------- */
   let openInspect: (() => void) | null = null;
+  let inspectSheet: HTMLElement | null = null;
 
   function focusBuilding(id: number) {
     const b = state.buildings.find((x) => x.id === id);
@@ -877,6 +880,7 @@ export function startGame(opts: GameOptions): void {
       const zone = z ? `Zona ${['', 'residencial (R)', 'comercial (C)', 'industrial (I)'][z]}` : 'Sin zona';
       sheet(name, h('p', {}, zone), h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`));
       openInspect = null;
+      inspectSheet = null;
       return;
     }
     const content: (Node | string)[] = [];
@@ -933,7 +937,7 @@ export function startGame(opts: GameOptions): void {
     }
     const owner = b.owner === 0 ? 'Municipal' : b.owner === -1 ? 'Privado (inversor de fuera)' : 'De un vecino';
     content.push(h('p', { class: 'muted' }, owner));
-    sheet(b.name ?? BUILD_NAMES[b.kind] ?? b.kind, ...content);
+    inspectSheet = sheet(b.name ?? BUILD_NAMES[b.kind] ?? b.kind, ...content);
     const body = document.querySelector('.sheet-body');
     if (body) body.scrollTop = prevScroll;
   }
