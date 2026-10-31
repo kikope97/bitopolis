@@ -89,6 +89,15 @@ export const Command = z.discriminatedUnion('type', [
       })
       .optional(),
   }),
+  /**
+   * 2.1: votos de los vecinos con IA para el escudo y el lema al subir de rango
+   * (menú cerrado de `rankCandidates`; el motor descarta lo que no esté en él y
+   * el resto del pueblo vota por reglas). Solo lo trae la IA del servidor.
+   */
+  z.object({
+    type: z.literal('ChooseCrest'),
+    votes: z.array(z.object({ vecino: z.number().int(), pieza: z.string().regex(/^[a-z_]+$/).max(20), lema: z.string().regex(/^[a-z_]+$/).max(40) })).min(1).max(300),
+  }),
   /** 2.0: % de vecinos con IA (solo sube: nadie deja de pensar con IA). */
   z.object({ type: z.literal('SetAiShare'), share: z.number().int().min(0).max(100) }),
   /** 2.0: días de juego entre turnos de la IA (el cliente los alarga a x3/x10). */

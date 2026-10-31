@@ -12,9 +12,10 @@ import type { Moment } from './album.ts';
 import type { Departed } from './family.ts';
 // Solo el tipo: importar crime.ts aquí crea un ciclo al cargar (crime → social → commands → state).
 import type { Justice } from './crime.ts';
+import { emptyRank, type TownRank } from './rank-core.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
-export const FORMAT_VERSION = 13;
+export const FORMAT_VERSION = 14;
 
 export const MAP_W = 48;
 export const MAP_H = 48;
@@ -374,6 +375,8 @@ export interface GameState {
   justice: Justice;
   /** Última despedida (como mucho una por semana). */
   lastDeathTick?: number;
+  /** 2.1: rango del pueblo (aldea → capital comarcal) y su escudo (rank.ts). */
+  rank?: TownRank;
 }
 
 export type BudgetPlan = 'austero' | 'equilibrado' | 'inversor';
@@ -474,6 +477,7 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiSh
       : {}),
     minWage: 'none',
     debtLedger: { created: 0, repaid: 0, written: 0, forgiven: 0 },
+    rank: emptyRank(seed, terrain),
   };
   // Árboles dispersos (se talan gratis al construir encima).
   for (let i = 0; i < tiles.length; i++) {

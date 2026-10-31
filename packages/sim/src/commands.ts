@@ -1,5 +1,6 @@
 import { canMeetAssociation, meetAssociation } from './associations.ts';
 import { canUpgradeBuilding, startUpgrade } from './levels.ts';
+import { applyCrestVote, validBallot } from './rank.ts';
 import { applyTownTurn, canApplyTurn, mayorText, noteMayor, setAiShare } from './turns.ts';
 import { canMicrocredit, canSettleDebt, grantMicrocredit, settleDebt } from './household.ts';
 import { serviceCounts } from './economy.ts';
@@ -237,6 +238,9 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       return canUpgradeTownhall(state);
     case 'TownTurn':
       return canApplyTurn(state, cmd.n);
+    case 'ChooseCrest':
+      if (!state.rank?.vote) return { ok: false, error: 'No hay votación del escudo abierta' };
+      return cmd.votes.some((b) => validBallot(state, b)) ? { ok: true } : { ok: false, error: 'Ningún voto vale (vecino sin IA o fuera del menú)' };
     case 'SetAiShare':
       if (!state.aiMode || !state.ai) return { ok: false, error: 'Solo en Modo IA' };
       return cmd.share === state.ai.share ? { ok: false, error: 'Ya está en ese %' } : { ok: true };
@@ -312,6 +316,9 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
   switch (cmd.type) {
     case 'TownTurn':
       applyTownTurn(state, cmd.n, cmd.acts, { focus: cmd.focus, chronicle: cmd.chronicle, director: cmd.director });
+      break;
+    case 'ChooseCrest':
+      applyCrestVote(state, cmd.votes);
       break;
     case 'SetAiShare':
       setAiShare(state, cmd.share);

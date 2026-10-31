@@ -1,4 +1,5 @@
-import { TICKS_PER_DAY } from '@bitopolis/shared';
+import { TICKS_PER_DAY, tickToDate } from '@bitopolis/shared';
+import { seasonOf } from './weather.ts';
 import { BUILD_NAMES } from './commands.ts';
 import { JOBS, SHOP_NAMES } from './balance.ts';
 import { buyHome, canBuyHome, canFound, foundBusiness, sellOnDeparture, shopTypesFor } from './economy.ts';
@@ -311,8 +312,19 @@ export function performAction(state: GameState, c: Citizen, trigger: Trigger, ac
   // Ronda 13: lo rutinario (ahorrar, darse un capricho, seguir igual) queda en la ficha del
   // vecino, no en el diario ni en burbujas (en 12 años eran miles de «decide ahorrar»).
   const routine = ['ahorrar', 'gastar_ocio', 'seguir_alquilando', 'seguir_fuera'].includes(verb) || (verb === 'quedarse' && p.trigger === 'opinion');
-  if (!routine) pushEvent(state, 'decision', `${c.name} ${effect}: «${text}»`, { ref: citizenId });
+  // 2.1: «X se queda» no cambia nada: una vez por estación basta (salían 15 seguidas en el diario).
+  const again = verb === 'quedarse' && state.events.some((e) => e.kind === 'decision' && e.ref === citizenId && e.text.startsWith(`${c.name} ${effect}: `) && sameSeason(e.tick, state.tick));
+  if (!routine && !again) pushEvent(state, 'decision', `${c.name} ${effect}: «${text}»`, { ref: citizenId });
   return effect;
+}
+
+/** ¿Los dos ticks caen en la misma estación del mismo año? (el invierno cruza el año). */
+function sameSeason(a: number, b: number): boolean {
+  const key = (t: number) => {
+    const d = tickToDate(t);
+    return `${d.month === 12 ? d.year + 1 : d.year}${seasonOf(d.month)}`;
+  };
+  return key(a) === key(b);
 }
 
 /* ---------------- reglas (Modo normal y fallback) ---------------- */

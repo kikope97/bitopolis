@@ -52,6 +52,7 @@ import { Terrain } from './terrain.ts';
 import { weatherDay, weatherFx, weatherMood } from './weather.ts';
 import { associationsDay, associationsMonth } from './associations.ts';
 import { albumDay } from './album.ts';
+import { rankDay } from './rank.ts';
 import { crimeDay, jailNear } from './crime.ts';
 import { townLevel, zonesUnlocked } from './townhall.ts';
 import { finishUpgrades, jobsOf, maintenanceOf, plantCapacityOf, radiusOf, serviceHappiness } from './levels.ts';
@@ -577,6 +578,8 @@ function endOfDay(state: GameState): void {
   for (const b of finishUpgrades(state)) {
     pushEvent(state, 'built', `${b.name ?? BUILD_NAMES[b.kind] ?? b.kind} sube a nivel ${b.level}: llega más lejos y atiende a más gente`, { ref: b.id });
   }
+  // 2.1: de aldea a ciudad (antes del álbum: la subida sale en la foto del día).
+  rankDay(state);
   albumDay(state);
   accumulateRates(state);
 }

@@ -1,6 +1,8 @@
 import { emptyPolitics } from './politics-core.ts';
 import { FORMAT_VERSION, type GameState } from './state.ts';
+import { emptyRank } from './rank-core.ts';
 import { levelForPop } from './townhall.ts';
+import { RANKS } from './balance.ts';
 
 /**
  * Migraciones encadenadas: MIGRATIONS[n] convierte un estado de formatVersion
@@ -141,7 +143,26 @@ export const MIGRATIONS: Record<number, Migration> = {
       ? { ai: { share: 25, paceDays: 7, turn: null, lastN: 0, next: (s.tick ?? 0) + 7 * 24, mayor: [], quick: null, lastQuick: -1e9, log: [] } }
       : {}),
   }),
+  // 2.1: cada parte añade lo suyo en su propia función (varias ramas suben a 14 a la vez).
+  13: (s) => migrate14Rank({ ...s, formatVersion: 14 }),
 };
+
+/**
+ * 2.1 (rangos del pueblo): un pueblo de antes empieza en el rango que ya le
+ * corresponde, con el escudo de su terreno y sin votación (no hay fanfarria
+ * de algo que ya tenía).
+ */
+export function migrate14Rank(s: Record<string, any>): Record<string, any> {
+  if (s.rank) return s;
+  const pop = s.citizens?.length ?? 0;
+  const hall = s.townhallLevel ?? 1;
+  let level = 0;
+  RANKS.forEach((r, i) => {
+    if (pop >= r.pop && hall >= r.townhall) level = i;
+  });
+  const terrain = s.map?.terrain ?? [];
+  return { ...s, rank: emptyRank(s.seed ?? 0, terrain, level, s.tick ?? 0) };
+}
 
 export function migrate(raw: unknown): GameState {
   if (typeof raw !== 'object' || raw === null) throw new Error('estado inválido');

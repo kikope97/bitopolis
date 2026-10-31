@@ -62,6 +62,8 @@ export function albumDay(state: GameState): void {
       if (b && FIRST_KINDS[b.kind]) add(state, `primer_${b.kind}`, FIRST_KINDS[b.kind]!, b, true);
     } else if (e.kind === 'milestone' && /fiestas/i.test(e.text)) add(state, 'fiestas', e.text, hall, false);
     else if (e.kind === 'milestone' && e.text.startsWith('Objetivo cumplido') && /Plaza|Mercado/.test(e.text)) add(state, 'hito', e.text, hall, false);
+    // 2.1: cada subida de rango, una postal (una por rango).
+    else if (e.kind === 'milestone' && e.text.startsWith('¡Bitópolis ya es')) add(state, `rango_${state.rank?.level ?? 0}`, e.text.split('!')[0]!.replace(/^¡/, ''), hall, true);
     else if (e.kind === 'election') add(state, 'elecciones', e.text, hall, false);
     else if (e.text.startsWith('¡Llega un bebé')) add(state, 'primer_bebe', `Primer bebé del pueblo: ${e.text.replace(/^¡/, '').replace(/!$/, '')}`, where(e.ref), true);
     else if (e.text.startsWith('Nos ha dejado')) add(state, 'primera_despedida', e.text.split('. ')[0]!, where(e.ref), true);
