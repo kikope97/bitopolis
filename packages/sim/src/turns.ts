@@ -91,7 +91,8 @@ export function emptyTownAi(share = TURN.defaultShare): TownAi {
 
 /** ¿Este vecino piensa con IA? (Modo IA y vecino con nombre: el % decide quién lo tiene.) */
 export function isAiCitizen(state: GameState, c: Citizen): boolean {
-  return state.aiMode && c.named && !!state.ai;
+  // Con el % a 0, nadie piensa con IA: vuelven los detonantes y las reglas de siempre.
+  return state.aiMode && c.named && !!state.ai && state.ai.share > 0;
 }
 
 /** En Modo IA, ¿le toca IA a este vecino nuevo? Fijo por su id: al subir el %, solo se añaden. */
@@ -516,8 +517,9 @@ function turnIds(state: GameState, kind: 'semana' | 'rapida'): number[] {
  */
 export function turnsTick(state: GameState, ruleFallback: (state: GameState, ids: number[]) => TurnLog['lines']): void {
   const ai = state.ai;
-  if (!state.aiMode || !ai || ai.share <= 0) return;
+  if (!state.aiMode || !ai) return;
   const t = ai.turn;
+  // Ronda 16: un turno abierto vence aunque el % de vecinos con IA haya bajado a 0.
   if (t) {
     if (state.tick >= t.due) {
       if (t.kind === 'semana') ai.directed = false;
@@ -526,7 +528,7 @@ export function turnsTick(state: GameState, ruleFallback: (state: GameState, ids
     return;
   }
   // Solo se abren turnos al empezar el día (estable para el cliente y el servidor).
-  if (state.tick % TICKS_PER_DAY !== 0) return;
+  if (ai.share <= 0 || state.tick % TICKS_PER_DAY !== 0) return;
   let kind: 'semana' | 'rapida' | null = null;
   if (state.tick >= ai.next) kind = 'semana';
   else if (ai.quick) kind = 'rapida';

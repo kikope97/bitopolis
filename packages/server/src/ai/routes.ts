@@ -197,8 +197,11 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
       if (s.locked.includes('model') && s.locked.includes('modelPremium')) return bad(reply, 'El modelo lo fija el servidor', 403);
     } else {
       if (!srv.playerKeys) return bad(reply, 'Este servidor no permite poner una API key propia', 403);
+      const nextBase = draft?.baseUrl !== undefined ? draft.baseUrl || undefined : baseUrl;
+      // Ronda 16: la key guardada nunca va a un endpoint distinto del guardado (fuga y SSRF).
       if (draft?.key) key = draft.key;
-      if (draft?.baseUrl !== undefined) baseUrl = draft.baseUrl || undefined;
+      else if (nextBase !== baseUrl) key = undefined;
+      baseUrl = nextBase;
     }
     if (!key && !baseUrl) return bad(reply, 'Escribe tu API key y pulsa «Cargar modelos»');
     try {
@@ -238,6 +241,12 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
     if (!t.success || !Number.isInteger(n) || n < 1) return bad(reply, 'petición no válida');
     const row = await load(t.data);
     if (!row) return bad(reply, 'no existe', 404);
+    // Ronda 16: si el servidor no conoce ese turno (se reinició, o el guardado no era «live»),
+    // lo pide ahora con el estado guardado, si ese turno sigue abierto.
+    if (!ai.turn(row.id, n) && row.mode === 'ai') {
+      const st = migrate(JSON.parse(row.state)) as GameState;
+      if (st.ai?.turn?.n === n) void ai.onSaved(row.id, st);
+    }
     return { turn: ai.turn(row.id, n), ...ai.status(row.id) };
   });
 

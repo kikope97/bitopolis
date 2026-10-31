@@ -14,6 +14,7 @@ import {
   GESTURES,
   gestureCandidates,
   hashState,
+  isAiCitizen,
   migrate,
   NEEDS,
   parseTurn,
@@ -261,4 +262,18 @@ describe('turnos del pueblo con IA (2.0)', () => {
     expect(rules.every((c) => Math.abs(c.attitude!) <= 1)).toBe(true);
     expect(checkInvariants(state)).toEqual([]);
   }, 120_000);
+
+  it('con el % de vecinos con IA a 0, el turno abierto vence y vuelven las reglas', () => {
+    const { state } = runSimulation({ seed: 5, days: 120, profile: 'constructor', aiMode: true, aiShare: 60 });
+    while (!state.ai!.turn) step(state);
+    const n = state.ai!.turn!.n;
+    state.ai!.share = 0;
+    for (let i = 0; i < 24; i++) step(state);
+    expect(state.ai!.turn).toBeNull();
+    expect(state.ai!.log.at(-1)!.n).toBe(n);
+    expect(state.citizens.some((c) => c.named && isAiCitizen(state, c))).toBe(false);
+    for (let i = 0; i < 24 * 30; i++) step(state);
+    expect(state.ai!.turn).toBeNull();
+    expect(checkInvariants(state)).toEqual([]);
+  });
 });

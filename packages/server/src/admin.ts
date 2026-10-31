@@ -256,7 +256,8 @@ export async function registerAdminRoutes(
     if (!b.success) return bad(reply, zodError(b.error));
     const s = await ai.settings(null);
     const baseUrl = b.data.baseUrl === undefined ? s.baseUrl : opt(b.data.baseUrl);
-    return listFor(reply, b.data.key ?? s.key, baseUrl);
+    // La key guardada solo va a su endpoint: con otro, hay que escribirla otra vez.
+    return listFor(reply, b.data.key ?? (baseUrl === s.baseUrl ? s.key : undefined), baseUrl);
   });
 
   app.get('/api/admin/stats', async () => {

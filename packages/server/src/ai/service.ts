@@ -78,8 +78,11 @@ export const SAVING_AT = 0.7;
 
 /** 2.0: vecinos por lote y lotes en paralelo (el primero va solo para escribir la caché). */
 export const TURN_BATCH = 15;
-const TURN_PARALLEL = 4;
-const TURN_TIMEOUT_MS = 60_000;
+const TURN_TIMEOUT_MS = 30_000;
+/** Todo el turno (lotes, director y segunda pregunta) debe caber en la espera del cliente (45 s). */
+const TURN_DEADLINE_MS = 40_000;
+/** Sin este margen, no se hace la segunda pregunta. */
+const TURN_RETRY_MIN_MS = 8_000;
 const TURN_OUT_PER_CITIZEN = 320;
 /** Tokens de salida del director (sucesos, avisos, foco y crónica). */
 const DIRECTOR_OUT = 900;
@@ -273,6 +276,9 @@ export class AiService {
     const shared = turnShared(state);
     const { model, rung } = await this.turnModel(gameId, s);
     result.rung = rung;
+    // Ronda 16: todo el turno (con la segunda pregunta) tiene que caber en la espera del cliente.
+    const deadline = Date.now() + TURN_DEADLINE_MS;
+    const timeLeft = () => Math.max(1000, Math.min(TURN_TIMEOUT_MS, deadline - Date.now()));
     /** Pide un lote; a los vecinos que la IA se haya dejado se les pregunta una vez más, solos. */
     const one = async (ids: number[], retry = true): Promise<void> => {
       let missing: number[] = [];
@@ -292,8 +298,9 @@ export class AiService {
         const provider = this.providerOverride ? this.providerOverride(s) : makeProvider(s.provider, s.key, s.baseUrl);
         const r = await provider.complete(
           { system: req.system, shared: req.shared, user: req.user, schema: req.schema, model, maxTokens: 300 + ids.length * TURN_OUT_PER_CITIZEN },
-          AbortSignal.timeout(TURN_TIMEOUT_MS),
+          AbortSignal.timeout(timeLeft()),
         );
+        if (r.truncated) status = 'truncated';
         usage.in = r.usage.in;
         usage.cachedIn = r.usage.cachedIn;
         usage.out = r.usage.out;
@@ -302,9 +309,10 @@ export class AiService {
         result.acts.push(...parsed.acts);
         result.answered += parsed.acts.length;
         missing = parsed.missing;
-        if (missing.length) status = 'partial';
+        if (missing.length && status === 'ok') status = 'partial';
       } catch (e) {
         status = (e as Error).name === 'TimeoutError' ? 'timeout' : 'error';
+        missing = ids;
         g.lastError = `La IA no respondió a tiempo (${(e as Error).message}). Esta semana deciden las reglas para parte del pueblo.`;
       } finally {
         this.reserved.set(gameId, Math.max(0, (this.reserved.get(gameId) ?? 0) - est));
@@ -329,20 +337,28 @@ export class AiService {
           })
           .execute();
       }
-      if (retry && missing.length && missing.length < ids.length) await one(missing, false);
+      // Segunda pregunta si aún hay tiempo: a los que faltan; si falló el lote entero (cortado o
+      // sin respuesta), en dos mitades más cortas.
+      if (!retry || !missing.length || deadline - Date.now() < TURN_RETRY_MIN_MS) return;
+      if (missing.length < ids.length) await one(missing, false);
+      else if (ids.length > 1) {
+        const half = Math.ceil(ids.length / 2);
+        await Promise.all([one(ids.slice(0, half), false).catch(() => undefined), one(ids.slice(half), false).catch(() => undefined)]);
+      }
     };
     /** El director del pueblo: una petición con el modelo del director (cerca del tope, un turno sí y otro no). */
     const director = async (): Promise<void> => {
       if (state.ai?.turn?.kind !== 'semana' || (rung === 'cerca del tope' && result.n % 2 === 1)) return;
       const req = buildDirectorRequest(state, shared);
-      const dModel = rung === 'calidad' ? s.modelPremium : model;
+      // Ronda 16: el director va siempre con su modelo (también en Ahorro); cerca del tope, con el barato.
+      const dModel = rung === 'cerca del tope' ? model : s.modelPremium;
       const est = costEur(this.prices, dModel, s.provider, { in: Math.ceil((req.system.length + req.shared.length + req.user.length) / 3.2), cachedIn: 0, out: DIRECTOR_OUT }) * 1.5;
       if (await this.reserve(gameId, s, est)) return;
       const usage = { in: 0, cachedIn: 0, out: 0 };
       let status = 'ok';
       try {
         const provider = this.providerOverride ? this.providerOverride(s) : makeProvider(s.provider, s.key, s.baseUrl);
-        const r = await provider.complete({ system: req.system, shared: req.shared, user: req.user, schema: req.schema, model: dModel, maxTokens: DIRECTOR_OUT }, AbortSignal.timeout(TURN_TIMEOUT_MS));
+        const r = await provider.complete({ system: req.system, shared: req.shared, user: req.user, schema: req.schema, model: dModel, maxTokens: DIRECTOR_OUT }, AbortSignal.timeout(timeLeft()));
         usage.in = r.usage.in;
         usage.cachedIn = r.usage.cachedIn;
         usage.out = r.usage.out;
@@ -363,14 +379,13 @@ export class AiService {
           .execute();
       }
     };
-    // El primer lote va solo (escribe la caché del bloque común); los demás, en paralelo, con el director.
+    // Ronda 16: todos los lotes a la vez con el director (esperar al primero para escribir la
+    // caché ahorraba céntimos y costaba una latencia entera).
     try {
-      await one(batches[0]!);
-      const rest = batches.slice(1);
-      const others = (async () => {
-        for (let i = 0; i < rest.length; i += TURN_PARALLEL) await Promise.all(rest.slice(i, i + TURN_PARALLEL).map((b) => one(b).catch(() => undefined)));
-      })();
-      await Promise.all([director().catch(() => undefined), others]);
+      const all = batches.map((b) => one(b).catch((e: Error) => e));
+      const [first] = await Promise.all([Promise.all(all), director().catch(() => undefined)]);
+      const capped = first.find((x): x is Error => x instanceof Error && g.capped);
+      if (capped) throw capped;
     } catch (e) {
       result.reason = (e as Error).message;
     }

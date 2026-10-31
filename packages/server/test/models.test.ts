@@ -218,6 +218,10 @@ describe('/api/games/:token/ai/models', () => {
     expect(r.statusCode).toBe(200);
     expect(r.json().provider).toBe('anthropic');
     expect(asked.at(-1)!.key).toBe(ANT_KEY);
+    // Ronda 16: la key guardada nunca va a otro endpoint (quien tenga el enlace no puede robarla).
+    asked.length = 0;
+    await gameReq(token, 'POST', { baseUrl: 'https://atacante.example/v1' });
+    expect(asked.every((a) => a.key === undefined)).toBe(true);
   });
 
   it('sin permiso para keys propias, 403', async () => {

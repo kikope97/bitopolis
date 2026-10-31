@@ -15,6 +15,8 @@ export interface LLMRequest {
 export interface LLMResult {
   text: string;
   usage: { in: number; cachedIn: number; out: number };
+  /** Ronda 16: la respuesta se cortó por el tope de tokens (el JSON llega incompleto). */
+  truncated?: boolean;
 }
 
 export interface LLMProvider {
@@ -77,6 +79,7 @@ export class OpenAICompatProvider implements LLMProvider {
     if (typeof text !== 'string') throw new ProviderError('respuesta sin contenido');
     const u = data.usage ?? {};
     return {
+      ...(data?.choices?.[0]?.finish_reason === 'length' ? { truncated: true } : {}),
       text,
       usage: { in: u.prompt_tokens ?? 0, cachedIn: u.prompt_tokens_details?.cached_tokens ?? u.prompt_cache_hit_tokens ?? 0, out: u.completion_tokens ?? 0 },
     };
@@ -133,6 +136,7 @@ export class AnthropicProvider implements LLMProvider {
     const u = msg.usage;
     const cached = u.cache_read_input_tokens ?? 0;
     return {
+      ...(msg.stop_reason === 'max_tokens' ? { truncated: true } : {}),
       text,
       usage: { in: u.input_tokens + cached + (u.cache_creation_input_tokens ?? 0), cachedIn: cached, out: u.output_tokens },
     };
