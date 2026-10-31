@@ -698,3 +698,6 @@ html[data-text='200'] .tut-box { max-height: 40dvh; overflow: auto; }
   .sheet { left: 116px; }
   #toasts, .tut-box { left: 124px; }
 }
+/* Ronda 11: con la barra de obra a la vista, el tutorial sube por encima (antes tapaba «Construir»). */
+body.placing .tut-box { bottom: calc(var(--dock-h, 64px) + 80px); }
+body.placing .tut-arrow { display: none; }

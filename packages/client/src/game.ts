@@ -388,10 +388,15 @@ export function startGame(opts: GameOptions): void {
         calmPause();
         openElectionNight(social);
       } else if (e.kind === 'info' && /Diputación|fiestas|Subvención/.test(e.text)) {
-        // v1.5: ofertas de subvención y fiestas: llevan a la hoja del Ayuntamiento.
-        toast(e.text, { kind: 'info', onClick: () => openTownHall(social) });
+        // v1.5: ofertas de subvención y fiestas: llevan a su sección del Ayuntamiento.
+        // Si hay que decidir algo con plazo, el juego baja a x1 para que dé tiempo (ronda 11).
+        const decide = /Responde antes|puedes organizarlas/.test(e.text);
+        if (decide && speed >= 3) setSpeed(1);
+        toast(e.text, { kind: 'info', sticky: decide, onClick: () => openTownHall(social, /fiestas/i.test(e.text) ? 'festival' : 'grants') });
       } else if (e.kind === 'politics' && /presupuesto/i.test(e.text)) {
-        toast(e.text, { kind: e.text.includes('rechaza') ? 'warn' : 'info', onClick: () => openTownHall(social) });
+        const decide = e.text.startsWith('Toca presentar');
+        if (decide && speed >= 3) setSpeed(1);
+        toast(e.text, { kind: e.text.includes('rechaza') ? 'warn' : 'info', sticky: decide, onClick: () => openTownHall(social, 'budget') });
       } else if (e.kind === 'politics') {
         // Lo que responde a una acción tuya (moción, campaña) se avisa siempre.
         if (quiet && !e.text.startsWith('Faltan') && !/moción|campaña/i.test(e.text)) continue;
@@ -786,7 +791,8 @@ export function startGame(opts: GameOptions): void {
     const yes = $('#confirm-yes') as HTMLButtonElement;
     yes.textContent = tool.zone ? (tool.zone === 'none' ? 'Quitar zona' : 'Marcar zona') : 'Construir';
     yes.disabled = !v.ok;
-    yes.hidden = false;
+    // Si no se puede, no se ofrece «Construir»: solo el motivo y ✕ (ronda 11).
+    yes.hidden = !v.ok;
     if ($('#confirm-bar').hidden) barShownAt = performance.now();
     $('#confirm-bar').hidden = false;
     document.body.classList.add('placing');

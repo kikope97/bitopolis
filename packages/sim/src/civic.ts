@@ -101,8 +101,8 @@ export function festivalActive(state: GameState): boolean {
 export function canHoldFestival(state: GameState, size: 'pequena' | 'grande'): { ok: boolean; error?: string } {
   const d = tickToDate(state.tick);
   if (state.festival.year === d.year) return { ok: false, error: 'Este año ya hubo fiestas' };
-  if (d.month < FESTIVAL_MONTH - 1 || d.month > FESTIVAL_MONTH) return { ok: false, error: 'Las fiestas son en julio y agosto' };
-  if (state.treasury < FESTIVAL[size].cost) return { ok: false, error: `Cuestan ${FESTIVAL[size].cost} €` };
+  if (d.month < FESTIVAL_MONTH - 1 || d.month > FESTIVAL_MONTH) return { ok: false, error: 'Se pueden organizar del 1 de julio al 30 de agosto' };
+  if (state.treasury < FESTIVAL[size].cost) return { ok: false, error: `Te faltan ${FESTIVAL[size].cost - Math.max(0, state.treasury)} € para las ${size === 'grande' ? 'grandes' : 'pequeñas'}` };
   return { ok: true };
 }
 
@@ -152,7 +152,8 @@ function offerGrant(state: GameState): void {
     advance: 0,
     minId: 0,
   });
-  pushEvent(state, 'info', `La Diputación ofrece pagar el ${Math.round(share * 100)} % de ${GRANT_NAME[kind]} si se termina a tiempo`);
+  const until = tickToDate(state.tick + GRANT_OFFER_DAYS * TICKS_PER_DAY);
+  pushEvent(state, 'info', `La Diputación ofrece pagar el ${Math.round(share * 100)} % de ${GRANT_NAME[kind]}. Responde antes del ${until.day}/${until.month} (☰ › Ayuntamiento)`);
 }
 
 export const GRANT_NAME: Partial<Record<BuildingKind, string>> = { school: 'un colegio', clinic: 'un centro de salud', police: 'una comisaría', park: 'un parque' };
@@ -174,7 +175,8 @@ export function answerGrant(state: GameState, grantId: number, accept: boolean):
   g.deadline = state.tick + GRANT_DEADLINE_DAYS * TICKS_PER_DAY;
   g.advance = Math.round(estimatedCost(g.kind) * GRANT_ADVANCE);
   transfer(state, OUTSIDE, TREASURY, g.advance, 'subvenciones');
-  pushEvent(state, 'info', `Subvención aceptada: anticipo de ${g.advance} €. Hay que terminar ${GRANT_NAME[g.kind]} antes del plazo`);
+  const until = tickToDate(g.deadline);
+  pushEvent(state, 'info', `Subvención aceptada: anticipo de ${g.advance} €. Construye ${GRANT_NAME[g.kind]} y termínalo antes del ${until.day}/${until.month} del año ${until.year}`);
 }
 
 /** Al terminar una obra: si cumple una subvención aceptada y en plazo, se cobra el resto. */
@@ -198,7 +200,7 @@ export function civicDay(state: GameState): void {
     b.status = 'open';
     b.votesFor = 0;
     b.votesAgainst = 0;
-    pushEvent(state, 'politics', `Toca presentar el presupuesto del año ${d.year} (☰ › Presupuesto). Si no, se prorroga el ${b.plan}`);
+    pushEvent(state, 'politics', `Toca presentar el presupuesto del año ${d.year} antes de febrero (☰ › Ayuntamiento). Si no, se prorroga el ${b.plan}`);
   }
   if (b.status === 'open' && d.month > 1) {
     b.status = 'prorrogado';
