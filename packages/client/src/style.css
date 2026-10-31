@@ -847,3 +847,8 @@ html[data-font='pixel'] body #hud-date, html[data-font='pixel'] body .bar-num, h
   html[data-text='200'] .trend, html[data-font='pixel'] .trend { display: none; }
   html[data-text='200'] .tb-btn, html[data-font='pixel'] .tb-btn { padding: 0 2px; }
 }
+/* v1.7: leyenda de «Qué falta» con iconos. */
+.legend-need { display: flex; align-items: center; gap: 6px; }
+.legend-need .px-icon { width: 16px; height: 16px; flex: 0 0 auto; }
+.legend-note { color: var(--muted); font-size: 0.85em; }
+.pill.warn { border-color: #eea160; color: var(--accent); }

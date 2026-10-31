@@ -1,5 +1,10 @@
 import { type GameState, Tile, Zone } from '@bitopolis/sim';
-import { happinessMarks, type LayerId, layerCanvas } from './layers.ts';
+import { happinessMarks, type LayerId, layerCanvas, missingMarks, NEED_ICON } from './layers.ts';
+import { pixelIcon } from './icons.ts';
+
+/** Iconos de la capa «Qué falta», creados una vez. */
+const iconCache = new Map<string, HTMLCanvasElement>();
+const icon = (name: string) => iconCache.get(name) ?? iconCache.set(name, pixelIcon(name)).get(name)!;
 import { liveParticles, squash } from './fx.ts';
 import { C, PALETTE } from './palette.ts';
 import {
@@ -438,6 +443,28 @@ export function render(
           if (on) ctx.fillRect(px + x * z, py + y * z, 2 * z, 2 * z);
         }
       }
+    }
+  }
+
+  if (layer === 'missing') {
+    // Sobre cada vivienda (o solar R), los iconos de lo que falta: rojo debajo si falta, amarillo si está lleno.
+    for (const m of missingMarks(state)) {
+      if (!m.needs.length) continue;
+      const shown = m.needs.slice(0, 4);
+      const cols = Math.min(2, shown.length);
+      const rows = Math.ceil(shown.length / 2);
+      const built = state.buildings.some((b) => b.x === m.x && b.y === m.y);
+      const px = m.x * ts - cam.x + (T - cols * 14) / 2 * z;
+      const py = (m.y * T - (built ? BH - T : 0)) * z - cam.y + 2 * z;
+      ctx.fillStyle = P(0);
+      ctx.fillRect(px - z, py - z, (cols * 14 + 1) * z, (rows * 15 + 1) * z);
+      shown.forEach((need, k) => {
+        const ix = px + (k % 2) * 14 * z;
+        const iy = py + Math.floor(k / 2) * 15 * z;
+        ctx.drawImage(icon(NEED_ICON[need.key]), ix + z, iy, 12 * z, 12 * z);
+        ctx.fillStyle = P(need.status === 'falta' ? 2 : 4);
+        ctx.fillRect(ix + z, iy + 12 * z, 12 * z, 2 * z);
+      });
     }
   }
 

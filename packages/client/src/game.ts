@@ -7,7 +7,10 @@ import {
   unitValue,
   type GameEvent,
   type GameState,
+  coverageSummary,
   happinessFactors,
+  missingServices,
+  NEED_TEXT,
   occupants,
   Tile,
   validateCommand,
@@ -16,7 +19,7 @@ import {
 } from '@bitopolis/sim';
 import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
 import { openNeighbours, openReport, openTaxes as openTaxesSheet } from './economy-ui.ts';
-import { LAYERS, type LayerId } from './layers.ts';
+import { LAYERS, type LayerId, NEED_ICON } from './layers.ts';
 import { openTownHall } from './civic-ui.ts';
 import { objectivesNode, openAdvisor, openCitizen, openDiary, openPleno, portraitCanvas, rememberSeen, renderObjectives, resumeSummary, type SocialCtx } from './social-ui.ts';
 import { api, ApiError } from './api.ts';
@@ -234,6 +237,7 @@ export function startGame(opts: GameOptions): void {
   let lastStats = state.stats.length;
   let lastPop = state.citizens.length;
   function onState() {
+    if (layer === 'missing' && Math.floor(state.tick / 24) !== legendDay) missingLegend();
     // Ronda 12: al llegar a 10 vecinos, un momento de desbloqueo que lleva a la bandeja.
     if (lastPop < ZONE_UNLOCK_POP && state.citizens.length >= ZONE_UNLOCK_POP) {
       sfx.milestone();
@@ -1207,6 +1211,13 @@ export function startGame(opts: GameOptions): void {
       if (b.kind === 'house' || b.kind === 'res' || b.kind === 'shop' || b.kind === 'factory') {
         pills.push(h('span', { class: 'pill' }, `${money(unitValue(state, b))}${b.kind === 'house' || b.kind === 'res' ? '/vivienda' : ''}`));
       }
+      // v1.7: qué servicio le falta a esta vivienda (o lo tiene lleno).
+      if (b.kind === 'house' || b.kind === 'res') {
+        for (const n of missingServices(state, b.x, b.y)) {
+          if (n.key === 'agua' || n.key === 'luz') continue;
+          pills.push(h('span', { class: `pill ${n.status === 'falta' ? 'bad' : 'warn'}` }, `${n.status === 'falta' ? 'Sin' : 'Lleno:'} ${NEED_TEXT[n.key]}`));
+        }
+      }
       if (pills.length) content.push(h('div', { class: 'status-row' }, ...pills));
       const res = occupants(state, b);
       if (res.length) content.push(h('h3', {}, 'Viven aquí'), citizenList(res));
@@ -1404,12 +1415,27 @@ export function startGame(opts: GameOptions): void {
     const def = LAYERS.find((l) => l.id === layer)!;
     const legend = $('#legend');
     legend.hidden = layer === 'none';
-    legend.replaceChildren(h('strong', {}, def.label), ...def.legend.map((x) => h('span', { class: `legend-item ${x.cls}` }, x.text)));
+    if (layer === 'missing') missingLegend();
+    else legend.replaceChildren(h('strong', {}, def.label), ...def.legend.map((x) => h('span', { class: `legend-item ${x.cls}` }, x.text)));
     const chip = $('#layers');
     chip.querySelector('.chip-text')!.textContent = layer === 'none' ? 'Capas' : def.label;
     chip.setAttribute('aria-label', `Capas de datos: ${def.label}. Cambiar`);
     chip.setAttribute('aria-pressed', String(layer !== 'none'));
     $('#sr-live').textContent = layer === 'none' ? 'Capas desactivadas' : `Capa activa: ${def.label}`;
+  }
+  /** Leyenda de «Qué falta»: cuántas viviendas (y solares R) carecen de cada servicio. */
+  let legendDay = -1;
+  function missingLegend() {
+    legendDay = Math.floor(state.tick / 24);
+    const sum = coverageSummary(state);
+    const rows = sum.map((r) =>
+      h('span', { class: 'legend-need' }, pixelIcon(NEED_ICON[r.key]), `${NEED_TEXT[r.key][0]!.toUpperCase()}${NEED_TEXT[r.key].slice(1)}: ${r.falta ? `falta en ${r.falta}` : ''}${r.falta && r.lleno ? ', ' : ''}${r.lleno ? `lleno en ${r.lleno}` : ''}`),
+    );
+    $('#legend').replaceChildren(
+      h('strong', {}, 'Qué falta'),
+      ...(rows.length ? rows : [h('span', {}, 'A ninguna vivienda le falta nada.')]),
+      h('span', { class: 'legend-note' }, 'Raya roja: falta. Amarilla: llega, pero está lleno.'),
+    );
   }
   function openLayers() {
     const list = h('div', { class: 'radio-list compact', role: 'radiogroup', 'aria-label': 'Capa' });
