@@ -145,7 +145,7 @@ export function happinessMarks(state: GameState): { x: number; y: number; lv: nu
 }
 
 /** Icono de cada necesidad (icons.ts). */
-export const NEED_ICON: Record<NeedKey, string> = { agua: 'drop', luz: 'bolt', colegio: 'school', salud: 'health', policia: 'police', ocio: 'leaf' };
+export const NEED_ICON: Record<NeedKey, string> = { agua: 'drop', luz: 'bolt', colegio: 'school', salud: 'health', policia: 'police', ocio: 'leaf', bomberos: 'fire' };
 
 let marksCache: { key: string; marks: { x: number; y: number; needs: CoverageNeed[] }[] } | null = null;
 /** Lo que falta en cada vivienda o solar R (se rehace cada día de juego y al construir). */

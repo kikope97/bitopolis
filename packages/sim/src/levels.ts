@@ -8,7 +8,7 @@ import type { Building, BuildingKind, GameState } from './state.ts';
  * radio, más capacidad (vecinos, casas con agua o luz, calabozos, plazas de
  * cárcel), algo más de felicidad y un empleo más; cuesta más mantenerlo.
  */
-export const UPGRADABLE: BuildingKind[] = ['water', 'power', 'school', 'clinic', 'police', 'jail', 'park', 'library', 'sports'];
+export const UPGRADABLE: BuildingKind[] = ['water', 'power', 'school', 'clinic', 'police', 'jail', 'park', 'library', 'sports', 'firestation'];
 
 export const levelOf = (b: Building): number => b.level ?? 1;
 const mult = (b: Building) => L.capacity[levelOf(b) - 1] ?? 1;

@@ -1,5 +1,5 @@
 import type { BuildKind, Command, ZoneKind } from '@bitopolis/shared';
-import { BUILD, BUILD_LEVEL, buildCost, type GameState, TERRAIN, TOWNHALL_LEVELS, townLevel, ZONE_COST_PER_TILE } from '@bitopolis/sim';
+import { BUILD, BUILD_LEVEL, buildCost, CIVIL, type GameState, TERRAIN, TOWNHALL_LEVELS, townLevel, ZONE_COST_PER_TILE } from '@bitopolis/sim';
 import { money } from './i18n.ts';
 
 export type ToolId =
@@ -24,6 +24,9 @@ export type ToolId =
   | 'library'
   | 'sports'
   | 'jail'
+  | 'firestation'
+  | 'civilprotection'
+  | 'dike'
   | 'demolish';
 
 export interface Tool {
@@ -60,6 +63,10 @@ export const TOOLS: Tool[] = [
   { id: 'sports', label: 'Polideportivo', shape: 'tap', build: 'sports', key: 'g', help: 'Felicidad en 8 casillas; los mayores de cerca viven más.' },
   // v1.8: la cárcel vacía los calabozos de las comisarías.
   { id: 'jail', label: 'Cárcel', shape: 'tap', build: 'jail', key: 'j', help: '30 plazas: los detenidos pasan aquí y los calabozos de las comisarías se vacían. A los vecinos no les gusta tenerla cerca.' },
+  // 2.1: emergencias.
+  { id: 'firestation', label: 'Bomberos', shape: 'tap', build: 'firestation', key: 'f', help: 'Parque de bomberos: en 9 casillas apaga los incendios en pocas horas. Sin él, lo que arde queda destrozado. Con cisterna (nivel 2) llega a las colinas.' },
+  { id: 'civilprotection', label: 'Protección civil', shape: 'tap', build: 'civilprotection', key: 'v', help: 'Caseta de voluntarios: en 10 casillas, las riadas un 60 % menos y el quitanieves a mitad de precio. Permite levantar diques.' },
+  { id: 'dike', label: 'Dique', shape: 'tap', key: 'q', help: 'Muro en una casilla junto al río: ahí y alrededor no llega la riada. Hace falta una caseta de protección civil.' },
   { id: 'dezone', label: 'Sin zona', shape: 'rect', zone: 'none', key: 'z', help: 'Quita la zona (no derriba lo construido).' },
   { id: 'demolish', label: 'Derribar', shape: 'tap', key: 'x', help: 'Derriba un edificio o una carretera. Pide confirmación.' },
 ];
@@ -72,6 +79,7 @@ export function unlockPop(tool: Tool): number {
 /** v1.8: nivel del ayuntamiento que pide la herramienta (las zonas, el 2). */
 export function toolLevel(tool: Tool): number {
   if (tool.build) return BUILD_LEVEL[tool.build];
+  if (tool.id === 'dike') return BUILD_LEVEL.civilprotection;
   if (tool.zone && tool.zone !== 'none') return 2;
   return 1;
 }
@@ -82,6 +90,7 @@ export function lockShort(tool: Tool, state: GameState): string | null {
   if (townLevel(state) < lv) return `ayto. nivel\u00a0${lv}`;
   if ((tool.build === 'plaza' || tool.build === 'market') && !state.unlocked.includes(tool.build)) return `hito de ${unlockPop(tool)}`;
   if (state.citizens.length < unlockPop(tool) && tool.build !== 'plaza' && tool.build !== 'market') return `${unlockPop(tool)} vecinos`;
+  if (tool.id === 'dike' && !state.buildings.some((b) => b.kind === 'civilprotection' && b.built)) return 'protección civil';
   return null;
 }
 
@@ -93,6 +102,7 @@ export function lockLong(tool: Tool, state: GameState): string {
     return `${tool.label}: llega con el ayuntamiento de nivel ${lv} (${L.name}; pide ${L.pop} vecinos y ${money(L.cost)}). Toca el ayuntamiento para ampliarlo.`;
   }
   if (tool.build === 'plaza' || tool.build === 'market') return `${tool.label}: es el premio del hito de ${unlockPop(tool)} vecinos (tienes ${state.citizens.length}).`;
+  if (tool.id === 'dike' && lockShort(tool, state) === 'protección civil') return 'Dique: primero construye una caseta de protección civil.';
   return `${tool.label}: hacen falta ${unlockPop(tool)} vecinos (tienes ${state.citizens.length}).`;
 }
 
@@ -106,6 +116,7 @@ export function trayCost(tool: Tool): string {
   if (tool.build && tool.build !== 'road') return money(buildCost(tool.build));
   if (tool.zone && tool.zone !== 'none') return `${money(ZONE_COST_PER_TILE)}/casilla`;
   if (tool.zone === 'none') return 'gratis';
+  if (tool.id === 'dike') return `${money(CIVIL.dikeCost)}/casilla`;
   return '';
 }
 
@@ -115,6 +126,7 @@ export const TRAY: { title: string; tools: ToolId[] }[] = [
   { title: 'Zonas (los vecinos construyen)', tools: ['zoneR', 'zoneC', 'zoneI', 'dezone'] },
   { title: 'Servicios', tools: ['park', 'school', 'clinic', 'police', 'jail'] },
   { title: 'Vida social', tools: ['bar', 'chapel', 'cemetery', 'library', 'sports'] },
+  { title: 'Emergencias', tools: ['firestation', 'civilprotection', 'dike'] },
   { title: 'Premios de los hitos', tools: ['plaza', 'market'] },
 ];
 
@@ -125,6 +137,7 @@ export function costText(tool: Tool): string {
     return `${money(s.materials)} + obra (${s.workers} obreros × ${s.days} días, hasta ${money(buildCost(tool.build))})`;
   }
   if (tool.zone && tool.zone !== 'none') return `${money(ZONE_COST_PER_TILE)} por casilla`;
+  if (tool.id === 'dike') return `${money(CIVIL.dikeCost)} por casilla de orilla`;
   return '';
 }
 
@@ -149,6 +162,7 @@ export function commandFor(tool: Tool, a: { x: number; y: number }, b: { x: numb
   }
   if (tool.build) return { type: 'Build', kind: tool.build, x: b.x, y: b.y };
   if (tool.id === 'demolish') return { type: 'Demolish', x: b.x, y: b.y };
+  if (tool.id === 'dike') return { type: 'BuildDike', x: b.x, y: b.y };
   return null;
 }
 

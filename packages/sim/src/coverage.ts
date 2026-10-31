@@ -1,17 +1,18 @@
 import type { BuildKind } from '@bitopolis/shared';
-import { BUILD } from './balance.ts';
+import { BUILD, FIRE } from './balance.ts';
+import { Terrain } from './terrain.ts';
 import { isUnlocked } from './townhall.ts';
-import { radiusOf } from './levels.ts';
+import { levelOf, radiusOf } from './levels.ts';
 import { serviceSaturation } from './economy.ts';
-import { DIRS, type GameState, inBounds, Tile, tileIndex, Zone } from './state.ts';
+import { DIRS, type GameState, inBounds, terrainAt, Tile, tileIndex, Zone } from './state.ts';
 
 /**
  * v1.7 (propuesta del creador): qué servicio le falta a cada sitio. Lo usan la
  * capa «Qué falta», la ficha de cada edificio y el consejero. Función pura:
  * no toca el estado y no usa azar.
  */
-export type NeedKey = 'agua' | 'luz' | 'colegio' | 'salud' | 'policia' | 'ocio';
-export const NEED_KEYS: NeedKey[] = ['agua', 'luz', 'colegio', 'salud', 'policia', 'ocio'];
+export type NeedKey = 'agua' | 'luz' | 'colegio' | 'salud' | 'policia' | 'ocio' | 'bomberos';
+export const NEED_KEYS: NeedKey[] = ['agua', 'luz', 'colegio', 'salud', 'policia', 'ocio', 'bomberos'];
 export const NEED_LABEL: Record<NeedKey, string> = {
   agua: 'agua',
   luz: 'luz',
@@ -19,6 +20,7 @@ export const NEED_LABEL: Record<NeedKey, string> = {
   salud: 'centro de salud',
   policia: 'policía',
   ocio: 'parque o plaza',
+  bomberos: 'bomberos',
 };
 /** Qué edificios cubren cada necesidad por radio (agua y luz van por la red). */
 export const NEED_KINDS: Record<NeedKey, string[]> = {
@@ -28,6 +30,8 @@ export const NEED_KINDS: Record<NeedKey, string[]> = {
   salud: ['clinic'],
   policia: ['police'],
   ocio: ['park', 'plaza', 'market'],
+  // 2.1: en la colina solo llega el parque con cisterna (nivel 2).
+  bomberos: ['firestation'],
 };
 
 export interface CoverageNeed {
@@ -108,7 +112,7 @@ export function missingServices(state: GameState, x: number, y: number, ctx: Cov
       continue;
     }
     const reach = state.buildings.filter(
-      (s) => s.built && NEED_KINDS[key].includes(s.kind) && Math.abs(s.x - x) + Math.abs(s.y - y) <= radiusOf(s),
+      (s) => s.built && !s.damaged && NEED_KINDS[key].includes(s.kind) && Math.abs(s.x - x) + Math.abs(s.y - y) <= radiusOf(s) && (key !== 'bomberos' || terrainAt(state, x, y) !== Terrain.Hill || levelOf(s) >= FIRE.hillLevel),
     );
     if (!reach.length) out.push({ key, status: 'falta' });
     // Llega, pero todos los que llegan están saturados (atienden a menos del 90 % de quien lo usa).

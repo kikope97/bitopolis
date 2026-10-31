@@ -590,6 +590,58 @@ const ICONS: Record<string, { rows: string[]; colors: Record<string, number> }> 
     ],
     colors: { h: 4, s: 20, d: 19 },
   },
+  // 2.1: emergencias (fuego, protección civil y ambulancia).
+  fire: {
+    rows: [
+      '.....r......',
+      '....rr......',
+      '....rrr..r..',
+      '...rrorr.r..',
+      '..rrroorrr..',
+      '..rroooorr..',
+      '.rrooyyoorr.',
+      '.rroyyyyorr.',
+      '.rroyyyyorr.',
+      '..rooyyoor..',
+      '...rooooro..',
+      '....rrrr....',
+    ],
+    colors: { r: 2, o: 3, y: 4 },
+  },
+  civil: {
+    rows: [
+      '...oooooo...',
+      '..oooooooo..',
+      '.oooobboooo.',
+      'oooobbbboooo',
+      'ooobbbbbbooo',
+      'oobbbbbbbboo',
+      'obbbbbbbbbbo',
+      'oooooooooooo',
+      '.oooooooooo.',
+      '..oooooooo..',
+      '...oooooo...',
+      '............',
+    ],
+    colors: { o: 3, b: 9 },
+  },
+  ambulance: {
+    rows: [
+      '............',
+      '..b.........',
+      '.wwwwwww....',
+      '.wwwrwww....',
+      '.wwrrrwwwgg.',
+      '.wwwrwwwwggw',
+      '.rrrrrrrrrrr',
+      '.wwwwwwwwwww',
+      '.ssssssssss.',
+      '..kk....kk..',
+      '..kk....kk..',
+      '............',
+    ],
+    colors: { w: 12, r: 2, b: 10, g: 11, s: 13, k: 0 },
+  },
 };
 
 /** Un icono de píxeles listo para poner en un botón (se escala con CSS sin suavizar). */

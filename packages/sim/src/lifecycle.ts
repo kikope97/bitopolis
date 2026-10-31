@@ -21,6 +21,7 @@ import { addMemory } from './social.ts';
 import type { Citizen, GameState } from './state.ts';
 import { pushEvent } from './state.ts';
 import { freeHomes, newResident } from './tick.ts';
+import { tryAmbulance } from './fire.ts';
 
 /**
  * Ciclo vital (v1.5): cumpleaños, nacimientos, hijos que se independizan,
@@ -136,6 +137,8 @@ export function lifeDay(state: GameState): void {
     const fit = home && state.buildings.some((b) => b.kind === 'sports' && b.built && Math.abs(b.x - home.x) + Math.abs(b.y - home.y) <= 8);
     const p = Math.min(DEATH_RATE_MAX, (c.age - DEATH_START_AGE + 2) * DEATH_RATE_PER_YEAR_OVER) * (fit ? 1 - SOCIAL_PLACES.sportsHealth : 1);
     if (chance(state.rng, p)) {
+      // 2.1: es una urgencia; con ambulancia que llegue a tiempo, la despedida se pospone (un año).
+      if (tryAmbulance(state, c)) return;
       dies(state, c);
       return;
     }

@@ -10,6 +10,19 @@ import { levelForPop } from './townhall.ts';
  */
 type Migration = (s: Record<string, any>) => Record<string, any>;
 
+/**
+ * 2.1 (13 → 14), parte de bomberos y protección civil: diques y contadores de
+ * emergencias. Los edificios no cambian (riesgo, fuego y daños son opcionales).
+ * Va en una función propia para combinarla con las otras partes de la 2.1.
+ */
+export function migrate14Fire(s: Record<string, any>): Record<string, any> {
+  return {
+    ...s,
+    dikes: Array.isArray(s.dikes) ? s.dikes : [],
+    emergencies: { fires: 0, putOut: 0, saved: 0, floodsAvoided: 0, ...(s.emergencies ?? {}) },
+  };
+}
+
 export const MIGRATIONS: Record<number, Migration> = {
   // 0 → 1: estados previos al campo `debtMonths`.
   0: (s) => ({ ...s, debtMonths: s.debtMonths ?? 0, bankrupt: s.bankrupt ?? false, formatVersion: 1 }),
@@ -143,8 +156,8 @@ export const MIGRATIONS: Record<number, Migration> = {
       ? { ai: { share: 25, paceDays: 7, turn: null, lastN: 0, next: (s.tick ?? 0) + 7 * 24, mayor: [], quick: null, lastQuick: -1e9, log: [] } }
       : {}),
   }),
-  // 2.1: encargos y periódico (y lo que añadan incendios, basura y rangos en sus funciones).
-  13: (s) => migrate14Errands({ ...s, formatVersion: 14 }),
+  // 2.1: emergencias, encargos y periódico (cada parte, en su función).
+  13: (s) => ({ ...migrate14Errands(migrate14Fire(s)), formatVersion: 14 }),
 };
 
 /** 2.1: encargos del pueblo y El Eco de Bitópolis, vacíos (el primero, en unos días). */

@@ -84,6 +84,15 @@ export const MEMORY_KINDS = [
   'mitin',
   'le_ayudaron',
   'se_conocieron',
+  // 2.1: emergencias.
+  'incendio',
+  'bomberos',
+  'ayudo_incendio',
+  'acogio',
+  'le_acogieron',
+  'voluntario',
+  'ambulancia',
+  'susto',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -317,6 +326,22 @@ export function memoryText(state: GameState, m: Memory): string {
       return `Le echó una mano ${who}`;
     case 'se_conocieron':
       return `Conoció a ${who}`;
+    case 'incendio':
+      return 'Hubo fuego en su casa o en su trabajo';
+    case 'bomberos':
+      return 'Los bomberos apagaron a tiempo el fuego de su casa o su trabajo';
+    case 'ayudo_incendio':
+      return who ? `Ayudó a ${who} tras un incendio` : 'Ayudó a apagar un incendio';
+    case 'acogio':
+      return `Acogió en su casa a ${who} tras el incendio`;
+    case 'le_acogieron':
+      return `${who} le acogió en su casa tras el incendio`;
+    case 'voluntario':
+      return 'Se hizo voluntario de protección civil';
+    case 'ambulancia':
+      return 'La ambulancia le salvó la vida';
+    case 'susto':
+      return 'Se llevó un susto, pero la ambulancia llegó enseguida';
   }
 }
 
@@ -911,6 +936,12 @@ const MEMORY_LINE: Partial<Record<MemoryKind, (who: string) => string>> = {
   deuda_perdonada: () => 'El alcalde me perdonó lo que debía. No lo olvido.',
   cerro_negocio: () => 'Tuve que cerrar mi negocio; las nóminas me comían.',
   sin_respuesta: () => 'Pedí tiempo al alcalde para pagar y ni me contestó.',
+  // 2.1: emergencias.
+  incendio: () => 'Todavía huelo a humo cuando me acuerdo del incendio.',
+  bomberos: () => 'Menos mal que los bomberos llegaron a tiempo.',
+  le_acogieron: (who) => `No olvidaré que ${who} me abrió su casa tras el fuego.`,
+  voluntario: () => 'Desde que soy voluntario de protección civil me siento útil.',
+  ambulancia: () => 'Si no llega a ser por la ambulancia, no lo cuento.',
 };
 
 /** Frase de un recuerdo; las pérdidas, distintas para la pareja y para una amistad (ronda 11). */

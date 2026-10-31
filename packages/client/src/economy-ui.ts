@@ -160,6 +160,9 @@ const CONCEPT: Record<string, string> = {
   'venta de viviendas': 'Venta de viviendas',
   multas: 'Multas a los detenidos',
   'reparaciones (disturbios)': 'Reparaciones tras disturbios',
+  'reparaciones (incendio)': 'Reparaciones tras incendios',
+  'reparaciones (inundación)': 'Reparaciones tras riadas',
+  quitanieves: 'Quitanieves',
 };
 
 /** Parte mensual: ingresos y gastos con flechas y «por qué baja tu saldo» con nombres. */

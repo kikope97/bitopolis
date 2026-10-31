@@ -914,6 +914,9 @@ html[data-text='200'] .tray-grid { grid-template-columns: repeat(auto-fill, minm
 .svc.bad { border-left-color: var(--bad); }
 .svc.bad .svc-state { color: var(--bad); font-weight: 600; }
 .danger-box { border-left-color: #b13e53; }
+/* 2.1: en riesgo de incendio. */
+.warn-box { border-left-color: #ffcd75; }
+.danger-box > .px-icon, .warn-box > .px-icon { float: left; width: 24px; height: 24px; margin: 2px 8px 0 0; image-rendering: pixelated; }
 @media (max-width: 420px) { .poll-word { display: none; } }
 .album-more summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 600; }
 .album-more .album-card { margin-top: 8px; }

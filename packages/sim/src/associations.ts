@@ -24,6 +24,7 @@ export const CAUSE_TEXT: Record<Cause, string> = {
   salud: 'centro de salud',
   policia: 'policía',
   ocio: 'parque o plaza',
+  bomberos: 'bomberos',
   ruido: 'menos ruido',
   contaminacion: 'aire limpio',
   inseguridad: 'más seguridad',
@@ -37,6 +38,7 @@ export const CAUSE_ASK: Record<Cause, string> = {
   salud: 'un centro de salud cerca',
   policia: 'una comisaría cerca',
   ocio: 'un parque o una plaza cerca',
+  bomberos: 'un parque de bomberos cerca',
   ruido: 'que baje el ruido del barrio',
   contaminacion: 'que se aleje la industria de las casas',
   inseguridad: 'policía en el barrio',
@@ -72,6 +74,7 @@ export const LEMA: Record<Cause, string> = {
   salud: '¡Sanidad en el barrio!',
   policia: '¡Queremos seguridad!',
   ocio: '¡Un parque para los niños!',
+  bomberos: '¡Bomberos para el barrio!',
   ruido: '¡Queremos dormir!',
   contaminacion: '¡Aire limpio ya!',
   inseguridad: '¡Barrio seguro!',
@@ -95,7 +98,8 @@ export function grievanceOf(state: GameState, c: Citizen, ctx = coverageCtx(stat
   const i = home.y * state.map.w + home.x;
   const scored: [Cause, number][] = [];
   for (const n of missingServices(state, home.x, home.y, ctx)) {
-    if (n.status === 'falta') scored.push([n.key, n.key === 'agua' || n.key === 'luz' ? 12 : 5]);
+    // 2.1: los bomberos se echan de menos, pero menos que lo demás.
+    if (n.status === 'falta') scored.push([n.key, n.key === 'agua' || n.key === 'luz' ? 12 : n.key === 'bomberos' ? 3 : 5]);
   }
   const pol = state.fields.pollution[i] ?? 0;
   const noise = state.fields.noise[i] ?? 0;

@@ -3,6 +3,7 @@ import { protestFor, type Association } from './associations.ts';
 import { DEBT, KIDS_MAX, TURN } from './balance.ts';
 import { BUILD_NAMES, removeBuilding } from './commands.ts';
 import { homeRobbery } from './crime.ts';
+import { becomeVolunteer, canVolunteer, fireHelpTargets, helpAfterFire, homelessByFire, placeName, shelter } from './fire.ts';
 import { canBuyHome, canFound, shopTypesFor } from './economy.ts';
 import type { Brewing } from './director-core.ts';
 import type { DirectorChoice } from './director.ts';
@@ -140,7 +141,7 @@ function vacantJobs(state: GameState, c: Citizen): Building[] {
 function freeHomesFor(state: GameState, c: Citizen): Building[] {
   const use = new Map<number, number>();
   for (const x of state.citizens) if (x.homeId !== null) use.set(x.homeId, (use.get(x.homeId) ?? 0) + 1);
-  const cap = (b: Building) => (b.built ? (b.kind === 'house' ? 3 : b.kind === 'res' ? 4 : 0) : 0);
+  const cap = (b: Building) => (b.built && b.damaged?.cause !== 'fuego' ? (b.kind === 'house' ? 3 : b.kind === 'res' ? 4 : 0) : 0);
   return state.buildings
     .filter((b) => b.id !== c.homeId && cap(b) > (use.get(b.id) ?? 0))
     .sort((a, b) => (state.fields.land[b.y * state.map.w + b.x] ?? 0) - (state.fields.land[a.y * state.map.w + a.x] ?? 0) || a.id - b.id)
@@ -209,6 +210,16 @@ export function turnMenu(state: GameState, c: Citizen): MenuItem[] {
   if (p && p.homeId === c.homeId && c.homeId !== null && Math.max(c.age, p.age) <= 45 && Math.min(c.age, p.age) >= 20 && (c.kids?.length ?? 0) < KIDS_MAX) {
     out.push({ accion: 'tener_hijo', detalle: `tener un hijo con ${p.name.split(' ')[0]}` });
   }
+  // 2.1: emergencias. Ayudar tras un incendio, acoger a quien se ha quedado sin casa, protección civil.
+  for (const b of fireHelpTargets(state)) {
+    if (b.id === c.homeId) continue;
+    out.push({ accion: `ayudar_incendio:${b.id}`, detalle: b.fire ? `ayudar a apagar el fuego en ${placeName(b)}` : `echar una mano a quien se ha quedado sin casa en ${placeName(b)}` });
+  }
+  if (c.homeId !== null && !homelessByFire(state).includes(c)) {
+    const guests = homelessByFire(state).filter((x) => x !== c && c.relations.some((r) => r.id === x.id && (r.kind === 'amistad' || r.kind === 'pareja')));
+    for (const g of guests.slice(0, 2)) out.push({ accion: `acoger:${g.id}`, detalle: `acoger en su casa a ${g.name.split(' ')[0]}, que se ha quedado sin ella por el fuego` });
+  }
+  if (canVolunteer(state, c)) out.push({ accion: 'hacerse_voluntario', detalle: 'apuntarse como voluntario de protección civil (está en paro)' });
   // Solo si está desesperado: robar en una casa del pueblo.
   if (desperate(c)) out.push({ accion: 'robar', detalle: 'robar en una casa del pueblo (está sin dinero, sin trabajo y endeudado)' });
   out.push({ accion: 'irse', detalle: 'irse del pueblo y vender lo que tenga' });
@@ -306,6 +317,14 @@ export function extraAction(state: GameState, c: Citizen, verb: string, arg: str
       pushEvent(state, 'milestone', `${c.name.split(' ')[0]} y ${p.name.split(' ')[0]} tienen un bebé`, { ref: c.id });
       return 'tiene un bebé';
     }
+    case 'ayudar_incendio': {
+      const b = state.buildings.find((x) => x.id === Number(arg));
+      return b ? helpAfterFire(state, c, b) : 'quiere ayudar, pero ya no hace falta';
+    }
+    case 'acoger':
+      return shelter(state, c, state.citizens.find((x) => x.id === Number(arg)));
+    case 'hacerse_voluntario':
+      return becomeVolunteer(state, c);
     case 'robar': {
       if (!desperate(c)) return 'se lo piensa mejor y no roba';
       const targets = state.buildings.filter((b) => (b.kind === 'house' || b.kind === 'res') && b.built && b.id !== c.homeId);
