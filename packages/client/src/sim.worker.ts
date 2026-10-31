@@ -8,7 +8,9 @@ export type ToWorker =
   | { type: 'speed'; speed: number }
   | { type: 'command'; cmd: Command; id: number }
   /** Pide un lote de guardado con lo que haya hasta ahora. */
-  | { type: 'flush' };
+  | { type: 'flush' }
+  /** 2.0: deja de esperar a la IA en el turno `n` (deciden las reglas al vencer). */
+  | { type: 'release'; n: number };
 
 export interface SaveBatch {
   fromTick: number;
@@ -20,7 +22,9 @@ export interface SaveBatch {
 export type FromWorker =
   | { type: 'state'; state: GameState }
   | { type: 'result'; id: number; ok: boolean; error?: string }
-  | { type: 'save'; batch: SaveBatch; flush: boolean };
+  | { type: 'save'; batch: SaveBatch; flush: boolean }
+  /** 2.0: el reloj espera a la IA (turno `n`). */
+  | { type: 'thinking'; n: number | null };
 
 let state: GameState | null = null;
 let speed = 0;
@@ -30,6 +34,9 @@ let dirty = false;
 let lastPost = 0;
 let pending: TimedCommand[] = [];
 let batchFrom = 0;
+/** 2.0: turnos que ya no se esperan (la IA tardó o falló) y el turno que se está esperando. */
+const released = new Set<number>();
+let waiting: number | null = null;
 
 const post = (m: FromWorker) => postMessage(m);
 
@@ -48,6 +55,21 @@ function loop() {
   if (state && speed > 0) {
     acc += (dt * speed * TICKS_PER_DAY) / REAL_MS_PER_DAY_AT_X1;
     while (acc >= 1) {
+      // 2.0: el reloj no se adelanta al turno del pueblo mientras la IA piensa (como mucho
+      // lo que decida el hilo principal; luego deciden las reglas al vencer).
+      const t = state.ai?.turn;
+      if (t && state.tick + 1 >= t.due && !released.has(t.n)) {
+        acc = 0;
+        if (waiting !== t.n) {
+          waiting = t.n;
+          post({ type: 'thinking', n: t.n });
+        }
+        break;
+      }
+      if (waiting !== null) {
+        waiting = null;
+        post({ type: 'thinking', n: null });
+      }
       step(state);
       acc -= 1;
       dirty = true;
@@ -80,11 +102,19 @@ onmessage = (e: MessageEvent<ToWorker>) => {
       pending.push({ tick: state.tick, cmd: m.cmd });
       dirty = true;
     }
+    // 2.0: si el comando cerró el turno que se esperaba, el reloj sigue.
+    if (waiting !== null && state.ai?.turn?.n !== waiting) {
+      waiting = null;
+      post({ type: 'thinking', n: null });
+    }
     // Primero el estado: quien espera el resultado ya ve el cambio aplicado.
     post({ type: 'state', state });
     post({ type: 'result', id: m.id, ok: r.ok, error: r.ok ? undefined : r.error });
   } else if (m.type === 'flush') {
     emitSave(true);
+  } else if (m.type === 'release') {
+    released.add(m.n);
+    if (released.size > 50) released.delete(released.values().next().value!);
   }
 };
 loop();

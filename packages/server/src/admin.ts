@@ -44,6 +44,7 @@ const Patch = z.object({
       model: z.string().trim().max(128).optional(),
       modelPremium: z.string().trim().max(128).optional(),
       maxCitizens: z.number().int().min(1).max(20).optional(),
+      aiShare: z.number().int().min(0).max(100).optional(),
       serverMonthly: Money.optional(),
       gameMonthly: Money.optional(),
       gameDaily: Money.optional(),
@@ -73,6 +74,7 @@ export function adminView(s: ServerSettings, version: string) {
       model: s.ai.model ?? '',
       modelPremium: s.ai.modelPremium ?? '',
       maxCitizens: s.ai.maxCitizens,
+      aiShare: s.ai.aiShare ?? 50,
       serverMonthly: s.ai.serverMonthly ?? null,
       gameMonthly: s.ai.gameMonthly ?? null,
       gameDaily: s.ai.gameDaily ?? null,
@@ -190,6 +192,7 @@ export async function registerAdminRoutes(
         if (a.model !== undefined) s.ai.model = opt(a.model);
         if (a.modelPremium !== undefined) s.ai.modelPremium = opt(a.modelPremium);
         if (a.maxCitizens !== undefined) s.ai.maxCitizens = a.maxCitizens;
+        if (a.aiShare !== undefined) s.ai.aiShare = a.aiShare;
         if (a.serverMonthly !== undefined) s.ai.serverMonthly = opt(a.serverMonthly);
         if (a.gameMonthly !== undefined) s.ai.gameMonthly = opt(a.gameMonthly);
         if (a.gameDaily !== undefined) s.ai.gameDaily = opt(a.gameDaily);

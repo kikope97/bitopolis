@@ -70,10 +70,30 @@ function volume(label: string, key: 'sfxDb' | 'musicDb' | 'ambDb', bus: 'sfx' | 
 }
 
 /** Ajustes de este dispositivo: sonido, vibración y accesibilidad (spec §8.2, §8.4). */
-export function openSettings(): void {
+/** 2.0: en Modo IA, el % de vecinos con IA de esta partida (si la key es del jugador). */
+export interface AiShareCtl {
+  share: number;
+  locked: boolean;
+  set: (share: number) => Promise<boolean>;
+}
+
+export function openSettings(ai?: AiShareCtl): void {
   const p = prefs();
+  const aiBlock: (Node | string)[] = [];
+  if (ai) {
+    const out = h('output', {}, `${ai.share} %`);
+    const range = h('input', { type: 'range', min: '0', max: '100', step: '5', value: String(ai.share), 'aria-label': 'Vecinos que piensan con IA', ...(ai.locked ? { disabled: true } : {}) }) as HTMLInputElement;
+    range.addEventListener('input', () => (out.textContent = `${range.value} %`));
+    range.addEventListener('change', () => void ai.set(Number(range.value)));
+    aiBlock.push(
+      h('h3', {}, 'IA del pueblo'),
+      h('label', { class: 'field' }, 'Vecinos que piensan con IA ', out, ai.locked ? h('span', { class: 'muted small' }, ' · lo fija el servidor') : '', range),
+      h('p', { class: 'muted small' }, 'Al subirlo, más vecinos pasan a decidir con la IA cada semana. Al bajarlo, solo cambia para los que lleguen. Más vecinos con IA, más gasto.'),
+    );
+  }
   sheet(
     'Ajustes',
+    ...aiBlock,
     h('h3', {}, 'Sonido'),
     toggle('Efectos de sonido', 'sfx'),
     volume('Volumen de los efectos', 'sfxDb', 'sfx'),

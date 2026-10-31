@@ -34,6 +34,8 @@ export interface ServerAi {
   model?: string;
   modelPremium?: string;
   maxCitizens: number;
+  /** 2.0: % de vecinos con IA en las partidas nuevas (con key del servidor, fijo; con key propia, lo elige el jugador). */
+  aiShare?: number;
   serverMonthly?: number;
   gameMonthly?: number;
   gameDaily?: number;

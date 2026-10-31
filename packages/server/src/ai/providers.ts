@@ -4,6 +4,8 @@ import { PROVIDER_INFO, type ProviderId } from './catalog.ts';
 
 export interface LLMRequest {
   system: string;
+  /** 2.0: bloque común a varias peticiones (el estado del pueblo del turno): se cachea aparte. */
+  shared?: string;
   user: string;
   schema: Record<string, unknown>;
   model: string;
@@ -55,7 +57,7 @@ export class OpenAICompatProvider implements LLMProvider {
       model: req.model,
       messages: [
         { role: 'system', content: info.jsonSchema ? req.system : `${req.system}\n\nEsquema JSON de la respuesta:\n${JSON.stringify(req.schema)}` },
-        { role: 'user', content: req.user },
+        { role: 'user', content: req.shared ? `${req.shared}\n\n${req.user}` : req.user },
       ],
       response_format: info.jsonSchema
         ? { type: 'json_schema', json_schema: { name: 'decisiones', strict: true, schema: req.schema } }
@@ -104,7 +106,18 @@ export class AnthropicProvider implements LLMProvider {
           // Margen para el razonamiento (cuenta como salida).
           max_tokens: req.maxTokens + 1024,
           system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
-          messages: [{ role: 'user', content: req.user }],
+          messages: [
+            {
+              role: 'user',
+              // 2.0: el estado del pueblo del turno, igual en todos los lotes, va en su propio bloque cacheado.
+              content: req.shared
+                ? [
+                    { type: 'text', text: req.shared, cache_control: { type: 'ephemeral' } },
+                    { type: 'text', text: req.user },
+                  ]
+                : req.user,
+            },
+          ],
           output_config: { effort: 'low', format: { type: 'json_schema', schema: req.schema } },
         },
         { signal },
@@ -136,8 +149,10 @@ export class ReplayProvider implements LLMProvider {
     private fallback?: (req: LLMRequest) => LLMResult,
   ) {}
 
-  static key(req: Pick<LLMRequest, 'system' | 'user'>): string {
-    return createHash('sha256').update(req.system).update('\u0000').update(req.user).digest('hex').slice(0, 32);
+  static key(req: Pick<LLMRequest, 'system' | 'user' | 'shared'>): string {
+    const h = createHash('sha256').update(req.system).update('\u0000');
+    if (req.shared) h.update(req.shared).update('\u0000');
+    return h.update(req.user).digest('hex').slice(0, 32);
   }
 
   async complete(req: LLMRequest): Promise<LLMResult> {

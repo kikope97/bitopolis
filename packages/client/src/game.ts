@@ -53,6 +53,7 @@ import { objectivesNode, openAdvisor, openCitizen, openDiary, openPleno, portrai
 import { api, ApiError } from './api.ts';
 import { nextHint } from './hints.ts';
 import { openManagement } from './manage-ui.ts';
+import { openWhatsHappening, turnHeadline } from './ai-town-ui.ts';
 import { pocketMark } from './money-ui.ts';
 import { formatDate, money, MONTHS, plural, shortDate, t } from './i18n.ts';
 import { type Camera, type Preview, render, restartAnimations } from './render.ts';
@@ -199,15 +200,20 @@ export function startGame(opts: GameOptions): void {
     } else if (m.type === 'save') {
       queue.push({ ...m.batch, live: !m.flush && speed > 0 && !document.hidden });
       void flushQueue();
+    } else if (m.type === 'thinking') {
+      // 2.0: el reloj espera al turno del pueblo.
+      thinkingN = m.n;
+      thinkingSince = performance.now();
+      paintThinking();
     }
   };
   send({ type: 'init', state });
 
-  function command(cmd: Command): Promise<boolean> {
+  function command(cmd: Command, quiet = false): Promise<boolean> {
     const id = ++cmdId;
     return new Promise((resolve) => {
       pendingResults.set(id, (ok, error) => {
-        if (!ok && error) {
+        if (!ok && error && !quiet) {
           toast(error, { kind: 'warn' });
           sfx.error();
         }
@@ -421,6 +427,13 @@ export function startGame(opts: GameOptions): void {
       setTimeout(() => tabBuild.classList.remove('pulse'), 8000);
     }
     lastLevel = lv;
+    // 2.0: una tarjeta por turno del pueblo (en vez de muchos avisos sueltos).
+    const lastTurn = state.ai?.log.at(-1);
+    if (lastTurn && lastTurn.n > turnLogSeen) {
+      turnLogSeen = lastTurn.n;
+      const head = turnHeadline(state);
+      if (head && speed < 10) toast(head, { kind: 'info', onClick: openHappening });
+    }
     if (state.stats.length !== lastStats) {
       lastStats = state.stats.length;
       const m = state.stats.at(-1);
@@ -752,12 +765,65 @@ export function startGame(opts: GameOptions): void {
     }
   }
   const decisionTimer = setInterval(() => void pollDecisions(), 1500);
-  function setAiChip(mode: 'on' | 'paused') {
+
+  /* ---------- 2.0: turnos del pueblo con IA ---------- */
+  let thinkingN: number | null = null;
+  let thinkingSince = 0;
+  let turnBusy = false;
+  let turnLogSeen = state.ai?.log.at(-1)?.n ?? 0;
+  /** Lo que el reloj espera a la IA como mucho (luego deciden las reglas: «por costumbre»). */
+  const TURN_WAIT_MS = 45_000;
+  function paintThinking() {
+    const on = thinkingN !== null;
+    document.body.classList.toggle('ai-thinking', on);
+    setAiChip(on ? 'thinking' : 'on');
+    const strip = document.getElementById('thinking');
+    if (strip) strip.hidden = !on;
+  }
+  function releaseTurn(n: number, why: string) {
+    send({ type: 'release', n });
+    if (why) toast(why, { kind: 'info' });
+  }
+  async function pollTurn() {
+    const t = state.ai?.turn;
+    if (!state.aiMode || !t || lost || turnBusy || document.hidden) return;
+    turnBusy = true;
+    try {
+      const r = await api.turn(token, t.n);
+      $('#ai-banner').hidden = !r.capped;
+      if (r.notice && !notices.has(r.notice)) {
+        notices.add(r.notice);
+        toast(r.notice, { kind: 'warn' });
+      }
+      const res = r.turn;
+      if (res && res.status === 'ready' && state.ai?.turn?.n === t.n) {
+        await command({ type: 'TownTurn', n: t.n, acts: res.acts }, true);
+      } else if (res && res.status === 'failed') {
+        releaseTurn(t.n, '');
+      }
+    } catch {
+      /* sin conexión: si tarda demasiado, deciden las reglas */
+    } finally {
+      turnBusy = false;
+    }
+    if (thinkingN !== null && state.ai?.turn?.n === thinkingN && performance.now() - thinkingSince > TURN_WAIT_MS) {
+      releaseTurn(thinkingN, 'La IA tarda: esta semana el pueblo decide por costumbre.');
+    }
+  }
+  const turnTimer = setInterval(() => void pollTurn(), 1500);
+  /** Ritmo de los turnos según la velocidad: a x3 y x10, turnos más espaciados (menos esperas y menos gasto). */
+  function syncTurnPace(s: number) {
+    if (!state.aiMode || !state.ai || s <= 0) return;
+    const days = s >= 10 ? 28 : s >= 3 ? 14 : 7;
+    if (days !== state.ai.paceDays) void command({ type: 'SetTurnPace', days }, true);
+  }
+  function setAiChip(mode: 'on' | 'paused' | 'thinking') {
     const chip = $('#ai-chip');
     chip.hidden = !state.aiMode;
-    chip.textContent = mode === 'on' ? 'IA ●' : 'IA en pausa';
+    chip.textContent = mode === 'on' ? 'IA ●' : mode === 'thinking' ? 'IA …' : 'IA en pausa';
     chip.classList.toggle('paused', mode === 'paused');
-    chip.setAttribute('aria-label', mode === 'on' ? 'IA activa: ver gasto' : 'IA en pausa por el tope de gasto: deciden las reglas. Ver gasto');
+    chip.classList.toggle('thinking', mode === 'thinking');
+    chip.setAttribute('aria-label', mode === 'on' ? 'IA activa: ver gasto' : mode === 'thinking' ? 'El pueblo está pensando (la IA decide la semana). Ver gasto' : 'IA en pausa por el tope de gasto: deciden las reglas. Ver gasto');
   }
   setAiChip('on');
   $('#ai-chip').onclick = () => void openUsage(token);
@@ -1222,7 +1288,7 @@ export function startGame(opts: GameOptions): void {
     else if (k === '-') setZoom(cam.zoom - 1);
     else if (k === 'l') setLayer(LAYERS[(LAYERS.findIndex((l) => l.id === layer) + 1) % LAYERS.length]!.id);
     // Atajo de Ajustes: solo la tecla sola (Ctrl+O abre archivos en el navegador), con o sin mayúsculas.
-    else if (k.toLowerCase() === 'o') openSettings();
+    else if (k.toLowerCase() === 'o') openSettingsGame();
     else if (k === ' ' && target.tagName !== 'BUTTON') {
       e.preventDefault();
       userSpeed(speed === 0 ? lastSpeed : 0);
@@ -1674,6 +1740,12 @@ export function startGame(opts: GameOptions): void {
   /* ---------- menú, impuestos y cuentas ---------- */
   const social: SocialCtx = { token, state: () => state, command };
   const openTaxes = () => openTaxesSheet(() => state, command);
+  // 2.0: el % de vecinos con IA se cambia en Ajustes (con key del servidor, lo fija /admin).
+  let aiShareLocked = true;
+  if (state.aiMode) void api.aiMeta().then((m) => (aiShareLocked = m.serverKey)).catch(() => undefined);
+  const openSettingsGame = () =>
+    openSettings(state.aiMode && state.ai ? { share: state.ai.share, locked: aiShareLocked, set: (share) => command({ type: 'SetAiShare', share }) } : undefined);
+  const openHappening = () => openWhatsHappening(social, (id) => withBack('Qué está pasando', openHappening, () => openCitizen(social, id)));
   const openAccounts = () => openReport(state);
 
   /**
@@ -1724,6 +1796,7 @@ export function startGame(opts: GameOptions): void {
         'Gente',
         [h('strong', {}, plural(state.citizens.length, 'vecino', 'vecinos')), ` · felicidad ${happy}`],
         item('Vecinos', go(openPeople)),
+        ...(state.aiMode ? [item('✦ Qué está pasando', go(openHappening), !!state.ai?.log.length)] : []),
         item('Felicidad', go(openHappiness)),
         item('Diario del pueblo', go(() => openDiary(social))),
         item('Álbum del pueblo', go(() => openAlbum(social))),
@@ -1735,7 +1808,7 @@ export function startGame(opts: GameOptions): void {
       h(
         'div',
         { class: 'menu-foot' },
-        item('Ajustes', go(openSettings)),
+        item('Ajustes', go(openSettingsGame)),
         item('Repetir tutorial', () => {
           closeSheet();
           tutorial.start(state, true);
@@ -1920,6 +1993,7 @@ export function startGame(opts: GameOptions): void {
       );
     }
     speed = s;
+    syncTurnPace(s);
     if (s > 0) lastSpeed = s;
     send({ type: 'speed', speed: s });
     $('#sr-live').textContent = s === 0 ? 'Juego en pausa' : `Velocidad x${s}`;
@@ -1985,6 +2059,7 @@ export function startGame(opts: GameOptions): void {
         worker.terminate();
         clearInterval(heartbeat);
         clearInterval(decisionTimer);
+        clearInterval(turnTimer);
         document.removeEventListener('visibilitychange', onVisibility);
         window.removeEventListener('pagehide', onPageHide);
         window.removeEventListener('popstate', onBack);

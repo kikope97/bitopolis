@@ -35,6 +35,13 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
   }) as HTMLInputElement;
   const capDay = h('input', { id: 'ai-cap-day', type: 'number', min: '0', step: '0.1', value: String(cur.capDay ?? 0.5), ...ro('capDay') }) as HTMLInputElement;
   const capMonth = h('input', { id: 'ai-cap-month', type: 'number', min: '0', step: '0.5', value: String(cur.capMonth ?? 5), ...ro('capMonth') }) as HTMLInputElement;
+  // 2.0: % de vecinos con IA (con la key del servidor lo fija /admin).
+  const shareLocked = locked.has('key');
+  const share = h('input', { id: 'ai-share', type: 'range', min: '0', max: '100', step: '5', value: String(meta.aiShare ?? 50), ...(shareLocked ? { disabled: true } : {}) }) as HTMLInputElement;
+  const shareOut = h('output', { for: 'ai-share' }, `${share.value} %`);
+  share.addEventListener('input', () => {
+    shareOut.textContent = `${share.value} %`;
+  });
   const accept = h('input', { type: 'checkbox', id: 'ai-accept' }) as HTMLInputElement;
   const estimate = h('p', { class: 'estimate', 'aria-live': 'polite' });
   const detected = h('span', { class: 'help', 'aria-live': 'polite' });
@@ -73,6 +80,7 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
       if (!locked.has('capDay')) body.capDay = Number(capDay.value);
       if (!locked.has('capMonth')) body.capMonth = Number(capMonth.value);
       if (key.value.trim() && !locked.has('key')) body.key = key.value.trim();
+      if (!shareLocked) body.aiShare = Number(share.value);
       const s = await api.saveAiConfig(token, body);
       key.value = '';
       if (!s.configured) {
@@ -110,6 +118,15 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
       ? h('p', { class: 'server-ai' }, 'La API key ya la pone el servidor. Solo tienes que aceptar el aviso.')
       : h('label', { class: 'field' }, 'API key', key, h('span', { class: 'help' }, 'Se acepta API key de Anthropic (sk-ant-…) o de OpenAI (sk-…).'), detected),
     h('label', { class: 'field' }, 'Gasto máximo al mes (€)', serverNote('capMonth'), capMonth),
+    h(
+      'label',
+      { class: 'field' },
+      'Vecinos que piensan con IA ',
+      shareOut,
+      shareLocked ? h('span', { class: 'muted small' }, ' · definido por el servidor') : '',
+      share,
+      h('span', { class: 'help' }, 'Cada semana de juego deciden con la IA qué hacen (trabajo, compras, pareja, negocio, protestas…). El resto, por costumbre. Más vecinos con IA, más gasto.'),
+    ),
     estimate,
     advanced,
     h('label', { class: 'check warning' }, accept, h('span', {}, 'Pon un límite de gasto en el panel de tu proveedor. Bitópolis es un proyecto personal y no se hace responsable si la key se filtra o se usa de más.')),

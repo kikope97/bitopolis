@@ -94,7 +94,7 @@ export async function registerGameRoutes(app: FastifyInstance, db: Db, store: Se
     const mode = b.data.mode;
     if (mode === 'ai' && !(await ai.settings(null)).configured) return bad(reply, 'Configura la IA antes de jugar en Modo IA');
     const seed = newSeed();
-    const state = createInitialState({ seed, aiMode: mode === 'ai', namedLimit: store.get().ai.maxCitizens });
+    const state = createInitialState({ seed, aiMode: mode === 'ai', namedLimit: store.get().ai.maxCitizens, aiShare: store.get().ai.aiShare ?? 50 });
     const ts = new Date().toISOString();
     await db
       .insertInto('games')
@@ -160,6 +160,10 @@ export async function registerGameRoutes(app: FastifyInstance, db: Db, store: Se
     }
     const state = migrate(JSON.parse(row.state));
     if (state.tick !== fromTick) return reply.code(409).send({ error: 'desincronizado', state });
+    // 2.0: con la IA del servidor, el % de vecinos con IA lo fija /admin (la partida no lo cambia).
+    if (commands.some((c) => c.cmd.type === 'SetAiShare') && (await ai.settings(row.id)).locked.includes('key')) {
+      return reply.code(403).send({ error: 'El % de vecinos con IA lo fija el servidor', state: migrate(JSON.parse(row.state)) });
+    }
     replayOnto(state, commands, toTick);
     if (hashState(state) !== hash) {
       req.log.warn({ token: '…', fromTick, toTick }, 'hash distinto en el guardado');

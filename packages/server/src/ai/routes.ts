@@ -70,6 +70,8 @@ const ConfigBody = z.object({
   key: z.string().trim().min(8).max(400).optional(),
   capDay: z.number().min(0).max(1000).optional(),
   capMonth: z.number().min(0).max(10000).optional(),
+  /** 2.0: % de vecinos con IA (solo con key propia; con la del servidor manda /admin). */
+  aiShare: z.number().int().min(0).max(100).optional(),
   accepted: z.boolean(),
 });
 
@@ -85,6 +87,7 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
       providers: PROVIDERS.map((id) => ({ id, ...PROVIDER_INFO[id] })),
       serverKey: !!s.ai.keyEnc || !!s.ai.baseUrl,
       maxCitizens: s.ai.maxCitizens,
+      aiShare: s.ai.aiShare ?? 50,
       playerKeys: s.ai.playerKeys,
       prices: ai.prices,
       newGames: s.newGames,
@@ -124,7 +127,8 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
     if (!row) {
       if (!store.get().newGames) return bad(reply, 'Este servidor no admite partidas nuevas', 403);
       const seed = newSeed();
-      const state = createInitialState({ seed, aiMode: true, namedLimit: store.get().ai.maxCitizens });
+      const share = srv.configured ? (store.get().ai.aiShare ?? 50) : (d.aiShare ?? store.get().ai.aiShare ?? 50);
+      const state = createInitialState({ seed, aiMode: true, namedLimit: store.get().ai.maxCitizens, aiShare: share });
       const ts = new Date().toISOString();
       await db
         .insertInto('games')
@@ -175,6 +179,16 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
       s.serverMonthly ? spent.serverMonth / s.serverMonthly : 0,
     ];
     return { ...ai.take(row.id), budgetFraction: Math.max(...fractions) };
+  });
+
+  /** 2.0: resultado del turno del pueblo `n` (pendiente, listo o fallido). */
+  app.get('/api/games/:token/turn/:n', async (req, reply) => {
+    const t = tokenOf(req.params);
+    const n = Number((req.params as { n?: string }).n);
+    if (!t.success || !Number.isInteger(n) || n < 1) return bad(reply, 'petición no válida');
+    const row = await load(t.data);
+    if (!row) return bad(reply, 'no existe', 404);
+    return { turn: ai.turn(row.id, n), ...ai.status(row.id) };
   });
 
   app.get('/api/games/:token/ai-usage', async (req, reply) => {

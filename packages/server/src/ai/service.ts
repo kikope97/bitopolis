@@ -1,4 +1,4 @@
-import { buildDecisionRequest, type GameState, parseDecisions, parseText, type Pending, type TextRequest } from '@bitopolis/sim';
+import { buildDecisionRequest, buildTurnRequest, type GameState, parseDecisions, parseText, parseTurn, type Pending, type TextRequest, turnBatches, turnShared, type TurnAct } from '@bitopolis/sim';
 import type { Config } from '../config.ts';
 import type { Db } from '../db/index.ts';
 import type { SettingsStore } from '../settings.ts';
@@ -35,7 +35,26 @@ interface GameAiState {
   ready: ReadyDecision[];
   capped: boolean;
   lastError?: string;
+  /** 2.0: turnos del pueblo pedidos (número) y su resultado. */
+  turns: Map<number, TurnResult>;
 }
+
+/** 2.0: resultado de un turno del pueblo para el cliente. */
+export interface TurnResult {
+  n: number;
+  status: 'pending' | 'ready' | 'failed';
+  acts: TurnAct[];
+  /** Vecinos pedidos y respondidos (para el panel de gasto y «Qué está pasando»). */
+  requested: number;
+  answered: number;
+  reason?: string;
+}
+
+/** 2.0: vecinos por lote y lotes en paralelo (el primero va solo para escribir la caché). */
+export const TURN_BATCH = 15;
+const TURN_PARALLEL = 4;
+const TURN_TIMEOUT_MS = 60_000;
+const TURN_OUT_PER_CITIZEN = 160;
 
 const TIMEOUT_MS = 20_000;
 const MAX_OUT_PER_CITIZEN = 120;
@@ -169,12 +188,115 @@ export class AiService {
 
   private gs(gameId: number): GameAiState {
     let g = this.games.get(gameId);
-    if (!g) this.games.set(gameId, (g = { inflight: false, requested: new Set(), ready: [], capped: false }));
+    if (!g) this.games.set(gameId, (g = { inflight: false, requested: new Set(), ready: [], capped: false, turns: new Map() }));
     return g;
   }
 
-  /** Tras cada guardado: pide por adelantado las decisiones pendientes. */
+  /** Tras cada guardado: pide el turno del pueblo abierto y, por adelantado, las decisiones pendientes. */
   onSaved(gameId: number, state: GameState): Promise<void> | void {
+    const turn = this.onTurn(gameId, state);
+    const dec = this.onPending(gameId, state);
+    if (turn || dec) return Promise.all([turn, dec]).then(() => undefined);
+  }
+
+  /** 2.0: si hay un turno abierto que aún no se ha pedido, se piden sus lotes. */
+  private onTurn(gameId: number, state: GameState): Promise<void> | void {
+    const t = state.ai?.turn;
+    if (!state.aiMode || !t) return;
+    const g = this.gs(gameId);
+    if (g.turns.has(t.n)) return;
+    const batches = turnBatches(state, TURN_BATCH);
+    const result: TurnResult = { n: t.n, status: 'pending', acts: [], requested: batches.flat().length, answered: 0 };
+    g.turns.set(t.n, result);
+    // Solo se guardan los últimos turnos.
+    for (const k of [...g.turns.keys()]) if (k < t.n - 4) g.turns.delete(k);
+    return this.requestTurn(gameId, state, batches, result).catch((e) => {
+      result.status = 'failed';
+      result.reason = (e as Error).message;
+    });
+  }
+
+  private async requestTurn(gameId: number, state: GameState, batches: number[][], result: TurnResult): Promise<void> {
+    const g = this.gs(gameId);
+    const s = await this.settings(gameId);
+    if (!s.configured || batches.length === 0) {
+      result.status = 'failed';
+      result.reason = s.configured ? 'sin vecinos con IA' : 'IA sin configurar';
+      return;
+    }
+    const shared = turnShared(state);
+    const one = async (ids: number[]): Promise<void> => {
+      const req = buildTurnRequest(state, ids, shared);
+      const est = costEur(this.prices, s.model, s.provider, { in: Math.ceil((req.system.length + req.shared.length + req.user.length) / 3.2), cachedIn: 0, out: ids.length * TURN_OUT_PER_CITIZEN }) * 1.5;
+      const blocked = await this.reserve(gameId, s, est);
+      if (blocked) {
+        g.capped = true;
+        g.lastError = `IA en pausa: ${blocked} alcanzado. Deciden las reglas.`;
+        throw new Error(blocked);
+      }
+      g.capped = false;
+      const usage = { in: 0, cachedIn: 0, out: 0 };
+      let status = 'ok';
+      let valid = 0;
+      try {
+        const provider = this.providerOverride ? this.providerOverride(s) : makeProvider(s.provider, s.key, s.baseUrl);
+        const r = await provider.complete(
+          { system: req.system, shared: req.shared, user: req.user, schema: req.schema, model: s.model, maxTokens: 300 + ids.length * TURN_OUT_PER_CITIZEN },
+          AbortSignal.timeout(TURN_TIMEOUT_MS),
+        );
+        usage.in = r.usage.in;
+        usage.cachedIn = r.usage.cachedIn;
+        usage.out = r.usage.out;
+        const parsed = parseTurn(r.text, ids, `${req.shared}\n${req.user}`);
+        valid = parsed.acts.length;
+        result.acts.push(...parsed.acts);
+        result.answered += parsed.acts.length;
+        if (parsed.missing.length) status = 'partial';
+      } catch (e) {
+        status = (e as Error).name === 'TimeoutError' ? 'timeout' : 'error';
+        g.lastError = `La IA no respondió a tiempo (${(e as Error).message}). Esta semana deciden las reglas para parte del pueblo.`;
+      } finally {
+        this.reserved.set(gameId, Math.max(0, (this.reserved.get(gameId) ?? 0) - est));
+        const now = new Date();
+        await this.db
+          .insertInto('ai_usage')
+          .values({
+            game_id: gameId,
+            ts: now.getTime(),
+            day: day(now),
+            month: month(now),
+            kind: 'turno',
+            model: s.model,
+            tokens_in: usage.in,
+            tokens_cached: usage.cachedIn,
+            tokens_out: usage.out,
+            eur: costEur(this.prices, s.model, s.provider, usage),
+            requested: ids.length,
+            valid,
+            retried: 0,
+            status,
+          })
+          .execute();
+      }
+    };
+    // El primer lote va solo (escribe la caché del bloque común); los demás, en paralelo.
+    try {
+      await one(batches[0]!);
+      const rest = batches.slice(1);
+      for (let i = 0; i < rest.length; i += TURN_PARALLEL) await Promise.all(rest.slice(i, i + TURN_PARALLEL).map((b) => one(b).catch(() => undefined)));
+    } catch (e) {
+      result.reason = (e as Error).message;
+    }
+    result.status = result.acts.length ? 'ready' : 'failed';
+  }
+
+  /** 2.0: el resultado de un turno (el cliente lo aplica con un comando `TownTurn`). */
+  turn(gameId: number, n: number): TurnResult | null {
+    return this.gs(gameId).turns.get(n) ?? null;
+  }
+
+  /** Decisiones con detonante (vecinos por reglas que piden IA, y el Modo IA de antes). */
+  private onPending(gameId: number, state: GameState): Promise<void> | void {
     if (!state.aiMode || state.pending.length === 0) return;
     const g = this.gs(gameId);
     if (g.inflight) return;
@@ -316,6 +438,14 @@ export class AiService {
       })
       .execute();
     return text ? { text } : { text: null, reason: status };
+  }
+
+  /** 2.0: estado de la IA para el cliente (el aviso se entrega una vez). */
+  status(gameId: number): { capped: boolean; notice?: string } {
+    const g = this.gs(gameId);
+    const notice = g.lastError;
+    g.lastError = undefined;
+    return { capped: g.capped, notice };
   }
 
   /** Decisiones listas para el cliente (se entregan una sola vez). */

@@ -966,3 +966,18 @@ body.cal-on .legend { top: 86px; }
 .mg-card { min-width: 0; }
 .mg-row strong, .accounts .num { white-space: nowrap; }
 .legend { max-width: min(60%, calc(100% - 180px)); }
+
+/* 2.0: la IA del pueblo. */
+.thinking { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); margin: 0; padding: 4px 10px; background: #1a1c2c; border: 2px solid #ffcd75; color: #ffcd75; font-size: 0.9rem; pointer-events: none; z-index: 3; }
+.thinking[hidden] { display: none; }
+.ai-chip.thinking { border-color: #ffcd75; color: #ffcd75; }
+.mind-box { margin: 8px 0; padding: 8px 12px; border: 2px solid #ffcd75; background: var(--bg); }
+.mind-tag { margin: 0 0 4px; color: #ffcd75; font-weight: 600; }
+.mind-thought { font-style: italic; }
+.mind-plan { color: var(--bad); }
+.turn-lines { list-style: none; padding: 0; margin: 4px 0 12px; }
+.turn-line { display: block; width: 100%; min-height: 44px; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); padding: 6px 0; color: inherit; font: inherit; cursor: pointer; }
+.turn-why { color: var(--muted); font-style: italic; }
+.turn-source { font-size: 0.8rem; padding: 0 6px; border: 1px solid var(--line); }
+.turn-source.ia { color: #ffcd75; border-color: #ffcd75; }
+.turn-focus { font-weight: 600; }
