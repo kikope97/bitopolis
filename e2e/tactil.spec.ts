@@ -157,3 +157,29 @@ test('táctil: con el inicio de una carretera marcado, la barra dice qué hacer 
   await page.locator('#confirm-no').click();
   await expect(page.locator('#confirm-bar')).toBeHidden();
 });
+
+test('táctil: se puede alejar como antes; muy alejado, el primer toque acerca y no construye (v1.6.1)', async ({ page }, info) => {
+  // Con densidad ×1 (escritorio) la casilla mínima ya es de 32 px: no hay nada que alejar.
+  test.skip(info.project.name !== 'movil');
+  await start(page);
+  const t = await touch(page);
+  const width = async () => (await tile(page, 1, 0)).x - (await tile(page, 0, 0)).x;
+  const w0 = await width();
+  await page.locator('#map').focus();
+  for (let i = 0; i < 4; i++) await page.keyboard.press('-');
+  const w1 = await width();
+  expect(w1).toBeLessThan(w0);
+  expect(w1).toBeLessThan(24);
+  const s0 = await state(page);
+  const th = s0.buildings.find((b: { kind: string }) => b.kind === 'townhall');
+  await pickTool(page, 'house');
+  const p = await tile(page, th.x + 1, th.y + 2);
+  await t.tap(p.x, p.y);
+  // Primer toque: acerca (casillas de 24 px o más) y no propone obra.
+  await expect.poll(width).toBeGreaterThanOrEqual(24);
+  await expect(page.locator('#confirm-bar')).toBeHidden();
+  // Segundo toque: ya propone la obra.
+  const q = await tile(page, th.x + 1, th.y + 2);
+  await t.tap(q.x, q.y);
+  await expect(page.locator('#confirm-bar')).toBeVisible();
+});

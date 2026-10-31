@@ -545,7 +545,7 @@ export function startGame(opts: GameOptions): void {
     const w = x1 - x0 + 5;
     const hgt = y1 - y0 + 5;
     const fit = Math.floor(Math.min(canvas.width / (w * T), canvas.height / (hgt * T)));
-    cam.zoom = Math.max(minZoom(), Math.min(Math.max(2, Math.round(dpr() * 1.25)), fit));
+    cam.zoom = Math.max(touchZoom(), Math.min(Math.max(2, Math.round(dpr() * 1.25)), fit));
     centerOn((x0 + x1) / 2, (y0 + y1) / 2);
   }
   function centerOn(tx: number, ty: number) {
@@ -561,8 +561,10 @@ export function startGame(opts: GameOptions): void {
     cam.x = axis(cam.x, state.map.w * tileSize(), canvas.width);
     cam.y = axis(cam.y, state.map.h * tileSize(), canvas.height);
   }
-  // Casillas de al menos 24 px en pantalla: más pequeñas no se aciertan con el dedo.
-  const minZoom = () => Math.max(1, Math.ceil((24 * dpr()) / T));
+  // v1.6.1: se puede alejar como antes de la 1.4 (≈11 px por casilla en un iPhone) para ver el pueblo.
+  // Para construir con el dedo hacen falta casillas de al menos 24 px: por debajo, el primer toque acerca.
+  const minZoom = () => Math.max(1, Math.floor(dpr() / 2));
+  const touchZoom = () => Math.max(1, Math.ceil((24 * dpr()) / T));
   const maxZoom = () => Math.round(dpr() * 4);
   function setZoom(z: number, ax = canvas.width / 2, ay = canvas.height / 2) {
     const nz = Math.max(minZoom(), Math.min(maxZoom(), Math.round(z)));
@@ -721,7 +723,14 @@ export function startGame(opts: GameOptions): void {
     }
     if (g.mode === 'pan' && touchInput && performance.now() - fling.t < 80) startFling();
     const t1 = tileAt(e.clientX, e.clientY);
-    if (g.mode === 'pending' && t1 && performance.now() >= quietUntil) void tapTile(pickTile(e.clientX, e.clientY, t1));
+    if (g.mode === 'pending' && t1 && performance.now() >= quietUntil) {
+      if (touchInput && tool.id !== 'inspect' && cam.zoom < touchZoom()) {
+        // Muy alejado para acertar con el dedo: este toque acerca ahí; el siguiente ya construye.
+        const r = canvas.getBoundingClientRect();
+        setZoom(touchZoom(), (e.clientX - r.left) * dpr(), (e.clientY - r.top) * dpr());
+        $('#sr-live').textContent = 'Mapa acercado para colocar con precisión. Toca otra vez.';
+      } else void tapTile(pickTile(e.clientX, e.clientY, t1));
+    }
     if (g.mode === 'paint' && g.startTile && t1) {
       // Con el dedo, el trazado se enseña y se confirma; con ratón, se hace al soltar.
       if (touchInput) proposePlace(g.startTile, t1);
