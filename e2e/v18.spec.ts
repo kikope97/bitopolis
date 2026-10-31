@@ -1,7 +1,7 @@
 import { gzipSync } from 'node:zlib';
 import { expect, type Page, test } from '@playwright/test';
 import { type GameState, OUTSIDE, runSimulation, transfer, TREASURY } from '../packages/sim/src/index.ts';
-import { skipTutorial, tile } from './helpers.ts';
+import { setSpeed, skipTutorial, tile } from './helpers.ts';
 
 /** v1.8: ficha de casa completa, cárcel, tiendas destrozadas y su reparación. */
 function pack(state: GameState) {
@@ -54,5 +54,43 @@ test('v1.8: ficha de casa con servicios y vecinos; cárcel en la bandeja; tienda
   await shot('2-tienda-destrozada');
   await page.getByRole('button', { name: /Reparar/ }).click();
   await expect(page.locator('.sheet')).toContainText('En reparación');
+  expect(errors).toEqual([]);
+});
+
+test('v1.8: el ayuntamiento abre el panel de gestión y se amplía; calendario a x3', async ({ page, request }, info) => {
+  test.setTimeout(120_000);
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  const shot = (n: string) => page.screenshot({ path: `test-results/capturas/${info.project.name}-v18-${n}.png` });
+  const { state } = runSimulation({ seed: 3, days: 500, profile: 'constructor' });
+  state.townhallLevel = 1;
+  transfer(state, OUTSIDE, TREASURY, 30_000, 'subvencion');
+  const hall = state.buildings.find((b) => b.kind === 'townhall')!;
+  await openTown(page, request, state);
+
+  // Con el nivel 1, las zonas están bloqueadas y lo explican.
+  await page.locator('#tab-build').click();
+  await expect(page.locator('#tray [data-tool="zoneR"] .tool-cost')).toContainText('nivel 2');
+  await page.locator('#tab-build').click();
+
+  await inspect(page, hall.x, hall.y);
+  await expect(page.locator('.sheet h2')).toHaveText('Gestión del pueblo');
+  await expect(page.locator('.sheet')).toContainText('Nivel 1 de 5');
+  await expect(page.locator('.sheet')).toContainText('Lo que falta');
+  await expect(page.locator('.sheet')).toContainText('Seguridad');
+  await shot('3-gestion');
+  await page.getByRole('button', { name: /Ampliar a nivel 2/ }).click();
+  await expect(page.locator('.sheet')).toContainText('Nivel 2 de 5');
+  await page.locator('.sheet-close').click();
+  await page.locator('#tab-build').click();
+  await expect(page.locator('#tray [data-tool="zoneR"] .tool-cost')).not.toContainText('nivel');
+  await page.locator('#tab-build').click();
+
+  // Calendario: solo a x3/x10.
+  await expect(page.locator('#calendar')).toBeHidden();
+  await setSpeed(page, 3);
+  await expect(page.locator('#calendar')).toBeVisible();
+  await setSpeed(page, 1);
+  await expect(page.locator('#calendar')).toBeHidden();
   expect(errors).toEqual([]);
 });

@@ -91,8 +91,9 @@ export function openManagement(ctx: SocialCtx, links: ManageLinks): void {
   const missing = card('Lo que falta', 'layers');
   if (!gaps.length) missing.append(h('p', { class: 'muted small' }, 'Todas las viviendas tienen lo que el pueblo puede ofrecer ahora.'));
   for (const g of gaps) {
-    const parts = [g.falta ? `${g.falta} sin ${NEED_LABEL[g.key]}` : '', g.lleno ? `${g.lleno} con ${NEED_LABEL[g.key]} lleno` : ''].filter(Boolean);
-    missing.append(row(NEED_LABEL[g.key][0]!.toUpperCase() + NEED_LABEL[g.key].slice(1), `${parts.join(' · ')} ${g.falta + g.lleno === 1 ? 'vivienda' : 'viviendas'}`, 'neg'));
+    const viv = (n: number) => `${n} ${n === 1 ? 'vivienda' : 'viviendas'}`;
+    const parts = [g.falta ? `${viv(g.falta)} sin él` : '', g.lleno ? `${viv(g.lleno)} con él lleno` : ''].filter(Boolean);
+    missing.append(row(NEED_LABEL[g.key][0]!.toUpperCase() + NEED_LABEL[g.key].slice(1), parts.join(' · '), 'neg'));
   }
   const locked = Object.entries(BUILD_LEVEL).filter(([, l]) => l > lv);
   if (locked.length) {

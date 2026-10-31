@@ -101,7 +101,7 @@ test('el menú ☰ no se cambia solo por la última ficha mirada (el «menú en 
   await pickTool(page, 'inspect');
   const p = await tile(page, th.x, th.y);
   await page.mouse.click(p.x, p.y);
-  await expect(page.locator('.sheet h2')).toHaveText('Ayuntamiento');
+  await expect(page.locator('.sheet h2')).toHaveText('Gestión del pueblo');
   await page.locator('.sheet-close').click();
   await setSpeed(page, 3);
   await page.locator('#menu').click();
@@ -110,7 +110,7 @@ test('el menú ☰ no se cambia solo por la última ficha mirada (el «menú en 
   await expect(page.locator('.sheet h2')).toHaveText('Pueblo');
   await page.getByRole('button', { name: 'Impuestos' }).click();
   await page.waitForTimeout(2000);
-  await expect(page.locator('.sheet h2')).not.toHaveText('Ayuntamiento');
+  await expect(page.locator('.sheet h2')).not.toHaveText('Gestión del pueblo');
 });
 
 test('táctil: un solo toque junto al borde de abajo no construye (el clic fantasma caía en «Construir»)', async ({ page }) => {
