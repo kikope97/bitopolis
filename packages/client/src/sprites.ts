@@ -454,6 +454,166 @@ function townhall(): Pix {
   return p;
 }
 
+/* ---------------- ayuntamiento por niveles (v1.8) ---------------- */
+
+/** Mástil con la bandera rojigualda (motivo común a todos los niveles). */
+function thFlag(p: Pix, x: number, top: number, base: number, left = false) {
+  p.vline(x, top, base - top, MAT.metal[2]);
+  p.set(x, top - 1, MAT.yellow[1]);
+  const fx = left ? x - 5 : x + 1;
+  p.rect(fx, top, 5, 2, MAT.red[1]);
+  p.rect(fx, top + 2, 5, 2, MAT.yellow[1]);
+  p.rect(fx, top + 4, 5, 1, MAT.red[1]);
+  p.set(left ? fx : fx + 4, top + 4, MAT.red[2]);
+  p.set(left ? fx : fx + 4, top + 2, MAT.yellow[2]);
+}
+
+/** Escudo municipal pequeño sobre la puerta. */
+function thShield(p: Pix, x: number, y: number) {
+  p.rect(x, y, 3, 3, MAT.red[1]);
+  p.set(x + 1, y + 1, MAT.yellow[0]);
+  p.set(x + 1, y + 3, MAT.red[2]);
+  p.set(x + 2, y, MAT.red[2]);
+}
+
+/** Reloj de esfera blanca con agujas. */
+function thClock(p: Pix, x: number, y: number, r: number) {
+  p.ball(x, y, r, [31, 12, 13, 14], 1);
+  p.set(x, y - 1, 0);
+  p.set(x, y, 0);
+  p.set(x + 1, y, 0);
+}
+
+/** Balcón de forja con dos banderas colgadas. */
+function thBalcony(p: Pix, x: number, y: number, w: number) {
+  p.hline(x, y + 3, w, MAT.metal[3]);
+  for (let i = x; i < x + w; i += 2) p.vline(i, y, 3, MAT.metal[3]);
+  p.hline(x, y, w, MAT.metal[1]);
+  p.rect(x + 2, y - 5, 3, 5, MAT.red[1]);
+  p.rect(x + 2, y - 4, 3, 2, MAT.yellow[1]);
+  p.rect(x + w - 5, y - 5, 3, 5, MAT.blue[1]);
+  p.set(x + w - 4, y - 3, MAT.yellow[1]);
+}
+
+/** Nivel 1: casa consistorial pequeña, una planta y bandera en el caballete. */
+function townhall1(): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 5, 28, 22, 18);
+  facade(p, 6, 30, 20, 16, MAT.stone, 'stone', 7);
+  gableRoof(p, 4, 20, 24, 4, 6, MAT.terracotta);
+  thFlag(p, 16, 9, 24);
+  windowAt(p, 9, 34, 3, 5, { shutters: MAT.moss });
+  windowAt(p, 21, 34, 3, 5, { shutters: MAT.moss });
+  thShield(p, 15, 31);
+  doorAt(p, 14, 36, 5, 9, MAT.wood, MAT.stone[0]);
+  bush(p, 4, 45, 2, 7, true);
+  bush(p, 28, 45, 2, 9, true);
+  return p;
+}
+
+/** Nivel 2: algo mayor, con espadaña y reloj. */
+function townhall2(): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 3, 26, 26, 20);
+  facade(p, 4, 28, 24, 18, MAT.stone, 'stone', 7);
+  gableRoof(p, 2, 18, 28, 4, 6, MAT.terracotta);
+  // Espadaña encalada con el reloj.
+  facade(p, 12, 12, 8, 11, MAT.cream, 'plaster', 3);
+  p.hline(11, 11, 10, MAT.terracotta[1]);
+  p.hline(12, 10, 8, MAT.terracotta[0]);
+  p.hline(14, 9, 4, MAT.terracotta[1]);
+  thClock(p, 16, 16, 2.6);
+  thFlag(p, 26, 6, 21);
+  windowAt(p, 7, 31, 3, 5, { shutters: MAT.moss });
+  windowAt(p, 22, 31, 3, 5, { shutters: MAT.moss });
+  windowAt(p, 7, 39, 3, 4);
+  windowAt(p, 22, 39, 3, 4);
+  thShield(p, 15, 30);
+  doorAt(p, 14, 35, 5, 10, MAT.wood, MAT.stone[0]);
+  p.rect(12, 45, 9, 1, MAT.stone[1]);
+  return p;
+}
+
+/** Nivel 3: más ancho, balcón con banderas y reloj en el frontón. */
+function townhall3(): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 1, 24, 30, 22);
+  facade(p, 1, 24, 30, 22, MAT.stone, 'stone', 7);
+  gableRoof(p, 0, 14, 32, 4, 6, MAT.terracotta);
+  // Frontón de piedra con el reloj.
+  for (let y = 12; y < 24; y++) {
+    const half = (y - 11) * 0.9;
+    for (let x = Math.ceil(16 - half); x < 16 + half; x++) p.set(x, y, x < 13 ? MAT.cream[0] : x > 19 ? MAT.cream[2] : MAT.cream[1]);
+    p.set(Math.ceil(16 - half), y, 12);
+  }
+  thClock(p, 16, 19, 2.6);
+  thFlag(p, 29, 4, 18, true);
+  thBalcony(p, 9, 31, 14);
+  windowAt(p, 12, 27, 3, 3);
+  windowAt(p, 17, 27, 3, 3);
+  windowAt(p, 4, 27, 3, 5);
+  windowAt(p, 25, 27, 3, 5);
+  windowAt(p, 4, 37, 3, 5);
+  windowAt(p, 25, 37, 3, 5);
+  doorAt(p, 13, 36, 6, 9, MAT.wood, MAT.stone[0]);
+  p.rect(10, 45, 12, 1, MAT.stone[1]);
+  return p;
+}
+
+/** Nivel 5: palacio municipal con cúpula, pórtico y escalinata. */
+function townhall5(): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 0, 18, 32, 27);
+  facade(p, 0, 22, 32, 23, MAT.stone, 'stone', 7);
+  flatRoof(p, 0, 17, 32, 6, MAT.stone, 7);
+  // Balaustrada.
+  for (let x = 1; x < 31; x += 2) p.vline(x, 15, 2, MAT.stone[0]);
+  p.hline(0, 14, 32, MAT.stone[0]);
+  // Tambor y cúpula de pizarra con linterna dorada.
+  facade(p, 10, 9, 12, 8, MAT.cream, 'plaster', 3);
+  for (const x of [12, 19]) windowAt(p, x, 11, 1, 3, { frame: MAT.cream[2] });
+  thClock(p, 16, 12, 2.4);
+  for (let y = 2; y < 9; y++) {
+    const half = Math.sqrt(Math.max(0, 1 - ((9 - y) / 7.5) ** 2)) * 7;
+    for (let x = Math.round(16 - half); x < Math.round(16 + half); x++) {
+      const u = (x - (16 - half)) / (2 * half);
+      p.set(x, y, u < 0.3 ? MAT.slate[0] : u < 0.65 ? MAT.slate[1] : u < 0.85 ? MAT.slate[2] : MAT.slate[3]);
+    }
+  }
+  for (const x of [12, 16, 20]) p.vline(x, 3, 6, MAT.slate[2]);
+  p.hline(9, 8, 14, MAT.stone[0]);
+  p.rect(15, 0, 3, 3, MAT.yellow[1]);
+  p.set(15, 0, MAT.yellow[0]);
+  p.set(17, 2, MAT.yellow[2]);
+  // Banderas en las esquinas.
+  thFlag(p, 2, 3, 15);
+  thFlag(p, 29, 3, 15, true);
+  // Planta noble: ventanales con balcones; pórtico central con frontón.
+  for (const x of [3, 8, 22, 26]) {
+    windowAt(p, x, 25, 3, 5);
+    p.hline(x - 1, 31, 5, MAT.metal[3]);
+  }
+  for (const x of [3, 8, 22, 26]) windowAt(p, x, 36, 3, 5);
+  for (let y = 19; y < 25; y++) {
+    const half = (y - 18) * 1.2 + 1;
+    for (let x = Math.ceil(16 - half); x < 16 + half; x++) p.set(x, y, MAT.cream[1]);
+    p.set(Math.ceil(16 - half), y, 12);
+  }
+  thShield(p, 15, 21);
+  p.hline(9, 25, 14, MAT.stone[0]);
+  for (const x of [10, 13, 18, 21]) {
+    p.rect(x, 26, 2, 18, MAT.stone[0]);
+    p.vline(x + 1, 26, 18, MAT.stone[2]);
+  }
+  doorAt(p, 14, 34, 4, 10, MAT.wood, MAT.stone[0]);
+  // Escalinata.
+  p.rect(8, 44, 16, 1, MAT.stone[0]);
+  p.rect(6, 45, 20, 1, MAT.stone[1]);
+  p.hline(5, 46, 22, MAT.stone[0]);
+  p.hline(5, 47, 22, MAT.stone[3]);
+  return p;
+}
+
 function waterTower(seed: number): Pix {
   const p = new Pix(T, BH);
   p.shadow(10, 44, 18, 2);
@@ -1123,6 +1283,125 @@ function sports(seed: number): Pix {
   p.rect(26, 28, 4, 1, MAT.wood[1]);
   p.set(26, 29, MAT.wood[3]);
   p.set(29, 29, MAT.wood[3]);
+  return p;
+}
+
+/* ===================== delincuencia y disturbios (v1.8) ===================== */
+
+/** Granito gris frío de muros y garitas: [brillo, base, sombra, oscuro]. */
+const GRANITE: Mat = [51, 52, 53, 55];
+/** Hormigón claro del módulo de celdas. */
+const CONCRETE: Mat = [54, 51, 52, 53];
+
+/** Ventanuco con barrotes (de noche, algunas celdas encendidas). */
+function barredWindow(p: Pix, x: number, y: number, w: number, h: number, frame: number) {
+  const lit = nightLights && hash(x, y, 31) > 0.45;
+  p.rect(x - 1, y - 1, w + 2, h + 2, frame);
+  p.rect(x, y, w, h, lit ? C.lampWarm : 26);
+  if (lit) p.hline(x, y, w, C.lamp);
+  else p.set(x, y, MAT.glass[3]);
+  for (let i = x; i < x + w; i += 2) p.vline(i, y, h, lit ? 53 : 52);
+  p.hline(x - 1, y + h + 1, w + 2, CONCRETE[3]);
+}
+
+/** Concertina de alambre de espino sobre un muro. */
+function razorWire(p: Pix, x: number, y: number, w: number) {
+  for (let i = 0; i < w; i++) {
+    const X = x + i;
+    const k = i % 4;
+    // Espiras oscuras con brillo arriba: se leen sobre el hormigón claro.
+    if (k === 1 || k === 2) {
+      p.set(X, y, k === 1 ? 31 : 53);
+      p.set(X, y + 2, 55);
+    } else {
+      p.set(X, y + 1, 55);
+    }
+    if (k === 3 && hash(X, y) > 0.4) p.set(X, y - 1, 53); // púa
+  }
+  for (let i = 1; i < w; i += 7) {
+    p.vline(x + i, y - 1, 4, 55);
+    p.set(x + i + 1, y - 2, 55); // poste acodado hacia dentro
+  }
+}
+
+function jail(seed: number): Pix {
+  const p = new Pix(T, BH);
+  // Módulo de celdas al fondo: hormigón claro, dos filas de ventanucos.
+  castShadow(p, 2, 9, 22, 18);
+  flatRoof(p, 2, 6, 22, 6, CONCRETE, seed);
+  facade(p, 3, 11, 20, 16, CONCRETE, 'plaster', seed);
+  p.hline(3, 18, 20, CONCRETE[2]); // forjado
+  for (const x of [5, 10, 15, 20]) {
+    barredWindow(p, x, 13, 3, 3, CONCRETE[3]);
+    barredWindow(p, x, 20, 3, 3, CONCRETE[3]);
+  }
+  // Muro perimetral alto de sillería gris con alambrada.
+  castShadow(p, 0, 27, 32, 19);
+  facade(p, 0, 27, 32, 19, GRANITE, 'stone', seed);
+  p.hline(0, 27, 32, 54); // albardilla
+  p.hline(0, 28, 32, GRANITE[0]);
+  p.hline(0, 29, 32, GRANITE[2]);
+  razorWire(p, 0, 24, 22);
+  // Portón metálico con remaches y mirilla.
+  p.rect(9, 33, 12, 13, 26);
+  p.rect(10, 34, 10, 12, 55);
+  for (let y = 35; y < 45; y += 3) {
+    p.hline(10, y, 10, 53);
+    p.set(10, y + 1, 52);
+    p.set(19, y + 1, 26);
+  }
+  p.vline(15, 34, 12, 26);
+  p.vline(10, 34, 12, 53);
+  for (const x of [11, 18]) for (let y = 36; y < 45; y += 3) p.set(x, y, 51);
+  p.rect(12, 37, 2, 1, 0); // mirilla
+  p.rect(9, 32, 12, 1, 53);
+  p.hline(8, 31, 14, GRANITE[0]);
+  // Placa azul sobre el portón y apliques.
+  p.rect(11, 29, 8, 2, MAT.blue[2]);
+  p.hline(11, 29, 8, MAT.blue[1]);
+  for (let i = 0; i < 3; i++) p.set(12 + i * 2, 29, 12);
+  for (const x of [7, 22]) {
+    p.set(x, 32, nightLights ? C.lamp : 55);
+    p.set(x, 33, nightLights ? C.lampWarm : 53);
+  }
+  // Garita en la esquina: fuste de granito y caseta acristalada.
+  castShadow(p, 23, 10, 8, 36);
+  facade(p, 24, 12, 6, 34, GRANITE, 'stone', seed + 1);
+  p.vline(24, 12, 34, GRANITE[0]);
+  p.rect(22, 5, 10, 7, GRANITE[2]);
+  p.hline(22, 11, 10, GRANITE[3]);
+  p.rect(23, 6, 8, 4, nightLights ? C.lampWarm : MAT.glass[2]);
+  if (!nightLights) {
+    p.hline(23, 6, 8, MAT.glass[1]);
+    p.set(23, 7, MAT.glass[0]);
+  } else p.hline(23, 6, 8, C.lamp);
+  for (const x of [25, 28]) p.vline(x, 6, 4, GRANITE[3]);
+  p.hline(21, 4, 11, GRANITE[1]);
+  p.hline(21, 3, 11, 54);
+  p.hline(22, 2, 9, GRANITE[2]);
+  // Foco sobre la garita.
+  p.rect(25, 0, 3, 2, 55);
+  p.set(26, 0, nightLights ? C.lamp : 51);
+  p.set(27, 1, nightLights ? C.lamp : 54);
+  if (nightLights) {
+    // Haz del foco barriendo el patio (línea con tramado debajo) y charco de luz ante el portón.
+    for (let t = 1; t <= 10; t++) {
+      p.set(25 - t, 1 + Math.floor(t / 2), C.lamp);
+      if (t % 2 === 0 && t > 2) p.set(25 - t, 2 + Math.floor(t / 2), C.lampWarm);
+    }
+    p.set(28, 0, C.lampWarm);
+    p.set(24, 0, C.lampWarm);
+    p.dither(10, 46, 10, 2, C.lamp, 0);
+    p.set(7, 34, C.lamp);
+    p.set(22, 34, C.lamp);
+  }
+  // Ventanucos con barrotes en el fuste de la garita.
+  barredWindow(p, 26, 18, 2, 3, GRANITE[3]);
+  barredWindow(p, 26, 34, 2, 3, GRANITE[3]);
+  // Cámara en el muro y matojo.
+  p.rect(2, 31, 2, 1, 55);
+  p.set(3, 32, nightLights ? 2 : 53);
+  bush(p, 3, 45, 1.8, seed);
   return p;
 }
 
@@ -1798,50 +2077,247 @@ export function sprite(key: string, make: () => Pix, tod: TimeOfDay = 'day'): HT
   return c;
 }
 
-/** Sprite de 32×48 de un edificio. Las viviendas y tiendas varían con su id. */
-export function buildingSprite(kind: string, id: number, tod: TimeOfDay = 'day', snow = false): HTMLCanvasElement {
-  // v1.7: en invierno con nieve, tejados nevados (otra entrada de la caché).
-  const s = (key: string, make: () => Pix) => (snow ? sprite(`snow-${key}`, () => snowify(make()), tod) : sprite(key, make, tod));
+/** Clave de caché y generador de cada edificio (null: no es un edificio conocido). */
+function buildingSpec(kind: string, id: number): [string, () => Pix] | null {
   switch (kind) {
     case 'townhall':
-      return s('townhall', townhall);
+      return ['townhall', townhall];
     case 'water':
-      return s('water', () => waterTower(3));
+      return ['water', () => waterTower(3)];
     case 'power':
-      return s('power', () => powerPlant(5));
+      return ['power', () => powerPlant(5)];
     case 'park':
-      return s('park', () => park(11));
+      return ['park', () => park(11)];
     case 'school':
-      return s('school', () => school(2));
+      return ['school', () => school(2)];
     case 'clinic':
-      return s('clinic', () => clinic(4));
+      return ['clinic', () => clinic(4)];
     case 'police':
-      return s('police', () => policeStation(6));
+      return ['police', () => policeStation(6)];
     case 'plaza':
-      return s('plaza', () => plaza(8));
+      return ['plaza', () => plaza(8)];
     case 'market':
-      return s('market', () => market(9));
+      return ['market', () => market(9)];
     case 'bar':
-      return s('bar', () => bar(12));
+      return ['bar', () => bar(12)];
     case 'chapel':
-      return s('chapel', () => chapel(13));
+      return ['chapel', () => chapel(13)];
     case 'cemetery':
-      return s('cemetery', () => cemetery(14));
+      return ['cemetery', () => cemetery(14)];
     case 'library':
-      return s('library', () => library(15));
+      return ['library', () => library(15)];
     case 'sports':
-      return s('sports', () => sports(16));
+      return ['sports', () => sports(16)];
+    case 'jail':
+      return ['jail', () => jail(17)];
     case 'factory':
-      return s(`factory${id % 4}`, () => factory(id % 4));
+      return [`factory${id % 4}`, () => factory(id % 4)];
     case 'shop':
-      return s(`shop${id % 16}`, () => shop(id % 16));
+      return [`shop${id % 16}`, () => shop(id % 16)];
     case 'house':
-      return s(`house${id % 4}`, () => cottage(id % 4));
+      return [`house${id % 4}`, () => cottage(id % 4)];
     case 'res':
-      return s(`res${id % 256}`, () => apartment(Math.floor(hash(id, 77) * 256)));
+      return [`res${id % 256}`, () => apartment(Math.floor(hash(id, 77) * 256))];
     default:
-      return constructionSprite(0, id, tod);
+      return null;
   }
+}
+
+/** Sprite de 32×48 de un edificio. Las viviendas y tiendas varían con su id. */
+export function buildingSprite(kind: string, id: number, tod: TimeOfDay = 'day', snow = false): HTMLCanvasElement {
+  const spec = buildingSpec(kind, id);
+  if (!spec) return constructionSprite(0, id, tod);
+  const [key, make] = spec;
+  // v1.7: en invierno con nieve, tejados nevados (otra entrada de la caché).
+  return snow ? sprite(`snow-${key}`, () => snowify(make()), tod) : sprite(key, make, tod);
+}
+
+/**
+ * Ayuntamiento según su nivel (1–5), 32×48 (v1.8): 1 casa consistorial
+ * pequeña; 2 con espadaña y reloj; 3 más ancho con balcón y banderas; 4 el
+ * de siempre, con torre del reloj (el de `buildingSprite('townhall', …)`);
+ * 5 palacio municipal con cúpula y escalinata.
+ */
+export function townhallSprite(level: number, tod: TimeOfDay = 'day', snow = false): HTMLCanvasElement {
+  const lv = Math.max(1, Math.min(5, Math.round(level) || 1));
+  if (lv === 4) return buildingSprite('townhall', 0, tod, snow);
+  const make = [townhall1, townhall2, townhall3, townhall, townhall5][lv - 1]!;
+  const key = `townhall-n${lv}`;
+  return snow ? sprite(`snow-${key}`, () => snowify(make()), tod) : sprite(key, make, tod);
+}
+
+/* -------------------- destrozos tras unos disturbios (v1.8) -------------------- */
+
+/** Cristal roto: hueco oscuro, esquirlas en el marco y brasas al fondo. */
+function smash(p: Pix, x: number, y: number, w: number, h: number, seed: number) {
+  p.rect(x, y, w, h, 26);
+  p.hline(x, y, w, 0);
+  // Esquirlas que quedan pegadas al marco.
+  const a = Math.max(2, Math.round(Math.min(w, h) * 0.6));
+  for (let j = 0; j < a; j++) {
+    for (let i = 0; i < a - j; i++) p.set(x + i, y + j, i + j === a - j - 1 ? MAT.glass[0] : MAT.glass[1]);
+  }
+  const b = Math.max(1, a - 1);
+  for (let j = 0; j < b; j++) {
+    for (let i = 0; i < b - j; i++) p.set(x + w - 1 - i, y + h - 1 - j, i === 0 && j === 0 ? MAT.glass[3] : MAT.glass[2]);
+  }
+  if (w > 5) {
+    p.set(x + w - 1, y, MAT.glass[1]);
+    p.set(x + w - 2, y, MAT.glass[1]);
+    p.set(x + w - 1, y + 1, MAT.glass[2]);
+  }
+  // Brasas: de noche brillan.
+  for (let i = 0; i < Math.max(1, w / 3); i++) {
+    const ex = x + 1 + Math.floor(hash(i, seed, 7) * Math.max(1, w - 2));
+    p.set(ex, y + h - 1, nightLights ? C.lampWarm : i % 2 ? 3 : 20);
+  }
+  if (h > 4) p.set(x + Math.floor(w / 2), y + h - 2, nightLights ? C.lamp : 3);
+}
+
+/** Tablones clavados sobre un hueco (n tablas, ligeramente torcidas). */
+function planks(p: Pix, x: number, y: number, w: number, h: number, seed: number) {
+  // El hueco queda a oscuras detrás de las tablas.
+  p.rect(x, y, w, h, 26);
+  const n = h >= 8 ? 3 : 2;
+  for (let k = 0; k < n; k++) {
+    const by = y + Math.round(((k + 0.5) * h) / n) - 1;
+    // Una de las tablas, algo torcida.
+    const tilt = k === n - 1 && hash(k, seed, 3) > 0.4 && w > 4;
+    for (let i = -1; i <= w; i++) {
+      const dy = tilt && i > w / 2 ? 1 : 0;
+      p.set(x + i, by + dy, MAT.wood[0]);
+      p.set(x + i, by + dy + 1, MAT.wood[2]);
+    }
+    p.set(x, by, 53); // clavos
+    p.set(x + w - 1, by + (tilt ? 1 : 0), 53);
+  }
+}
+
+/** Cristales por el suelo. */
+function shards(p: Pix, x: number, y: number, w: number, seed: number) {
+  for (let i = 0; i < w; i++) {
+    const r = hash(x + i, y, seed);
+    if (r > 0.55) p.set(x + i, y + Math.floor(hash(seed, x + i) * 3), r > 0.85 ? 31 : r > 0.7 ? MAT.glass[0] : MAT.glass[1]);
+  }
+}
+
+/** Pintada: firma de 9×4 con un goterón. */
+const TAG = ['.##.#..##', '#...##.#.', '.##.#.###', '...#.....'];
+function graffiti(p: Pix, x: number, y: number, seed: number) {
+  const col = [62, 61, 63, 2][seed % 4]!;
+  const dark = [1, 2, 7, 16][seed % 4]!;
+  TAG.forEach((r, j) =>
+    [...r].forEach((ch, i) => {
+      if (ch !== '#') return;
+      p.set(x + i, y + j, col);
+      if (p.get(x + i + 1, y + j + 1) !== col && j < 3) p.set(x + i + 1, y + j + 1, dark);
+    }),
+  );
+}
+
+/** Tizne que sube desde un hueco quemado. */
+function soot(p: Pix, x: number, y: number, w: number, h: number, seed: number) {
+  for (let j = 0; j < h; j++) {
+    for (let i = 0; i < w; i++) {
+      const edge = Math.abs(i + 0.5 - w / 2) / (w / 2);
+      const d = (1 - j / h) * (1 - edge * 0.6);
+      if (hash(x + i, y - j, seed) < d * 0.75 && (i + j) % 2 === 0) p.set(x + i, y - j, j < h / 3 ? 55 : 53);
+    }
+  }
+}
+
+/** Columna de humo oscuro que se aleja hacia la derecha. */
+function smokeColumn(p: Pix, x: number, seed: number) {
+  let top = 0;
+  while (top < p.h && p.get(x, top) === NONE) top++;
+  const dark: Mat = [C.smoke, C.smokeMid, C.smokeDark, 55];
+  const light: Mat = [12, C.smoke, C.smokeMid, C.smokeDark];
+  const puffs = [
+    [-1, 0, 3, dark],
+    [2, -3, 3.2, dark],
+    [4, -7, 2.6, dark],
+    [6, -10, 2.2, light],
+    [7, -13, 1.7, light],
+  ] as const;
+  for (const [dx, dy, r, m] of puffs) {
+    const cy = top + dy;
+    if (cy + r < 1) continue;
+    p.ball(x + dx, cy, r, m, seed + dx);
+  }
+  // Ceniza y pavesas.
+  for (let i = 0; i < 4; i++) p.set(x - 2 + Math.floor(hash(i, seed, 9) * 8), Math.max(0, top - 3 - Math.floor(hash(seed, i, 9) * 8)), i % 2 ? 53 : nightLights ? C.lampWarm : 3);
+}
+
+/** Toldo rasgado: un jirón arrancado y tiras colgando. */
+function tearAwning(p: Pix, x0: number, x1: number, y: number, seed: number) {
+  for (let x = x0; x <= x1; x++) {
+    const depth = 1 + Math.floor(hash(x, seed, 5) * 3);
+    for (let j = 0; j < depth; j++) p.set(x, y + 4 - j, NONE);
+  }
+  for (const x of [x0 + 1, x1 - 1]) {
+    const c = p.get(x, y + 1);
+    for (let j = 0; j < 3; j++) p.set(x, y + 3 + j, j === 2 ? MAT.stone[3] : c);
+  }
+}
+
+function damage(p: Pix, kind: string, seed: number): Pix {
+  switch (kind) {
+    case 'shop':
+      soot(p, 21, 17, 6, 5, seed);
+      smash(p, 22, 18, 4, 5, seed);
+      planks(p, 14, 18, 4, 5, seed);
+      graffiti(p, 9, 26, seed);
+      tearAwning(p, 9, 15, 30, seed);
+      smash(p, 5, 36, 13, 7, seed);
+      planks(p, 22, 35, 5, 9, seed + 1);
+      shards(p, 3, 45, 17, seed);
+      smokeColumn(p, 23, seed);
+      break;
+    case 'house':
+      soot(p, 7, 29, 7, 4, seed);
+      smash(p, 8, 30, 5, 6, seed);
+      planks(p, 21, 30, 4, 6, seed);
+      graffiti(p, 19, 37, seed);
+      shards(p, 5, 44, 11, seed);
+      smokeColumn(p, 10, seed);
+      break;
+    case 'res':
+      smash(p, 6, 38, 4, 5, seed);
+      planks(p, 23, 38, 4, 5, seed);
+      planks(p, 14, 37, 5, 8, seed + 1);
+      soot(p, 5, 37, 6, 6, seed);
+      graffiti(p, 20, 44 - 4, seed);
+      shards(p, 3, 45, 12, seed);
+      smokeColumn(p, 9, seed);
+      break;
+    case 'bar':
+      smash(p, 5, 32, 5, 3, seed);
+      planks(p, 23, 32, 5, 3, seed);
+      tearAwning(p, 17, 24, 27, seed);
+      graffiti(p, 20, 21, seed);
+      shards(p, 2, 44, 14, seed);
+      smokeColumn(p, 8, seed);
+      break;
+    default:
+      graffiti(p, 3, 38, seed);
+      shards(p, 2, 45, 28, seed);
+      smokeColumn(p, 12, seed);
+  }
+  return p;
+}
+
+/**
+ * Edificio destrozado tras unos disturbios (v1.8): el mismo sprite con el
+ * escaparate roto, tablones, toldo rasgado, pintada y humo. Pensado sobre
+ * todo para tiendas; con otros edificios, pintada, cristales y humo.
+ */
+export function damagedSprite(kind: string, id: number, tod: TimeOfDay = 'day'): HTMLCanvasElement {
+  const spec = buildingSpec(kind, id);
+  if (!spec) return constructionSprite(0, id, tod);
+  const [key, make] = spec;
+  // La semilla solo depende de lo que ya distingue la clave de caché.
+  const seed = kind === 'shop' || kind === 'house' || kind === 'res' || kind === 'factory' ? id % 4 : 0;
+  return sprite(`dmg-${key}`, () => damage(make(), kind, seed), tod);
 }
 
 export const constructionSprite = (stage: number, id: number, tod: TimeOfDay = 'day') => sprite(`obra${stage}-${id % 3}`, () => construction(stage, id % 3), tod);
@@ -1973,6 +2449,226 @@ export const portraitSprite = (variant: number) => sprite(`portrait${variant}`, 
 
 export const walkerSprite = (variant: number, frame: number, dir: 1 | -1, tod: TimeOfDay = 'day') =>
   sprite(`walker${variant}-${frame}-${dir}`, () => walker(variant, frame, dir), tod);
+
+/* -------------------- manifestantes y policía (v1.8) -------------------- */
+
+/**
+ * Pancartas de 9×5: w fondo, s franja, # letra oscura, L letra en el color
+ * del fondo (sobre la franja), e canto inferior en sombra.
+ */
+const SIGNS: { rows: string[]; bg: number; stripe: number }[] = [
+  { rows: ['sssssssss', 'wwwwwwwww', 'w#w##w#ww', 'w##w#w##w', 'eeeeeeeee'], bg: 12, stripe: 2 },
+  { rows: ['wwwwwwwww', 'w##ww#w#w', 'w#www##ww', 'sssssssss', 'eeeeeeeee'], bg: 21, stripe: 9 },
+  { rows: ['ssswwwwww', 'ssw##w#ww', 'ssw#ww##w', 'ssswwwwww', 'eeeeeeeee'], bg: 12, stripe: 6 },
+  { rows: ['wwwwwwwww', 'sLsLLsLss', 'sLLsLsLLs', 'wwwwwwwww', 'eeeeeeeee'], bg: 21, stripe: 62 },
+];
+
+/**
+ * Vecino manifestándose: 9×18 px (4 fotogramas), con una pancarta en alto
+ * en un palo. `sign` 0–3 elige el diseño; la pancarta no se refleja con
+ * `dir` (las letras se leen igual hacia los dos lados).
+ */
+export function marcher(variant: number, frame: number, dir: 1 | -1, sign: number): Pix {
+  const p = new Pix(9, 18);
+  const body = walker(variant, frame, dir);
+  const shirt = SHIRTS[Math.floor(variant / 3) % SHIRTS.length]!;
+  const skin = SKINS[variant % SKINS.length]!;
+  // El cuerpo del paseante, sin los brazos que balancea (aquí sujetan el palo).
+  for (let y = 0; y < body.h; y++) {
+    for (let x = 0; x < body.w; x++) {
+      const c = body.data[y * body.w + x]!;
+      const arm = (x === 1 || x === 5) && y >= 5 && y <= 7;
+      if (c !== NONE && !arm) p.set(x + 1, y + 6, c);
+    }
+  }
+  const fx = (x: number) => (dir === 1 ? x : 8 - x);
+  // Palo por delante del cuerpo, del cartel a la cadera.
+  const bob = frame % 2; // el palo sube y baja un píxel con el paso
+  for (let y = 5; y <= 14; y++) p.set(fx(7), y, y < 7 + bob ? 47 : 46);
+  // Brazos: los dos agarran el palo, uno alto y otro bajo.
+  p.set(fx(6), 10, shirt[2]);
+  p.set(fx(7), 10, skin);
+  p.set(fx(6), 12, shirt[1]);
+  p.set(fx(7), 12, skin);
+  p.set(fx(2), 10, shirt[2]); // hombro de atrás
+  // Pancarta.
+  const s = SIGNS[((sign % 4) + 4) % 4]!;
+  const col: Record<string, number> = { w: s.bg, s: s.stripe, '#': 15, L: s.bg, e: s.bg === 12 ? 13 : 30 };
+  s.rows.forEach((r, j) =>
+    [...r].forEach((ch, i) => {
+      const c = col[ch];
+      if (c !== undefined) p.set(i, j + bob, c);
+    }),
+  );
+  p.set(0, bob, s.rows[0]![0] === 's' ? s.stripe : 31); // brillo en la esquina de la luz
+  return p;
+}
+
+export const marcherSprite = (variant: number, frame: number, dir: 1 | -1, sign: number, tod: TimeOfDay = 'day') =>
+  sprite(`marcher${variant}-${frame}-${dir}-${sign}`, () => marcher(variant, frame, dir, sign), tod);
+
+/**
+ * Agente de la policía local, 7×12 px como `walker` (4 fotogramas): gorra
+ * con visera, uniforme azul marino y chaleco amarillo reflectante.
+ */
+export function policeWalker(frame: number, dir: 1 | -1): Pix {
+  const p = new Pix(7, 12);
+  const skin = C.skinTan;
+  const fx = (x: number) => (dir === 1 ? x : 6 - x);
+  const set = (x: number, y: number, c: number) => p.set(fx(x), y, c);
+  for (let x = 1; x < 6; x++) set(x, 11, 24);
+  // Cabeza y gorra con visera.
+  for (const [x, y] of [[2, 1], [3, 1], [4, 1], [2, 2], [3, 2], [4, 2], [3, 3]]) set(x!, y!, skin);
+  set(4, 2, 0);
+  set(1, 0, 8);
+  set(2, 0, 9);
+  set(3, 0, 8);
+  set(4, 0, 8);
+  set(2, 1, 8); // cinta de la gorra
+  set(3, 1, 4); // placa
+  set(4, 1, 8);
+  set(5, 1, 26); // visera
+  set(1, 1, C.hairDark);
+  // Chaleco reflectante con banda plateada.
+  for (let y = 4; y <= 7; y++) for (let x = 2; x <= 4; x++) set(x, y, 40);
+  for (let y = 4; y <= 7; y++) set(4, y, 22);
+  set(2, 4, 59);
+  set(3, 4, 8); // cuello del uniforme
+  for (let x = 2; x <= 4; x++) set(x, 6, x === 4 ? 52 : 54);
+  set(2, 7, 26); // cinturón
+  set(3, 7, 26);
+  set(4, 7, 26);
+  // Brazos con manga azul marino (balanceo).
+  const swing = [0, 1, 0, -1][frame % 4]!;
+  set(1, 5 + Math.max(0, swing), 8);
+  set(5, 5 + Math.max(0, -swing), 57);
+  set(1, 6 + Math.max(0, swing), skin);
+  set(5, 6 + Math.max(0, -swing), skin);
+  // Pantalón azul marino y botas.
+  const legs = [
+    [[2, 3], [4, 3]],
+    [[2, 2], [4, 4]],
+    [[3, 3], [3, 3]],
+    [[2, 4], [4, 2]],
+  ][frame % 4]!;
+  const [[lx, ly], [rx, ry]] = legs as [[number, number], [number, number]];
+  set(3, 8, 57);
+  for (let y = 8; y < 8 + ly; y++) set(lx, y, 8);
+  for (let y = 8; y < 8 + ry; y++) set(rx, y, 57);
+  set(lx, 8 + ly, 0);
+  set(rx, 8 + ry, 0);
+  return p;
+}
+
+export const policeSprite = (frame: number, dir: 1 | -1, tod: TimeOfDay = 'day') =>
+  sprite(`policia-${frame}-${dir}`, () => policeWalker(frame, dir), tod);
+
+/**
+ * Ladrón huyendo, 7×12 px como `walker` (4 fotogramas): ropa oscura, gorro
+ * de lana, antifaz y un saco al hombro (a la espalda).
+ */
+export function thiefWalker(frame: number, dir: 1 | -1): Pix {
+  const p = new Pix(7, 12);
+  const skin = C.skin;
+  const fx = (x: number) => (dir === 1 ? x : 6 - x);
+  const set = (x: number, y: number, c: number) => p.set(fx(x), y, c);
+  for (let x = 1; x < 6; x++) set(x, 11, 24);
+  // Cabeza con gorro y antifaz.
+  for (const [x, y] of [[2, 1], [3, 1], [4, 1], [2, 2], [3, 2], [4, 2], [3, 3]]) set(x!, y!, skin);
+  set(2, 0, 53);
+  set(3, 0, 55);
+  set(4, 0, 55);
+  set(2, 1, 55);
+  set(3, 1, 0); // antifaz
+  set(4, 1, 0);
+  set(5, 1, 0);
+  set(4, 1, 12); // ojo
+  // Saco al hombro, a la espalda.
+  set(1, 1, 47);
+  set(0, 2, 45);
+  set(1, 2, 45);
+  set(0, 3, 45);
+  set(1, 3, 46);
+  set(0, 4, 46);
+  set(1, 4, 46);
+  set(0, 5, 47);
+  set(1, 5, 47);
+  set(2, 3, skin); // mano que sujeta el saco
+  // Jersey oscuro.
+  for (let y = 4; y <= 7; y++) for (let x = 2; x <= 4; x++) set(x, y, 55);
+  for (let y = 4; y <= 7; y++) set(4, y, 26);
+  set(2, 4, 53);
+  set(3, 4, 53);
+  // Brazo delantero corriendo.
+  const swing = [0, 1, 0, -1][frame % 4]!;
+  set(5, 5 + Math.max(0, -swing), 26);
+  set(5, 6 + Math.max(0, -swing), skin);
+  // Piernas: zancada más larga que al pasear.
+  const legs = [
+    [[2, 3], [4, 3]],
+    [[1, 2], [5, 3]],
+    [[3, 3], [3, 3]],
+    [[2, 3], [5, 2]],
+  ][frame % 4]!;
+  const [[lx, ly], [rx, ry]] = legs as [[number, number], [number, number]];
+  set(3, 8, 26);
+  for (let y = 8; y < 8 + ly; y++) set(lx, y, 26);
+  for (let y = 8; y < 8 + ry; y++) set(rx, y, 15);
+  set(lx, 8 + ly, 0);
+  set(rx, 8 + ry, 0);
+  return p;
+}
+
+export const thiefSprite = (frame: number, dir: 1 | -1, tod: TimeOfDay = 'day') =>
+  sprite(`ladron-${frame}-${dir}`, () => thiefWalker(frame, dir), tod);
+
+/**
+ * Destello de aviso de 16×16 (4 fotogramas): estrella que se abre en un
+ * anillo. Usa los tonos de luz, que no se oscurecen de noche.
+ */
+export function sparkle(frame: number): Pix {
+  const p = new Pix(16, 16);
+  const f = ((frame % 4) + 4) % 4;
+  const ring = (r: number, c: number, dotted: boolean) => {
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) {
+        const d = Math.hypot(x + 0.5 - 8, y + 0.5 - 8);
+        if (Math.abs(d - r) < 0.55 && (!dotted || (x + y) % 2 === 0)) p.set(x, y, c);
+      }
+    }
+  };
+  const star = (len: number, core: number) => {
+    for (let k = 1; k <= len; k++) {
+      const c = k === len ? C.lampWarm : C.lamp;
+      p.set(8 + k - 1, 7, c);
+      p.set(7 - k + 1, 8, c);
+      p.set(7, 7 - k + 1, c);
+      p.set(8, 8 + k - 1, c);
+      p.set(7 - k + 1, 7, c);
+      p.set(8 + k - 1, 8, c);
+      p.set(8, 7 - k + 1, c);
+      p.set(7, 8 + k - 1, c);
+    }
+    p.rect(7, 7, 2, 2, core);
+  };
+  if (f === 0) star(3, C.lamp);
+  else if (f === 1) {
+    ring(4, C.lampWarm, false);
+    star(5, C.lamp);
+  } else if (f === 2) {
+    ring(6, C.lampWarm, false);
+    ring(5, 4, true);
+    star(3, C.lamp);
+    for (const [x, y] of [[3, 3], [12, 3], [3, 12], [12, 12]] as const) p.set(x, y, C.lamp);
+  } else {
+    ring(7.2, 4, true);
+    star(2, C.lampWarm);
+    for (const [x, y] of [[2, 2], [13, 2], [2, 13], [13, 13]] as const) p.set(x, y, C.lampWarm);
+  }
+  return p;
+}
+
+export const sparkleSprite = (frame: number, tod: TimeOfDay = 'day') => sprite(`destello${frame % 4}`, () => sparkle(frame), tod);
 
 /** Bocanada de humo (3 tamaños). */
 export function puff(size: number): Pix {
