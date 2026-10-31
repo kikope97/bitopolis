@@ -56,9 +56,9 @@ export const JOBS: Record<BuildingKind, number> = {
   police: 3,
   plaza: 0,
   market: 4,
-  bar: 2,
+  bar: 1,
   chapel: 0,
-  cemetery: 1,
+  cemetery: 0,
   library: 2,
   sports: 2,
   house: 0,
@@ -80,8 +80,8 @@ export const MAINTENANCE: Record<BuildingKind, number> = {
   plaza: 80,
   market: 250,
   bar: 40,
-  chapel: 60,
-  cemetery: 80,
+  chapel: 200,
+  cemetery: 150,
   library: 300,
   sports: 350,
   house: 20,
@@ -99,7 +99,7 @@ export const SERVICE: Partial<Record<BuildingKind, { radius: number; happiness: 
   plaza: { radius: 6, happiness: 8 },
   market: { radius: 8, happiness: 6 },
   // v1.7: el bar alegra el barrio (y hace ruido); la ermita, la biblioteca y el polideportivo, más lejos.
-  bar: { radius: 5, happiness: 4 },
+  bar: { radius: 5, happiness: 5 },
   chapel: { radius: 8, happiness: 3 },
   library: { radius: 8, happiness: 3 },
   sports: { radius: 8, happiness: 4 },
@@ -116,7 +116,7 @@ export const SOCIAL_PLACES = {
   /** Con cementerio, el duelo pesa menos (valencia del recuerdo «perdió a»). */
   cemeteryGrief: 0.5,
   /** Sin cementerio, quien ha perdido a alguien en el último año lo nota. */
-  noCemeteryMood: 2,
+  noCemeteryMood: 4,
 } as const;
 
 /**
@@ -284,7 +284,7 @@ export const GRANT_PENALTY = 0.1;
 export const TERRAIN = {
   bridgePerTile: 600,
   hillFactor: 1.5,
-  riverPumpBonus: 1.5,
+  riverPumpBonus: 1.25,
   waterfrontLand: 12,
   hillLand: 8,
 } as const;
@@ -300,11 +300,11 @@ export const WEATHER = {
   /** Quitanieves: euros por casilla de carretera y día de nieve. */
   snowPerRoad: 1.5,
   /** Con calor, la bomba da agua a menos edificios. */
-  heatWater: 0.75,
+  heatWater: 0.9,
   /** Felicidad que resta el calor sin un parque o plaza cerca. */
   heatMood: 3,
   /** Probabilidad de que una tormenta anegue cada edificio de la orilla del río. */
-  floodChance: 0.3,
+  floodChance: 0.12,
   /** Reparación de un edificio anegado (fracción de sus materiales). */
   floodRepair: 0.15,
 } as const;
@@ -327,4 +327,13 @@ export const ASSOCIATIONS = {
   max: 3,
   /** Socios que deciden si van a cada manifestación (el líder y los primeros). */
   deciders: 6,
+} as const;
+
+/**
+ * Campos del mapa (ronda 13: estaban escritos en fields.ts). Con 0,985 la
+ * contaminación se acumulaba hasta el tope (×67 la emisión) y no bajaba
+ * nunca: protestas perpetuas y pueblos estancados.
+ */
+export const FIELDS = {
+  pollutionDecay: 0.85,
 } as const;

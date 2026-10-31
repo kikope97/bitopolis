@@ -74,8 +74,8 @@ Monorepo pnpm + TypeScript:
 - La sesión es del dispositivo (`localStorage`), no de la pestaña.
 
 ## Geografía, tiempo y vida social (v1.7) — formato de partida 10
-- `sim/src/terrain.ts`: `map.terrain` (0 llano, 1 río, 2 mar, 3 colina); `generateTerrain` deja el centro en llano. En el río solo puentes (`roadCost`, `TERRAIN.bridgePerTile`); en el mar nada; colina con materiales ×1,5 (`buildCostAt`, `materialsCost(state, kind, x, y)`). Suelo junto al agua y en alto vale más; bomba junto al río +50 %.
-- `sim/src/weather.ts`: `state.weather` por estación (`seasonOf`); nieve (obras a la mitad, central −15 %, quitanieves), calor (bomba −25 %, sin sombra resta), tormenta (`flood`: riadas en la orilla, las paga el ayuntamiento). Un mes de gracia al empezar (`WEATHER.graceDays`).
+- `sim/src/terrain.ts`: `map.terrain` (0 llano, 1 río, 2 mar, 3 colina); `generateTerrain` deja el centro en llano. En el río solo puentes (`roadCost`, `TERRAIN.bridgePerTile`); en el mar nada; colina con materiales ×1,5 (`buildCostAt`, `materialsCost(state, kind, x, y)`). Suelo junto al agua y en alto vale más; bomba junto al río +25 % (ronda 13). Contaminación: `FIELDS.pollutionDecay` en balance.ts.
+- `sim/src/weather.ts`: `state.weather` por estación (`seasonOf`); nieve (obras a la mitad, central −15 %, quitanieves), calor (bomba −10 %, sin sombra resta), tormenta (`flood`: riadas en la orilla, las paga el ayuntamiento). Un mes de gracia al empezar (`WEATHER.graceDays`).
 - Lugares de vida social: `bar`, `chapel`, `cemetery`, `library`, `sports` (`SOCIAL_PLACES` en balance.ts): amistades en el bar, fiestas con ermita, duelo con cementerio, biblioteca para prosperar, polideportivo y salud de los mayores.
 - `sim/src/associations.ts`: asociaciones vecinales por queja compartida (`grievanceOf`), manifestación si se les ignora (detonante `protesta`, decide el líder y hasta 5 socios), `MeetAssociation` promete en 3 meses. PROMPT_VERSION 4.
 - `sim/src/coverage.ts` (propuesta del creador): `missingServices`/`coverageSummary`; capa «Qué falta» (`layers.ts`, iconos sobre cada vivienda), avisos en la ficha y en el «?».

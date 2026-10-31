@@ -1,6 +1,6 @@
 import type { GameState } from './state.ts';
 import { Tile } from './state.ts';
-import { TERRAIN } from './balance.ts';
+import { FIELDS, TERRAIN } from './balance.ts';
 import { isWater, Terrain } from './terrain.ts';
 
 /**
@@ -115,7 +115,7 @@ export function updateFields(state: GameState): void {
   }
   for (let i = 0; i < n; i++) {
     // La contaminación industrial persiste: se disipa muy despacio.
-    f.pollution[i] = clamp(f.pollution[i]! * 0.985 + emit[i]!);
+    f.pollution[i] = clamp(f.pollution[i]! * FIELDS.pollutionDecay + emit[i]!);
     f.noise[i] = clamp(noise[i]!);
     f.crime[i] = clamp(crime[i]! * (1 - Math.min(0.75, police[i]! * 0.9)));
     const x = i % w;

@@ -132,7 +132,7 @@ describe('tributos', () => {
 });
 
 describe('externalidades', () => {
-  it('la contaminación industrial persiste tras cerrar el taller; la policía baja la delincuencia', () => {
+  it('la contaminación industrial se disipa en unas semanas al cerrar el taller (ronda 13); la policía baja la delincuencia', () => {
     const s = createInitialState({ seed: 5 });
     const f = newBuilding(s, 'factory', 5, 5, -1);
     f.built = true;
@@ -142,7 +142,7 @@ describe('externalidades', () => {
     expect(high).toBeGreaterThan(50);
     s.buildings = s.buildings.filter((b) => b !== f);
     for (let d = 0; d < 30; d++) updateFields(s);
-    expect(s.fields.pollution[i]!).toBeGreaterThan(high / 3);
+    expect(s.fields.pollution[i]!).toBeLessThan(high / 3);
     // Delincuencia por densidad, reducida por la policía.
     const home = newBuilding(s, 'res', 20, 20, -1);
     home.built = true;

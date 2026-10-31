@@ -74,8 +74,8 @@ describe('elecciones (v1.0)', () => {
     const seen: string[] = [];
     for (let i = 0; i < 13 * TICKS_PER_MONTH - 24; i++) {
       step(s);
-      const e = s.events.at(-1);
-      if (e && e.tick === s.tick && e.kind === 'politics' && e.text.startsWith('Faltan')) seen.push(e.text.match(/Faltan (\d+)/)![1]!);
+      // Todos los sucesos de esta hora (otro aviso de la misma hora podía tapar el de popularidad).
+      for (const e of s.events) if (e.tick === s.tick && e.kind === 'politics' && e.text.startsWith('Faltan')) seen.push(e.text.match(/Faltan (\d+)/)![1]!);
     }
     expect([...new Set(seen)]).toEqual(['12', '6', '3', '1']);
   });
