@@ -1,5 +1,5 @@
 import type { BuildKind, Command, ZoneKind } from '@bitopolis/shared';
-import { BUILD, buildCost, type GameState, ZONE_COST_PER_TILE, ZONE_UNLOCK_POP } from '@bitopolis/sim';
+import { BUILD, buildCost, type GameState, TERRAIN, ZONE_COST_PER_TILE, ZONE_UNLOCK_POP } from '@bitopolis/sim';
 import { money } from './i18n.ts';
 
 export type ToolId =
@@ -18,6 +18,11 @@ export type ToolId =
   | 'police'
   | 'plaza'
   | 'market'
+  | 'bar'
+  | 'chapel'
+  | 'cemetery'
+  | 'library'
+  | 'sports'
   | 'demolish';
 
 export interface Tool {
@@ -46,6 +51,12 @@ export const TOOLS: Tool[] = [
   { id: 'police', label: 'Policía', shape: 'tap', build: 'police', key: 'p', help: 'Baja la delincuencia en 10 casillas.' },
   { id: 'plaza', label: 'Plaza', shape: 'tap', build: 'plaza', key: 'm', help: 'Plaza Mayor: mucha felicidad en 6 casillas. Premio del hito de 50 vecinos.' },
   { id: 'market', label: 'Mercado', shape: 'tap', build: 'market', key: 'k', help: 'Mercado municipal: empleo y felicidad en 8 casillas. Premio del hito de 200 vecinos.' },
+  // v1.7: lugares de vida social.
+  { id: 'bar', label: 'Bar', shape: 'tap', build: 'bar', key: 'b', help: 'Felicidad en 5 casillas y amistades que nacen tomando algo. Hace algo de ruido.' },
+  { id: 'chapel', label: 'Ermita', shape: 'tap', build: 'chapel', key: 'e', help: 'Felicidad en 8 casillas. Con ermita, las fiestas alegran más.' },
+  { id: 'cemetery', label: 'Cementerio', shape: 'tap', build: 'cemetery', key: 'n', help: 'Para despedir a los que se van: el duelo pesa menos. Sin él, se nota.' },
+  { id: 'library', label: 'Biblioteca', shape: 'tap', build: 'library', key: 'y', help: 'Felicidad en 8 casillas; más aún para quien quiere prosperar.' },
+  { id: 'sports', label: 'Polideportivo', shape: 'tap', build: 'sports', key: 'g', help: 'Felicidad en 8 casillas; los mayores de cerca viven más.' },
   { id: 'dezone', label: 'Sin zona', shape: 'rect', zone: 'none', key: 'z', help: 'Quita la zona (no derriba lo construido).' },
   { id: 'demolish', label: 'Derribar', shape: 'tap', key: 'x', help: 'Derriba un edificio o una carretera. Pide confirmación.' },
 ];
@@ -74,11 +85,12 @@ export const TRAY: { title: string; tools: ToolId[] }[] = [
   { title: 'Lo básico', tools: ['house', 'water', 'power'] },
   { title: 'Zonas (los vecinos construyen)', tools: ['zoneR', 'zoneC', 'zoneI', 'dezone'] },
   { title: 'Servicios', tools: ['park', 'school', 'clinic', 'police'] },
+  { title: 'Vida social', tools: ['bar', 'chapel', 'cemetery', 'library', 'sports'] },
   { title: 'Premios de los hitos', tools: ['plaza', 'market'] },
 ];
 
 export function costText(tool: Tool): string {
-  if (tool.build === 'road') return `${money(BUILD.road.materials)} por casilla`;
+  if (tool.build === 'road') return `${money(BUILD.road.materials)} por casilla (puente sobre el río: ${money(TERRAIN.bridgePerTile)})`;
   if (tool.build) {
     const s = BUILD[tool.build];
     return `${money(s.materials)} + obra (${s.workers} obreros × ${s.days} días, hasta ${money(buildCost(tool.build))})`;

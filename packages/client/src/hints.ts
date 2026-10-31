@@ -1,4 +1,4 @@
-import { type GameState, ZONE_UNLOCK_POP, freeHomes, taxLevels } from '@bitopolis/sim';
+import { coverageSummary, type GameState, NEED_LABEL, ZONE_UNLOCK_POP, freeHomes, taxLevels } from '@bitopolis/sim';
 import type { ToolId } from './tools.ts';
 
 export interface Hint {
@@ -25,6 +25,18 @@ export function nextHint(state: GameState): Hint {
   const unserved = state.buildings.filter((b) => b.built && b.kind !== 'water' && b.kind !== 'power' && (!b.hasWater || !b.hasPower));
   if (unserved.length > 0) {
     return { text: `${unserved.length} edificio(s) sin agua o luz (icono de gota o rayo). Conéctalos con carretera a las plantas, o construye otra si están llenas.` };
+  }
+  // v1.7: el servicio que falta en más viviendas (la capa «Qué falta» lo enseña casa por casa).
+  const TOOL: Record<string, ToolId> = { colegio: 'school', salud: 'clinic', policia: 'police', ocio: 'park' };
+  const gap = coverageSummary(state)
+    .filter((r) => TOOL[r.key] && r.falta + r.lleno >= 3)
+    .sort((a, b) => b.falta + b.lleno - (a.falta + a.lleno))[0];
+  if (gap) {
+    const n = gap.falta + gap.lleno;
+    return {
+      text: `${n} viviendas no tienen ${NEED_LABEL[gap.key]}${gap.lleno && !gap.falta ? ' con sitio libre (está lleno)' : ' cerca'}. Constrúyelo donde más falta: mira la capa «Qué falta».`,
+      tool: TOOL[gap.key],
+    };
   }
   if (pop < ZONE_UNLOCK_POP) {
     if (freeHomes(state) === 0 && !state.projects.some((p) => p.payer === 0)) {

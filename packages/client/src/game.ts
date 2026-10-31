@@ -1,14 +1,23 @@
 import { tickToDate, type Command } from '@bitopolis/shared';
 import {
-  BUILD,
   BUILD_NAMES,
   type Building,
   salePrice,
   unitValue,
   type GameEvent,
   type GameState,
+  coverageSummary,
+  SEASON_TEXT,
+  seasonOf,
+  WEATHER_TEXT,
   happinessFactors,
+  missingServices,
+  NEED_LABEL,
   occupants,
+  roadCost,
+  zoneChanges,
+  Terrain,
+  terrainAt,
   Tile,
   validateCommand,
   ZONE_COST_PER_TILE,
@@ -16,8 +25,9 @@ import {
 } from '@bitopolis/sim';
 import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
 import { openNeighbours, openReport, openTaxes as openTaxesSheet } from './economy-ui.ts';
-import { LAYERS, type LayerId } from './layers.ts';
+import { LAYERS, type LayerId, NEED_ICON } from './layers.ts';
 import { openTownHall } from './civic-ui.ts';
+import { openAlbum, snapMoments } from './album-ui.ts';
 import { objectivesNode, openAdvisor, openCitizen, openDiary, openPleno, portraitCanvas, rememberSeen, renderObjectives, resumeSummary, type SocialCtx } from './social-ui.ts';
 import { api, ApiError } from './api.ts';
 import { nextHint } from './hints.ts';
@@ -233,7 +243,11 @@ export function startGame(opts: GameOptions): void {
   $('#hud-happy').replaceChildren(pixelIcon('smile'), happyText);
   let lastStats = state.stats.length;
   let lastPop = state.citizens.length;
+  const albumSeen = { n: state.album?.length ?? 0 };
   function onState() {
+    // v1.7: foto de cada momento nuevo del álbum (en este navegador).
+    snapMoments(token, state, albumSeen);
+    if (layer === 'missing' && Math.floor(state.tick / 24) !== legendDay) missingLegend();
     // Ronda 12: al llegar a 10 vecinos, un momento de desbloqueo que lleva a la bandeja.
     if (lastPop < ZONE_UNLOCK_POP && state.citizens.length >= ZONE_UNLOCK_POP) {
       sfx.milestone();
@@ -259,6 +273,17 @@ export function startGame(opts: GameOptions): void {
     const d = tickToDate(state.tick);
     $('#hud-date').textContent = shortDate(d);
     $('#hud-date').setAttribute('aria-label', formatDate(d));
+    // v1.7: el tiempo de hoy junto a la fecha (icono y, en pantallas anchas, el nombre).
+    const wk = state.weather?.kind ?? 'sol';
+    const wEl = $('#hud-weather');
+    if (wEl.dataset.kind !== wk) {
+      wEl.dataset.kind = wk;
+      const icon = { sol: 'sun', nubes: 'rain', lluvia: 'rain', tormenta: 'storm', nieve: 'snow', calor: 'heat' }[wk];
+      wEl.replaceChildren(...(wk === 'nubes' ? [] : [pixelIcon(icon)]), h('span', { class: 'weather-name' }, WEATHER_TEXT[wk]));
+      wEl.setAttribute('aria-label', `${SEASON_TEXT[seasonOf(d.month)]}: ${WEATHER_TEXT[wk].toLowerCase()}`);
+    }
+    // El botón de la franja lleva su propio nombre: incluye la fecha y el tiempo (ronda 13).
+    $('#strip-info').setAttribute('aria-label', `${formatDate(d)}, ${WEATHER_TEXT[wk].toLowerCase()}. Ver qué pide el pueblo`);
     if (d.hour === 0 || dayAgoTreasury.length === 0) {
       dayAgoTreasury.push(state.treasury);
       if (dayAgoTreasury.length > 2) dayAgoTreasury.shift();
@@ -412,6 +437,24 @@ export function startGame(opts: GameOptions): void {
         const decide = /Responde antes|puedes organizarlas/.test(e.text);
         if (decide && speed >= 3) setSpeed(1);
         toast(e.text, { kind: 'info', sticky: decide, onClick: () => openTownHall(social, /fiestas/i.test(e.text) ? 'festival' : 'grants') });
+      } else if (e.kind === 'info' && /^(Nieva|Ola de calor|Tormenta sobre|El río crece)/.test(e.text)) {
+        // v1.7: el tiempo que cambia algo (no el sol ni las nubes).
+        toast(e.text, { kind: 'info' });
+      } else if (e.kind === 'info' && e.text.startsWith('El río se desborda')) {
+        sfx.warn();
+        vibrate(80);
+        calmPause();
+        toast(e.text, { kind: 'warn', sticky: true, onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+      } else if (e.kind === 'protest') {
+        sfx.warn();
+        duck(1.5);
+        calmPause();
+        toast(e.text, { kind: 'warn', sticky: true, onClick: () => openTownHall(social, 'associations') });
+      } else if (e.kind === 'politics' && /Asociación|asociación/.test(e.text)) {
+        // v1.7: asociaciones. Si convocan una manifestación, hay 3 días para reunirse con ellos: baja a x1.
+        const urgent = e.text.includes('convoca una manifestación');
+        if (urgent && speed >= 3) setSpeed(1);
+        toast(e.text, { kind: urgent ? 'warn' : 'info', sticky: urgent || e.text.startsWith('Nace'), onClick: () => openTownHall(social, 'associations') });
       } else if (e.kind === 'politics' && /presupuesto/i.test(e.text)) {
         const decide = e.text.startsWith('Toca presentar');
         if (decide && speed >= 3) setSpeed(1);
@@ -764,7 +807,8 @@ export function startGame(opts: GameOptions): void {
     if (tool.id === 'demolish') {
       // v1.6: se confirma en la franja de abajo, en rojo (antes, una ventana que tapaba el mapa).
       const b = state.buildings.find((x) => x.x === tile.x && x.y === tile.y);
-      const what = b ? (b.name ?? BUILD_NAMES[b.kind]) : state.map.tiles[tile.y * state.map.w + tile.x] === Tile.Road ? 'Carretera' : null;
+      const onRiver = terrainAt(state, tile.x, tile.y) === Terrain.River;
+      const what = b ? (b.name ?? BUILD_NAMES[b.kind]) : state.map.tiles[tile.y * state.map.w + tile.x] === Tile.Road ? (onRiver ? 'Puente' : 'Carretera') : null;
       if (!what) {
         $('#tool-info').replaceChildren(h('b', {}, 'Derribar'), ': ahí no hay nada que derribar. Toca un edificio o una carretera.');
         return refreshStrip();
@@ -797,11 +841,9 @@ export function startGame(opts: GameOptions): void {
       if (!pendingEnd || pendingEnd.x !== tile.x || pendingEnd.y !== tile.y) {
         pendingEnd = tile;
         preview = previewFor(anchor, tile);
-        const n = tilesOf(line).length;
-        const cost = n * (tool.zone ? ZONE_COST_PER_TILE : BUILD.road.materials);
         const v = validateCommand(state, line);
         const msg = v.ok
-          ? `${tool.label}: ${plural(n, 'casilla', 'casillas')}, ${money(cost)}. Toca otra vez el final para confirmar.`
+          ? `${tool.label}: ${lineText(anchor, tile)}. Toca otra vez el final para confirmar.`
           : `${tool.label}: no se puede (${v.error}). Elige otro final o pulsa Esc.`;
         $('#tool-info').textContent = msg;
         refreshStrip();
@@ -824,6 +866,31 @@ export function startGame(opts: GameOptions): void {
     if (cmd) await command(cmd);
   }
 
+  /**
+   * Lo que cuesta un trazo, en palabras. Zonas: solo las casillas que cambian
+   * (lo mismo que cobra el motor; las ocupadas se saltan y se dice cuántas).
+   * Carretera: las casillas nuevas, con los puentes aparte.
+   */
+  function lineText(a: { x: number; y: number }, b: { x: number; y: number }): string {
+    const cmd = commandFor(tool, a, b);
+    if (!cmd) return '';
+    if (cmd.type === 'Zone') {
+      const { changed, skipped } = zoneChanges(state, cmd);
+      if (cmd.zone === 'none') return `${plural(changed, 'casilla', 'casillas')}, gratis`;
+      return `${plural(changed, 'casilla', 'casillas')}, ${money(changed * ZONE_COST_PER_TILE)}${skipped ? ` (no se cobran ${skipped} ocupadas o ya marcadas; los árboles sí, se talan al construir)` : ''}`;
+    }
+    const n = tilesOf(cmd).filter((t) => state.map.tiles[t.y * state.map.w + t.x] !== Tile.Road && !state.buildings.some((q) => q.x === t.x && q.y === t.y)).length;
+    const bridges = bridgeTiles(a, b);
+    return `${plural(n, 'casilla nueva', 'casillas nuevas')}, ${money(lineCost(a, b))}${bridges ? ` (con puente de ${plural(bridges, 'casilla', 'casillas')})` : ''}`;
+  }
+
+  /** Coste de un tramo de carretera (los puentes, más caros) y cuántas casillas son puente (v1.7). */
+  const lineCost = (a: { x: number; y: number }, b: { x: number; y: number }) => roadCost(state, a.x, a.y, b.x, b.y);
+  function bridgeTiles(a: { x: number; y: number }, b: { x: number; y: number }) {
+    const cmd = commandFor(tool, a, b);
+    return cmd ? tilesOf(cmd).filter((t) => terrainAt(state, t.x, t.y) === Terrain.River && state.map.tiles[t.y * state.map.w + t.x] !== Tile.Road).length : 0;
+  }
+
   /** Enseña la obra (fantasma) y la barra «Construir / ✕». Nada se gasta hasta confirmar. */
   function proposePlace(a: { x: number; y: number }, b: { x: number; y: number }, demolishText?: string) {
     const cmd = commandFor(tool, a, b);
@@ -834,10 +901,11 @@ export function startGame(opts: GameOptions): void {
     pendingEnd = null;
     preview = previewFor(a, b);
     const v = validateCommand(state, cmd);
-    const n = tilesOf(cmd).length;
-    const cost = tool.build && tool.shape === 'tap' ? shortCost(tool) : `${plural(n, 'casilla', 'casillas')}, ${money(n * (tool.zone ? ZONE_COST_PER_TILE : BUILD.road.materials))}`;
-    const msg = demolishText && v.ok ? demolishText : v.ok ? `${tool.label} aquí${cost ? ` · ${cost}` : ''}` : `${tool.label}: no se puede (${v.error})`;
-    $('#confirm-text').textContent = msg;
+    const hill = tool.build && tool.shape === 'tap' && terrainAt(state, a.x, a.y) === Terrain.Hill;
+    const cost = tool.build && tool.shape === 'tap' ? `${shortCost(tool)}${hill ? ' (colina: materiales +50 %)' : ''}` : lineText(a, b);
+    // Ronda 13: el precio va en su propia línea y siempre se ve (también si no se puede: «no hay dinero»).
+    const what = demolishText && v.ok ? demolishText : v.ok ? `${tool.label} aquí` : `${tool.label}: no se puede (${v.error})`;
+    $('#confirm-text').replaceChildren(h('span', { class: 'cc-what' }, what), demolishText || !cost ? '' : h('span', { class: 'cc-cost' }, v.ok ? cost : `Cuesta ${cost}`));
     const yes = $('#confirm-yes') as HTMLButtonElement;
     yes.textContent = demolishText ? 'Derribar' : tool.zone ? (tool.zone === 'none' ? 'Quitar zona' : 'Marcar zona') : 'Construir';
     yes.className = demolishText ? 'btn danger' : 'btn primary';
@@ -859,6 +927,8 @@ export function startGame(opts: GameOptions): void {
     if (!p) return;
     const cmd = commandFor(tool, p.a, p.b);
     if (cmd) await command(cmd);
+    // Tras una carretera o zona, la franja vuelve a la ayuda de la herramienta (no a «toca dónde termina»).
+    if (tool.shape !== 'tap') selectTool(tool.id);
   }
 
   function cancelAnchor() {
@@ -887,7 +957,13 @@ export function startGame(opts: GameOptions): void {
   function describeTile(t: { x: number; y: number }): string {
     const b = state.buildings.find((x) => x.x === t.x && x.y === t.y);
     const i = t.y * state.map.w + t.x;
-    const what = b ? (b.name ?? BUILD_NAMES[b.kind] ?? b.kind) : state.map.tiles[i] === Tile.Road ? 'carretera' : state.map.tiles[i] === Tile.Tree ? 'árboles' : 'solar libre';
+    const ter = state.map.terrain?.[i] ?? 0;
+    const road = state.map.tiles[i] === Tile.Road;
+    const what = b
+      ? (b.name ?? BUILD_NAMES[b.kind] ?? b.kind)
+      : road
+        ? ter === Terrain.River ? 'puente' : 'carretera'
+        : ter === Terrain.River ? 'río' : ter === Terrain.Sea ? 'mar' : state.map.tiles[i] === Tile.Tree ? 'árboles' : ter === Terrain.Hill ? 'colina' : 'solar libre';
     const zone = ['', ', zona residencial', ', zona comercial', ', zona industrial'][state.map.zones[i] ?? 0] ?? '';
     let can = '';
     if (tool.id !== 'inspect') {
@@ -942,7 +1018,7 @@ export function startGame(opts: GameOptions): void {
     else if (k.toLowerCase() === 'o') openSettings();
     else if (k === ' ' && target.tagName !== 'BUTTON') {
       e.preventDefault();
-      setSpeed(speed === 0 ? 1 : 0);
+      userSpeed(speed === 0 ? lastSpeed : 0);
     } else if (k === 'Escape') {
       if (!tray.hidden) closeTray();
       else if (isSheetOpen()) closeSheet();
@@ -1169,7 +1245,11 @@ export function startGame(opts: GameOptions): void {
     if (!b) {
       const z = state.map.zones[tile.y * state.map.w + tile.x];
       const tt = state.map.tiles[tile.y * state.map.w + tile.x];
-      const name = tt === Tile.Road ? 'Carretera' : tt === Tile.Tree ? 'Árboles' : 'Solar';
+      const ter = state.map.terrain?.[tile.y * state.map.w + tile.x] ?? 0;
+      const name =
+        tt === Tile.Road
+          ? ter === Terrain.River ? 'Puente' : 'Carretera'
+          : ter === Terrain.River ? 'Río' : ter === Terrain.Sea ? 'Mar' : tt === Tile.Tree ? 'Árboles' : ter === Terrain.Hill ? 'Colina' : 'Solar';
       const zone = z ? `Zona ${['', 'residencial (R)', 'comercial (C)', 'industrial (I)'][z]}` : 'Sin zona';
       sheet(name, h('p', {}, zone), h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`)).classList.add('half');
       openInspect = null;
@@ -1206,6 +1286,13 @@ export function startGame(opts: GameOptions): void {
       }
       if (b.kind === 'house' || b.kind === 'res' || b.kind === 'shop' || b.kind === 'factory') {
         pills.push(h('span', { class: 'pill' }, `${money(unitValue(state, b))}${b.kind === 'house' || b.kind === 'res' ? '/vivienda' : ''}`));
+      }
+      // v1.7: qué servicio le falta a esta vivienda (o lo tiene lleno).
+      if (b.kind === 'house' || b.kind === 'res') {
+        for (const n of missingServices(state, b.x, b.y)) {
+          if (n.key === 'agua' || n.key === 'luz') continue;
+          pills.push(h('span', { class: `pill ${n.status === 'falta' ? 'bad' : 'warn'}` }, `${n.status === 'falta' ? 'Sin' : 'Lleno:'} ${NEED_LABEL[n.key]}`));
+        }
       }
       if (pills.length) content.push(h('div', { class: 'status-row' }, ...pills));
       const res = occupants(state, b);
@@ -1296,6 +1383,9 @@ export function startGame(opts: GameOptions): void {
     const offers = state.grants.filter((g) => g.status === 'offered').length;
     const townSum: string[] = [budgetOpen ? `Presupuesto ${d.year} por aprobar` : `Presupuesto ${state.budget.plan}`];
     if (offers) townSum.push(plural(offers, 'subvención por responder', 'subvenciones por responder'));
+    const assocs = state.associations ?? [];
+    const protest = assocs.some((a) => a.protestDay >= 0);
+    if (assocs.length) townSum.push(protest ? 'manifestación convocada' : plural(assocs.length, 'asociación vecinal', 'asociaciones vecinales'));
     sheet(
       'Pueblo',
       card(
@@ -1309,7 +1399,7 @@ export function startGame(opts: GameOptions): void {
         'build',
         'Ayuntamiento',
         [townSum.join(' · ')],
-        item('Presupuesto y fiestas', go(() => openTownHall(social)), budgetOpen || offers > 0),
+        item('Presupuesto y fiestas', go(() => openTownHall(social)), budgetOpen || offers > 0 || protest),
         item('Pleno municipal', go(() => openPleno(social))),
         item('Política y elecciones', go(() => openPolitics(social))),
         item('Consejero', go(() => openAdvisor(social))),
@@ -1321,6 +1411,7 @@ export function startGame(opts: GameOptions): void {
         item('Vecinos', go(openPeople)),
         item('Felicidad', go(openHappiness)),
         item('Diario del pueblo', go(() => openDiary(social))),
+        item('Álbum del pueblo', go(() => openAlbum(social))),
       ),
       h('section', { class: 'hub-card' }, h('h3', {}, pixelIcon('smile'), 'Objetivos'), objectivesNode(state)),
       ...(state.aiMode
@@ -1404,12 +1495,40 @@ export function startGame(opts: GameOptions): void {
     const def = LAYERS.find((l) => l.id === layer)!;
     const legend = $('#legend');
     legend.hidden = layer === 'none';
-    legend.replaceChildren(h('strong', {}, def.label), ...def.legend.map((x) => h('span', { class: `legend-item ${x.cls}` }, x.text)));
+    if (layer === 'missing') missingLegend();
+    else legend.replaceChildren(h('strong', {}, def.label), ...def.legend.map((x) => h('span', { class: `legend-item ${x.cls}` }, x.text)));
     const chip = $('#layers');
     chip.querySelector('.chip-text')!.textContent = layer === 'none' ? 'Capas' : def.label;
     chip.setAttribute('aria-label', `Capas de datos: ${def.label}. Cambiar`);
     chip.setAttribute('aria-pressed', String(layer !== 'none'));
     $('#sr-live').textContent = layer === 'none' ? 'Capas desactivadas' : `Capa activa: ${def.label}`;
+  }
+  /** Leyenda de «Qué falta»: cuántas viviendas (y solares R) carecen de cada servicio. */
+  let legendDay = -1;
+  let legendFolded = false;
+  function missingLegend() {
+    legendDay = Math.floor(state.tick / 24);
+    // Ronda 13: ordenada por lo que más falta, con «Construir» al lado; plegable para ver el mapa.
+    const sum = coverageSummary(state).sort((a, b) => b.falta - a.falta || b.lleno - a.lleno);
+    const TOOL_FOR: Record<string, ToolId> = { agua: 'water', luz: 'power', colegio: 'school', salud: 'clinic', policia: 'police', ocio: 'park' };
+    const rows = sum.map((r) => {
+      const name = `${NEED_LABEL[r.key][0]!.toUpperCase()}${NEED_LABEL[r.key].slice(1)}`;
+      const count = r.falta ? `falta en ${plural(r.falta, 'casa', 'casas')}` : `lleno en ${plural(r.lleno, 'casa', 'casas')}`;
+      const go = h('button', { class: 'legend-go', 'aria-label': `Construir: ${NEED_LABEL[r.key]}` }, 'Construir');
+      go.addEventListener('click', () => selectTool(TOOL_FOR[r.key]!));
+      return h('span', { class: 'legend-need' }, pixelIcon(NEED_ICON[r.key]), h('span', { class: 'legend-text' }, `${name}: ${count}`), go);
+    });
+    const head = h('button', { class: 'legend-head', 'aria-expanded': String(!legendFolded) }, h('strong', {}, 'Qué falta'), h('span', { 'aria-hidden': 'true' }, legendFolded ? ' ▸' : ' ▾'));
+    head.addEventListener('click', () => {
+      legendFolded = !legendFolded;
+      missingLegend();
+    });
+    $('#legend').classList.toggle('folded', legendFolded);
+    $('#legend').replaceChildren(
+      head,
+      ...(legendFolded ? [] : rows.length ? rows : [h('span', {}, 'A ninguna vivienda le falta nada.')]),
+      ...(legendFolded ? [] : [h('span', { class: 'legend-note' }, 'Marco rojo: falta. Amarillo a trazos: llega, pero está lleno. Un icono por casa: lo que más falta.')]),
+    );
   }
   function openLayers() {
     const list = h('div', { class: 'radio-list compact', role: 'radiogroup', 'aria-label': 'Capa' });
@@ -1447,6 +1566,29 @@ export function startGame(opts: GameOptions): void {
   }
 
   /* ---------- velocidad y ciclo de vida ---------- */
+  /**
+   * v1.7.0: la velocidad que dejó el jugador se recuerda (por partida, en este
+   * navegador). Solo cuentan sus decisiones (▶/❚❚, la velocidad, la barra
+   * espaciadora), no las pausas automáticas al cambiar de pestaña o salir.
+   */
+  const speedKey = `bitopolis.speed.${token}`;
+  function savedSpeed(): number {
+    try {
+      const v = Number(localStorage.getItem(speedKey) ?? '0');
+      return [0, 1, 3, 10].includes(v) ? v : 0;
+    } catch {
+      return 0;
+    }
+  }
+  function userSpeed(s: number) {
+    setSpeed(s);
+    try {
+      localStorage.setItem(speedKey, String(speed));
+    } catch {
+      /* sin almacenamiento: empezará en pausa */
+    }
+  }
+
   function setSpeed(s: number) {
     if (lost && s > 0) return;
     // Modo tranquilo: como mucho x1.
@@ -1486,6 +1628,9 @@ export function startGame(opts: GameOptions): void {
     if (document.hidden) {
       setSpeed(0);
       send({ type: 'flush' });
+    } else if (speed === 0 && !lost && !isSheetOpen() && savedSpeed() > 0) {
+      // Al volver a la pestaña, sigue como lo dejó el jugador.
+      setSpeed(savedSpeed());
     }
   };
   const onPageHide = () => {
@@ -1536,11 +1681,11 @@ export function startGame(opts: GameOptions): void {
     }, 150);
   }
 
-  $('#play-pause').onclick = () => setSpeed(speed === 0 ? lastSpeed : 0);
+  $('#play-pause').onclick = () => userSpeed(speed === 0 ? lastSpeed : 0);
   $('#speed').onclick = () => {
-    if (prefs().calm) return setSpeed(1);
+    if (prefs().calm) return userSpeed(1);
     const next = ({ 1: 3, 3: 10, 10: 1 } as Record<number, number>)[lastSpeed] ?? 1;
-    setSpeed(next);
+    userSpeed(next);
   };
   paintSpeed();
   $('#layers').onclick = openLayers;
@@ -1592,14 +1737,17 @@ export function startGame(opts: GameOptions): void {
   resize();
   frameTown();
   selectTool('inspect');
-  setSpeed(0);
+  // Si lo dejó en marcha, sigue en marcha (con la misma velocidad).
+  const resume = savedSpeed();
+  if (resume > 0) lastSpeed = resume;
+  setSpeed(resume);
   onState();
   refreshStrip();
   const away = resumeSummary(token, state);
   if (away && away.length) toast(`Desde tu última visita: ${away.join(' · ')}`, { sticky: true });
   tutorial.start(state);
   tutorial.update(state, tool.id);
-  if (!tutorial.active) toast(`En pausa. Pulsa ▶ (${matchMedia('(orientation: landscape) and (max-height: 500px)').matches ? 'arriba' : 'arriba a la izquierda'}) para que pase el tiempo.`);
+  if (!tutorial.active && resume === 0) toast(`En pausa. Pulsa ▶ (${matchMedia('(orientation: landscape) and (max-height: 500px)').matches ? 'arriba' : 'arriba a la izquierda'}) para que pase el tiempo.`);
   // Sonido: se desbloquea con el primer gesto; el ambiente sigue la hora del juego.
   const unlock = () => unlockAudio();
   window.addEventListener('pointerdown', unlock, { once: true });

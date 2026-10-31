@@ -1,4 +1,4 @@
-import { type GameState, SERVICE } from '@bitopolis/sim';
+import { coverageCtx, type GameState, homeSites, missingServices, type CoverageNeed, type NeedKey, SERVICE } from '@bitopolis/sim';
 import { PALETTE } from './palette.ts';
 import { prefs } from './prefs.ts';
 import { T } from './sprites.ts';
@@ -8,7 +8,7 @@ import { T } from './sprites.ts';
  * servicios y contaminación. Cada nivel usa una trama distinta además del
  * color, para que el color nunca sea la única señal.
  */
-export type LayerId = 'none' | 'happiness' | 'land' | 'services' | 'pollution';
+export type LayerId = 'none' | 'missing' | 'happiness' | 'land' | 'services' | 'pollution';
 
 interface LayerDef {
   id: LayerId;
@@ -32,6 +32,8 @@ function levelColor(colors: [number, number, number, number], lv: number): numbe
 
 export const LAYERS: LayerDef[] = [
   { id: 'none', label: 'Sin capa', colors: GOOD, legend: [] },
+  // v1.7 (propuesta del creador): en cada vivienda y solar R, qué servicio le falta.
+  { id: 'missing', label: 'Qué falta', colors: GOOD, legend: legend(['Faltan 3 o más', 'Faltan 2', 'Falta 1', 'Nada'], 'good') },
   { id: 'happiness', label: 'Felicidad de los vecinos', colors: GOOD, legend: legend(['Muy baja', 'Baja', 'Alta', 'Muy alta'], 'good') },
   { id: 'land', label: 'Valor del suelo', colors: GOOD, legend: legend(['Muy bajo', 'Bajo', 'Alto', 'Muy alto'], 'good') },
   { id: 'services', label: 'Cobertura de servicios', colors: GOOD, legend: legend(['Ninguno', '1 servicio', '2 servicios', '3 o más'], 'good') },
@@ -47,6 +49,14 @@ function values(state: GameState, layer: LayerId): (number | null)[] {
   const n = w * h;
   if (layer === 'land') return state.fields.land;
   if (layer === 'pollution') return state.fields.pollution.map((v) => (v < 3 ? null : v));
+  if (layer === 'missing') {
+    const out: (number | null)[] = new Array(n).fill(null);
+    for (const m of missingMarks(state)) {
+      const weight = m.needs.reduce((a, x) => a + (x.status === 'falta' ? 1 : 0.5), 0);
+      out[m.y * w + m.x] = weight === 0 ? 100 : weight <= 1 ? 60 : weight <= 2 ? 30 : 0;
+    }
+    return out;
+  }
   if (layer === 'services') {
     const kinds: Set<string>[] = Array.from({ length: n }, () => new Set());
     for (const b of state.buildings) {
@@ -125,4 +135,24 @@ export function happinessMarks(state: GameState): { x: number; y: number; lv: nu
     out.push({ x: i % w, y: Math.floor(i / w), lv, color: levelColor(GOOD, lv) });
   });
   return out;
+}
+
+/** Icono de cada necesidad (icons.ts). */
+export const NEED_ICON: Record<NeedKey, string> = { agua: 'drop', luz: 'bolt', colegio: 'school', salud: 'health', policia: 'police', ocio: 'leaf' };
+
+let marksCache: { key: string; marks: { x: number; y: number; needs: CoverageNeed[] }[] } | null = null;
+/** Lo que falta en cada vivienda o solar R (se rehace cada día de juego y al construir). */
+export function missingMarks(state: GameState): { x: number; y: number; needs: CoverageNeed[] }[] {
+  const key = `${Math.floor(state.tick / 24)}:${state.buildings.length}:${state.buildings.filter((b) => b.built).length}`;
+  if (marksCache?.key === key) return marksCache.marks;
+  const ctx = coverageCtx(state);
+  const raw = homeSites(state).map((s) => ({ ...s, needs: missingServices(state, s.x, s.y, ctx) }));
+  // Ronda 13: primero lo que falta (no lo lleno) y, entre eso, lo que falta en más casas del pueblo:
+  // así el icono de cada casa señala la misma prioridad que la leyenda.
+  const count = new Map<string, number>();
+  for (const m of raw) for (const n of m.needs) if (n.status === 'falta') count.set(n.key, (count.get(n.key) ?? 0) + 1);
+  const rank = (n: CoverageNeed) => (n.key === 'agua' || n.key === 'luz' ? -1e6 : 0) + (n.status === 'falta' ? -1000 - (count.get(n.key) ?? 0) : 0);
+  const marks = raw.map((m) => ({ ...m, needs: [...m.needs].sort((a, b) => rank(a) - rank(b)) }));
+  marksCache = { key, marks };
+  return marks;
 }

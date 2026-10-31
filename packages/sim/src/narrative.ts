@@ -73,7 +73,7 @@ export interface DiaryEntry {
   lines: string[];
 }
 
-const DIARY_KINDS = new Set(['arrival', 'departure', 'built', 'business', 'decision', 'milestone', 'bankrupt', 'tax', 'info', 'politics', 'election']);
+const DIARY_KINDS = new Set(['arrival', 'departure', 'built', 'business', 'decision', 'milestone', 'bankrupt', 'tax', 'info', 'politics', 'election', 'protest']);
 
 export function diary(state: GameState, maxDays = 12): DiaryEntry[] {
   const byDay = new Map<number, GameEvent[]>();

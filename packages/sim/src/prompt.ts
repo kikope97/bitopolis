@@ -1,4 +1,5 @@
 import { COMMON_NAMES, FIRST_NAMES, SURNAMES } from './names.ts';
+import { CAUSE_ASK, protestFor } from './associations.ts';
 import { tickToDate } from '@bitopolis/shared';
 import { z } from 'zod';
 import { ACTION_LABELS, cleanMotivo, MOTIVO_MAX } from './decisions.ts';
@@ -15,7 +16,7 @@ import { daysToElection, FACTION_TEXT, factionOf, politicsActive } from './polit
  * - Salida estructurada con enum de acciones válidas; se valida con zod.
  */
 
-export const PROMPT_VERSION = 3;
+export const PROMPT_VERSION = 4;
 
 export const SYSTEM_PROMPT = `Eres el narrador de Bitópolis, un pueblo español pequeño. Interpretas a vecinos con nombre que toman UNA decisión cada uno.
 
@@ -51,6 +52,7 @@ const TRIGGER_TEXT: Record<string, string> = {
   comprar_casa: 'podría comprar la vivienda en la que vive de alquiler',
   emprender: 'tiene ahorros y hay un local comercial libre',
   elecciones: 'hay elecciones municipales en unos días y decide su voto (secreto)',
+  protesta: 'su asociación de vecinos convoca una manifestación ante el ayuntamiento y decide si va'
 };
 
 const band = (n: number, cuts: number[], names: string[]) => names[cuts.findIndex((c) => n < c) === -1 ? names.length - 1 : cuts.findIndex((c) => n < c)]!;
@@ -64,7 +66,7 @@ function townSummary(state: GameState) {
     impuestos: state.taxesSplit ? Object.fromEntries(Object.entries(state.taxes).map(([k, v]) => [k, { low: 'bajo', medium: 'medio', high: 'alto' }[v]])) : { low: 'bajos', medium: 'medios', high: 'altos' }[state.taxLevel],
     felicidad_media: Math.round(averageHappiness(state)),
     caja_ayuntamiento: band(state.treasury, [0, 5_000, 30_000], ['en deuda', 'justa', 'normal', 'holgada']),
-    servicios: ['water', 'power', 'park', 'school', 'clinic', 'shop', 'factory'].filter((k) => kinds.has(k as never)).map((k) => BUILD_NAMES[k]!.toLowerCase()),
+    servicios: ['water', 'power', 'park', 'school', 'clinic', 'police', 'bar', 'chapel', 'cemetery', 'library', 'sports', 'shop', 'factory'].filter((k) => kinds.has(k as never)).map((k) => BUILD_NAMES[k]!.toLowerCase()),
     ...(politicsActive(state) ? { politica: politicsView(state) } : {}),
   };
 }
@@ -143,6 +145,9 @@ function citizenView(state: GameState, c: Citizen, p: Pending) {
     recuerdos: [...c.memories].sort((a, b) => b.importance - a.importance).slice(0, 3).map((m) => memoryText(state, m)),
     gancho: hookFor(state, c.id) ? HOOK_TEXT[hookFor(state, c.id)!.kind] : null,
     situacion: TRIGGER_TEXT[p.trigger],
+    ...(p.trigger === 'protesta' && protestFor(state, c)
+      ? { asociacion: { piden: CAUSE_ASK[protestFor(state, c)!.cause], es_lider: protestFor(state, c)!.leaderId === c.id, socios: protestFor(state, c)!.members.length } }
+      : {}),
     acciones: p.actions.map((a) => {
       const [v, arg] = a.split(':');
       if (v === 'aceptar_trabajo') {

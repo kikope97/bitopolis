@@ -74,8 +74,8 @@ describe('elecciones (v1.0)', () => {
     const seen: string[] = [];
     for (let i = 0; i < 13 * TICKS_PER_MONTH - 24; i++) {
       step(s);
-      const e = s.events.at(-1);
-      if (e && e.tick === s.tick && e.kind === 'politics' && e.text.startsWith('Faltan')) seen.push(e.text.match(/Faltan (\d+)/)![1]!);
+      // Todos los sucesos de esta hora (otro aviso de la misma hora podía tapar el de popularidad).
+      for (const e of s.events) if (e.tick === s.tick && e.kind === 'politics' && e.text.startsWith('Faltan')) seen.push(e.text.match(/Faltan (\d+)/)![1]!);
     }
     expect([...new Set(seen)]).toEqual(['12', '6', '3', '1']);
   });
@@ -83,7 +83,10 @@ describe('elecciones (v1.0)', () => {
   it('la campaña mueve el voto de su facción, una vez al mes', () => {
     const s = town();
     s.politics.nextElection = s.tick + 6 * TICKS_PER_MONTH;
-    const f = factionOf(s, s.citizens[0]!);
+    // La facción con más vecinos: en una pequeña, el efecto puede no mover el porcentaje redondeado.
+    const count = new Map<string, number>();
+    for (const c of s.citizens) count.set(factionOf(s, c), (count.get(factionOf(s, c)) ?? 0) + 1);
+    const f = [...count.entries()].sort((a, b) => b[1] - a[1])[0]![0] as ReturnType<typeof factionOf>;
     const before = playerApproval(s);
     expect(applyCommand(s, { type: 'Campaign', faction: f }).ok).toBe(true);
     expect(applyCommand(s, { type: 'Campaign', faction: f }).ok).toBe(false);

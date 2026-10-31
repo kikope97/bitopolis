@@ -847,3 +847,44 @@ html[data-font='pixel'] body #hud-date, html[data-font='pixel'] body .bar-num, h
   html[data-text='200'] .trend, html[data-font='pixel'] .trend { display: none; }
   html[data-text='200'] .tb-btn, html[data-font='pixel'] .tb-btn { padding: 0 2px; }
 }
+/* v1.7: leyenda de «Qué falta» con iconos. */
+.legend-need { display: flex; align-items: center; gap: 6px; }
+.legend-need .px-icon { width: 16px; height: 16px; flex: 0 0 auto; }
+.legend-note { color: var(--muted); font-size: 0.85em; }
+.pill.warn { border-color: #eea160; color: var(--accent); }
+/* v1.7: el tiempo junto a la fecha. */
+.hud-weather { display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto; color: var(--muted); font-size: 0.85em; }
+.hud-weather .px-icon { width: 16px; height: 16px; }
+@media (max-width: 520px) { .hud-weather .weather-name { display: none; } }
+html[data-font='pixel'] body .hud-weather { font-size: 0.5rem; }
+/* v1.7: álbum y árbol familiar. */
+.album { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.album-card { margin: 0; padding: 8px; background: #f4cca1; color: #1a1c2c; box-shadow: 3px 3px 0 #1a1c2c; }
+.album-card figcaption { margin: 6px 0; font-size: 0.9rem; line-height: 1.3; }
+.album-card .muted { color: #5d275d; }
+.album-card .btn { width: 100%; }
+.album-photo { display: block; width: 100%; height: auto; aspect-ratio: 8 / 5; image-rendering: pixelated; border: 2px solid #1a1c2c; }
+.tree .gen { border-left: 3px solid var(--line); margin: 0 0 8px 4px; padding-left: 10px; }
+.tree .gen.me { border-left-color: var(--accent); }
+.tree h3 { margin: 4px 0; }
+.kin-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.kin { min-height: 40px; padding: 4px 10px; background: var(--bg); border: 2px solid var(--line); color: var(--text); font: inherit; cursor: pointer; }
+.kin.gone { display: inline-flex; align-items: center; border-style: dashed; color: var(--muted); cursor: default; }
+.kin.self { border-color: var(--accent); }
+.btn .px-icon { width: 16px; height: 16px; }
+/* Ronda 13: en la barra de confirmar, el precio en su propia línea (nunca se corta). */
+.confirm-bar p { display: flex; flex-direction: column; -webkit-line-clamp: unset; overflow: visible; }
+.cc-what { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cc-cost { font-weight: 700; color: var(--accent); }
+.confirm-bar.danger .cc-what { -webkit-line-clamp: 3; }
+/* Ronda 13: leyenda de «Qué falta» con acción y plegable. */
+.legend-head { all: unset; cursor: pointer; display: flex; align-items: center; min-height: 32px; }
+.legend-head:focus-visible { outline: 3px solid var(--accent); }
+.legend-need { display: grid; grid-template-columns: 16px 1fr auto; gap: 6px; align-items: center; }
+.legend-go { min-height: 36px; padding: 0 8px; background: var(--panel); border: 2px solid var(--line); color: var(--text); font: inherit; font-size: 0.85em; font-weight: 700; cursor: pointer; }
+.legend.folded { padding-top: 0; padding-bottom: 0; }
+@media (pointer: coarse) { .legend-go { min-height: 44px; } }
+/* Ronda 13: nombres largos en la bandeja (al 200 %) y toques de 44 px en el árbol. */
+.tray .tool-label { overflow-wrap: anywhere; hyphens: auto; }
+html[data-text='200'] .tray-grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+.kin { min-height: 44px; }

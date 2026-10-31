@@ -9,6 +9,8 @@ import {
   GRANT_EVERY_DAYS,
   GRANT_OFFER_DAYS,
   GRANT_PENALTY,
+  SOCIAL_PLACES,
+  TERRAIN,
   WAGE_OUTSIDE,
 } from './balance.ts';
 import { saturated } from './economy.ts';
@@ -19,7 +21,8 @@ import { type Faction, FACTIONS } from './politics-core.ts';
 import { pick } from './prng.ts';
 import { addMemory } from './social.ts';
 import type { Building, BuildingKind, BudgetPlan, GameState } from './state.ts';
-import { pushEvent } from './state.ts';
+import { pushEvent, terrainAt } from './state.ts';
+import { Terrain } from './terrain.ts';
 
 /**
  * v1.5: el ayuntamiento por dentro.
@@ -46,8 +49,10 @@ const LIKES: Record<Faction, BudgetPlan[]> = {
 export const budgetFx = (state: GameState) => BUDGET[state.budget.plan];
 
 /** Coste de una obra con el presupuesto en vigor (materiales). */
-export function materialsCost(state: GameState, kind: BuildingKind | 'road'): number {
-  return Math.round(BUILD[kind as keyof typeof BUILD].materials * budgetFx(state).materials);
+export function materialsCost(state: GameState, kind: BuildingKind | 'road', x?: number, y?: number): number {
+  // v1.7: en la colina, los materiales cuestan más (hay que allanar y subirlos).
+  const hill = x !== undefined && y !== undefined && terrainAt(state, x, y) === Terrain.Hill ? TERRAIN.hillFactor : 1;
+  return Math.round(BUILD[kind as keyof typeof BUILD].materials * budgetFx(state).materials * hill);
 }
 
 /**
@@ -133,12 +138,14 @@ export function holdFestival(state: GameState, size: 'pequena' | 'grande' | 'pop
 /** Felicidad de las fiestas mientras dura su recuerdo. */
 export function festivalMood(state: GameState): { label: string; value: number } | null {
   if (!festivalActive(state) || state.festival.size === 'none') return null;
-  return { label: `Fiestas de ${state.festival.name ?? 'el pueblo'}`, value: FESTIVAL[state.festival.size].mood };
+  // v1.7: con ermita, las fiestas patronales alegran más.
+  const chapel = state.buildings.some((b) => b.kind === 'chapel' && b.built) ? SOCIAL_PLACES.chapelFestivalMood : 0;
+  return { label: `Fiestas de ${state.festival.name ?? 'el pueblo'}${chapel ? ' (con procesión a la ermita)' : ''}`, value: FESTIVAL[state.festival.size].mood + chapel };
 }
 
 /* ---------------- subvenciones ---------------- */
 
-const GRANT_KINDS: BuildingKind[] = ['school', 'clinic', 'police', 'park'];
+const GRANT_KINDS: BuildingKind[] = ['school', 'clinic', 'police', 'park', 'library', 'sports'];
 // Solo se ofrece lo que ya se puede construir (ronda 11: salían comisarías imposibles).
 const unlockOf = (k: BuildingKind) => BUILD[k as keyof typeof BUILD].unlockPop ?? 0;
 
@@ -163,7 +170,14 @@ function offerGrant(state: GameState): void {
   pushEvent(state, 'info', `La Diputación ofrece pagar el ${Math.round(share * 100)} % de ${GRANT_NAME[kind]}. Responde antes del ${until.day}/${until.month} (Pueblo › Ayuntamiento)`);
 }
 
-export const GRANT_NAME: Partial<Record<BuildingKind, string>> = { school: 'un colegio', clinic: 'un centro de salud', police: 'una comisaría', park: 'un parque' };
+export const GRANT_NAME: Partial<Record<BuildingKind, string>> = {
+  school: 'un colegio',
+  clinic: 'un centro de salud',
+  police: 'una comisaría',
+  park: 'un parque',
+  library: 'una biblioteca',
+  sports: 'un polideportivo',
+};
 
 export function canAnswerGrant(state: GameState, grantId: number): { ok: boolean; error?: string } {
   const g = state.grants.find((x) => x.id === grantId);

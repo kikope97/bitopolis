@@ -24,6 +24,8 @@ import {
   WAGE_LOCAL,
   WAGE_OUTSIDE,
   ZONE_UNLOCK_POP,
+  SOCIAL_PLACES,
+  TERRAIN,
 } from './balance.ts';
 import { applyCommand, BUILD_NAMES, removeBuilding } from './commands.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
@@ -45,6 +47,10 @@ import {
 } from './economy.ts';
 import { budgetFx, civicDay, festivalMood, onBuildingDone } from './civic.ts';
 import { updateFields } from './fields.ts';
+import { Terrain } from './terrain.ts';
+import { weatherDay, weatherFx, weatherMood } from './weather.ts';
+import { associationsDay, associationsMonth } from './associations.ts';
+import { albumDay } from './album.ts';
 import { lifeDay, lifeMonth, lifeYear } from './lifecycle.ts';
 import { FIRST_NAMES, SURNAMES } from './names.ts';
 import { goalFor, memoryMood, onCitizenLeaves, PROFESSIONS, relationMood, socialDay } from './social.ts';
@@ -61,6 +67,7 @@ import {
   newBuilding,
   NO_PROPERTY,
   pushEvent,
+  terrainAt,
   Tile,
   tileIndex,
   Zone,
@@ -105,6 +112,12 @@ export function averageHappiness(state: GameState): number {
   return state.citizens.reduce((s, c) => s + c.happiness, 0) / state.citizens.length;
 }
 
+/** ¿Hay río en una casilla vecina (incluidas las diagonales)? */
+export function riverside(state: GameState, x: number, y: number): boolean {
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && inBounds(state, x + dx, y + dy) && terrainAt(state, x + dx, y + dy) === Terrain.River) return true;
+  return false;
+}
+
 function dist(a: { x: number; y: number }, b: { x: number; y: number }): number {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
@@ -141,7 +154,9 @@ export function updateNetworks(state: GameState): { water: Set<number>; power: S
     for (const plant of state.buildings) {
       if (plant.kind !== kind || !plant.built) continue;
       plant[flag] = true;
-      let capacity = PLANT_CAPACITY[kind];
+      let capacity = Math.round(PLANT_CAPACITY[kind] * (kind === 'water' ? weatherFx(state).water : weatherFx(state).power));
+      // v1.7: una bomba a la orilla del río da agua a más edificios.
+      if (kind === 'water' && riverside(state, plant.x, plant.y)) capacity = Math.round(capacity * TERRAIN.riverPumpBonus);
       const queue: number[] = [];
       const seen = new Set<number>();
       for (const [dx, dy] of DIRS) {
@@ -244,6 +259,16 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
   const fest = festivalMood(state);
   if (fest) f.push(fest);
   if (c.kids?.length) f.push({ label: c.kids.length === 1 ? 'Un hijo en casa' : `${c.kids.length} hijos en casa`, value: 3 });
+  // v1.7: la biblioteca, para quien quiere prosperar; sin cementerio, el duelo pesa.
+  if (home && c.desire === 'prosperar' && state.buildings.some((b) => b.kind === 'library' && b.built && dist(b, home) <= SERVICE.library!.radius)) {
+    f.push({ label: 'Biblioteca cerca para formarse', value: SOCIAL_PLACES.libraryProsper });
+  }
+  if (!state.buildings.some((b) => b.kind === 'cemetery' && b.built) && c.memories.some((m) => m.kind === 'perdio_a' && state.tick - m.tick < 360 * TICKS_PER_DAY)) {
+    f.push({ label: 'Sin cementerio donde despedir a los suyos', value: -SOCIAL_PLACES.noCemeteryMood });
+  }
+  // v1.7: el calor sin sombra cerca.
+  const heat = weatherMood(state, home);
+  if (heat) f.push(heat);
   return f;
 }
 
@@ -269,7 +294,8 @@ function progressProjects(state: GameState): void {
     p.outsideToday = p.workersNeeded - p.crew.length;
     for (const id of p.crew) transfer(state, p.payer, id, WAGE_LOCAL, 'obras');
     transfer(state, p.payer, OUTSIDE, p.outsideToday * WAGE_OUTSIDE, 'obras');
-    p.workerDaysDone += p.workersNeeded;
+    // v1.7: con nieve, las obras avanzan a la mitad (los sueldos se pagan igual).
+    p.workerDaysDone += p.workersNeeded * weatherFx(state).build;
   }
   for (const p of [...state.projects]) {
     if (p.workerDaysDone < p.workerDaysNeeded) continue;
@@ -455,6 +481,7 @@ function departures(state: GameState): void {
 /* ---------- día y mes ---------- */
 
 function endOfDay(state: GameState): void {
+  weatherDay(state);
   progressProjects(state);
   const served = updateNetworks(state);
   updateFields(state);
@@ -478,6 +505,8 @@ function endOfDay(state: GameState): void {
   const d = tickToDate(state.tick);
   if (d.month === 1 && d.day === 1 && state.tick > 0) lifeYear(state);
   lifeDay(state);
+  associationsDay(state);
+  albumDay(state);
   accumulateRates(state);
 }
 
@@ -509,6 +538,7 @@ function payBusinesses(state: GameState, r: ReturnType<typeof monthRates>): void
 }
 
 function endOfMonth(state: GameState): void {
+  associationsMonth(state);
   const r = monthRates(state);
   // Nóminas municipales (los sueldos no pagan impuesto municipal).
   for (const c of state.citizens) {

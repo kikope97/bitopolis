@@ -1,6 +1,8 @@
+import { canMeetAssociation, meetAssociation } from './associations.ts';
 import { answerGrant, canAnswerGrant, canHoldFestival, canProposeBudget, holdFestival, materialsCost, proposeBudget } from './civic.ts';
 import { Command, tickToDate, type BuildKind, type ZoneKind } from '@bitopolis/shared';
-import { BUILD, DEBT_LIMIT, WAGE_OUTSIDE, ZONE_COST_PER_TILE, ZONE_UNLOCK_POP } from './balance.ts';
+import { BUILD, DEBT_LIMIT, TERRAIN, WAGE_OUTSIDE, ZONE_COST_PER_TILE, ZONE_UNLOCK_POP } from './balance.ts';
+import { isWater, Terrain } from './terrain.ts';
 import { applyDecision, canApplyDecision } from './decisions.ts';
 import { campaign, canCampaign, canMotion, motion } from './politics.ts';
 import { addMemory, answerPetition, canConvenePleno, closePleno, convenePleno, talkTo } from './social.ts';
@@ -13,6 +15,7 @@ import {
   inBounds,
   newBuilding,
   pushEvent,
+  terrainAt,
   Tile,
   tileIndex,
   Zone,
@@ -28,6 +31,11 @@ export const BUILD_NAMES: Record<string, string> = {
   power: 'Central eléctrica',
   park: 'Parque',
   school: 'Colegio',
+  bar: 'Bar',
+  chapel: 'Ermita',
+  cemetery: 'Cementerio',
+  library: 'Biblioteca',
+  sports: 'Polideportivo',
   clinic: 'Centro de salud',
   police: 'Comisaría',
   plaza: 'Plaza Mayor',
@@ -65,6 +73,40 @@ function roadNewTiles(state: GameState, x: number, y: number, x2: number, y2: nu
   return roadTiles(x, y, x2, y2).filter(
     ([tx, ty]) => state.map.tiles[tileIndex(state, tx, ty)] !== Tile.Road && !buildingAt(state, tx, ty),
   );
+}
+
+/** Lo que cuesta un tramo de carretera: sobre el río, puente (v1.7). */
+export function roadCost(state: GameState, x: number, y: number, x2: number, y2: number): number {
+  return roadNewTiles(state, x, y, x2, y2).reduce(
+    (sum, [tx, ty]) => sum + (terrainAt(state, tx, ty) === Terrain.River ? TERRAIN.bridgePerTile : BUILD.road.materials),
+    0,
+  );
+}
+
+/**
+ * Casillas que de verdad cambian al pintar una zona (v1.7.0): no cuentan las
+ * carreteras, los edificios, el agua ni lo que ya tenía esa zona. Los árboles
+ * sí: se talan cuando los vecinos construyen. El jugador paga solo estas.
+ */
+export function zoneChanges(state: GameState, cmd: { x: number; y: number; w: number; h: number; zone: ZoneKind }): { changed: number; skipped: number } {
+  const value = ZONE_VALUE[cmd.zone];
+  let changed = 0;
+  let skipped = 0;
+  for (let y = cmd.y; y < cmd.y + cmd.h; y++) {
+    for (let x = cmd.x; x < cmd.x + cmd.w; x++) {
+      if (!inBounds(state, x, y)) continue;
+      const i = tileIndex(state, x, y);
+      if (state.map.tiles[i] === Tile.Road || buildingAt(state, x, y) || isWater(state.map.terrain?.[i]) || state.map.zones[i] === value) skipped++;
+      else changed++;
+    }
+  }
+  return { changed, skipped };
+}
+
+/** Coste total previsto en un sitio concreto (en la colina, más materiales). */
+export function buildCostAt(state: GameState, kind: BuildKind, x: number, y: number): number {
+  const extra = terrainAt(state, x, y) === Terrain.Hill ? Math.round(BUILD[kind].materials * (TERRAIN.hillFactor - 1)) : 0;
+  return buildCost(kind) + extra;
 }
 
 /** Valida sin aplicar. El motor es quien decide si un comando es legal. */
@@ -112,9 +154,11 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       }
       if (pop < spec.unlockPop && cmd.kind !== 'plaza' && cmd.kind !== 'market') return { ok: false, error: `Se desbloquea con ${spec.unlockPop} vecinos` };
       const t = state.map.tiles[tileIndex(state, cmd.x, cmd.y)];
+      const ter = terrainAt(state, cmd.x, cmd.y);
+      if (isWater(ter)) return { ok: false, error: ter === Terrain.Sea ? 'Ahí está el mar' : 'Ahí pasa el río: solo se puede cruzar con un puente (Carretera)' };
       if (t === Tile.Road || buildingAt(state, cmd.x, cmd.y)) return { ok: false, error: 'Ese sitio está ocupado' };
       if (!hasAdjacentRoad(state, cmd.x, cmd.y)) return { ok: false, error: 'Necesita una carretera al lado' };
-      if (state.treasury < buildCost(cmd.kind)) return { ok: false, error: 'No hay dinero suficiente' };
+      if (state.treasury < buildCostAt(state, cmd.kind, cmd.x, cmd.y)) return { ok: false, error: 'No hay dinero suficiente' };
       return { ok: true };
     }
     case 'BuildRoad': {
@@ -122,7 +166,8 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       if (cmd.x !== cmd.x2 && cmd.y !== cmd.y2) return { ok: false, error: 'La carretera debe ser recta' };
       const tiles = roadNewTiles(state, cmd.x, cmd.y, cmd.x2, cmd.y2);
       if (tiles.length === 0) return { ok: false, error: 'Ya hay carretera' };
-      if (state.treasury < tiles.length * BUILD.road.materials) return { ok: false, error: 'No hay dinero suficiente' };
+      if (tiles.some(([tx, ty]) => terrainAt(state, tx, ty) === Terrain.Sea)) return { ok: false, error: 'No se puede hacer carretera en el mar' };
+      if (state.treasury < roadCost(state, cmd.x, cmd.y, cmd.x2, cmd.y2)) return { ok: false, error: 'No hay dinero suficiente' };
       return { ok: true };
     }
     case 'Zone': {
@@ -131,7 +176,7 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
         return { ok: false, error: 'Fuera del mapa' };
       }
       // Pintar zonas es la salida de una crisis: se permite con deuda hasta el límite.
-      if (cmd.zone !== 'none' && state.treasury - cmd.w * cmd.h * ZONE_COST_PER_TILE < -DEBT_LIMIT) return { ok: false, error: 'No hay dinero suficiente' };
+      if (cmd.zone !== 'none' && state.treasury - zoneChanges(state, cmd).changed * ZONE_COST_PER_TILE < -DEBT_LIMIT) return { ok: false, error: 'No hay dinero suficiente' };
       return { ok: true };
     }
     case 'Demolish': {
@@ -146,6 +191,8 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       return state.projects.some((p) => p.buildingId === cmd.buildingId) ? { ok: true } : { ok: false, error: 'No hay obra' };
     case 'CitizenAct':
       return canApplyDecision(state, cmd.citizenId, cmd.action) ? { ok: true } : { ok: false, error: 'Decisión ya no válida' };
+    case 'MeetAssociation':
+      return canMeetAssociation(state, cmd.associationId);
     case 'ConvenePleno': {
       const r = canConvenePleno(state);
       return r.ok ? { ok: true } : { ok: false, error: r.error! };
@@ -229,7 +276,7 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
     case 'Build': {
       if (cmd.kind === 'road') return applyCommand(state, { type: 'BuildRoad', x: cmd.x, y: cmd.y, x2: cmd.x, y2: cmd.y });
       const spec = BUILD[cmd.kind];
-      transfer(state, TREASURY, OUTSIDE, materialsCost(state, cmd.kind), 'obras');
+      transfer(state, TREASURY, OUTSIDE, materialsCost(state, cmd.kind, cmd.x, cmd.y), 'obras');
       const idx = tileIndex(state, cmd.x, cmd.y);
       state.map.tiles[idx] = Tile.Grass;
       state.map.zones[idx] = Zone.None;
@@ -249,7 +296,8 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
     }
     case 'BuildRoad': {
       const tiles = roadNewTiles(state, cmd.x, cmd.y, cmd.x2, cmd.y2);
-      transfer(state, TREASURY, OUTSIDE, tiles.length * BUILD.road.materials, 'obras');
+      transfer(state, TREASURY, OUTSIDE, roadCost(state, cmd.x, cmd.y, cmd.x2, cmd.y2), 'obras');
+      if (tiles.some(([tx, ty]) => terrainAt(state, tx, ty) === Terrain.River)) pushEvent(state, 'info', 'Se construye un puente sobre el río');
       for (const [tx, ty] of tiles) {
         const i = tileIndex(state, tx, ty);
         state.map.tiles[i] = Tile.Road;
@@ -264,6 +312,7 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
         for (let x = cmd.x; x < cmd.x + cmd.w; x++) {
           const i = tileIndex(state, x, y);
           if (state.map.tiles[i] === Tile.Road || buildingAt(state, x, y)) continue;
+          if (isWater(state.map.terrain?.[i])) continue;
           if (state.map.zones[i] === value) continue;
           state.map.zones[i] = value;
           changed++;
@@ -278,6 +327,9 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       else state.map.tiles[tileIndex(state, cmd.x, cmd.y)] = Tile.Grass;
       break;
     }
+    case 'MeetAssociation':
+      meetAssociation(state, cmd.associationId);
+      break;
     case 'NotifyProject': {
       const p = state.projects.find((x) => x.buildingId === cmd.buildingId);
       if (p) p.notify = cmd.on;

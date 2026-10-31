@@ -105,6 +105,16 @@ export const MIGRATIONS: Record<number, Migration> = {
     festival: s.festival ?? { name: null, year: 0, size: 'none', until: 0 },
     grants: s.grants ?? [],
   }),
+  // 9 → 10 (v1.7): terreno (los pueblos de antes quedan en llano).
+  9: (s) => ({
+    ...s,
+    formatVersion: 10,
+    map: { ...s.map, terrain: s.map?.terrain ?? new Array((s.map?.w ?? 48) * (s.map?.h ?? 48)).fill(0) },
+    weather: s.weather ?? { kind: 'sol', until: (s.tick ?? 0) + 24 },
+    associations: s.associations ?? [],
+    album: s.album ?? [],
+    departed: s.departed ?? [],
+  }),
 };
 
 export function migrate(raw: unknown): GameState {

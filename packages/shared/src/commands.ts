@@ -5,7 +5,7 @@ export const TaxLevel = z.enum(['low', 'medium', 'high']);
 export type TaxLevel = z.infer<typeof TaxLevel>;
 
 /** Lo que el alcalde puede construir directamente. */
-export const BuildKind = z.enum(['road', 'water', 'power', 'park', 'school', 'clinic', 'police', 'house', 'plaza', 'market']);
+export const BuildKind = z.enum(['road', 'water', 'power', 'park', 'school', 'clinic', 'police', 'house', 'plaza', 'market', 'bar', 'chapel', 'cemetery', 'library', 'sports']);
 export type BuildKind = z.infer<typeof BuildKind>;
 
 export const ZoneKind = z.enum(['none', 'R', 'C', 'I']);
@@ -29,6 +29,7 @@ export const Command = z.discriminatedUnion('type', [
   z.object({ type: z.literal('NotifyProject'), buildingId: z.number().int().min(1), on: z.boolean() }),
   /** Pleno municipal: convocar, responder a cada petición y cerrar. */
   z.object({ type: z.literal('ConvenePleno') }),
+  z.object({ type: z.literal('MeetAssociation'), associationId: z.number().int() }),
   // v1.5: presupuesto anual, fiestas y subvenciones.
   z.object({ type: z.literal('ProposeBudget'), plan: z.enum(['austero', 'equilibrado', 'inversor']) }),
   z.object({ type: z.literal('HoldFestival'), size: z.enum(['pequena', 'grande']) }),

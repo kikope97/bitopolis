@@ -24,6 +24,12 @@ export const BUILD: Record<BuildKind, BuildSpec> = {
   /** Hitos: se desbloquean con objetivos (no por población). */
   plaza: { materials: 3_000, workers: 5, days: 3, unlockPop: 50 },
   market: { materials: 6_000, workers: 6, days: 4, unlockPop: 200 },
+  // v1.7: vida social.
+  bar: { materials: 1_800, workers: 3, days: 2, unlockPop: 15 },
+  chapel: { materials: 2_800, workers: 4, days: 3, unlockPop: 20 },
+  cemetery: { materials: 2_200, workers: 3, days: 3, unlockPop: 20 },
+  library: { materials: 4_500, workers: 4, days: 4, unlockPop: 35 },
+  sports: { materials: 5_500, workers: 5, days: 4, unlockPop: 35 },
 };
 
 /** Obras que crecen solas sobre zonas (las paga un inversor de fuera). */
@@ -50,6 +56,11 @@ export const JOBS: Record<BuildingKind, number> = {
   police: 3,
   plaza: 0,
   market: 4,
+  bar: 1,
+  chapel: 0,
+  cemetery: 0,
+  library: 2,
+  sports: 2,
   house: 0,
   res: 0,
   shop: 3,
@@ -68,6 +79,11 @@ export const MAINTENANCE: Record<BuildingKind, number> = {
   police: 350,
   plaza: 80,
   market: 250,
+  bar: 40,
+  chapel: 200,
+  cemetery: 150,
+  library: 300,
+  sports: 350,
   house: 20,
   res: 0,
   shop: 0,
@@ -82,7 +98,26 @@ export const SERVICE: Partial<Record<BuildingKind, { radius: number; happiness: 
   police: { radius: 10, happiness: 3 },
   plaza: { radius: 6, happiness: 8 },
   market: { radius: 8, happiness: 6 },
+  // v1.7: el bar alegra el barrio (y hace ruido); la ermita, la biblioteca y el polideportivo, más lejos.
+  bar: { radius: 5, happiness: 5 },
+  chapel: { radius: 8, happiness: 3 },
+  library: { radius: 8, happiness: 3 },
+  sports: { radius: 8, happiness: 4 },
 };
+
+/** v1.7: efectos propios de los lugares de vida social. */
+export const SOCIAL_PLACES = {
+  /** Con ermita, las fiestas alegran más. */
+  chapelFestivalMood: 3,
+  /** Felicidad extra de la biblioteca para quien quiere prosperar. */
+  libraryProsper: 3,
+  /** El polideportivo cerca reduce el riesgo de fallecer de los mayores (fracción). */
+  sportsHealth: 0.3,
+  /** Con cementerio, el duelo pesa menos (valencia del recuerdo «perdió a»). */
+  cemeteryGrief: 0.5,
+  /** Sin cementerio, quien ha perdido a alguien en el último año lo nota. */
+  noCemeteryMood: 4,
+} as const;
 
 /**
  * Vecinos que atiende cada servicio (v1.3, aplazado de la ronda 07). Con más
@@ -240,3 +275,65 @@ export const GRANT_OFFER_DAYS = 30;
 export const GRANT_DEADLINE_DAYS = 180;
 export const GRANT_ADVANCE = 0.3;
 export const GRANT_PENALTY = 0.1;
+
+/**
+ * v1.7: geografía. En el río solo caben puentes (más caros); en la colina se
+ * construye pagando más materiales; el suelo junto al agua y en alto vale más;
+ * una bomba junto al río da agua a más edificios.
+ */
+export const TERRAIN = {
+  bridgePerTile: 600,
+  hillFactor: 1.5,
+  riverPumpBonus: 1.25,
+  waterfrontLand: 12,
+  hillLand: 8,
+} as const;
+
+/** v1.7: tiempo. Multiplicadores del día y costes. */
+export const WEATHER = {
+  /** Días del principio sin nieve, calor ni tormentas (el tutorial empieza en enero). */
+  graceDays: 30,
+  /** Con nieve, las obras avanzan a la mitad. */
+  snowBuild: 0.5,
+  /** Con nieve, la central da luz a menos edificios (calefacción). */
+  snowPower: 0.85,
+  /** Quitanieves: euros por casilla de carretera y día de nieve. */
+  snowPerRoad: 1.5,
+  /** Con calor, la bomba da agua a menos edificios. */
+  heatWater: 0.9,
+  /** Felicidad que resta el calor sin un parque o plaza cerca. */
+  heatMood: 3,
+  /** Probabilidad de que una tormenta anegue cada edificio de la orilla del río. */
+  floodChance: 0.12,
+  /** Reparación de un edificio anegado (fracción de sus materiales). */
+  floodRepair: 0.15,
+} as const;
+
+/** v1.7: asociaciones vecinales y protestas. */
+export const ASSOCIATIONS = {
+  /** Población mínima para que los vecinos se organicen. */
+  minPop: 20,
+  /** Vecinos con nombre que comparten la queja para fundar una. */
+  minMembers: 4,
+  /** Si quedan menos socios con la queja, la dan por resuelta. */
+  dissolveBelow: 2,
+  /** Meses sin respuesta hasta que convocan una manifestación. */
+  patienceMonths: 2,
+  /** Días de aviso de la manifestación (para que cada socio decida). */
+  protestNoticeDays: 3,
+  /** Meses que se da el alcalde al prometer en una reunión. */
+  promiseMonths: 3,
+  /** Como mucho, asociaciones a la vez. */
+  max: 3,
+  /** Socios que deciden si van a cada manifestación (el líder y los primeros). */
+  deciders: 6,
+} as const;
+
+/**
+ * Campos del mapa (ronda 13: estaban escritos en fields.ts). Con 0,985 la
+ * contaminación se acumulaba hasta el tope (×67 la emisión) y no bajaba
+ * nunca: protestas perpetuas y pueblos estancados.
+ */
+export const FIELDS = {
+  pollutionDecay: 0.85,
+} as const;

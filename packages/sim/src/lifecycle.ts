@@ -1,5 +1,7 @@
 import { DAYS_PER_YEAR, TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { hash32 } from './hash.ts';
+import { SOCIAL_PLACES } from './balance.ts';
+import { rememberDeparted } from './family.ts';
 import {
   ADULT_AGE,
   BIRTH_CHANCE_ADULT,
@@ -67,17 +69,20 @@ export function dies(state: GameState, c: Citizen): void {
     // Sin nadie en el pueblo: lo hereda la familia de fuera.
     transfer(state, c.id, OUTSIDE, c.money);
   }
-  // Duelo: quien lo quería lo recuerda.
+  // Duelo: quien lo quería lo recuerda. Con cementerio en el pueblo, se lleva mejor (v1.7).
+  const cemetery = state.buildings.some((b) => b.kind === 'cemetery' && b.built);
+  const grief = cemetery ? SOCIAL_PLACES.cemeteryGrief : 1;
   for (const o of state.citizens) {
     const r = o.relations.find((x) => x.id === c.id);
     if (!r) continue;
-    if (r.kind === 'pareja' || r.kind === 'amistad') addMemory(state, o, 'perdio_a', r.kind === 'pareja' ? 5 : 3, r.kind === 'pareja' ? -7 : -4, [c.id]);
+    if (r.kind === 'pareja' || r.kind === 'amistad') addMemory(state, o, 'perdio_a', r.kind === 'pareja' ? 5 : 3, Math.round((r.kind === 'pareja' ? -7 : -4) * grief), [c.id]);
     o.relations = o.relations.filter((x) => x.id !== c.id);
   }
   state.pending = state.pending.filter((p) => p.citizenId !== c.id);
+  rememberDeparted(state, c, 'fallecio');
   state.citizens = state.citizens.filter((x) => x !== c);
   const keeps = heir && heir.owns && heir.homeId === c.homeId ? `Su casa queda con ${first(heir)}` : heir ? `Lo suyo queda con ${first(heir)}` : 'Lo deja todo a su familia de fuera';
-  pushEvent(state, 'departure', `Nos ha dejado ${c.name}, a los ${c.age} años. El pueblo le despide en la plaza. ${keeps}`, heir ? { ref: heir.id } : {});
+  pushEvent(state, 'departure', `Nos ha dejado ${c.name}, a los ${c.age} años. El pueblo le despide ${cemetery ? 'en el cementerio' : 'en la plaza'}. ${keeps}`, heir ? { ref: heir.id } : {});
   state.lastDeathTick = state.tick;
 }
 
@@ -91,13 +96,22 @@ export function lifeYear(state: GameState): void {
     if (!grown.length) continue;
     c.kids = kids.filter((t) => !grown.includes(t));
     for (let i = 0; i < grown.length; i++) {
+      // Ronda 13: dos apellidos, el primero de cada progenitor; y padres en el árbol.
+      const partnerId = c.relations.find((r) => r.kind === 'pareja')?.id;
+      const partner = state.citizens.find((x) => x.id === partnerId);
+      const surnames = partner ? `${surname(c)} ${surname(partner)}` : surname(c);
+      const parents = partnerId !== undefined ? [c.id, partnerId] : [c.id];
       if (freeHomes(state) > 0) {
-        const kid = newResident(state, { age: ADULT_AGE, surname: surname(c) });
+        const kid = newResident(state, { age: ADULT_AGE, surname: surnames });
+        kid.parents = parents;
         state.citizens.push(kid);
         transfer(state, c.id, kid.id, Math.min(c.money, 500));
         pushEvent(state, 'arrival', `${first(kid)}, de casa de ${first(c)}, cumple 18, se independiza y se queda en el pueblo`, { ref: kid.id });
       } else {
-        pushEvent(state, 'info', `En casa de ${first(c)}, alguien cumple 18 y se va a estudiar fuera: no hay casa libre en el pueblo`, { ref: c.id });
+        // Se va, pero sigue en el árbol familiar con su nombre.
+        const kid = newResident(state, { age: ADULT_AGE, surname: surnames });
+        state.departed?.push({ id: kid.id, name: kid.name, age: ADULT_AGE, parents, tick: state.tick, reason: 'se_fue' });
+        pushEvent(state, 'info', `${first(kid)}, de casa de ${first(c)}, cumple 18 y se va a estudiar fuera: no hay casa libre en el pueblo`, { ref: c.id });
       }
     }
   }
@@ -114,7 +128,10 @@ export function lifeDay(state: GameState): void {
   const protectedIds = new Set([state.politics.party?.leaderId, typeof state.politics.mayor === 'number' ? state.politics.mayor : undefined]);
   for (const c of state.citizens) {
     if (c.age < DEATH_START_AGE || protectedIds.has(c.id) || hash32(state.seed, c.id) % DAYS_PER_YEAR !== dayOfYear) continue;
-    const p = Math.min(DEATH_RATE_MAX, (c.age - DEATH_START_AGE + 2) * DEATH_RATE_PER_YEAR_OVER);
+    // v1.7: con polideportivo cerca de casa, los mayores se cuidan más.
+    const home = state.buildings.find((b) => b.id === c.homeId);
+    const fit = home && state.buildings.some((b) => b.kind === 'sports' && b.built && Math.abs(b.x - home.x) + Math.abs(b.y - home.y) <= 8);
+    const p = Math.min(DEATH_RATE_MAX, (c.age - DEATH_START_AGE + 2) * DEATH_RATE_PER_YEAR_OVER) * (fit ? 1 - SOCIAL_PLACES.sportsHealth : 1);
     if (chance(state.rng, p)) {
       dies(state, c);
       return;

@@ -26,7 +26,9 @@ import { tickToDate } from '@bitopolis/shared';
 import { api } from './api.ts';
 import { formatDate, money } from './i18n.ts';
 import { portraitSprite } from './sprites.ts';
-import { $, confirmDialog, h, sheet, toast } from './ui.ts';
+import { $, confirmDialog, h, sheet, toast, withBack } from './ui.ts';
+import { openFamily } from './album-ui.ts';
+import { drawPixelIcons } from './icons.ts';
 
 type Cmd = (c: Command) => Promise<boolean>;
 
@@ -113,6 +115,7 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
     h('h3', {}, 'Hablar'),
     ask,
     answer,
+    familyButton(ctx, c.id),
     h('h3', {}, 'Relaciones'),
     c.relations.length ? h('ul', { class: 'people' }, ...c.relations.map((r) => h('li', {}, `${nameOf(r.id)}: ${RELATION_TEXT[r.kind]}`))) : h('p', { class: 'muted' }, 'Aún no tiene relaciones en el pueblo.'),
     h('h3', {}, 'Recuerdos'),
@@ -122,6 +125,17 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
     ...last.map((d) => h('p', { class: 'quote' }, `«${d.motivo}» `, d.source === 'ai' ? h('span', { class: 'ai-badge' }, 'IA') : '')),
     h('details', { class: 'advanced' }, h('summary', {}, 'Personalidad'), traits, c.summary ? h('p', {}, c.summary) : ''),
   );
+}
+
+/** v1.7: acceso al árbol genealógico desde la ficha. */
+function familyButton(ctx: SocialCtx, id: number): HTMLElement {
+  const b = h('button', { class: 'btn small' }, h('canvas', { class: 'px-icon', 'data-icon': 'family', 'aria-hidden': 'true' }), 'Árbol familiar');
+  drawPixelIcons(b);
+  b.addEventListener('click', () => {
+    const name = ctx.state().citizens.find((x) => x.id === id)?.name.split(' ')[0] ?? 'la ficha';
+    withBack(name, () => openCitizen(ctx, id), () => openFamily(ctx, id, (k) => openCitizen(ctx, k)));
+  });
+  return b;
 }
 
 /** Recuerdos sin repetir (ronda 12: salía la misma frase varias veces seguidas). */
