@@ -216,6 +216,11 @@ button, input, select { font: inherit; color: inherit; }
 .field { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; flex: 1; }
 .field input, .field select { min-height: 48px; padding: 8px; background: var(--bg); border: 2px solid var(--line); border-radius: 4px; }
 .field input:disabled, .field select:disabled { border-style: dashed; color: var(--muted); }
+/* Selector de modelo: desplegable con los de la API key y «Otro…» (model-picker.ts). */
+.model-picker { display: flex; flex-direction: column; gap: 4px; }
+.model-picker select { max-width: 100%; }
+.models-row { align-items: center; }
+.models-row .help { flex: 1; min-width: 160px; margin: 0; }
 .check.warning { align-items: flex-start; padding: 8px; border: 2px solid var(--accent); border-radius: 4px; margin: 8px 0; }
 .check.warning input { flex: 0 0 auto; margin-top: 2px; }
 .estimate { color: var(--accent); }

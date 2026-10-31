@@ -1,4 +1,5 @@
 import type { GameState } from '@bitopolis/sim';
+import type { ListedModel } from './model-picker.ts';
 import type { SaveBatch } from './sim.worker.ts';
 
 export interface Summary {
@@ -47,6 +48,11 @@ export const api = {
   aiMeta: () => call<AiMeta>('GET', '/api/ai/meta'),
   aiConfig: (token: string) => call<AiSettings>('GET', `/api/games/${token}/ai-config`),
   saveAiConfig: (token: string, body: Record<string, unknown>) => call<AiSettings>('PUT', `/api/games/${token}/ai-config`, body),
+  /** Modelos de la key guardada (sin borrador) o de una escrita y aún sin guardar. La key no vuelve. */
+  aiModels: (token: string, draft?: { key?: string; baseUrl?: string }) =>
+    draft
+      ? call<{ provider: string; models: ListedModel[] }>('POST', `/api/games/${token}/ai/models`, draft)
+      : call<{ provider: string; models: ListedModel[] }>('GET', `/api/games/${token}/ai/models`),
   estimate: (provider: string, model: string, citizens: number) =>
     call<{ eurPerHour: Record<string, number>; known: boolean }>('GET', `/api/ai/estimate?provider=${encodeURIComponent(provider)}&model=${encodeURIComponent(model)}&citizens=${citizens}`),
   decisions: (token: string) =>
