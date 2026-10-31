@@ -91,6 +91,10 @@ export function mindBox(s: GameState, c: Citizen): HTMLElement | null {
     const days = Math.max(0, Math.ceil((c.plan.until - s.tick) / 24));
     box.append(h('p', { class: 'mind-plan' }, `Su plan: ${planText(c.plan)} (quedan ${days} ${days === 1 ? 'día' : 'días'}).`));
   }
+  if (c.notes?.length) {
+    box.append(h('p', { class: 'muted small' }, 'Lo que ha apuntado estas semanas:'));
+    box.append(h('ul', { class: 'mind-notes small' }, ...[...c.notes].reverse().map((n) => h('li', {}, `${formatDate(tickToDate(n.tick))}: ${n.text}`))));
+  }
   if (c.spending) box.append(h('p', { class: 'muted small' }, c.spending.where === 'fuera' ? 'Compra sobre todo fuera del pueblo.' : c.spending.where === 'ahorrar' ? 'Está ahorrando: nada de caprichos.' : 'Compra en las tiendas del pueblo.'));
   return box;
 }

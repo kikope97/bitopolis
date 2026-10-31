@@ -990,6 +990,7 @@ body.cal-on .legend { top: 86px; }
 .mind-tag { margin: 0 0 4px; color: #ffcd75; font-weight: 600; }
 .mind-thought { font-style: italic; }
 .mind-plan { color: var(--bad); }
+.mind-notes { margin: 4px 0 8px; padding-left: 18px; color: var(--muted); }
 .turn-lines { list-style: none; padding: 0; margin: 4px 0 12px; }
 .turn-line { display: block; width: 100%; min-height: 44px; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); padding: 6px 0; color: inherit; font: inherit; cursor: pointer; }
 .turn-why { color: var(--muted); font-style: italic; }

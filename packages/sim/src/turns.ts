@@ -81,6 +81,8 @@ export interface TurnAct {
   plan: { tipo: string; necesidad: string; meses: number };
   pensamiento: string;
   motivo: string;
+  /** Lo que apunta de esta semana (su memoria escrita). */
+  recuerdo?: string;
 }
 
 export function emptyTownAi(share = TURN.defaultShare): TownAi {
@@ -411,6 +413,8 @@ export function applyTownTurn(state: GameState, n: number, acts: TurnAct[], extr
       parts.push(`avisa: ${planText(c.plan)}`);
     }
     c.thought = cleanText(a.pensamiento, 160) || c.thought;
+    const note = cleanText(a.recuerdo, 160);
+    if (note) c.notes = [...(c.notes ?? []), { tick: state.tick, text: note }].slice(-TURN.notes);
     if (parts.length) lines.push({ id: c.id, text: `${c.name} ${parts.join('; ')}`, motivo: cleanText(a.motivo, 160) });
   }
   // 2.0: el director (solo en los turnos semanales). Con él, este turno manda la IA;
@@ -461,10 +465,36 @@ function closeTurn(state: GameState, source: 'ia' | 'reglas', lines: TurnLog['li
   const t = ai.turn!;
   ai.log.push({ n: t.n, tick: state.tick, source, kind: t.kind, lines: lines.slice(0, TURN.logLines), focus: cleanText(extra?.focus, 140) || undefined, chronicle: cleanText(extra?.chronicle, 600) || undefined });
   if (ai.log.length > TURN.logTurns) ai.log.splice(0, ai.log.length - TURN.logTurns);
+  if (source === 'ia') spreadAttitude(state);
   // Lo del alcalde ya se ha contado.
   ai.mayor = ai.mayor.filter((m) => m.tick > t.opened);
   if (t.kind === 'semana') ai.next = t.opened + ai.paceDays * TICKS_PER_DAY;
   ai.turn = null;
+}
+
+/**
+ * Modo mixto (2.0): los vecinos que deciden por reglas copian, a medias, la
+ * actitud de sus amistades con IA; si no tienen, la media de los vecinos con IA
+ * de su barrio. Así lo que piensan los vecinos con IA llega a todo el pueblo.
+ */
+function spreadAttitude(state: GameState): void {
+  const ais = state.citizens.filter((c) => isAiCitizen(state, c));
+  if (!ais.length) return;
+  const home = (c: Citizen) => state.buildings.find((b) => b.id === c.homeId);
+  const zone = (c: Citizen) => {
+    const b = home(c);
+    return b ? `${Math.floor(b.x / TURN.barrioSize)}_${Math.floor(b.y / TURN.barrioSize)}` : 'fuera';
+  };
+  const byZone = new Map<string, number[]>();
+  for (const c of ais) byZone.set(zone(c), [...(byZone.get(zone(c)) ?? []), c.attitude ?? 0]);
+  const all = ais.map((c) => c.attitude ?? 0);
+  const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  for (const c of state.citizens) {
+    if (isAiCitizen(state, c)) continue;
+    const friends = c.relations.map((r) => ais.find((x) => x.id === r.id && (r.kind === 'amistad' || r.kind === 'pareja'))).filter((x): x is Citizen => !!x);
+    const src = friends.length ? friends.map((x) => x.attitude ?? 0) : (byZone.get(zone(c)) ?? all);
+    c.attitude = clamp(Math.round(mean(src) * TURN.contagion), -1, 1) || undefined;
+  }
 }
 
 /* ---------------- abrir, vencer y planes ---------------- */

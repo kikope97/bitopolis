@@ -54,6 +54,7 @@ function fuzzTurn(seed: number) {
           plan: rnd(6) === 0 ? { tipo: PLANS[1 + rnd(PLANS.length - 1)]!, necesidad: NEEDS[rnd(NEEDS.length)]!, meses: 1 + rnd(6) } : { tipo: 'ninguno', necesidad: '', meses: 0 },
           pensamiento: 'Hoy pienso en el pueblo.',
           motivo: 'Porque toca.',
+          recuerdo: rnd(2) ? `Semana ${t.n}: fui a la plaza.` : '',
         };
       });
     // Director al azar entre su menú (en los turnos semanales).
@@ -243,5 +244,21 @@ describe('turnos del pueblo con IA (2.0)', () => {
     if (req.ids[0]) expect(parsed!.director.sucesos[0]!.motivo).toBe('');
     expect(parsed!.chronicle).toBe('');
     expect(parseDirector('nada', req.ids, sent)).toBeNull();
+  }, 120_000);
+
+  it('continuidad: cada vecino con IA guarda sus notas (4 como mucho) y su actitud se contagia a los vecinos por reglas', () => {
+    const { state } = runSimulation({ seed: 7, days: 300, profile: 'constructor', aiMode: true, aiShare: 40, onTurn: fuzzTurn(11) });
+    const ais = state.citizens.filter((c) => c.named && c.notes?.length);
+    expect(ais.length).toBeGreaterThan(0);
+    expect(ais.every((c) => c.notes!.length <= 4)).toBe(true);
+    // Las notas van al prompt del vecino la semana siguiente.
+    while (!state.ai!.turn) step(state);
+    const id = state.ai!.turn!.ids.find((x) => state.citizens.find((c) => c.id === x)?.notes?.length);
+    if (id) expect(buildTurnRequest(state, [id]).user).toContain('sus_notas');
+    // Contagio: vecinos que no piensan con IA con actitud (−1…1).
+    const rules = state.citizens.filter((c) => !c.named && c.attitude !== undefined);
+    expect(rules.length).toBeGreaterThan(0);
+    expect(rules.every((c) => Math.abs(c.attitude!) <= 1)).toBe(true);
+    expect(checkInvariants(state)).toEqual([]);
   }, 120_000);
 });

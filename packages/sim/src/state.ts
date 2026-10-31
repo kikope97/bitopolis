@@ -181,6 +181,8 @@ export interface Citizen {
   spending?: { where: 'pueblo' | 'fuera' | 'ahorrar'; shop?: number; leisure: boolean };
   plan?: { kind: 'irse_si_no' | 'protestar_si_no' | 'votar_en_contra_si_no'; need: string; until: number; since: number };
   thought?: string;
+  /** 2.0: lo que el propio vecino (la IA) apunta de cada semana; lo lee la semana siguiente. */
+  notes?: { tick: number; text: string }[];
 }
 
 export interface CitizenDebt {

@@ -524,6 +524,12 @@ export const TURN = {
   logLines: 40,
   /** Cuánto mueve la actitud hacia el alcalde la intención de voto (por punto, de −2 a +2). */
   attitudeVote: 0.05,
+  /** Notas de su semana que guarda cada vecino con IA. */
+  notes: 4,
+  /** Modo mixto: los vecinos por reglas copian esta parte de la actitud de sus amigos con IA (o de su barrio). */
+  contagion: 0.6,
+  /** Lado (en casillas) de cada barrio para el contagio. */
+  barrioSize: 12,
 } as const;
 
 /** 2.0: el director del pueblo (sucesos que elige la IA entre los que propone el motor). */

@@ -72,6 +72,7 @@ createServer((req, res) => {
           plan: i === 0 && v.necesidades.length ? { tipo: 'irse_si_no', necesidad: v.necesidades[0], meses: 3 } : { tipo: 'ninguno', necesidad: '', meses: 0 },
           pensamiento: `Soy ${v.nombre.split(' ')[0]} y esta semana me toca mover ficha en el pueblo.`,
           motivo: 'Con lo que está pasando en el pueblo, no puedo quedarme de brazos cruzados.',
+          recuerdo: 'Esta semana he pedido cosas al alcalde.',
         };
       });
       const delay = Number(process.env.FAKE_LLM_DELAY_MS ?? 0);

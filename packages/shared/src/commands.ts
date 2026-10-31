@@ -75,6 +75,7 @@ export const Command = z.discriminatedUnion('type', [
           plan: z.object({ tipo: z.string().max(30), necesidad: z.string().max(20), meses: z.number().int().min(0).max(12) }),
           pensamiento: z.string().max(300),
           motivo: z.string().max(400),
+          recuerdo: z.string().max(300).optional(),
         }),
       )
       .max(300),

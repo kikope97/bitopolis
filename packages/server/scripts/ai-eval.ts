@@ -14,9 +14,12 @@ import { parseArgs } from 'node:util';
 import { REAL_MS_PER_DAY_AT_X1, TICKS_PER_DAY } from '@bitopolis/shared';
 import {
   applyCommand,
+  buildDirectorRequest,
   buildTurnRequest,
+  type DirectorChoice,
   createInitialState,
   type GameState,
+  parseDirector,
   parseTurn,
   PROFILES,
   profileRng,
@@ -49,6 +52,13 @@ const tokens = (s: string) => Math.ceil(s.length / 3.5);
 /** Simulador sin red: elige con algo de sentido entre las acciones del menú. */
 const simulated: LLMProvider = {
   async complete(req: LLMRequest): Promise<LLMResult> {
+    if (req.user.startsWith('Director')) {
+      const d = JSON.parse(req.user.slice(req.user.indexOf('\n') + 1)) as { presupuesto_drama: { sucesos_malos_que_caben: number }; menu: { id: string; malo: boolean; avisado: boolean }[] };
+      const sucesos = [...d.menu.filter((m) => !m.malo).slice(0, 1), ...d.menu.filter((m) => m.malo && m.avisado).slice(0, d.presupuesto_drama.sucesos_malos_que_caben)];
+      const avisos = d.menu.filter((m) => m.malo && !m.avisado).slice(0, 2);
+      const text = JSON.stringify({ sucesos: sucesos.map((m) => ({ id: m.id, motivo: 'Toca.' })), avisos: avisos.map((m) => ({ id: m.id, motivo: 'Se nota.' })), foco: 'La semana', cronica: 'Pasan cosas en el pueblo.' });
+      return { text, usage: { in: tokens(req.system + (req.shared ?? '') + req.user), cachedIn: 0, out: tokens(text) } };
+    }
     const list = JSON.parse(req.user.slice(req.user.indexOf('\n') + 1)) as {
       vecino: number;
       nombre: string;
@@ -70,6 +80,7 @@ const simulated: LLMProvider = {
         plan: i % 7 === 0 && v.necesidades.length ? { tipo: 'protestar_si_no', necesidad: v.necesidades[0]!, meses: 3 } : { tipo: 'ninguno', necesidad: '', meses: 0 },
         pensamiento: voces[(v.vecino + i) % voces.length]!,
         motivo: voces[(v.vecino * 7 + i) % voces.length]!,
+        recuerdo: i % 2 ? 'Fui a la tienda del pueblo.' : '',
       };
     });
     const text = JSON.stringify({ decisiones });
@@ -79,6 +90,7 @@ const simulated: LLMProvider = {
 
 const provider: ProviderId = providerFromKey(process.env.BITOPOLIS_API_KEY, process.env.BITOPOLIS_AI_BASE_URL);
 const model = modelFor(provider, process.env.BITOPOLIS_AI_MODEL, 'cheap');
+const directorModel = modelFor(provider, process.env.BITOPOLIS_AI_DIRECTOR_MODEL ?? process.env.BITOPOLIS_AI_MODEL, 'premium');
 const recordings = new Map<string, LLMResult>();
 let llm: LLMProvider = simulated;
 let source = 'simulador local (sin red)';
@@ -105,6 +117,8 @@ const spending: Record<string, number> = {};
 let plans = 0;
 let gestures = 0;
 const thoughts: string[] = [];
+const notes: string[] = [];
+const dir = { calls: 0, valid: 0, tokensIn: 0, tokensCached: 0, tokensOut: 0, picked: {} as Record<string, number>, warned: {} as Record<string, number>, fired: 0, chronicles: [] as string[] };
 const shopSales: number[] = [];
 
 for (let seed = 1; seed <= Number(values.seeds); seed++) {
@@ -147,6 +161,7 @@ for (let seed = 1; seed <= Number(values.seeds); seed++) {
             if (a.plan.tipo !== 'ninguno') plans++;
             if (a.gesto.tipo !== 'ninguno') gestures++;
             if (a.pensamiento) thoughts.push(a.pensamiento);
+            if (a.recuerdo) notes.push(a.recuerdo);
           }
           acts.push(...parsed.acts);
           // Como el servidor: a los que se deja, una segunda pregunta.
@@ -156,7 +171,33 @@ for (let seed = 1; seed <= Number(values.seeds); seed++) {
           if (totals.errors <= 3) console.error('error de la IA:', (e as Error).message);
         }
       }
-      if (acts.length) applyCommand(state, { type: 'TownTurn', n: t.n, acts });
+      // Director (turnos semanales).
+      let director: { director: DirectorChoice; focus: string; chronicle: string } | null = null;
+      if (t.kind === 'semana') {
+        const req = buildDirectorRequest(state, shared);
+        dir.calls++;
+        try {
+          const r = await llm.complete({ system: req.system, shared: req.shared, user: req.user, schema: req.schema, model: directorModel, maxTokens: 900 });
+          if (values.record) recordings.set(ReplayProvider.key({ system: req.system, shared: req.shared, user: req.user }), r);
+          dir.tokensIn += r.usage.in || tokens(req.system + req.shared + req.user);
+          dir.tokensCached += r.usage.cachedIn;
+          dir.tokensOut += r.usage.out || tokens(r.text);
+          director = parseDirector(r.text, req.ids, `${req.shared}\n${req.user}`);
+          if (director) {
+            dir.valid++;
+            for (const x of director.director.sucesos) dir.picked[x.id.split(':')[0]!] = (dir.picked[x.id.split(':')[0]!] ?? 0) + 1;
+            for (const x of director.director.avisos) dir.warned[x.id.split(':')[0]!] = (dir.warned[x.id.split(':')[0]!] ?? 0) + 1;
+            if (director.chronicle) dir.chronicles.push(director.chronicle);
+          }
+        } catch (e) {
+          totals.errors++;
+          if (totals.errors <= 3) console.error('error del director:', (e as Error).message);
+        }
+      }
+      if (acts.length) {
+        applyCommand(state, { type: 'TownTurn', n: t.n, acts, ...(director ? { director: director.director, focus: director.focus, chronicle: director.chronicle } : {}) });
+        if (director) dir.fired += state.ai!.log.at(-1)!.lines.filter((l) => l.text.startsWith('✦')).length;
+      }
     }
   }
   for (const s of state.stats.slice(-12)) shopSales.push(s.margin ?? 0);
@@ -200,6 +241,19 @@ const report = {
   gestures,
   distinctThoughtsPct: pct(new Set(thoughts).size, thoughts.length),
   sampleThoughts: [...new Set(thoughts)].slice(0, 10),
+  notesPct: pct(notes.length, totals.parsed),
+  sampleNotes: [...new Set(notes)].slice(-6),
+  director: {
+    model: directorModel,
+    calls: dir.calls,
+    validPct: pct(dir.valid, dir.calls),
+    perCall: { tokensIn: dir.tokensIn / Math.max(1, dir.calls), tokensCached: dir.tokensCached / Math.max(1, dir.calls), tokensOut: dir.tokensOut / Math.max(1, dir.calls) },
+    eurPorTurno: +costEur(DEFAULT_PRICES, directorModel, 'anthropic', { in: dir.tokensIn / Math.max(1, dir.calls), cachedIn: dir.tokensCached / Math.max(1, dir.calls), out: dir.tokensOut / Math.max(1, dir.calls) }).toFixed(4),
+    picked: dir.picked,
+    warned: dir.warned,
+    fired: dir.fired,
+    sampleChronicles: dir.chronicles.slice(-4),
+  },
   avgBusinessMargin: shopSales.length ? Math.round(sum(shopSales) / shopSales.length) : 0,
 };
 if (values.record) writeFileSync(values.record, JSON.stringify(Object.fromEntries(recordings), null, 1));

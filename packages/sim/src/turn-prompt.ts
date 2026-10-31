@@ -20,7 +20,7 @@ import { GESTURES, gestureCandidates, isAiCitizen, PLANS, planText, SPEND, type 
  * La salida tiene un esquema fijo (sin uniones por vecino); cada parte se valida
  * en el motor con el menú del vecino. Nunca va texto libre del jugador.
  */
-export const TURN_PROMPT_VERSION = 6;
+export const TURN_PROMPT_VERSION = 7;
 
 export const TURN_SYSTEM = `Eres la mente de los vecinos de Bitópolis, un pueblo español pequeño. Cada semana decides, a la vez, qué hace cada vecino de la lista. Ellos viven de verdad: trabajan, compran, se enamoran, se enfadan, ahorran o se arruinan, y reaccionan a lo que hace el alcalde (el jugador).
 
@@ -33,10 +33,11 @@ Para cada vecino del lote devuelve exactamente un objeto con:
 - "plan": un ultimátum o propósito con plazo si de verdad le importa algo ("irse_si_no", "protestar_si_no", "votar_en_contra_si_no", con la "necesidad" de su lista y los "meses", de 1 a 6), o "ninguno". Úsalo con moderación: es una promesa que el pueblo recordará.
 - "pensamiento": una frase en primera persona, en español de España, con su tono y su vida (máx. 140 caracteres).
 - "motivo": por qué hace lo que hace esta semana, en una frase corta en primera persona (máx. 160 caracteres).
+- "recuerdo": lo que apunta de esta semana para acordarse (un hecho, no un sentimiento; máx. 120 caracteres), o "" si no pasó nada. Sus notas anteriores están en "sus_notas".
 
 Reglas:
 - Decide según su personalidad (rasgos 0-100), su deseo, su miedo, su situación (dinero, deudas, trabajo, casa), sus relaciones, sus recuerdos y lo que ha hecho el alcalde. La terquedad alta puede llevar a decisiones poco racionales.
-- Coherencia: recuerda lo que pensaba y lo que hizo la semana pasada; si tenía un plan, actúa en consecuencia.
+- Coherencia: recuerda lo que pensaba, sus notas y lo que hizo la semana pasada; si tenía un plan, actúa en consecuencia.
 - Variedad: no todos hacen lo mismo ni suenan igual. Que pasen cosas, buenas y malas, pero creíbles. "seguir" es válido, pero en cada lote algunos vecinos deberían hacer algo (cambiar de trabajo, mudarse, abrir o cerrar un negocio, contratar, unirse a una asociación, pedir, quejarse, tener un hijo, acercarse a alguien…) si su situación lo justifica.
 - No repitas lo que pensaba la semana pasada ("pensaba"): cuenta algo nuevo de su vida, del pueblo o de otro vecino.
 - Dinero con cabeza: con deudas, sin trabajo o "no llega", el ocio sobra; con dinero de sobra, puede gastar, invertir o ayudar al negocio del pueblo.
@@ -120,6 +121,7 @@ function citizenBrief(state: GameState, c: Citizen) {
     recuerdos: [...c.memories].sort((a, b) => b.importance - a.importance).slice(0, 3).map((m) => memoryText(state, m)),
     ...(hook ? { gancho: HOOK_TEXT[hook.kind] } : {}),
     ...(c.thought ? { pensaba: c.thought } : {}),
+    ...(c.notes?.length ? { sus_notas: c.notes.map((n) => n.text) } : {}),
     ...(lastLine ? { la_semana_pasada: lastLine.text } : {}),
     ...(c.plan ? { su_plan: planText(c.plan) } : {}),
     actitud_anterior: c.attitude ?? 0,
@@ -164,8 +166,9 @@ export const TURN_SCHEMA = {
           },
           pensamiento: { type: 'string' },
           motivo: { type: 'string' },
+          recuerdo: { type: 'string' },
         },
-        required: ['vecino', 'accion', 'gesto', 'actitud', 'gasto', 'plan', 'pensamiento', 'motivo'],
+        required: ['vecino', 'accion', 'gesto', 'actitud', 'gasto', 'plan', 'pensamiento', 'motivo', 'recuerdo'],
         additionalProperties: false,
       },
     },
@@ -210,6 +213,7 @@ const ActSchema = z.object({
   plan: z.object({ tipo: z.string().max(40), necesidad: z.string().max(30), meses: z.number() }),
   pensamiento: z.string().max(600),
   motivo: z.string().max(600),
+  recuerdo: z.string().max(600).optional(),
 });
 
 const clean = (s: string, max: number) =>
@@ -245,6 +249,8 @@ export function parseTurn(text: string, ids: number[], sent: string): { acts: Tu
     let motivo = clean(a.motivo, 160);
     if (inventedName(pensamiento, sent)) pensamiento = '';
     if (inventedName(motivo, sent)) motivo = '';
+    let recuerdo = clean(a.recuerdo ?? '', 120);
+    if (inventedName(recuerdo, sent)) recuerdo = '';
     acts.push({
       vecino: a.vecino,
       accion: /^[a-z_]+(:[a-z0-9_]+)?$/.test(accion) ? accion : 'seguir',
@@ -254,6 +260,7 @@ export function parseTurn(text: string, ids: number[], sent: string): { acts: Tu
       plan: { tipo: a.plan.tipo, necesidad: a.plan.necesidad, meses: Math.max(0, Math.min(12, Math.round(a.plan.meses))) },
       pensamiento,
       motivo,
+      ...(recuerdo ? { recuerdo } : {}),
     });
   }
   return { acts, missing: ids.filter((id) => !acts.some((a) => a.vecino === id)) };
