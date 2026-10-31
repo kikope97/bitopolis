@@ -303,9 +303,13 @@ export function startGame(opts: GameOptions): void {
       for (const k of keep) seenEvents.add(k);
     }
     for (const e of fresh) if (e.kind === 'decision' && e.ref) addBubble(e.ref, e.tick);
+    // v1.4: a x10 solo avisa lo importante; lo demás queda en el diario (antes llenaba la pantalla).
+    const quiet = speed >= 10;
     const arrivals = fresh.filter((e) => e.kind === 'arrival');
     if (arrivals.length) sfx.arrival();
-    if (arrivals.length === 1) toast(arrivals[0]!.text, { kind: 'good' });
+    if (quiet) {
+      /* llegadas: en el contador de vecinos y en el diario */
+    } else if (arrivals.length === 1) toast(arrivals[0]!.text, { kind: 'good' });
     else if (arrivals.length > 1) toast(`Llegan ${arrivals.length} vecinos nuevos`, { kind: 'good' });
     const built = fresh.filter((e) => e.kind === 'built');
     for (const e of built) {
@@ -317,12 +321,13 @@ export function startGame(opts: GameOptions): void {
     }
     if (built.length) sfx.done();
     const notified = built.filter((e) => e.notify);
-    for (const e of notified) {
-      toast(e.text, { kind: 'good', sticky: true, onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+    if (quiet && notified.length > 1) toast(`${notified.length} obras terminadas`, { kind: 'good' });
+    for (const e of quiet && notified.length > 1 ? [] : notified) {
+      toast(e.text, { kind: 'good', sticky: !quiet, onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
       vibrate(80);
       calmPause();
     }
-    const plain = built.filter((e) => !e.notify);
+    const plain = quiet ? [] : built.filter((e) => !e.notify);
     if (plain.length === 1) toast(plain[0]!.text, { kind: 'good' });
     else if (plain.length > 1) toast(`${plain.length} obras terminadas`, { kind: 'good' });
     for (const e of fresh) {
@@ -353,38 +358,45 @@ export function startGame(opts: GameOptions): void {
         calmPause();
         openElectionNight(social);
       } else if (e.kind === 'politics') {
+        if (quiet && !e.text.startsWith('Faltan')) continue;
         toast(e.text, { kind: e.text.startsWith('Faltan') && state.politics.approval < 50 ? 'warn' : 'info', sticky: e.text.startsWith('Faltan'), onClick: () => openPolitics(social) });
         if (e.text.startsWith('Faltan') || e.text.includes('funda')) calmPause();
       } else if (e.kind === 'departure' || e.kind === 'business') {
-        toast(e.text, { kind: 'warn' });
+        if (!quiet) toast(e.text, { kind: 'warn' });
         calmPause();
       }
     }
   }
 
   /* ---------- burbujas con el motivo ---------- */
-  const bubbles: { el: HTMLElement; tx: number; ty: number }[] = [];
+  const bubbles: { el: HTMLElement; tx: number; ty: number; close: () => void }[] = [];
   function addBubble(citizenId: number, tick: number) {
     const entry = [...state.decisionLog].reverse().find((d) => d.citizenId === citizenId && d.tick === tick);
     const c = state.citizens.find((x) => x.id === citizenId);
     const name = c?.name ?? 'Un vecino';
     const where = state.buildings.find((b) => b.id === (c?.homeId ?? c?.jobId)) ?? state.buildings.find((b) => b.kind === 'townhall');
     if (!entry || !where) return;
+    // v1.4: a x10 no salen (llenaban la pantalla); la decisión queda en el diario.
+    // A x3, una sola y breve; parado o a x1, como mucho dos (una en el móvil).
+    if (speed >= 10) return;
+    const max = speed >= 3 || window.innerWidth < 720 ? 1 : 2;
+    while (bubbles.length >= max) bubbles[0]!.close();
     const el = makeBubble(name, entry.motivo, entry.source === 'ai');
-    const b = { el, tx: where.x, ty: where.y };
+    const b = { el, tx: where.x, ty: where.y, close: () => {} };
     bubbles.push(b);
     const close = () => {
       el.remove();
       const i = bubbles.indexOf(b);
       if (i >= 0) bubbles.splice(i, 1);
     };
+    b.close = close;
     el.addEventListener('click', () => {
       close();
       if (c?.named) openCitizen(social, c.id);
       else focusBuilding(where.id);
     });
     // Sin límite de tiempo con movimiento reducido; si no, según lo largo del texto.
-    if (!reducedMotion()) setTimeout(close, Math.max(9000, entry.motivo.length * 90));
+    if (!reducedMotion()) setTimeout(close, speed >= 3 ? 4000 : Math.max(8000, entry.motivo.length * 70));
   }
   function placeBubbles() {
     if (!bubbles.length) return;
@@ -393,8 +405,13 @@ export function startGame(opts: GameOptions): void {
       const r = canvas.getBoundingClientRect();
       const x = r.left + ((b.tx + 0.5) * tileSize() - cam.x) / dpr() - wrap.left;
       const y = r.top + (b.ty * tileSize() - 16 * cam.zoom - cam.y) / dpr() - wrap.top;
-      b.el.style.left = `${Math.round(x)}px`;
-      b.el.style.top = `${Math.round(y)}px`;
+      // Siempre dentro del mapa (antes se salían por los lados y tapaban la mitad).
+      const w = b.el.offsetWidth;
+      const hgt = b.el.offsetHeight;
+      const cx = Math.max(w / 2 + 4, Math.min(wrap.width - w / 2 - 4, x));
+      const cy = Math.max(hgt + 4, Math.min(wrap.height - 8, y));
+      b.el.style.left = `${Math.round(cx)}px`;
+      b.el.style.top = `${Math.round(cy)}px`;
     }
   }
 

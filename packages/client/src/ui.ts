@@ -57,6 +57,8 @@ export function toast(text: string, opts: { sticky?: boolean; kind?: 'info' | 'w
   }
   if (opts.sticky) {
     el.classList.add('sticky');
+    // v1.4: fuera del modo tranquilo, también los fijos se van solos (se acumulaban y tapaban el mapa).
+    if (!prefs().calm) el.dataset.timer = String(setTimeout(() => el.remove(), 15000));
     const x = h('button', { class: 'toast-close', 'aria-label': 'Cerrar aviso' }, '✕');
     x.addEventListener('click', (e) => {
       e.stopPropagation();

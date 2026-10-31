@@ -596,3 +596,7 @@ body.placing #toasts { bottom: calc(200px + env(safe-area-inset-bottom)); }
 /* Ayuda de la herramienta: dos líneas como mucho, con puntos suspensivos (no cortada a media línea). */
 .tool-info { max-height: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .tool-info:empty { display: none; }
+/* Burbujas de decisión (v1.4): pequeñas y sin capturar el dedo en táctil. */
+.bubble { max-width: min(220px, 60vw); padding: 5px 8px; font-size: 0.8rem; line-height: 1.25; box-shadow: 3px 3px 0 #333c57; }
+.bubble-text { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+@media (pointer: coarse) { .bubble { pointer-events: none; } }
