@@ -211,7 +211,8 @@ export function associationsDay(state: GameState): void {
     // Además de los socios con nombre, se suman vecinos anónimos del barrio; y cada vez que
     // vuelven a salir sin solución, son más (v1.8).
     const times = a.protests ?? 0;
-    const crowd = Math.round((marchers.length * 3 + a.members.length * 1.5) * (1 + ASSOCIATIONS.growth * times));
+    // Ronda 14: nunca más gente que la que vive en el pueblo.
+    const crowd = Math.min(state.citizens.length, Math.round((marchers.length * 3 + a.members.length * 1.5) * (1 + ASSOCIATIONS.growth * times)));
     for (const c of marchers) addMemory(state, c, 'se_manifesto', 4, -2);
     if (!marchers.length) {
       pushEvent(state, 'protest', `La manifestación de la ${a.name} se queda en nada: casi nadie acude`, { ref: a.id });

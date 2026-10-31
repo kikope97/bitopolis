@@ -63,7 +63,7 @@ export const JOBS: Record<BuildingKind, number> = {
   cemetery: 0,
   library: 2,
   sports: 2,
-  jail: 4,
+  jail: 1, // ronda 14: con 4 empleos costaba ~4.100 €/mes sin beneficio medible
   house: 0,
   res: 0,
   shop: 3,
@@ -332,9 +332,9 @@ export const ASSOCIATIONS = {
   /** Socios que deciden si van a cada manifestación (el líder y los primeros). */
   deciders: 6,
   /** v1.8: cada manifestación sin solución es mayor que la anterior (+50 % de gente). */
-  growth: 0.5,
+  growth: 0.2, // ronda 14: con 0,5 la marcha llegaba a 4 veces la población
   /** Tras estas manifestaciones sin respuesta, puede haber disturbios. */
-  riotAfter: 3,
+  riotAfter: 4,
   /** Probabilidad de disturbios (a la mitad si la policía puede detener a los alborotadores). */
   riotChance: 0.5,
   /** Reparación de una tienda dañada (euros, la paga el ayuntamiento) y días que tarda. */
@@ -364,10 +364,10 @@ export const CRIME = {
   hotDays: 30,
   hotCrime: 15,
   /** Calabozos por comisaría. */
-  cellsPerStation: 4,
+  cellsPerStation: 2, // ronda 14: con 4 casi nunca se llenaban y la cárcel no servía
   /** Días en el calabozo hasta el traslado (con cárcel) o cumpliendo (sin cárcel). */
   transferDays: 2,
-  cellDays: 30,
+  cellDays: 60,
   /** Plazas y días de condena en la cárcel. */
   jailCapacity: 30,
   jailDays: 60,

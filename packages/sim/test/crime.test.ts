@@ -57,13 +57,13 @@ describe('delincuencia (v1.8)', () => {
     const p = police(s);
     const j = newBuilding(s, 'jail', p.x + 3, p.y, 0);
     j.built = true;
-    expect(tryArrest(s, p.x, p.y, 3)).toBe(3);
+    expect(tryArrest(s, p.x, p.y, CRIME.cellsPerStation)).toBe(CRIME.cellsPerStation);
     for (let i = 0; i < CRIME.transferDays + 1; i++) {
       s.tick += TICKS_PER_DAY;
       crimeDay(s);
     }
     expect(s.justice.cells.length).toBe(0);
-    expect(s.justice.jail.length).toBe(3);
+    expect(s.justice.jail.length).toBe(CRIME.cellsPerStation);
   });
 
   it('en años de juego hay robos; con policía, detenciones; el dinero se conserva', () => {

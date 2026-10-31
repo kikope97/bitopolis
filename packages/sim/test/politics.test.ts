@@ -193,9 +193,12 @@ describe('elecciones (v1.0)', () => {
     const f = (Object.keys(s.politics.factions) as (keyof typeof s.politics.factions)[]).find((k) => s.politics.factions[k].demand && k !== s.politics.party!.faction);
     if (!f) return;
     expect(applyCommand(s, { type: 'Motion', faction: f }).ok).toBe(true);
+    const first = s.politics.motions.at(-1)!.need;
     for (let i = 0; i < TICKS_PER_MONTH + 1; i++) step(s);
+    // Ronda 14: se compara con la primera moción (antes se miraba la última, que podía ser esta).
+    const same = s.politics.factions[f].demand === first;
     const again = applyCommand(s, { type: 'Motion', faction: f });
-    if (s.politics.factions[f].demand === s.politics.motions.at(-1)!.need) expect(again.ok ? '' : again.error).toMatch(/6 meses|comprometió/);
+    if (same) expect(again.ok ? '' : again.error).toMatch(/6 meses|comprometió/);
   });
 
   it('el gobierno rival rechaza lo que no puede hacer (sin obra ni impuesto) si no es de su facción', () => {
