@@ -10,7 +10,7 @@
  */
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { type Association, callProtest, CAUSE_ASK, CAUSE_TEXT, foundAssociation, freshCauses } from './associations.ts';
-import { ASSOCIATIONS, CRIME, DIRECTOR } from './balance.ts';
+import { ASSOCIATIONS, CRIME, DIRECTOR, TRASH } from './balance.ts';
 
 const CRIME_HOT_DAYS = CRIME.hotDays;
 import { homeRobbery, robbery, stationsFor } from './crime.ts';
@@ -27,8 +27,12 @@ import { FACTION_TEXT, FACTIONS, type Faction } from './politics-core.ts';
 import { addHook, addMemory, relation, setRelation } from './social.ts';
 import { type Citizen, type GameState, pushEvent } from './state.ts';
 import { setDirectorImpl, type TurnLog } from './turns.ts';
+import { BUILD_NAMES } from './commands.ts';
+import { trashServed, trashStateOf } from './trash-core.ts';
 
-export const DIRECTOR_KINDS = ['robo_tienda', 'robo_casa', 'asociacion', 'manifestacion', 'pelea', 'reconciliacion', 'gratitud', 'rumor', 'oposicion', 'local', 'encuentro', 'ayuda', 'incendio', 'susto'] as const;
+const plural = (n: number) => (n === 1 ? 'un edificio' : `${n} edificios`);
+
+export const DIRECTOR_KINDS = ['robo_tienda', 'robo_casa', 'asociacion', 'manifestacion', 'pelea', 'reconciliacion', 'gratitud', 'rumor', 'oposicion', 'local', 'encuentro', 'ayuda', 'incendio', 'susto', 'ratas'] as const;
 export type DirectorKind = (typeof DIRECTOR_KINDS)[number];
 
 export interface DirectorCandidate {
@@ -118,6 +122,25 @@ export function directorMenu(state: GameState): DirectorCandidate[] {
       text: `${c.name} se pone mal y la ambulancia llega a tiempo`,
       why: `tiene ${c.age} años y vive cerca del centro de salud con ambulancia`,
     })),
+  );
+  // 2.1: plaga de ratas donde la basura lleva días sin recogerse (con ratas ya, lo justifican los datos).
+  const served = trashServed(state);
+  add(
+    state.buildings
+      .filter((b) => b.built && (b.trash ?? 0) >= TRASH.dirtyAt && !served.has(b.id))
+      .sort((a, b) => (b.trash ?? 0) - (a.trash ?? 0) || a.id - b.id)
+      .map((b) => {
+        const who = state.citizens.find((c) => c.homeId === b.id || c.jobId === b.id);
+        const where = b.name ?? (who ? `casa de ${who.name}` : (BUILD_NAMES[b.kind] ?? 'una calle').toLowerCase());
+        return {
+          id: `ratas:${b.id}`,
+          kind: 'ratas' as const,
+          bad: true,
+          text: `Una plaga de ratas sale de la basura junto a ${where} y se extiende por la calle`,
+          why: `${trashStateOf(b) === 'ratas' ? 'ya hay ratas' : 'bolsas amontonadas'} y no pasa el camión de la basura`,
+          owed: trashStateOf(b) === 'ratas',
+        };
+      }),
   );
 
   // Asociaciones y manifestaciones.
@@ -305,6 +328,8 @@ function brewingText(c: DirectorCandidate): string {
       return `Hay vecinos organizándose: ${c.why}`;
     case 'manifestacion':
       return `${c.text.replace('convoca', 'prepara')}: ${c.why}`;
+    case 'ratas':
+      return `Se ven ratas cerca de la basura sin recoger (${c.why})`;
     case 'pelea':
       return `Hay tensión: ${c.text.replace('discuten', 'no se ponen de acuerdo')}`;
     case 'oposicion':
@@ -429,6 +454,22 @@ function perform(state: GameState, c: DirectorCandidate): { id: number; text: st
       const x = byId(state, Number(arg));
       if (!x || !scare(state, x)) return null;
       return { id: x.id, text: c.text };
+    }
+    case 'ratas': {
+      const b = state.buildings.find((x) => x.id === Number(arg));
+      if (!b || (b.trash ?? 0) < TRASH.dirtyAt || trashServed(state).has(b.id)) return null;
+      // La plaga: su basura llega a las ratas y se extiende a los edificios de alrededor sin recogida.
+      const served = trashServed(state);
+      const hit = state.buildings.filter((x) => x.built && !served.has(x.id) && Math.abs(x.x - b.x) + Math.abs(x.y - b.y) <= TRASH.plagueRadius);
+      for (const x of hit) x.trash = Math.min(TRASH.max, Math.max(x.trash ?? 0, x === b ? TRASH.ratsAt : TRASH.dirtyAt));
+      const ids = new Set(hit.map((x) => x.id));
+      const people = state.citizens.filter((c) => (c.homeId !== null && ids.has(c.homeId)) || (c.jobId !== null && ids.has(c.jobId)));
+      for (const c of people) {
+        c.grudge = Math.min(20, c.grudge + 1);
+        if (c.named) addMemory(state, c, 'ratas', 3, -2);
+      }
+      pushEvent(state, 'warning', `${c.text}: ${plural(hit.length)} sin recogida de basura`, { ref: b.id, notify: true });
+      return { id: people[0]?.id ?? 0, text: c.text };
     }
     case 'local': {
       const [a, b] = pair();

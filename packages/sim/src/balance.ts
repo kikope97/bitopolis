@@ -35,6 +35,8 @@ export const BUILD: Record<BuildKind, BuildSpec> = {
   // 2.1: emergencias.
   firestation: { materials: 4_500, workers: 4, days: 3, unlockPop: 20 },
   civilprotection: { materials: 2_500, workers: 3, days: 2, unlockPop: 30 },
+  // 2.1: punto limpio con camión de la basura.
+  cleanpoint: { materials: 2_500, workers: 3, days: 3, unlockPop: 20 },
 };
 
 /** Obras que crecen solas sobre zonas (las paga un inversor de fuera). */
@@ -66,6 +68,8 @@ export const JOBS: Record<BuildingKind, number> = {
   cemetery: 0,
   library: 2,
   sports: 2,
+  // 2.1: el camión es una contrata (va en el mantenimiento): sin plantilla municipal.
+  cleanpoint: 0,
   jail: 1, // ronda 14: con 4 empleos costaba ~4.100 €/mes sin beneficio medible
   firestation: 3,
   civilprotection: 1,
@@ -95,6 +99,8 @@ export const MAINTENANCE: Record<BuildingKind, number> = {
   jail: 500,
   firestation: 350,
   civilprotection: 120,
+  // 2.1: incluye la contrata del camión de la basura.
+  cleanpoint: 200,
   house: 20,
   res: 0,
   shop: 0,
@@ -214,8 +220,12 @@ export const DEBT_INTEREST_CAP = 0.25;
 export const TAX_SPLIT_POP = 50;
 /** IBI anual sobre el valor del inmueble (escala del juego). */
 export const IBI_RATE = { low: 0.05, medium: 0.07, high: 0.1 } as const;
-/** Tasa de basuras por hogar y mes, y de terrazas por comercio y mes. */
-export const TASA_BASURAS = { low: 10, medium: 15, high: 24 } as const;
+/**
+ * Tasa de basuras por vecino y mes, y de terrazas por comercio y mes.
+ * 2.1: la de basuras solo la paga quien tiene recogida (trash.ts); como ya paga
+ * un servicio de verdad (camión y punto limpio), sube un 20 % (10/15/24 → 12/18/28).
+ */
+export const TASA_BASURAS = { low: 12, medium: 18, high: 28 } as const;
 export const TASA_TERRAZAS = { low: 40, medium: 60, high: 95 } as const;
 /** Plusvalía municipal sobre la ganancia de una compraventa. */
 export const PLUSVALIA_RATE = { low: 0.1, medium: 0.2, high: 0.3 } as const;
@@ -702,4 +712,55 @@ export const RANK = {
   /** Piezas y lemas que entran en cada votación. */
   pieceChoices: 3,
   mottoChoices: 3,
+} as const;
+
+/**
+ * 2.1: basura y punto limpio. Cada edificio con gente acumula basura al día; el
+ * camión del punto limpio recorre cada día unas casillas de carretera (por la
+ * red, desde el punto limpio) y vacía los edificios que dan a ellas. Sin
+ * recogida, la basura se amontona: bolsas, suciedad en la calle y, más arriba,
+ * ratas. La tasa de basuras solo se cobra a quien tiene recogida. Ver trash.ts.
+ */
+export const TRASH = {
+  /** Basura al día por vecino que vive en el edificio y por persona que trabaja en él. */
+  perResident: 2,
+  perWorker: 1,
+  /** De más al día por la actividad (tiendas, bar, mercado y talleres). */
+  activity: { shop: 3, market: 4, bar: 2, factory: 3 } as Partial<Record<BuildingKind, number>>,
+  /** Bolsas en la calle a partir de aquí; ratas, más arriba; tope. */
+  dirtyAt: 40,
+  ratsAt: 120,
+  max: 150,
+  /** Campo de suciedad (0–100): radio alrededor de cada edificio sucio. */
+  dirtRadius: 2,
+  /** Felicidad que resta la suciedad en la calle (campo ≥ dirtyField) y las ratas (campo ≥ ratsField). */
+  dirtyField: 25,
+  ratsField: 70,
+  dirtyMood: 2,
+  ratsMood: 5,
+  /** Delincuencia de más donde la calle está sucia (fracción, a pleno con ratas). */
+  crimeBoost: 0.1,
+  /** Casillas de carretera que recorre el camión al día en el nivel 1 (× capacidad del nivel). */
+  route: 60,
+  /** Con nieve, el camión no llega a las calles nevadas: recorre esta parte. */
+  snowRoute: 0.5,
+  /** Días de aviso desde que se puede construir el punto limpio hasta que la basura empieza a acumularse. */
+  warnDays: 20,
+  /** Partidas de antes (migradas): días de gracia antes de que se ensucien. */
+  graceDays: 60,
+  /** Nivel 2 (reciclaje): tasa más barata y facción ecologista más contenta. */
+  recyclingDiscount: 0.2,
+  recyclingFaction: 6,
+  /** Nivel 3 (compostaje): el abono se vende fuera, por vecino atendido y mes. */
+  compostPerResident: 3,
+  /** «Tirar al monte»: contaminación cerca de casa (puntos y radio). */
+  dumpPollution: 30,
+  dumpRadius: 2,
+  /** Por reglas: un vecino terco con ratas en casa la tira al monte uno de cada tantos días. */
+  dumpTerco: 70,
+  dumpEvery: 7,
+  /** Director: la plaga de ratas se extiende a los edificios cercanos. */
+  plagueRadius: 3,
+  /** Días entre avisos de ratas. */
+  warnEveryDays: 7,
 } as const;

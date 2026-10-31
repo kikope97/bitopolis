@@ -50,6 +50,8 @@ export type BuildingKind =
   /** 2.1: emergencias. */
   | 'firestation'
   | 'civilprotection'
+  /** 2.1: punto limpio (recogida de basura). */
+  | 'cleanpoint'
   | 'house'
   /** Crecen solos sobre zonas. */
   | 'res'
@@ -94,6 +96,8 @@ export interface Building {
   forSale?: boolean;
   /** Viviendas de una casa municipal que ya no son del ayuntamiento. */
   privateUnits?: number;
+  /** 2.1: basura acumulada sin recoger (ver trash.ts). */
+  trash?: number;
 }
 
 /** Obra en curso: necesita obreros × días. */
@@ -390,6 +394,8 @@ export interface GameState {
   justice: Justice;
   /** Última despedida (como mucho una por semana). */
   lastDeathTick?: number;
+  /** 2.1: basura. `start`: desde qué tick se acumula (−1: aún no); `graceUntil`: gracia de las partidas migradas; `warned`: último aviso de ratas. */
+  trash?: { start: number; graceUntil?: number; warned?: number };
   /** 2.1: rango del pueblo (aldea → capital comarcal) y su escudo (rank.ts). */
   rank?: TownRank;
   /** 2.1: diques (índices de casilla) y contadores de emergencias. */
@@ -512,6 +518,7 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiSh
     dikes: [],
     emergencies: { fires: 0, putOut: 0, saved: 0, floodsAvoided: 0 },
     rank: emptyRank(seed, terrain),
+    trash: { start: -1 },
   };
   // Árboles dispersos (se talan gratis al construir encima).
   for (let i = 0; i < tiles.length; i++) {

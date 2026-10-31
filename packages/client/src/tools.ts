@@ -27,6 +27,7 @@ export type ToolId =
   | 'firestation'
   | 'civilprotection'
   | 'dike'
+  | 'cleanpoint'
   | 'demolish';
 
 export interface Tool {
@@ -67,6 +68,8 @@ export const TOOLS: Tool[] = [
   { id: 'firestation', label: 'Bomberos', shape: 'tap', build: 'firestation', key: 'f', help: 'Parque de bomberos: en 9 casillas apaga los incendios en pocas horas. Sin él, lo que arde queda destrozado. Con cisterna (nivel 2) llega a las colinas.' },
   { id: 'civilprotection', label: 'Protección civil', shape: 'tap', build: 'civilprotection', key: 'v', help: 'Caseta de voluntarios: en 10 casillas, las riadas un 60 % menos y el quitanieves a mitad de precio. Permite levantar diques.' },
   { id: 'dike', label: 'Dique', shape: 'tap', key: 'q', help: 'Muro en una casilla junto al río: ahí y alrededor no llega la riada. Hace falta una caseta de protección civil.' },
+  // 2.1: recogida de basura.
+  { id: 'cleanpoint', label: 'Punto limpio', shape: 'tap', build: 'cleanpoint', key: 'u', help: 'Su camión recoge la basura por las calles de alrededor (60 casillas al día). Solo quien tiene recogida paga la tasa de basuras.' },
   { id: 'dezone', label: 'Sin zona', shape: 'rect', zone: 'none', key: 'z', help: 'Quita la zona (no derriba lo construido).' },
   { id: 'demolish', label: 'Derribar', shape: 'tap', key: 'x', help: 'Derriba un edificio o una carretera. Pide confirmación.' },
 ];
@@ -124,7 +127,7 @@ export function trayCost(tool: Tool): string {
 export const TRAY: { title: string; tools: ToolId[] }[] = [
   { title: 'Lo básico', tools: ['house', 'water', 'power'] },
   { title: 'Zonas (los vecinos construyen)', tools: ['zoneR', 'zoneC', 'zoneI', 'dezone'] },
-  { title: 'Servicios', tools: ['park', 'school', 'clinic', 'police', 'jail'] },
+  { title: 'Servicios', tools: ['park', 'school', 'clinic', 'police', 'cleanpoint', 'jail'] },
   { title: 'Vida social', tools: ['bar', 'chapel', 'cemetery', 'library', 'sports'] },
   { title: 'Emergencias', tools: ['firestation', 'civilprotection', 'dike'] },
   { title: 'Premios de los hitos', tools: ['plaza', 'market'] },

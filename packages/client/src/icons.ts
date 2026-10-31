@@ -283,6 +283,42 @@ const ICONS: Record<string, { rows: string[]; colors: Record<string, number> }> 
     ],
     colors: { k: 44, l: 5, g: 41, d: 42, t: 18 },
   },
+  // 2.1: contenedor de basura (recogida, punto limpio, capa «Limpieza»).
+  trash: {
+    rows: [
+      '....kkkk....',
+      '.kkkkkkkkkk.',
+      '.kllllllllk.',
+      'kkkkkkkkkkkk',
+      '.kggggggggk.',
+      '.kgdgdgdgdk.',
+      '.kgdgdgdgdk.',
+      '.kgdgdgdgdk.',
+      '.kgdgdgdgdk.',
+      '.kggggggggk.',
+      '..kkkkkkkk..',
+      '..kk....kk..',
+    ],
+    colors: { k: 44, l: 41, g: 6, d: 42 },
+  },
+  // 2.1: rata (basura sin recoger).
+  rat: {
+    rows: [
+      '............',
+      '............',
+      '.......pp...',
+      '.....kkkkp..',
+      '...kkkkkkkk.',
+      '..kkkkkkkwkk',
+      '.kkkkkkkkkkp',
+      'pkkkkkkkkkk.',
+      'p.kkkkkkkk..',
+      'p..k.k..k.k.',
+      '.p..........',
+      '............',
+    ],
+    colors: { k: 53, p: 61, w: 12 },
+  },
   sun: {
     rows: [
       '.....yy.....',

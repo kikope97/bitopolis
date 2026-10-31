@@ -1,6 +1,6 @@
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { rememberDeparted } from './family.ts';
-import { CAMPAIGN_MONTHS } from './balance.ts';
+import { CAMPAIGN_MONTHS, TRASH } from './balance.ts';
 import { directorOwns } from './director-core.ts';
 import { BUILD_NAMES } from './commands.ts';
 import { canFound, freeShopLot, saturated, taxLevels } from './economy.ts';
@@ -93,6 +93,10 @@ export const MEMORY_KINDS = [
   'voluntario',
   'ambulancia',
   'susto',
+  // 2.1: basura.
+  'ratas',
+  'tiro_basura',
+  'vio_tirar_basura',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -161,7 +165,7 @@ export interface Hook {
   expires: number;
 }
 
-export const NEEDS = ['parque', 'colegio', 'centro_salud', 'policia', 'empleo', 'agua_luz', 'bajar_tasas', 'bajar_ibi'] as const;
+export const NEEDS = ['parque', 'colegio', 'centro_salud', 'policia', 'empleo', 'agua_luz', 'bajar_tasas', 'bajar_ibi', 'recogida'] as const;
 export type Need = (typeof NEEDS)[number];
 export interface Petition {
   id: number;
@@ -342,6 +346,12 @@ export function memoryText(state: GameState, m: Memory): string {
       return 'La ambulancia le salvó la vida';
     case 'susto':
       return 'Se llevó un susto, pero la ambulancia llegó enseguida';
+    case 'ratas':
+      return 'Vio ratas en su calle por la basura sin recoger';
+    case 'tiro_basura':
+      return 'Tiró la basura al monte porque no pasa el camión';
+    case 'vio_tirar_basura':
+      return `Vio a ${who} tirar la basura al monte`;
   }
 }
 
@@ -678,9 +688,16 @@ export const NEED_TEXT: Record<Need, string> = {
   agua_luz: 'agua y luz para todas las casas',
   bajar_tasas: 'bajar las tasas',
   bajar_ibi: 'bajar el IBI',
+  recogida: 'que pase el camión de la basura',
 };
 
-const NEED_KIND: Partial<Record<Need, string>> = { parque: 'park', colegio: 'school', centro_salud: 'clinic', policia: 'police' };
+const NEED_KIND: Partial<Record<Need, string>> = { parque: 'park', colegio: 'school', centro_salud: 'clinic', policia: 'police', recogida: 'cleanpoint' };
+
+/** 2.1: su calle está sucia (bolsas o ratas) y el camión no pasa. */
+function dirtyHome(state: GameState, c: Citizen): boolean {
+  const home = state.buildings.find((b) => b.id === c.homeId);
+  return !!home && (state.fields.dirt?.[home.y * state.map.w + home.x] ?? 0) >= TRASH.dirtyField;
+}
 const LEVEL = { low: 0, medium: 1, high: 2 } as const;
 
 function needBaseline(state: GameState, need: Need): number {
@@ -713,7 +730,9 @@ export function needsOf(state: GameState, c: Citizen): Need[] {
   const first = needOf(state, c);
   // Un servicio saturado cuenta como carencia: piden otro.
   const lacks = (kind: string) => !state.buildings.some((b) => b.kind === kind) || saturated(state, kind as never);
-  const rest = NEEDS.filter((n) => n !== first && (NEED_KIND[n] ? lacks(NEED_KIND[n]!) : n === 'bajar_tasas' && canLower(state, n)));
+  const rest = NEEDS.filter(
+    (n) => n !== first && (n === 'recogida' ? dirtyHome(state, c) : NEED_KIND[n] ? lacks(NEED_KIND[n]!) : n === 'bajar_tasas' && canLower(state, n)),
+  );
   return [first, ...rest.sort((a, b) => (hash32(c.id, a.length) % 7) - (hash32(c.id, b.length) % 7))];
 }
 
@@ -723,6 +742,8 @@ export function needOf(state: GameState, c: Citizen): Need {
   const has = (k: string) => state.buildings.some((b) => b.kind === k && b.built);
   if (home && (!home.hasWater || !home.hasPower)) return 'agua_luz';
   if (c.jobId === null) return 'empleo';
+  // 2.1: con ratas o bolsas en la puerta, lo primero es la basura.
+  if (dirtyHome(state, c)) return 'recogida';
   const lv = taxLevels(state);
   if (lv.tasas === 'high') return 'bajar_tasas';
   if (c.owns && lv.ibi === 'high') return 'bajar_ibi';
@@ -739,6 +760,7 @@ function wantsNeed(state: GameState, c: Citizen, need: Need): boolean {
   if (need === 'bajar_ibi') return c.owns;
   if (need === 'empleo') return c.jobId === null || c.traits.social > 50;
   if (need === 'agua_luz') return true;
+  if (need === 'recogida') return dirtyHome(state, c) || hash32(c.id, 9, state.tick) % 3 === 0;
   return needOf(state, c) === need || hash32(c.id, need.length, state.tick) % 3 !== 0;
 }
 

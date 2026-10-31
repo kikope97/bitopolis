@@ -48,6 +48,7 @@ export const BUILD_NAMES: Record<string, string> = {
   jail: 'Cárcel',
   firestation: 'Parque de bomberos',
   civilprotection: 'Protección civil',
+  cleanpoint: 'Punto limpio',
   clinic: 'Centro de salud',
   police: 'Comisaría',
   plaza: 'Plaza Mayor',

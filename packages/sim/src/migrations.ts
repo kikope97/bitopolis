@@ -4,7 +4,7 @@ import { emptyPolitics } from './politics-core.ts';
 import { FORMAT_VERSION, type GameState } from './state.ts';
 import { emptyRank } from './rank-core.ts';
 import { levelForPop } from './townhall.ts';
-import { RANKS } from './balance.ts';
+import { RANKS, TRASH } from './balance.ts';
 
 /**
  * Migraciones encadenadas: MIGRATIONS[n] convierte un estado de formatVersion
@@ -159,7 +159,7 @@ export const MIGRATIONS: Record<number, Migration> = {
       : {}),
   }),
   // 2.1: emergencias, encargos y periódico (cada parte, en su función).
-  13: (s) => ({ ...migrate14Rank(migrate14Errands(migrate14Fire(s))), formatVersion: 14 }),
+  13: (s) => ({ ...migrate14Trash(migrate14Rank(migrate14Errands(migrate14Fire(s)))), formatVersion: 14 }),
 };
 
 /** 2.1: encargos del pueblo y El Eco de Bitópolis, vacíos (el primero, en unos días). */
@@ -182,6 +182,21 @@ export function migrate14Rank(s: Record<string, any>): Record<string, any> {
   });
   const terrain = s.map?.terrain ?? [];
   return { ...s, rank: emptyRank(s.seed ?? 0, terrain, level, s.tick ?? 0) };
+}
+
+
+/**
+ * 2.1 (basura y punto limpio): campo de suciedad vacío y 60 días de gracia
+ * para que un pueblo de antes no se ensucie de golpe (la basura empieza a
+ * contar cuando se pueda construir el punto limpio, y nunca antes de la gracia).
+ */
+export function migrate14Trash(s: Record<string, any>): Record<string, any> {
+  const n = (s.map?.w ?? 0) * (s.map?.h ?? 0);
+  return {
+    ...s,
+    trash: s.trash ?? { start: -1, graceUntil: (s.tick ?? 0) + TRASH.graceDays * 24 },
+    fields: s.fields ? { ...s.fields, dirt: s.fields.dirt ?? new Array(n).fill(0) } : s.fields,
+  };
 }
 
 export function migrate(raw: unknown): GameState {

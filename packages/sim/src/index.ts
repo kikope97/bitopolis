@@ -38,3 +38,4 @@ export * from './errands.ts';
 export * from './press.ts';
 export * from './fire.ts';
 export * from './rank.ts';
+export * from './trash.ts';

@@ -52,6 +52,7 @@ import {
 } from './economy.ts';
 import { budgetFx, civicDay, festivalMood, onBuildingDone } from './civic.ts';
 import { updateFields } from './fields.ts';
+import { trashDay, trashMood } from './trash.ts';
 import { Terrain } from './terrain.ts';
 import { weatherDay, weatherFx, weatherMood } from './weather.ts';
 import { associationsDay, associationsMonth } from './associations.ts';
@@ -269,6 +270,9 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
     if (pol > 20) f.push({ label: 'Contaminación', value: -Math.round((pol - 20) / 5) });
     if (noise > 25) f.push({ label: 'Ruido', value: -Math.round((noise - 25) / 6) });
     if (crime > 20) f.push({ label: 'Inseguridad', value: -Math.round((crime - 20) / 5) });
+    // 2.1: basura sin recoger en su calle (bolsas o ratas).
+    const dirty = trashMood(state, home);
+    if (dirty) f.push(dirty);
   }
   if (c.jobId !== null) f.push({ label: 'Trabaja en el pueblo', value: 8 });
   else if (c.unemployedSince !== undefined) f.push({ label: 'En paro', value: -JOBS_OUTSIDE.mood });
@@ -558,6 +562,8 @@ function endOfDay(state: GameState): void {
       pushEvent(state, 'info', `Reabre ${b.name ?? BUILD_NAMES[b.kind]?.toLowerCase()} tras la reparación`, { ref: b.id });
     }
   }
+  // 2.1: el camión recoge y se amontona lo que no (antes de los campos: la suciedad sale de ahí).
+  trashDay(state);
   updateFields(state);
   assignHomesAndJobs(state);
   // Inercia: la felicidad baja más rápido de lo que sube.
