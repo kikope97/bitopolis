@@ -78,3 +78,13 @@ export function apply(): void {
   r.dataset.colorblind = current.colorblind;
   r.dataset.motion = lowMotion() ? 'reducido' : 'normal';
 }
+
+// Si cambia «reducir movimiento» del sistema con el juego abierto, se aplica al momento (ronda 10).
+try {
+  window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', () => {
+    apply();
+    for (const l of listeners) l(current);
+  });
+} catch {
+  /* navegadores antiguos: se aplica al recargar */
+}
