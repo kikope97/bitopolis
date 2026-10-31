@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { GameToken } from '@bitopolis/shared';
 import {
@@ -18,9 +18,9 @@ import type { Config } from '../config.ts';
 import type { Db } from '../db/index.ts';
 import type { SettingsStore } from '../settings.ts';
 import { newSeed } from '../tokens.ts';
-import { costEur, PROVIDER_INFO, PROVIDERS, type ProviderId } from './catalog.ts';
+import { costEur, PROVIDER_INFO, PROVIDERS, providerFromKey, type ProviderId } from './catalog.ts';
 import { encryptSecret, maskKey } from './crypto.ts';
-import type { AiService, AiSettings } from './service.ts';
+import { type AiService, type AiSettings, ModelsError } from './service.ts';
 
 /** Medido con `pnpm sim` (ver docs/rondas): decisiones por vecino con nombre y día. */
 export const DECISIONS_PER_CITIZEN_DAY = 0.085;
@@ -73,6 +73,11 @@ const ConfigBody = z.object({
   /** 2.0: % de vecinos con IA (solo con key propia; con la del servidor manda /admin). */
   aiShare: z.number().int().min(0).max(100).optional(),
   accepted: z.boolean(),
+});
+
+const ModelsBody = z.object({
+  key: z.string().trim().min(8, 'La API key es demasiado corta').max(400).optional(),
+  baseUrl: z.string().trim().url('El endpoint no es una URL válida').max(512).optional().or(z.literal('')),
 });
 
 export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Config, ai: AiService, store: SettingsStore): Promise<void> {
@@ -163,6 +168,44 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
     if (exists) await db.updateTable('ai_config').set({ ...values, ...keyValues }).where('game_id', '=', row.id).execute();
     else await db.insertInto('ai_config').values({ key_enc: null, key_mask: null, ...values, ...keyValues }).execute();
     return publicSettings(await ai.settings(row.id));
+  });
+
+  /**
+   * Modelos para el desplegable de Configurar. Con la key del servidor, su
+   * lista solo si la partida puede elegir modelo (403 si lo fija el servidor);
+   * con la del jugador, la guardada (GET) o una escrita y aún sin guardar (POST).
+   * La key nunca vuelve al cliente.
+   */
+  const gameModels = async (req: FastifyRequest, reply: FastifyReply, draft?: z.infer<typeof ModelsBody>) => {
+    const t = tokenOf(req.params);
+    if (!t.success) return bad(reply, 'enlace no válido');
+    const row = await load(t.data);
+    if (row && row.mode !== 'ai') return bad(reply, 'Esta partida es de Modo normal', 409);
+    const s = await ai.settings(row?.id ?? null);
+    const srv = store.get().ai;
+    let key = s.key;
+    let baseUrl = s.baseUrl;
+    if (srv.keyEnc || srv.baseUrl) {
+      // La key del servidor no se manda a otro endpoint ni se cambia desde aquí.
+      if (s.locked.includes('model') && s.locked.includes('modelPremium')) return bad(reply, 'El modelo lo fija el servidor', 403);
+    } else {
+      if (!srv.playerKeys) return bad(reply, 'Este servidor no permite poner una API key propia', 403);
+      if (draft?.key) key = draft.key;
+      if (draft?.baseUrl !== undefined) baseUrl = draft.baseUrl || undefined;
+    }
+    if (!key && !baseUrl) return bad(reply, 'Escribe tu API key y pulsa «Cargar modelos»');
+    try {
+      return await ai.models(providerFromKey(key, baseUrl), key, baseUrl);
+    } catch (e) {
+      if (e instanceof ModelsError) return bad(reply, e.message, 502);
+      throw e;
+    }
+  };
+  app.get('/api/games/:token/ai/models', (req, reply) => gameModels(req, reply));
+  app.post('/api/games/:token/ai/models', async (req, reply) => {
+    const b = ModelsBody.safeParse(req.body ?? {});
+    if (!b.success) return bad(reply, b.error.issues[0]?.message ?? 'datos no válidos');
+    return gameModels(req, reply, b.data);
   });
 
   app.get('/api/games/:token/decisions', async (req, reply) => {

@@ -95,6 +95,30 @@ test('admin: primer acceso, ajustes que valen al momento y vista móvil', async 
   await ia.getByLabel('Servidor al mes').fill('5');
   await saved(ia.getByRole('button', { name: 'Guardar la IA' }));
   await expect(page.locator('.server-ai')).toContainText('Endpoint propio');
+
+  // Modelos (petición del creador): desplegables con los que da la key/endpoint y «Recargar modelos».
+  const vecinos = ia.getByLabel('Modelo de los vecinos (lotes)');
+  const director = ia.getByLabel('Modelo del director (y consejero)');
+  await expect(vecinos).toHaveJSProperty('tagName', 'SELECT');
+  await expect(vecinos.locator('option')).toHaveText(['Por defecto (llama3.2)', 'falso-mini', 'falso-grande', 'falso-viejo', 'Otro…']);
+  await expect(director.locator('option')).toHaveCount(5);
+  await expect(ia.locator('.models-status')).toHaveText('3 modelos disponibles.');
+  await vecinos.selectOption('falso-mini');
+  await director.selectOption({ label: 'Otro…' });
+  await ia.getByLabel('Otro modelo (escríbelo)').fill('falso-a-mano');
+  await saved(ia.getByRole('button', { name: 'Guardar la IA' }));
+  await page.reload();
+  await expect(vecinos).toHaveValue('falso-mini');
+  await expect(director.locator('option:checked')).toHaveText('Otro…');
+  await expect(ia.getByLabel('Otro modelo (escríbelo)')).toHaveValue('falso-a-mano');
+  const listed = page.waitForResponse((r) => r.url().endsWith('/api/admin/ai/models') && r.request().method() === 'GET' && r.ok());
+  await ia.getByRole('button', { name: 'Recargar modelos' }).click();
+  await listed;
+  await expect(page.locator('.toast').last()).toContainText('Modelos cargados');
+  await expect(vecinos).toHaveValue('falso-mini');
+  // La respuesta no trae nunca la key.
+  expect(JSON.stringify(await (await page.request.get(`${ADMIN}/api/admin/ai/models`)).json())).not.toMatch(/sk-/);
+  await shot('3-modelos');
   await page.getByRole('button', { name: 'Guardar y probar' }).click();
   await expect(page.locator('.toast').last()).toContainText('Funciona');
   await visitor.goto(`${ADMIN}/`);
@@ -107,6 +131,12 @@ test('admin: primer acceso, ajustes que valen al momento y vista móvil', async 
   expect(await visitor.evaluate(() => (window as unknown as { __bitopolis: { state: { aiMode: boolean } } }).__bitopolis.state.aiMode)).toBe(true);
   await shot('3-ia');
   await page.getByRole('region', { name: 'IA' }).getByText('Avanzado: endpoint propio y precios').click();
+  // Si la lista falla (este endpoint no da /models), aviso claro y vuelta al campo de texto.
+  await ia.getByLabel('Endpoint propio (Ollama, LM Studio…)').fill('http://localhost:8099/nada');
+  await ia.getByLabel('Endpoint propio (Ollama, LM Studio…)').press('Tab');
+  await expect(ia.locator('.models-status')).toContainText('No se pudo cargar la lista de modelos');
+  await expect(vecinos).toHaveJSProperty('tagName', 'INPUT');
+  await expect(vecinos).toHaveValue('falso-mini');
   await page.getByRole('region', { name: 'IA' }).getByLabel('Endpoint propio (Ollama, LM Studio…)').fill('');
   await page.getByRole('region', { name: 'IA' }).getByRole('button', { name: 'Guardar la IA' }).click();
   await expect(page.locator('.server-ai')).toContainText('Sin IA del servidor');
