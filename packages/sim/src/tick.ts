@@ -1,3 +1,5 @@
+import { errandsDay } from './errands.ts';
+import { pressDay } from './press.ts';
 import { TICKS_PER_DAY, TICKS_PER_MONTH, tickToDate } from '@bitopolis/shared';
 import {
   BUSINESS_SEED_CASH,
@@ -578,6 +580,9 @@ function endOfDay(state: GameState): void {
     pushEvent(state, 'built', `${b.name ?? BUILD_NAMES[b.kind] ?? b.kind} sube a nivel ${b.level}: llega más lejos y atiende a más gente`, { ref: b.id });
   }
   albumDay(state);
+  // 2.1: encargos del pueblo y El Eco de Bitópolis.
+  errandsDay(state);
+  pressDay(state);
   accumulateRates(state);
 }
 

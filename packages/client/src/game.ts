@@ -57,6 +57,7 @@ import { objectivesNode, openAdvisor, openCitizen, openDiary, openPleno, portrai
 import { api, ApiError } from './api.ts';
 import { nextHint } from './hints.ts';
 import { openManagement } from './manage-ui.ts';
+import { errandsSummary, openErrands, openPress } from './town-news-ui.ts';
 import { openWhatsHappening, turnHeadline } from './ai-town-ui.ts';
 import { pocketMark } from './money-ui.ts';
 import { formatDate, money, MONTHS, plural, shortDate, t } from './i18n.ts';
@@ -1793,6 +1794,12 @@ export function startGame(opts: GameOptions): void {
     openSettings(state.aiMode && state.ai ? { share: state.ai.share, locked: aiShareLocked, set: (share) => command({ type: 'SetAiShare', share }) } : undefined);
   const openHappening = () => openWhatsHappening(social, (id) => withBack('Qué está pasando', openHappening, () => openCitizen(social, id)));
   const openAccounts = () => openReport(state);
+  const openErrandsSheet = () => openErrands(social, (id) => withBack('Encargos del pueblo', openErrandsSheet, () => openCitizen(social, id)));
+  const openPressSheet = () =>
+    openPress(social, (ref) => {
+      if (state.buildings.some((b) => b.id === ref)) focusBuilding(ref);
+      else if (state.citizens.some((c) => c.id === ref)) withBack('El Eco de Bitópolis', openPressSheet, () => openCitizen(social, ref));
+    });
 
   /**
    * v1.6: el panel «Pueblo» sustituye al menú plano. Cada sección resume cómo va
@@ -1853,6 +1860,14 @@ export function startGame(opts: GameOptions): void {
         item('Felicidad', go(openHappiness)),
         item('Diario del pueblo', go(() => openDiary(social))),
         item('Álbum del pueblo', go(() => openAlbum(social))),
+      ),
+      // 2.1: encargos del pueblo y El Eco de Bitópolis.
+      card(
+        'inspect',
+        'Encargos y El Eco',
+        [errandsSummary(state)],
+        item('Encargos del pueblo', go(openErrandsSheet), !!state.errands?.list.some((e) => e.status === 'ofrecido')),
+        item('El Eco de Bitópolis', go(openPressSheet), !!state.press?.editions.at(-1) && !state.press.editions.at(-1)!.answered),
       ),
       h('section', { class: 'hub-card' }, h('h3', {}, pixelIcon('smile'), 'Objetivos'), objectivesNode(state)),
       ...(state.aiMode

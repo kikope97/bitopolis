@@ -86,9 +86,16 @@ export const Command = z.discriminatedUnion('type', [
       .object({
         sucesos: z.array(z.object({ id: z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(40), motivo: z.string().max(400) })).max(6),
         avisos: z.array(z.object({ id: z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(40), motivo: z.string().max(400) })).max(6),
+        /** 2.1: titulares de El Eco y el encargo con historia. */
+        titulares: z.array(z.object({ seccion: z.enum(['sucesos', 'cartas', 'anuncios']), texto: z.string().max(300), sobre: z.number().int().optional() })).max(3).optional(),
+        encargo: z.object({ id: z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(40), carta: z.string().max(500) }).optional(),
       })
       .optional(),
   }),
+  /** 2.1: responder a un encargo del pueblo. */
+  z.object({ type: z.literal('AnswerErrand'), errandId: z.number().int(), answer: z.enum(['aceptar', 'mas_tarde', 'rechazar']) }),
+  /** 2.1: contestar en El Eco de Bitópolis (menú cerrado). */
+  z.object({ type: z.literal('AnswerPress'), edition: z.number().int().min(1), answer: z.enum(['agradecer', 'desmentir', 'prometer']) }),
   /** 2.0: % de vecinos con IA (solo sube: nadie deja de pensar con IA). */
   z.object({ type: z.literal('SetAiShare'), share: z.number().int().min(0).max(100) }),
   /** 2.0: días de juego entre turnos de la IA (el cliente los alarga a x3/x10). */

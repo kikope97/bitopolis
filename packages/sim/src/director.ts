@@ -16,6 +16,8 @@ const CRIME_HOT_DAYS = CRIME.hotDays;
 import { homeRobbery, robbery, stationsFor } from './crime.ts';
 import type { Brewing } from './director-core.ts';
 import { canFound, freeShopLot } from './economy.ts';
+import { offerErrand } from './errands.ts';
+import { publishEdition } from './press.ts';
 import { hash32 } from './hash.ts';
 import { debtBand, totalDebt } from './household.ts';
 import { transfer } from './money.ts';
@@ -45,6 +47,10 @@ export interface DirectorCandidate {
 export interface DirectorChoice {
   sucesos: { id: string; motivo: string }[];
   avisos: { id: string; motivo: string }[];
+  /** 2.1: titulares de El Eco de Bitópolis (sobre = vecino o edificio del que habla). */
+  titulares?: { seccion: 'sucesos' | 'cartas' | 'anuncios'; texto: string; sobre?: number }[];
+  /** 2.1: el encargo con historia (id de `errandCandidates`) y la carta con la que lo pide un vecino. */
+  encargo?: { id: string; carta: string };
 }
 
 const first = (c: Citizen) => c.name.split(' ')[0]!;
@@ -255,6 +261,12 @@ export function applyDirector(state: GameState, choice: DirectorChoice): TurnLog
     const c = menu.find((m) => m.id === a.id);
     if (!c || used.has(c.id) || (ai.brewing ?? []).some((b) => b.id === c.id) || (ai.brewing ?? []).length >= DIRECTOR.maxBrewing) continue;
     ai.brewing = [...(ai.brewing ?? []), { id: c.id, text: brewingText(c), since: state.tick, bad: c.bad }];
+  }
+  // 2.1: El Eco de esta semana (lo escribe el director) y el encargo con su carta.
+  if (choice.titulares?.length) publishEdition(state, choice.titulares.map((t) => ({ section: t.seccion, text: t.texto, ...(t.sobre !== undefined ? { ref: t.sobre } : {}) })), 'ia');
+  if (choice.encargo?.id) {
+    const e = offerErrand(state, choice.encargo.id, choice.encargo.carta || undefined);
+    if (e) lines.push({ id: e.by, text: `Encargo: ${e.text}`, ...(choice.encargo.carta ? { motivo: choice.encargo.carta } : {}) });
   }
   return lines;
 }

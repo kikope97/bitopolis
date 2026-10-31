@@ -1025,3 +1025,15 @@ html[data-font='pixel'] .logo { font-size: min(3rem, calc((100vw - 48px) / 6)); 
 }
 /* v1.9.1: mientras se confirma una obra, la flecha del tutorial no tapa la barra de confirmar. */
 body.placing .tut-arrow { visibility: hidden; }
+/* 2.1: encargos del pueblo y El Eco de Bitópolis. */
+.errand { margin: 8px 0; padding: 8px; border: 2px solid var(--line); }
+.errand.aceptado { border-color: #ffcd75; }
+.errand-title { margin: 0 0 4px; }
+.errand-story { margin: 4px 0; font-style: italic; }
+.errand-actions .btn { min-height: 44px; }
+.press-ed { margin: 8px 0 12px; padding: 8px; border: 2px solid var(--line); background: var(--panel); }
+.press-ed.latest { border-color: #f4f4f4; }
+.press-mast { margin: 0 0 6px; font-size: 1rem; letter-spacing: 0.5px; }
+.press-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin: 6px 0; }
+.press-sec { flex: 0 0 100%; font-size: 0.75rem; text-transform: uppercase; color: var(--muted); }
+.press-text { flex: 1; font-weight: 600; }

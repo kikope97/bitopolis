@@ -567,3 +567,38 @@ export const DIRECTOR = {
   /** Vecinos a los que llega un rumor. */
   rumorReach: 6,
 } as const;
+
+/** 2.1: encargos del pueblo (retos semanales que salen del estado real). */
+export const ERRANDS = {
+  /** Vecinos mínimos para que haya encargos. */
+  minPop: 8,
+  /** A la vez como mucho, cada cuánto se ofrecen y cuándo el primero. */
+  max: 3,
+  offerEveryDays: 7,
+  firstOfferDays: 10,
+  /** Días para responder a uno ofrecido, para cumplirlo y de aplazamiento (una vez). */
+  answerDays: 14,
+  days: 30,
+  postponeDays: 7,
+  /** No se repite el mismo encargo en estos días. */
+  repeatDays: 60,
+  /** Recompensa (€, la paga la Diputación) por tipo. */
+  reward: { servicio: 900, paro: 700, delincuencia: 700, felicidad: 600, deudas: 600 },
+  minJobless: 3,
+  jobsWanted: 2,
+  crimeFrom: 35,
+  crimeTo: 25,
+  happyBelow: 62,
+  happyGain: 5,
+  minDebtors: 4,
+  debtsWanted: 2,
+} as const;
+
+/** 2.1: El Eco de Bitópolis (periódico semanal). */
+export const PRESS = {
+  everyDays: 7,
+  /** Ediciones que se guardan. */
+  keep: 6,
+  /** Vecinos a los que llega la respuesta del alcalde. */
+  reach: 6,
+} as const;

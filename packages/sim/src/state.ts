@@ -1,5 +1,7 @@
 import type { MinWageLevel } from './balance.ts';
 import type { TownAi } from './turns.ts';
+import type { ErrandsState } from './errands.ts';
+import type { PressState } from './press.ts';
 import { TICKS_PER_DAY, type TaxLevel } from '@bitopolis/shared';
 import { emptyFields, type Fields } from './fields.ts';
 import { chance, nextInt, type RngState, seedRng } from './prng.ts';
@@ -14,7 +16,7 @@ import type { Departed } from './family.ts';
 import type { Justice } from './crime.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
-export const FORMAT_VERSION = 13;
+export const FORMAT_VERSION = 14;
 
 export const MAP_W = 48;
 export const MAP_H = 48;
@@ -366,6 +368,9 @@ export interface GameState {
   townhallLevel: number;
   /** 2.0: turnos del pueblo con IA (solo en Modo IA). */
   ai?: TownAi;
+  /** 2.1: encargos del pueblo y El Eco de Bitópolis. */
+  errands?: ErrandsState;
+  press?: PressState;
   /** v1.9: sueldo mínimo obligatorio para las empresas del pueblo. */
   minWage: MinWageLevel;
   /** v1.9: contabilidad de la deuda de los vecinos (conservación: deuda viva = altas − pagos − incobrables − perdonadas). */
@@ -474,6 +479,9 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiSh
       : {}),
     minWage: 'none',
     debtLedger: { created: 0, repaid: 0, written: 0, forgiven: 0 },
+    // 2.1: encargos (el primero, a los 10 días) y periódico.
+    errands: { list: [], recent: [], medals: 0, done: 0, failed: 0, nextOffer: 10 * TICKS_PER_DAY },
+    press: { editions: [], last: 0 },
   };
   // Árboles dispersos (se talan gratis al construir encima).
   for (let i = 0; i < tiles.length; i++) {

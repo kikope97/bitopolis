@@ -52,6 +52,11 @@ createServer((req, res) => {
         avisos: d.menu.filter((m) => m.malo && !m.avisado).slice(0, 2).map((m) => ({ id: m.id, motivo: 'Se nota en la calle.' })),
         foco: 'El pueblo empieza a moverse',
         cronica: 'Semana movida en el pueblo: los vecinos hablan del alcalde en el bar y en la plaza.',
+        titulares: ['sucesos', 'cartas', 'anuncios'].map((sec) => {
+          const n = (d.noticias ?? []).find((x) => x.seccion === sec);
+          return { seccion: sec, sobre: n?.id ?? '', texto: n ? `Lo que se cuenta: ${n.texto.split(/[.:(]/)[0]}` : 'Semana tranquila en el pueblo' };
+        }),
+        encargo: d.encargos_posibles?.[0] ? { id: d.encargos_posibles[0].id, carta: 'Alcalde, se lo pido de corazón: nos haría mucha falta en el pueblo.' } : { id: '', carta: '' },
       };
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify(out) } }], usage: { prompt_tokens: 2500, completion_tokens: 200 } }));

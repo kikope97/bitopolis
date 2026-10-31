@@ -1,3 +1,5 @@
+import { emptyErrands } from './errands.ts';
+import { emptyPress } from './press.ts';
 import { emptyPolitics } from './politics-core.ts';
 import { FORMAT_VERSION, type GameState } from './state.ts';
 import { levelForPop } from './townhall.ts';
@@ -141,7 +143,14 @@ export const MIGRATIONS: Record<number, Migration> = {
       ? { ai: { share: 25, paceDays: 7, turn: null, lastN: 0, next: (s.tick ?? 0) + 7 * 24, mayor: [], quick: null, lastQuick: -1e9, log: [] } }
       : {}),
   }),
+  // 2.1: encargos y periódico (y lo que añadan incendios, basura y rangos en sus funciones).
+  13: (s) => migrate14Errands({ ...s, formatVersion: 14 }),
 };
+
+/** 2.1: encargos del pueblo y El Eco de Bitópolis, vacíos (el primero, en unos días). */
+function migrate14Errands(s: Record<string, any>): Record<string, any> {
+  return { ...s, errands: s.errands ?? emptyErrands(s.tick ?? 0), press: s.press ?? emptyPress() };
+}
 
 export function migrate(raw: unknown): GameState {
   if (typeof raw !== 'object' || raw === null) throw new Error('estado inválido');

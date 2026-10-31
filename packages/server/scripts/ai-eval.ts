@@ -56,7 +56,15 @@ const simulated: LLMProvider = {
       const d = JSON.parse(req.user.slice(req.user.indexOf('\n') + 1)) as { presupuesto_drama: { sucesos_malos_que_caben: number }; menu: { id: string; malo: boolean; avisado: boolean }[] };
       const sucesos = [...d.menu.filter((m) => !m.malo).slice(0, 1), ...d.menu.filter((m) => m.malo && m.avisado).slice(0, d.presupuesto_drama.sucesos_malos_que_caben)];
       const avisos = d.menu.filter((m) => m.malo && !m.avisado).slice(0, 2);
-      const text = JSON.stringify({ sucesos: sucesos.map((m) => ({ id: m.id, motivo: 'Toca.' })), avisos: avisos.map((m) => ({ id: m.id, motivo: 'Se nota.' })), foco: 'La semana', cronica: 'Pasan cosas en el pueblo.' });
+      const e = (d as unknown as { encargos_posibles?: { id: string }[] }).encargos_posibles?.[0];
+      const text = JSON.stringify({
+        sucesos: sucesos.map((m) => ({ id: m.id, motivo: 'Toca.' })),
+        avisos: avisos.map((m) => ({ id: m.id, motivo: 'Se nota.' })),
+        foco: 'La semana',
+        cronica: 'Pasan cosas en el pueblo.',
+        titulares: [{ seccion: 'anuncios', sobre: '', texto: 'El pueblo sigue adelante' }],
+        encargo: e ? { id: e.id, carta: 'Alcalde, hágalo por el pueblo.' } : { id: '', carta: '' },
+      });
       return { text, usage: { in: tokens(req.system + (req.shared ?? '') + req.user), cachedIn: 0, out: tokens(text) } };
     }
     const list = JSON.parse(req.user.slice(req.user.indexOf('\n') + 1)) as {
@@ -182,7 +190,7 @@ for (let seed = 1; seed <= Number(values.seeds); seed++) {
           dir.tokensIn += r.usage.in || tokens(req.system + req.shared + req.user);
           dir.tokensCached += r.usage.cachedIn;
           dir.tokensOut += r.usage.out || tokens(r.text);
-          director = parseDirector(r.text, req.ids, `${req.shared}\n${req.user}`);
+          director = parseDirector(r.text, req.ids, `${req.shared}\n${req.user}`, { news: req.news, errands: req.errands });
           if (director) {
             dir.valid++;
             for (const x of director.director.sucesos) dir.picked[x.id.split(':')[0]!] = (dir.picked[x.id.split(':')[0]!] ?? 0) + 1;

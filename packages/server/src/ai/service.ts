@@ -367,7 +367,7 @@ export class AiService {
         usage.in = r.usage.in;
         usage.cachedIn = r.usage.cachedIn;
         usage.out = r.usage.out;
-        const parsed = parseDirector(r.text, req.ids, `${req.shared}\n${req.user}`);
+        const parsed = parseDirector(r.text, req.ids, `${req.shared}\n${req.user}`, { news: req.news, errands: req.errands });
         if (parsed) {
           result.director = parsed.director;
           if (parsed.focus) result.focus = parsed.focus;

@@ -1,3 +1,5 @@
+import { answerErrand, canAnswerErrand } from './errands.ts';
+import { answerPress, canAnswerPress } from './press.ts';
 import { canMeetAssociation, meetAssociation } from './associations.ts';
 import { canUpgradeBuilding, startUpgrade } from './levels.ts';
 import { applyTownTurn, canApplyTurn, mayorText, noteMayor, setAiShare } from './turns.ts';
@@ -226,6 +228,10 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       return canApplyDecision(state, cmd.citizenId, cmd.action) ? { ok: true } : { ok: false, error: 'Decisión ya no válida' };
     case 'MeetAssociation':
       return canMeetAssociation(state, cmd.associationId);
+    case 'AnswerErrand':
+      return canAnswerErrand(state, cmd.errandId, cmd.answer);
+    case 'AnswerPress':
+      return canAnswerPress(state, cmd.edition, cmd.answer);
     case 'RepairBuilding': {
       const b = buildingById(state, cmd.buildingId);
       if (!b?.damaged) return { ok: false, error: 'Ese edificio no necesita reparación' };
@@ -401,6 +407,12 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
     }
     case 'MeetAssociation':
       meetAssociation(state, cmd.associationId);
+      break;
+    case 'AnswerErrand':
+      answerErrand(state, cmd.errandId, cmd.answer);
+      break;
+    case 'AnswerPress':
+      answerPress(state, cmd.edition, cmd.answer);
       break;
     case 'UpgradeTownhall':
       upgradeTownhall(state);

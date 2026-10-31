@@ -8,6 +8,8 @@ import { debtBand, pocketOf } from './household.ts';
 import { jobsOf } from './levels.ts';
 import { daysToElection, FACTION_TEXT, factionOf, politicsActive } from './politics.ts';
 import { brewingNow, type DirectorChoice, directorMenu, dramaBudget } from './director.ts';
+import { errandCandidates } from './errands.ts';
+import { weekNews } from './press.ts';
 import { inventedName, inventedNumber, toneOf } from './prompt.ts';
 import { GOAL_TEXT, HOOK_TEXT, hookFor, memoryText, NEED_TEXT, NEEDS, needsOf } from './social.ts';
 import type { Citizen, GameState } from './state.ts';
@@ -22,7 +24,7 @@ import { GESTURES, gestureCandidates, isAiCitizen, PLANS, planText, SPEND, type 
  * La salida tiene un esquema fijo (sin uniones por vecino); cada parte se valida
  * en el motor con el menú del vecino. Nunca va texto libre del jugador.
  */
-export const TURN_PROMPT_VERSION = 8;
+export const TURN_PROMPT_VERSION = 9;
 
 export const TURN_SYSTEM = `Eres la mente de los vecinos de Bitópolis, un pueblo español pequeño. Cada semana decides, a la vez, qué hace cada vecino de la lista. Ellos viven de verdad: trabajan, compran, se enamoran, se enfadan, ahorran o se arruinan, y reaccionan a lo que hace el alcalde (el jugador).
 
@@ -313,6 +315,8 @@ Devuelve:
 - "avisos": sucesos del menú que empiezan a cocerse (0 a 3), para que el alcalde pueda reaccionar a tiempo. Un suceso malo ("malo": true) solo puede pasar si ya estaba avisado ("avisado": true); si no, avísalo primero.
 - "foco": el tema de la semana en una frase corta (máx. 100 caracteres).
 - "cronica": 2 o 3 frases en español de España, como el periódico del pueblo, sobre lo que ha hecho el alcalde, cómo está el pueblo y lo que pasa esta semana (máx. 400 caracteres).
+- "titulares": los 3 titulares de El Eco de Bitópolis, uno por sección ("sucesos", "cartas" al director, "anuncios"), cada uno sobre una de las "noticias" (su id en "sobre", o "" si es de los sucesos que eliges) y con un "texto" de periódico de pueblo (máx. 110 caracteres). En "cartas", la voz de un vecino.
+- "encargo": si encaja con la semana, uno de "encargos_posibles" ("id") con la "carta" (máx. 220 caracteres, en primera persona, firmada por quien lo pide) con la que se lo pide al alcalde; si no, id "" y carta "".
 
 Reglas:
 - Sé justo: respeta "presupuesto_drama" (cuántos sucesos malos caben). Un pueblo contento no tiene disturbios; si el alcalde lo hace bien, que pasen también cosas buenas.
@@ -333,8 +337,13 @@ export const DIRECTOR_SCHEMA = {
     },
     foco: { type: 'string' },
     cronica: { type: 'string' },
+    titulares: {
+      type: 'array',
+      items: { type: 'object', properties: { seccion: { type: 'string', enum: ['sucesos', 'cartas', 'anuncios'] }, sobre: { type: 'string' }, texto: { type: 'string' } }, required: ['seccion', 'sobre', 'texto'], additionalProperties: false },
+    },
+    encargo: { type: 'object', properties: { id: { type: 'string' }, carta: { type: 'string' } }, required: ['id', 'carta'], additionalProperties: false },
   },
-  required: ['sucesos', 'avisos', 'foco', 'cronica'],
+  required: ['sucesos', 'avisos', 'foco', 'cronica', 'titulares', 'encargo'],
   additionalProperties: false,
 } as const;
 
@@ -344,6 +353,9 @@ export interface DirectorRequest {
   user: string;
   schema: Record<string, unknown>;
   ids: string[];
+  /** 2.1: noticias de la semana (id «nX» → vecino o edificio) y encargos posibles. */
+  news: { id: string; ref?: number }[];
+  errands: string[];
 }
 
 /** La petición del director: el mismo bloque común del turno y el menú de sucesos. */
@@ -351,21 +363,40 @@ export function buildDirectorRequest(state: GameState, shared = turnShared(state
   const menu = directorMenu(state);
   const brewing = brewingNow(state, menu);
   const budget = dramaBudget(state, menu);
+  const news = weekNews(state);
+  const errands = errandCandidates(state).slice(0, 4);
   const paceTicks = Math.max(1, (state.ai?.paceDays ?? 7) * 24);
   const data = {
     presupuesto_drama: { sucesos_malos_que_caben: budget.bad, por_que: budget.why },
     se_esta_cociendo: brewing.map((b) => ({ id: b.id, texto: b.text, hace_turnos: Math.max(0, Math.round((state.tick - b.since) / paceTicks)) })),
     menu: menu.map((m) => ({ id: m.id, tipo: m.kind, malo: m.bad, avisado: brewing.some((b) => b.id === m.id), texto: m.text, por_que: m.why })),
+    noticias: news.map((n) => ({ id: n.id, seccion: n.section, texto: n.text })),
+    encargos_posibles: errands.map((e) => ({ id: e.key, lo_pide: state.citizens.find((c) => c.id === e.by)?.name ?? 'el pueblo', que: e.text })),
   };
   const user = `Director de la semana (elige entre el menú):\n${JSON.stringify(data)}`;
-  return { system: DIRECTOR_SYSTEM, shared, user, schema: DIRECTOR_SCHEMA as unknown as Record<string, unknown>, ids: menu.map((m) => m.id) };
+  return {
+    system: DIRECTOR_SYSTEM,
+    shared,
+    user,
+    schema: DIRECTOR_SCHEMA as unknown as Record<string, unknown>,
+    ids: menu.map((m) => m.id),
+    news: news.map((n) => ({ id: n.id, ...(n.ref !== undefined ? { ref: n.ref } : {}) })),
+    errands: errands.map((e) => e.key),
+  };
 }
 
 const PickSchema = z.object({ id: z.string().max(60), motivo: z.string().max(600) });
-const DirectorOut = z.object({ sucesos: z.array(PickSchema).max(10), avisos: z.array(PickSchema).max(10), foco: z.string().max(600), cronica: z.string().max(2000) });
+const DirectorOut = z.object({
+  sucesos: z.array(PickSchema).max(10),
+  avisos: z.array(PickSchema).max(10),
+  foco: z.string().max(600),
+  cronica: z.string().max(2000),
+  titulares: z.array(z.object({ seccion: z.string().max(20), sobre: z.string().max(20), texto: z.string().max(600) })).max(6).optional(),
+  encargo: z.object({ id: z.string().max(60), carta: z.string().max(1000) }).optional(),
+});
 
 /** Lee la respuesta del director: solo ids del menú y textos sin nombres inventados. Null si no vale. */
-export function parseDirector(text: string, ids: string[], sent: string): { director: DirectorChoice; focus: string; chronicle: string } | null {
+export function parseDirector(text: string, ids: string[], sent: string, extra: { news?: { id: string; ref?: number }[]; errands?: string[] } = {}): { director: DirectorChoice; focus: string; chronicle: string } | null {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
@@ -386,5 +417,20 @@ export function parseDirector(text: string, ids: string[], sent: string): { dire
   const focus = clean(r.data.foco, 120);
   const chronicle = clean(r.data.cronica, 500);
   const bad = (t: string) => !!inventedName(t, sent) || inventedNumber(t, sent);
-  return { director: { sucesos: pick(r.data.sucesos), avisos: pick(r.data.avisos) }, focus: bad(focus) ? '' : focus, chronicle: bad(chronicle) ? '' : chronicle };
+  // 2.1: titulares (una por sección, texto filtrado) y el encargo con su carta.
+  const titulares: NonNullable<DirectorChoice['titulares']> = [];
+  for (const t of r.data.titulares ?? []) {
+    if (!['sucesos', 'cartas', 'anuncios'].includes(t.seccion) || titulares.some((x) => x.seccion === t.seccion)) continue;
+    const texto = clean(t.texto, 140);
+    if (texto.length < 6 || bad(texto)) continue;
+    const ref = extra.news?.find((n) => n.id === t.sobre)?.ref;
+    titulares.push({ seccion: t.seccion as 'sucesos' | 'cartas' | 'anuncios', texto, ...(ref !== undefined ? { sobre: ref } : {}) });
+  }
+  const carta = clean(r.data.encargo?.carta ?? '', 260);
+  const encargo = r.data.encargo?.id && extra.errands?.includes(r.data.encargo.id) ? { id: r.data.encargo.id, carta: bad(carta) ? '' : carta } : undefined;
+  return {
+    director: { sucesos: pick(r.data.sucesos), avisos: pick(r.data.avisos), ...(titulares.length ? { titulares } : {}), ...(encargo ? { encargo } : {}) },
+    focus: bad(focus) ? '' : focus,
+    chronicle: bad(chronicle) ? '' : chronicle,
+  };
 }
