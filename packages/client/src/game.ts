@@ -59,6 +59,8 @@ import { openNeighbours, openReport, openTaxes as openTaxesSheet } from './econo
 import { LAYERS, type LayerId, NEED_ICON } from './layers.ts';
 import { openTownHall } from './civic-ui.ts';
 import { openAlbum, snapMoments } from './album-ui.ts';
+import { openAway } from './away-ui.ts';
+import { openRank, rankCard } from './rank-ui.ts';
 import { objectivesNode, openAdvisor, openCitizen, openDiary, openPleno, portraitCanvas, rememberSeen, renderObjectives, resumeSummary, type SocialCtx } from './social-ui.ts';
 import { api, ApiError } from './api.ts';
 import { nextHint } from './hints.ts';
@@ -67,7 +69,7 @@ import { errandsSummary, openErrands, openPress } from './town-news-ui.ts';
 import { openWhatsHappening, turnHeadline } from './ai-town-ui.ts';
 import { pocketMark } from './money-ui.ts';
 import { formatDate, money, MONTHS, plural, shortDate, t } from './i18n.ts';
-import { type Camera, type Preview, render, restartAnimations } from './render.ts';
+import { type Camera, type Preview, render, restartAnimations, signSpot } from './render.ts';
 import type { FromWorker, SaveBatch, ToWorker } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
 import { buildingSprite, letterSprite, T } from './sprites.ts';
@@ -390,6 +392,23 @@ export function startGame(opts: GameOptions): void {
       return { x: cam.x, y: cam.y };
     }, () => restartAnimations());
   }
+  /**
+   * 2.1: al subir de rango, «attention» suave: fanfarria, destello en el cartel
+   * de la entrada, baja a x1 sin temblor y un aviso que abre el escudo.
+   */
+  function celebrateRank(text: string) {
+    sfx.fanfare();
+    duck(3);
+    vibrate(150);
+    const at = signSpot(state) ?? hallSpot();
+    if (at) highlight = { x: at.x, y: at.y, since: performance.now() };
+    slowDown();
+    calmPause();
+    toast(`${text}. Toca para ver el escudo.`, { kind: 'good', sticky: true, onClick: () => withBack('Pueblo', openHub, () => openRank(state)) });
+    $('#sr-live').textContent = text;
+    const th = hallSpot();
+    if (th) coins(...screenOf(th.x, th.y), 12);
+  }
   /** Una oferta con plazo baja a x1 (sin temblor) y cuenta como parada (ronda 14). */
   function slowDown() {
     if (speed < 3) return;
@@ -638,6 +657,11 @@ export function startGame(opts: GameOptions): void {
           sticky: true,
           onClick: openAccounts,
         });
+      } else if (e.kind === 'milestone' && e.text.startsWith('¡Bitópolis ya es')) {
+        // 2.1: subida de rango: fanfarria, el cartel destella y un aviso que abre el escudo.
+        celebrateRank(e.text);
+      } else if (e.kind === 'milestone' && e.text.startsWith('El escudo estrena')) {
+        toast(e.text, { kind: 'good', onClick: () => withBack('Pueblo', openHub, () => openRank(state)) });
       } else if (e.kind === 'milestone') {
         toast(e.text, { kind: 'good', sticky: true });
         vibrate(120);
@@ -1892,6 +1916,8 @@ export function startGame(opts: GameOptions): void {
     if (assocs.length) townSum.push(protest ? 'manifestación convocada' : plural(assocs.length, 'asociación vecinal', 'asociaciones vecinales'));
     sheet(
       'Pueblo',
+      // 2.1: el rango y el escudo del pueblo, arriba del todo.
+      rankCard(state, go(() => openRank(state))),
       card(
         'coin',
         'Dinero',
@@ -2277,9 +2303,10 @@ export function startGame(opts: GameOptions): void {
   onState();
   refreshStrip();
   const away = resumeSummary(token, state);
-  if (away && away.length) toast(`Desde tu última visita: ${away.join(' · ')}`, { sticky: true });
   tutorial.start(state);
   tutorial.update(state, tool.id);
+  // 2.1: «Mientras no estabas», una tarjeta que se desliza (no durante el tutorial).
+  if (away && !tutorial.active) openAway(token, state, away, { openCitizen: (id) => openCitizen(social, id), openRank: () => openRank(state) });
   introGeography();
   if (!tutorial.active && resume === 0) toast(`En pausa. Pulsa ▶ (${matchMedia('(orientation: landscape) and (max-height: 500px)').matches ? 'arriba' : 'arriba a la izquierda'}) para que pase el tiempo.`);
   // Sonido: se desbloquea con el primer gesto; el ambiente sigue la hora del juego.

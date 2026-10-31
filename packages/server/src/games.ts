@@ -169,6 +169,8 @@ export async function registerGameRoutes(app: FastifyInstance, db: Db, store: Se
     // no puede inventarse actitudes, sucesos ni textos que luego irían al LLM). Si no coincide, el
     // hash no cuadra y el cliente recibe el estado bueno.
     const trusted = commands.flatMap((c) => {
+      // 2.1: los votos del escudo son de la IA de los vecinos: el cliente no los manda (se descartan).
+      if (c.cmd.type === 'ChooseCrest') return [];
       if (c.cmd.type !== 'TownTurn') return [c];
       const r = ai.turn(row.id, c.cmd.n);
       if (!r || r.status !== 'ready') return [];

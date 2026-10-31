@@ -6,6 +6,7 @@ import { pixelIcon } from './icons.ts';
 const iconCache = new Map<string, HTMLCanvasElement>();
 const icon = (name: string) => iconCache.get(name) ?? iconCache.set(name, pixelIcon(name)).get(name)!;
 import { liveParticles, squash } from './fx.ts';
+import { signSprite } from './crest.ts';
 import { C, PALETTE } from './palette.ts';
 import {
   BH,
@@ -312,7 +313,36 @@ function bSprite(b: GameState['buildings'][number], tod: TimeOfDay, snowing: boo
   if (b.damaged) return b.damaged.cause === 'fuego' ? burntSprite(b.kind, b.id, tod) : damagedSprite(b.kind, b.id, tod);
   if (b.kind === 'townhall') return townhallSprite(state.townhallLevel ?? 1, tod, snowing);
   if (b.level && b.level > 1) return serviceSprite(b.kind, b.id, b.level, tod, snowing);
-  return buildingSprite(b.kind, b.id, tod, snowing);
+  // 2.1: los tejados de las viviendas cambian con el rango del pueblo.
+  return buildingSprite(b.kind, b.id, tod, snowing, state.rank?.level ?? 2);
+}
+
+/**
+ * 2.1: dónde va el cartel del pueblo: junto al final de la calle del
+ * ayuntamiento (la entrada), en la primera casilla libre de hierba o árbol.
+ */
+let signSig = '';
+let signAt: number | null = null;
+export function signSpot(state: GameState, sig = mapSignature(state)): { x: number; y: number } | null {
+  if (sig === signSig) return signAt === null ? null : { x: signAt % state.map.w, y: Math.floor(signAt / state.map.w) };
+  signSig = sig;
+  signAt = null;
+  const { w, h, tiles } = state.map;
+  const hall = state.buildings.find((b) => b.kind === 'townhall');
+  if (!hall) return null;
+  const y = hall.y + 1;
+  if (y >= h) return null;
+  let x = hall.x;
+  while (x > 0 && tiles[y * w + x - 1] === Tile.Road) x--;
+  const used = new Set(state.buildings.map((b) => b.y * w + b.x));
+  const free = (cx: number, cy: number) => cx >= 0 && cy >= 0 && cx < w && cy < h && tiles[cy * w + cx] !== Tile.Road && !used.has(cy * w + cx) && !isWater(state.map.terrain?.[cy * w + cx]) && (state.map.zones[cy * w + cx] ?? 0) === Zone.None;
+  for (const [dx, dy] of [[-1, 1], [-1, 0], [0, 1], [-1, -1], [-2, 1], [-2, 0], [0, 2], [-1, 2]] as const) {
+    if (free(x + dx, y + dy)) {
+      signAt = (y + dy) * w + x + dx;
+      break;
+    }
+  }
+  return signAt === null ? null : { x: signAt % w, y: Math.floor(signAt / w) };
 }
 
 /** Imagen de las herramientas: un sprite reducido a su caja. */
@@ -436,6 +466,7 @@ export function render(
   const y0 = Math.max(0, Math.floor(cam.y / ts) - 1);
   const y1 = Math.min(h - 1, Math.ceil((cam.y + ctx.canvas.height) / ts) + 2);
 
+  const sign = signSpot(state, mapSig);
   const byTile = new Map<number, GameState['buildings'][number]>();
   for (const b of state.buildings) byTile.set(b.y * w + b.x, b);
   // 2.1: diques en la orilla.
@@ -463,6 +494,10 @@ export function render(
         continue;
       }
       if (!b) {
+        if (sign && sign.x === x && sign.y === y) {
+          ctx.drawImage(signSprite(state, tod), px, py, ts, BH * z);
+          continue;
+        }
         if (tiles[y * w + x] === Tile.Tree) {
           // Viento: la copa se mece con un desfase por árbol.
           const frame = still ? 0 : Math.floor(opts.time / 900 + hash(x, y, 4) * 4) % 2;

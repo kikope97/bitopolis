@@ -34,6 +34,7 @@ import { formatDate, money } from './i18n.ts';
 import { portraitSprite } from './sprites.ts';
 import { $, confirmDialog, h, sheet, toast, withBack } from './ui.ts';
 import { openFamily } from './album-ui.ts';
+import type { AwaySince } from './away-ui.ts';
 import { drawPixelIcons } from './icons.ts';
 
 type Cmd = (c: Command) => Promise<boolean>;
@@ -331,40 +332,53 @@ export function portraitCanvas(id: number, scale: number, cls = 'portrait'): HTM
   return face;
 }
 
-/** «Mientras no estabas»: cambios desde la última visita en este navegador. */
-export function resumeSummary(token: string, state: GameState): string[] | null {
+/** Lo que se guarda de cada visita (en este navegador). `at` es la hora real (solo para saber cuánto faltó). */
+interface Seen {
+  tick: number;
+  pop: number;
+  treasury: number;
+  at?: number;
+  rank?: number;
+}
+
+const seenOf = (state: GameState): Seen => ({ tick: state.tick, pop: state.citizens.length, treasury: state.treasury, at: Date.now(), rank: state.rank?.level ?? 0 });
+
+/** 2.1: tiempo real fuera para enseñar «Mientras no estabas» aunque el pueblo no avanzara (se para al salir). */
+export const AWAY_MS = 30 * 60_000;
+
+/**
+ * «Mientras no estabas» (2.1): desde cuándo contar al volver a la partida, o
+ * null si no toca (primera visita, o se fue hace poco y no ha pasado nada).
+ * Si el pueblo no avanzó (el juego se para al salir), se repasa la última semana.
+ */
+export function resumeSummary(token: string, state: GameState): AwaySince | null {
   const key = `bitopolis.seen.${token}`;
-  let seen: { tick: number; pop: number; treasury: number } | null = null;
+  let seen: Seen | null;
   try {
     seen = JSON.parse(localStorage.getItem(key) ?? 'null');
   } catch {
     seen = null;
   }
-  const save = () => {
-    try {
-      localStorage.setItem(key, JSON.stringify({ tick: state.tick, pop: state.citizens.length, treasury: state.treasury }));
-    } catch {
-      /* sin almacenamiento */
-    }
-  };
-  if (!seen || seen.tick >= state.tick) {
-    save();
-    return null;
+  try {
+    localStorage.setItem(key, JSON.stringify(seenOf(state)));
+  } catch {
+    /* sin almacenamiento */
   }
-  const lines: string[] = [];
-  const dp = state.citizens.length - seen.pop;
-  if (dp) lines.push(`${dp > 0 ? '+' : ''}${dp} ${Math.abs(dp) === 1 ? 'vecino' : 'vecinos'}`);
-  const dm = state.treasury - seen.treasury;
-  lines.push(`Caja: ${dm >= 0 ? '+' : ''}${money(dm)}`);
-  const important = state.events.filter((e) => e.tick > seen!.tick && ['business', 'milestone', 'departure', 'bankrupt', 'warning', 'info'].includes(e.kind));
-  for (const e of important.slice(-3).reverse()) lines.push(e.text);
-  save();
-  return lines.slice(0, 5);
+  if (!seen || seen.tick > state.tick) return null;
+  const advanced = seen.tick < state.tick;
+  if (!advanced && Date.now() - (seen.at ?? 0) < AWAY_MS) return null;
+  return {
+    tick: advanced ? seen.tick : Math.max(0, state.tick - 7 * 24),
+    pop: seen.pop,
+    treasury: seen.treasury,
+    advanced,
+    rank: seen.rank ?? state.rank?.level ?? 0,
+  };
 }
 
 export function rememberSeen(token: string, state: GameState): void {
   try {
-    localStorage.setItem(`bitopolis.seen.${token}`, JSON.stringify({ tick: state.tick, pop: state.citizens.length, treasury: state.treasury }));
+    localStorage.setItem(`bitopolis.seen.${token}`, JSON.stringify(seenOf(state)));
   } catch {
     /* sin almacenamiento */
   }

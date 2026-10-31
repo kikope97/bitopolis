@@ -98,6 +98,15 @@ export const Command = z.discriminatedUnion('type', [
   z.object({ type: z.literal('AnswerErrand'), errandId: z.number().int(), answer: z.enum(['aceptar', 'mas_tarde', 'rechazar']) }),
   /** 2.1: contestar en El Eco de Bitópolis (menú cerrado). */
   z.object({ type: z.literal('AnswerPress'), edition: z.number().int().min(1), answer: z.enum(['agradecer', 'desmentir', 'prometer']) }),
+  /**
+   * 2.1: votos de los vecinos con IA para el escudo y el lema al subir de rango
+   * (menú cerrado de `rankCandidates`; el motor descarta lo que no esté en él y
+   * el resto del pueblo vota por reglas). Solo lo trae la IA del servidor.
+   */
+  z.object({
+    type: z.literal('ChooseCrest'),
+    votes: z.array(z.object({ vecino: z.number().int(), pieza: z.string().regex(/^[a-z_]+$/).max(20), lema: z.string().regex(/^[a-z_]+$/).max(40) })).min(1).max(300),
+  }),
   /** 2.0: % de vecinos con IA (solo sube: nadie deja de pensar con IA). */
   z.object({ type: z.literal('SetAiShare'), share: z.number().int().min(0).max(100) }),
   /** 2.0: días de juego entre turnos de la IA (el cliente los alarga a x3/x10). */

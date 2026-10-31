@@ -46,3 +46,15 @@ describe('migración 2 → 3', () => {
     expect(m.aiMode).toBe(false);
   });
 });
+
+describe('migración 13 → 14 (2.1, rangos)', () => {
+  it('añade el rango que corresponde y el escudo del terreno, sin votación', () => {
+    const s = createInitialState({ seed: 8 }) as unknown as Record<string, unknown>;
+    const old: Record<string, unknown> = { ...structuredClone(s), formatVersion: 13 };
+    delete old.rank;
+    const m = migrate(old);
+    expect(m.formatVersion).toBe(FORMAT_VERSION);
+    expect(m.rank).toMatchObject({ level: 0, vote: null });
+    expect(m.rank!.crest.pieces).toHaveLength(1);
+  });
+});

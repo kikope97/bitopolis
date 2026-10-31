@@ -682,3 +682,24 @@ export const AMBULANCE = {
   /** Mayores en el menú del director para un susto que acaba bien. */
   scareAge: 75,
 } as const;
+
+/**
+ * 2.1: rangos del pueblo (de aldea a capital comarcal). Solo título y aspecto
+ * (cartel, escudo, tejados): no desbloquean nada (eso sigue en townhall.ts).
+ * Se sube al tener a la vez los vecinos y el nivel de ayuntamiento; no se baja.
+ */
+export const RANKS = [
+  { id: 'aldea', name: 'Aldea', pop: 0, townhall: 1 },
+  { id: 'lugar', name: 'Lugar', pop: 12, townhall: 2 },
+  { id: 'villa', name: 'Villa', pop: 40, townhall: 3 },
+  { id: 'ciudad', name: 'Ciudad', pop: 100, townhall: 4 },
+  { id: 'capital', name: 'Capital comarcal', pop: 200, townhall: 5 },
+] as const;
+
+export const RANK = {
+  /** Modo IA: días que dura la votación del escudo y el lema (luego deciden las reglas). */
+  voteDays: 10,
+  /** Piezas y lemas que entran en cada votación. */
+  pieceChoices: 3,
+  mottoChoices: 3,
+} as const;

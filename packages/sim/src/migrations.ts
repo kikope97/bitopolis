@@ -2,7 +2,9 @@ import { emptyErrands } from './errands.ts';
 import { emptyPress } from './press.ts';
 import { emptyPolitics } from './politics-core.ts';
 import { FORMAT_VERSION, type GameState } from './state.ts';
+import { emptyRank } from './rank-core.ts';
 import { levelForPop } from './townhall.ts';
+import { RANKS } from './balance.ts';
 
 /**
  * Migraciones encadenadas: MIGRATIONS[n] convierte un estado de formatVersion
@@ -157,12 +159,29 @@ export const MIGRATIONS: Record<number, Migration> = {
       : {}),
   }),
   // 2.1: emergencias, encargos y periódico (cada parte, en su función).
-  13: (s) => ({ ...migrate14Errands(migrate14Fire(s)), formatVersion: 14 }),
+  13: (s) => ({ ...migrate14Rank(migrate14Errands(migrate14Fire(s))), formatVersion: 14 }),
 };
 
 /** 2.1: encargos del pueblo y El Eco de Bitópolis, vacíos (el primero, en unos días). */
 function migrate14Errands(s: Record<string, any>): Record<string, any> {
   return { ...s, errands: s.errands ?? emptyErrands(s.tick ?? 0), press: s.press ?? emptyPress() };
+}
+
+/**
+ * 2.1 (rangos del pueblo): un pueblo de antes empieza en el rango que ya le
+ * corresponde, con el escudo de su terreno y sin votación (no hay fanfarria
+ * de algo que ya tenía).
+ */
+export function migrate14Rank(s: Record<string, any>): Record<string, any> {
+  if (s.rank) return s;
+  const pop = s.citizens?.length ?? 0;
+  const hall = s.townhallLevel ?? 1;
+  let level = 0;
+  RANKS.forEach((r, i) => {
+    if (pop >= r.pop && hall >= r.townhall) level = i;
+  });
+  const terrain = s.map?.terrain ?? [];
+  return { ...s, rank: emptyRank(s.seed ?? 0, terrain, level, s.tick ?? 0) };
 }
 
 export function migrate(raw: unknown): GameState {
