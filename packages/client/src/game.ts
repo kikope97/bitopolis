@@ -25,7 +25,7 @@ import { type Camera, type Preview, render } from './render.ts';
 import type { FromWorker, SaveBatch, ToWorker } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
 import { buildingSprite, letterSprite, T } from './sprites.ts';
-import { commandFor, costText, isLocked, type Tool, type ToolId, TOOLS, tilesOf, unlockPop } from './tools.ts';
+import { commandFor, costText, isLocked, shortCost, type Tool, type ToolId, TOOLS, tilesOf, unlockPop } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
 import { $, closeSheet, confirmDialog, h, isSheetOpen, reducedMotion, sheet, toast, vibrate } from './ui.ts';
 import { duck, sfx, startAmbience, startMusic, stopMusic, unlockAudio } from './audio.ts';
@@ -73,6 +73,9 @@ export function startGame(opts: GameOptions): void {
   let anchor: { x: number; y: number } | null = null;
   /** Final propuesto: se ve el trazado y el coste; un segundo toque ahí confirma. */
   let pendingEnd: { x: number; y: number } | null = null;
+  /** v1.4: en pantallas táctiles, una obra se coloca en dos pasos (ver, confirmar). */
+  let pendingPlace: { a: { x: number; y: number }; b: { x: number; y: number } } | null = null;
+  let touchInput = false;
   /** Cursor de casilla para jugar con teclado (flechas + Intro). */
   let cursor: { x: number; y: number } | null = null;
   const seenEvents = new Set(state.events.map((e) => `${e.tick}|${e.kind}|${e.text}`));
@@ -435,6 +438,8 @@ export function startGame(opts: GameOptions): void {
   /* ---------- cámara ---------- */
   function resize() {
     const r = canvas.getBoundingClientRect();
+    // El tutorial (fijo) se coloca justo debajo de donde empieza el mapa.
+    document.documentElement.style.setProperty('--map-top', `${Math.round(r.top)}px`);
     const oldCenter = { x: cam.x + canvas.width / 2, y: cam.y + canvas.height / 2, ts: tileSize() };
     canvas.width = Math.round(r.width * dpr());
     canvas.height = Math.round(r.height * dpr());
@@ -497,6 +502,7 @@ export function startGame(opts: GameOptions): void {
   }
 
   canvas.addEventListener('pointerdown', (e) => {
+    touchInput = e.pointerType !== 'mouse';
     canvas.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 2) {
@@ -515,7 +521,7 @@ export function startGame(opts: GameOptions): void {
     if (!prev) {
       // Ratón sin pulsar: vista previa del tile bajo el cursor.
       const t0 = tileAt(e.clientX, e.clientY);
-      if (!pendingEnd) preview = t0 && tool.id !== 'inspect' ? previewFor(anchor ?? t0, t0) : null;
+      if (!pendingEnd && !pendingPlace) preview = t0 && tool.id !== 'inspect' ? previewFor(anchor ?? t0, t0) : null;
       return;
     }
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -564,11 +570,15 @@ export function startGame(opts: GameOptions): void {
     const t1 = tileAt(e.clientX, e.clientY);
     if (g.mode === 'pending' && t1) void tapTile(t1);
     if (g.mode === 'paint' && g.startTile && t1) {
-      const cmd = commandFor(tool, g.startTile, t1);
-      if (cmd) void command(cmd);
+      // Con el dedo, el trazado se enseña y se confirma; con ratón, se hace al soltar.
+      if (touchInput) proposePlace(g.startTile, t1);
+      else {
+        const cmd = commandFor(tool, g.startTile, t1);
+        if (cmd) void command(cmd);
+      }
     }
-    // Con un inicio marcado (dos toques) se mantiene la vista previa del trazado.
-    if (!anchor) preview = null;
+    // Con un inicio marcado (dos toques) o una obra por confirmar se mantiene la vista previa.
+    if (!anchor && !pendingPlace) preview = null;
   };
   canvas.addEventListener('pointerup', endPointer);
   canvas.addEventListener('pointercancel', endPointer);
@@ -614,6 +624,7 @@ export function startGame(opts: GameOptions): void {
       }
       const line = commandFor(tool, anchor, tile);
       if (!line) return;
+      if (touchInput) return proposePlace(anchor, tile);
       // Primer toque en el final: se enseña el trazado y lo que cuesta; el segundo, ahí mismo, confirma.
       if (!pendingEnd || pendingEnd.x !== tile.x || pendingEnd.y !== tile.y) {
         pendingEnd = tile;
@@ -636,9 +647,51 @@ export function startGame(opts: GameOptions): void {
       await command(line);
       return;
     }
+    if (touchInput && tool.build) {
+      // Mismo sitio otra vez: confirma. Otro sitio: mueve la obra.
+      if (pendingPlace && pendingPlace.a.x === tile.x && pendingPlace.a.y === tile.y) return confirmPlace();
+      return proposePlace(tile, tile);
+    }
     const cmd = commandFor(tool, tile, tile);
     if (cmd) await command(cmd);
   }
+
+  /** Enseña la obra (fantasma) y la barra «Construir / ✕». Nada se gasta hasta confirmar. */
+  function proposePlace(a: { x: number; y: number }, b: { x: number; y: number }) {
+    const cmd = commandFor(tool, a, b);
+    if (!cmd) return;
+    pendingPlace = { a, b };
+    anchor = null;
+    pendingEnd = null;
+    preview = previewFor(a, b);
+    const v = validateCommand(state, cmd);
+    const n = tilesOf(cmd).length;
+    const cost = tool.build && tool.shape === 'tap' ? shortCost(tool) : `${plural(n, 'casilla', 'casillas')}, ${money(n * (tool.zone ? ZONE_COST_PER_TILE : BUILD.road.materials))}`;
+    const msg = v.ok ? `${tool.label} aquí${cost ? ` · ${cost}` : ''}` : `${tool.label}: no se puede (${v.error})`;
+    $('#confirm-text').textContent = msg;
+    const yes = $('#confirm-yes') as HTMLButtonElement;
+    yes.textContent = tool.zone ? (tool.zone === 'none' ? 'Quitar zona' : 'Marcar zona') : 'Construir';
+    yes.disabled = !v.ok;
+    $('#confirm-bar').hidden = false;
+    document.body.classList.add('placing');
+  }
+
+  async function confirmPlace() {
+    const p = pendingPlace;
+    cancelPlace();
+    if (!p) return;
+    const cmd = commandFor(tool, p.a, p.b);
+    if (cmd) await command(cmd);
+  }
+
+  function cancelPlace() {
+    pendingPlace = null;
+    preview = null;
+    $('#confirm-bar').hidden = true;
+    document.body.classList.remove('placing');
+  }
+  $('#confirm-yes').onclick = () => void confirmPlace();
+  $('#confirm-no').onclick = () => cancelPlace();
 
   /** Qué hay en una casilla (para el lector de pantalla). */
   function describeTile(t: { x: number; y: number }): string {
@@ -702,6 +755,7 @@ export function startGame(opts: GameOptions): void {
       setSpeed(speed === 0 ? 1 : 0);
     } else if (k === 'Escape') {
       if (isSheetOpen()) closeSheet();
+      else if (pendingPlace) cancelPlace();
       else if (anchor) {
         anchor = null;
         pendingEnd = null;
@@ -767,6 +821,7 @@ export function startGame(opts: GameOptions): void {
     selected = null;
     anchor = null;
     pendingEnd = null;
+    if (pendingPlace) cancelPlace();
     document.body.classList.remove('placing');
     tutorial.update(state, tool.id);
   }
@@ -1047,6 +1102,10 @@ export function startGame(opts: GameOptions): void {
   }
 
   window.addEventListener('resize', resize);
+  // El mapa cambia de alto sin que cambie la ventana (texto de ayuda, avisos, barras):
+  // sin esto el dibujo quedaba estirado y el toque caía casillas más arriba (v1.4).
+  const sizeWatch = new ResizeObserver(() => resize());
+  sizeWatch.observe(canvas);
   resize();
   // Un píxel del sprite ≈ 1,5 px CSS: se aprecia el detalle sin perder vista.
   cam.zoom = Math.max(2, Math.round(dpr() * 1.5));

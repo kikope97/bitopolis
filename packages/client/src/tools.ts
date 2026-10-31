@@ -56,6 +56,11 @@ export function unlockPop(tool: Tool): number {
   return 0;
 }
 
+/** Coste corto para la barra de confirmación: «hasta 3.500 €». */
+export function shortCost(tool: Tool): string {
+  return tool.build && tool.build !== 'road' ? `hasta ${money(buildCost(tool.build))}` : costText(tool);
+}
+
 export function costText(tool: Tool): string {
   if (tool.build === 'road') return `${money(BUILD.road.materials)} por casilla`;
   if (tool.build) {
