@@ -56,6 +56,9 @@ export const MEMORY_KINDS = [
   'heredo',
   // v1.7: tiempo, asociaciones y protestas.
   'inundacion',
+  'asociacion',
+  'se_manifesto',
+  'logro_vecinal',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -211,6 +214,12 @@ export function memoryText(state: GameState, m: Memory): string {
       return `Heredó de ${who}`;
     case 'inundacion':
       return 'El río le anegó la casa o el trabajo';
+    case 'asociacion':
+      return 'Se unió a una asociación de vecinos';
+    case 'se_manifesto':
+      return 'Salió a manifestarse ante el ayuntamiento';
+    case 'logro_vecinal':
+      return 'El barrio consiguió lo que pedía';
   }
 }
 

@@ -308,3 +308,23 @@ export const WEATHER = {
   /** Reparación de un edificio anegado (fracción de sus materiales). */
   floodRepair: 0.15,
 } as const;
+
+/** v1.7: asociaciones vecinales y protestas. */
+export const ASSOCIATIONS = {
+  /** Población mínima para que los vecinos se organicen. */
+  minPop: 20,
+  /** Vecinos con nombre que comparten la queja para fundar una. */
+  minMembers: 4,
+  /** Si quedan menos socios con la queja, la dan por resuelta. */
+  dissolveBelow: 2,
+  /** Meses sin respuesta hasta que convocan una manifestación. */
+  patienceMonths: 2,
+  /** Días de aviso de la manifestación (para que cada socio decida). */
+  protestNoticeDays: 3,
+  /** Meses que se da el alcalde al prometer en una reunión. */
+  promiseMonths: 3,
+  /** Como mucho, asociaciones a la vez. */
+  max: 3,
+  /** Socios que deciden si van a cada manifestación (el líder y los primeros). */
+  deciders: 6,
+} as const;

@@ -6,6 +6,7 @@ import { OUTSIDE, transfer } from './money.ts';
 import { hash32 } from './hash.ts';
 import { onCitizenLeaves } from './social.ts';
 import { factionOf, voteLean } from './politics.ts';
+import { protestFor } from './associations.ts';
 import {
   type Citizen,
   type DecisionLogEntry,
@@ -44,6 +45,8 @@ export const ACTION_LABELS: Record<string, string> = {
   votar_gobierno: 'votar al alcalde que gobierna',
   votar_oposicion: 'votar a la candidatura de la oposición',
   abstenerse: 'no ir a votar',
+  manifestarse: 'ir a la manifestación de su asociación ante el ayuntamiento',
+  no_ir: 'no ir a la manifestación',
 };
 
 const NEEDS = ['parque', 'colegio', 'centro_salud', 'tienda', 'empleo'] as const;
@@ -77,6 +80,8 @@ export function validActions(state: GameState, c: Citizen, trigger: Trigger): st
       return [...shopTypesFor(state, c).map((t) => `fundar:${t}`), 'ahorrar'];
     case 'elecciones':
       return ['votar_gobierno', 'votar_oposicion', 'abstenerse'];
+    case 'protesta':
+      return ['manifestarse', 'no_ir'];
     case 'opinion': {
       // Lo que le pide al alcalde: solo cosas que aún faltan.
       const has = (k: string) => state.buildings.some((b) => b.kind === k);
@@ -110,6 +115,12 @@ export function detectTriggers(state: GameState): void {
     if (!c.named || state.pending.some((p) => p.citizenId === c.id)) continue;
     if (voting && !c.vote) {
       addPending(state, c, 'elecciones');
+      continue;
+    }
+    // v1.7: su asociación convoca una manifestación: decide si va (una vez por convocatoria).
+    const assoc = protestFor(state, c);
+    if (assoc && c.protest !== assoc.id && c.protest !== -assoc.id) {
+      addPending(state, c, 'protesta');
       continue;
     }
     if (c.cooldownUntil > state.tick) continue;
@@ -197,6 +208,13 @@ export function applyDecision(state: GameState, citizenId: number, action: strin
     case 'seguir_fuera':
       effect = 'sigue trabajando fuera';
       break;
+    case 'manifestarse':
+    case 'no_ir': {
+      const a = protestFor(state, c);
+      if (a) c.protest = verb === 'manifestarse' ? a.id : -a.id;
+      effect = verb === 'manifestarse' ? 'irá a la manifestación' : 'no irá a la manifestación';
+      break;
+    }
     case 'comprar_casa':
       effect = buyHome(state, c) ? 'compra la vivienda en la que vive' : 'no llega a comprar la vivienda';
       break;
@@ -237,6 +255,8 @@ const TEMPLATES: Record<string, string[]> = {
   votar_gobierno: ['Las cosas van razonablemente bien; no voy a cambiar ahora.', 'Más vale lo conocido. Repito el voto.', 'Han cumplido lo suficiente para merecer otra oportunidad.'],
   votar_oposicion: ['Toca un cambio en el ayuntamiento.', 'Prometieron mucho y cumplieron poco. Esta vez, otros.', 'Quiero que alguien escuche de verdad a gente como yo.'],
   abstenerse: ['Todos son iguales. Ese día me quedo en casa.', 'No me convence nadie, la verdad.', 'Que decidan otros; yo paso.'],
+  manifestarse: ['Si no nos escuchan, que nos vean en la calle.', 'Allí estaré, con la pancarta.', 'Llevamos meses pidiéndolo. Toca plantarse.'],
+  no_ir: ['Estoy de acuerdo, pero manifestarme no va conmigo.', 'Ese día trabajo; que vayan otros.', 'Prefiero darle algo más de tiempo al alcalde.'],
 };
 
 /** Coletillas según el rasgo dominante: la misma decisión suena distinta en cada vecino. */
@@ -291,6 +311,12 @@ function score(c: Citizen, state: GameState, action: string): number {
       return (0.5 - voteLean(state, c)) * 120 + 30 + (state.politics.party?.faction === factionOf(state, c) ? 15 : 0);
     case 'abstenerse':
       return 18 + c.traits.terco * 0.1 - c.traits.social * 0.1;
+    case 'manifestarse': {
+      const a = protestFor(state, c);
+      return 25 + t.social * 0.4 + (c.happiness < 45 ? 15 : 0) + (a?.leaderId === c.id ? 40 : 0);
+    }
+    case 'no_ir':
+      return 30 + t.ahorro * 0.1 + (c.happiness >= 60 ? 15 : 0);
     case 'pedir': {
       const has = (k: string) => state.buildings.some((b) => b.kind === k);
       const missing = arg === 'parque' ? !has('park') : arg === 'colegio' ? !has('school') : arg === 'centro_salud' ? !has('clinic') : arg === 'tienda' ? !has('shop') : true;

@@ -22,3 +22,4 @@ export * from './names.ts';
 export * from './coverage.ts';
 export * from './terrain.ts';
 export * from './weather.ts';
+export * from './associations.ts';

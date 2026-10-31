@@ -1,3 +1,4 @@
+import { canMeetAssociation, meetAssociation } from './associations.ts';
 import { answerGrant, canAnswerGrant, canHoldFestival, canProposeBudget, holdFestival, materialsCost, proposeBudget } from './civic.ts';
 import { Command, tickToDate, type BuildKind, type ZoneKind } from '@bitopolis/shared';
 import { BUILD, DEBT_LIMIT, TERRAIN, WAGE_OUTSIDE, ZONE_COST_PER_TILE, ZONE_UNLOCK_POP } from './balance.ts';
@@ -170,6 +171,8 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       return state.projects.some((p) => p.buildingId === cmd.buildingId) ? { ok: true } : { ok: false, error: 'No hay obra' };
     case 'CitizenAct':
       return canApplyDecision(state, cmd.citizenId, cmd.action) ? { ok: true } : { ok: false, error: 'Decisión ya no válida' };
+    case 'MeetAssociation':
+      return canMeetAssociation(state, cmd.associationId);
     case 'ConvenePleno': {
       const r = canConvenePleno(state);
       return r.ok ? { ok: true } : { ok: false, error: r.error! };
@@ -304,6 +307,9 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       else state.map.tiles[tileIndex(state, cmd.x, cmd.y)] = Tile.Grass;
       break;
     }
+    case 'MeetAssociation':
+      meetAssociation(state, cmd.associationId);
+      break;
     case 'NotifyProject': {
       const p = state.projects.find((x) => x.buildingId === cmd.buildingId);
       if (p) p.notify = cmd.on;

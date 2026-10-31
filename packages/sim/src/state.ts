@@ -5,6 +5,7 @@ import type { Goal, Hook, Memory, Pleno, PromiseRecord, Relation } from './socia
 import { emptyPolitics, type Politics } from './politics-core.ts';
 import { generateTerrain, isWater, Terrain } from './terrain.ts';
 import type { Weather } from './weather.ts';
+import type { Association } from './associations.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
 export const FORMAT_VERSION = 10;
@@ -130,6 +131,8 @@ export interface Citizen {
   grudge: number;
   /** Voto decidido antes de las elecciones (solo vecinos con nombre; se borra al votar). */
   vote?: 'gobierno' | 'oposicion' | 'abstencion';
+  /** v1.7: decisión sobre la manifestación de la asociación `id`: `id` si va, `-id` si no. */
+  protest?: number;
 }
 
 export type TaxKey = 'ibi' | 'tasas' | 'plusvalia';
@@ -156,7 +159,7 @@ export interface Pending {
   dueTick: number;
 }
 
-export type Trigger = 'llegada' | 'sin_trabajo' | 'infeliz' | 'subida_impuestos' | 'ahorros' | 'opinion' | 'comprar_casa' | 'emprender' | 'elecciones';
+export type Trigger = 'llegada' | 'sin_trabajo' | 'infeliz' | 'subida_impuestos' | 'ahorros' | 'opinion' | 'comprar_casa' | 'emprender' | 'elecciones' | 'protesta';
 
 export interface DecisionLogEntry {
   tick: number;
@@ -180,6 +183,8 @@ export type EventKind =
   | 'warning'
   | 'politics'
   | 'election'
+  /** v1.7: manifestación ante el ayuntamiento (ref = id de la asociación). */
+  | 'protest'
   | 'info';
 
 export interface GameEvent {
@@ -266,6 +271,8 @@ export interface GameState {
   grants: Grant[];
   /** v1.7: tiempo de hoy y hasta cuándo dura. */
   weather: Weather;
+  /** v1.7: asociaciones vecinales. */
+  associations: Association[];
   /** Última despedida (como mucho una por semana). */
   lastDeathTick?: number;
 }
@@ -355,6 +362,7 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20 }: Ne
     festival: { name: null, year: 0, size: 'none', until: 0 },
     grants: [],
     weather: { kind: 'sol', until: 2 * 24 },
+    associations: [],
   };
   // Árboles dispersos (se talan gratis al construir encima).
   for (let i = 0; i < tiles.length; i++) {

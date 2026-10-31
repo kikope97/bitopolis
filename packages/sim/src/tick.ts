@@ -49,6 +49,7 @@ import { budgetFx, civicDay, festivalMood, onBuildingDone } from './civic.ts';
 import { updateFields } from './fields.ts';
 import { Terrain } from './terrain.ts';
 import { weatherDay, weatherFx, weatherMood } from './weather.ts';
+import { associationsDay, associationsMonth } from './associations.ts';
 import { lifeDay, lifeMonth, lifeYear } from './lifecycle.ts';
 import { FIRST_NAMES, SURNAMES } from './names.ts';
 import { goalFor, memoryMood, onCitizenLeaves, PROFESSIONS, relationMood, socialDay } from './social.ts';
@@ -503,6 +504,7 @@ function endOfDay(state: GameState): void {
   const d = tickToDate(state.tick);
   if (d.month === 1 && d.day === 1 && state.tick > 0) lifeYear(state);
   lifeDay(state);
+  associationsDay(state);
   accumulateRates(state);
 }
 
@@ -534,6 +536,7 @@ function payBusinesses(state: GameState, r: ReturnType<typeof monthRates>): void
 }
 
 function endOfMonth(state: GameState): void {
+  associationsMonth(state);
   const r = monthRates(state);
   // Nóminas municipales (los sueldos no pagan impuesto municipal).
   for (const c of state.citizens) {
