@@ -4,6 +4,8 @@ import { DEBT, KIDS_MAX, TURN } from './balance.ts';
 import { BUILD_NAMES, removeBuilding } from './commands.ts';
 import { homeRobbery } from './crime.ts';
 import { canBuyHome, canFound, shopTypesFor } from './economy.ts';
+import type { Brewing } from './director-core.ts';
+import type { DirectorChoice } from './director.ts';
 import { hash32 } from './hash.ts';
 import { totalDebt } from './household.ts';
 import { jobsOf } from './levels.ts';
@@ -49,6 +51,12 @@ export interface TownAi {
   lastQuick: number;
   /** «Qué está pasando»: lo que se decidió en cada turno (los últimos). */
   log: TurnLog[];
+  /** 2.0 (director): el último turno lo dirigió la IA (si no, las reglas tiran dados de respaldo). */
+  directed?: boolean;
+  /** «Se está cociendo»: avisos previos del director. */
+  brewing?: Brewing[];
+  /** Presupuesto de drama del mes (sucesos malos y buenos). */
+  drama?: { month: number; bad: number; good: number };
 }
 
 export interface TurnLog {
@@ -368,7 +376,7 @@ export function canApplyTurn(state: GameState, n: number): { ok: true } | { ok: 
  * Aplica lo que decidió la IA en un turno. Cada vecino se valida por separado:
  * lo que ya no vale se descarta (y ese vecino sigue igual).
  */
-export function applyTownTurn(state: GameState, n: number, acts: TurnAct[], extra?: { focus?: string; chronicle?: string }): void {
+export function applyTownTurn(state: GameState, n: number, acts: TurnAct[], extra?: { focus?: string; chronicle?: string; director?: DirectorChoice }): void {
   const ai = state.ai!;
   const t = ai.turn!;
   const lines: TurnLog['lines'] = [];
@@ -405,7 +413,19 @@ export function applyTownTurn(state: GameState, n: number, acts: TurnAct[], extr
     c.thought = cleanText(a.pensamiento, 160) || c.thought;
     if (parts.length) lines.push({ id: c.id, text: `${c.name} ${parts.join('; ')}`, motivo: cleanText(a.motivo, 160) });
   }
+  // 2.0: el director (solo en los turnos semanales). Con él, este turno manda la IA;
+  // sin él, las reglas vuelven a tirar los dados de robos, asociaciones e historias.
+  if (t.kind === 'semana') {
+    ai.directed = !!extra?.director;
+    if (extra?.director) lines.unshift(...applyDirectorImpl(state, extra.director).map((l) => ({ ...l, text: `✦ ${l.text}` })));
+  }
   closeTurn(state, 'ia', lines, extra);
+}
+
+/** El director vive en director.ts (que depende de este módulo): se engancha al cargar. */
+let applyDirectorImpl: (state: GameState, choice: DirectorChoice) => TurnLog['lines'] = () => [];
+export function setDirectorImpl(fn: typeof applyDirectorImpl): void {
+  applyDirectorImpl = fn;
 }
 
 /** Texto de un plan o ultimátum para la ficha y el diario. */
@@ -469,7 +489,10 @@ export function turnsTick(state: GameState, ruleFallback: (state: GameState, ids
   if (!state.aiMode || !ai || ai.share <= 0) return;
   const t = ai.turn;
   if (t) {
-    if (state.tick >= t.due) closeTurn(state, 'reglas', ruleFallback(state, t.ids));
+    if (state.tick >= t.due) {
+      if (t.kind === 'semana') ai.directed = false;
+      closeTurn(state, 'reglas', ruleFallback(state, t.ids));
+    }
     return;
   }
   // Solo se abren turnos al empezar el día (estable para el cliente y el servidor).

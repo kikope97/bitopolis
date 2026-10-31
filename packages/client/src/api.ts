@@ -85,6 +85,10 @@ export interface TurnResult {
   requested: number;
   answered: number;
   reason?: string;
+  rung?: 'calidad' | 'ahorro' | 'cerca del tope';
+  director?: { sucesos: { id: string; motivo: string }[]; avisos: { id: string; motivo: string }[] };
+  focus?: string;
+  chronicle?: string;
 }
 
 export interface AiMeta {

@@ -311,7 +311,7 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
   const mayor = mayorText(state, cmd);
   switch (cmd.type) {
     case 'TownTurn':
-      applyTownTurn(state, cmd.n, cmd.acts, { focus: cmd.focus, chronicle: cmd.chronicle });
+      applyTownTurn(state, cmd.n, cmd.acts, { focus: cmd.focus, chronicle: cmd.chronicle, director: cmd.director });
       break;
     case 'SetAiShare':
       setAiShare(state, cmd.share);

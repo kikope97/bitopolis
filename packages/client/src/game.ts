@@ -821,7 +821,17 @@ export function startGame(opts: GameOptions): void {
       }
       const res = r.turn;
       if (res && res.status === 'ready' && state.ai?.turn?.n === t.n) {
-        await command({ type: 'TownTurn', n: t.n, acts: res.acts }, true);
+        await command(
+          {
+            type: 'TownTurn',
+            n: t.n,
+            acts: res.acts,
+            ...(res.director ? { director: res.director } : {}),
+            ...(res.focus ? { focus: res.focus } : {}),
+            ...(res.chronicle ? { chronicle: res.chronicle } : {}),
+          },
+          true,
+        );
       } else if (res && res.status === 'failed') {
         releaseTurn(t.n, '');
       }

@@ -5,6 +5,11 @@ import {
   buildTurnRequest,
   checkInvariants,
   createInitialState,
+  directorMenu,
+  directorOwns,
+  dramaBudget,
+  buildDirectorRequest,
+  parseDirector,
   type GameState,
   GESTURES,
   gestureCandidates,
@@ -51,7 +56,10 @@ function fuzzTurn(seed: number) {
           motivo: 'Porque toca.',
         };
       });
-    return { type: 'TownTurn', n: t.n, acts };
+    // Director al azar entre su menú (en los turnos semanales).
+    const menu = directorMenu(state).map((m) => m.id);
+    const some = () => menu.filter(() => rnd(3) === 0).map((id) => ({ id, motivo: 'Porque sí.' }));
+    return { type: 'TownTurn', n: t.n, acts, ...(t.kind === 'semana' && rnd(4) > 0 ? { director: { sucesos: some(), avisos: some() }, focus: 'La semana', chronicle: 'Pasan cosas.' } : {}) };
   };
 }
 
@@ -73,6 +81,8 @@ describe('turnos del pueblo con IA (2.0)', () => {
       expect(checkInvariants(state)).toEqual([]);
       expect(state.ai!.log.some((l) => l.source === 'ia')).toBe(true);
       expect(state.citizens.length).toBeGreaterThan(0);
+      // El director ha hecho pasar cosas (líneas con ✦).
+      expect(state.ai!.log.some((l) => l.lines.some((x) => x.text.startsWith('✦')))).toBe(true);
     }
   }, 600_000);
 
@@ -174,4 +184,64 @@ describe('turnos del pueblo con IA (2.0)', () => {
     expect(migrate(normal).ai).toBeUndefined();
     expect(TICKS_PER_MONTH).toBeGreaterThan(0);
   });
+
+  it('director: lo malo solo pasa avisado antes y si cabe en el presupuesto de drama', () => {
+    const { state } = runSimulation({ seed: 3, days: 260, profile: 'constructor', aiMode: true, aiShare: 100 });
+    // Se fuerza un candidato malo: delincuencia alta en una tienda con caja.
+    const shop = state.buildings.find((b) => b.kind === 'shop' && b.built && b.cash > 0);
+    expect(shop).toBeTruthy();
+    const open = () => {
+      while (!state.ai!.turn || state.ai!.turn.kind !== 'semana') step(state);
+      state.fields.crime[shop!.y * state.map.w + shop!.x] = 90;
+      return state.ai!.turn!;
+    };
+    let t = open();
+    const id = `robo_tienda:${shop!.id}`;
+    expect(directorMenu(state).some((m) => m.id === id)).toBe(true);
+    // Pueblo descontento para que quepa algo malo.
+    for (const c of state.citizens) c.happiness = 30;
+    expect(dramaBudget(state).bad).toBe(2);
+    const robberies = state.justice.robberies;
+    // Sin aviso previo: no pasa, se queda como aviso (con un vecino que sigue igual).
+    {
+      const c = state.citizens.find((x) => t.ids.includes(x.id))!;
+      const keep = { vecino: c.id, accion: 'seguir', gesto: { con: 0, tipo: 'ninguno' }, actitud: 0, gasto: { donde: 'pueblo', tienda: 0, ocio: false }, plan: { tipo: 'ninguno', necesidad: '', meses: 0 }, pensamiento: '', motivo: '' };
+      expect(applyCommand(state, { type: 'TownTurn', n: t.n, acts: [keep], director: { sucesos: [{ id, motivo: 'Ya tocaba.' }], avisos: [{ id, motivo: 'Se huele.' }] } }).ok).toBe(true);
+      expect(state.justice.robberies).toBe(robberies);
+      expect(state.ai!.brewing!.some((b) => b.id === id)).toBe(true);
+      expect(directorOwns(state)).toBe(true);
+      // Turno siguiente: ya avisado, ahora sí pasa.
+      t = open();
+      for (const x of state.citizens) x.happiness = 30;
+      const c2 = state.citizens.find((x) => t.ids.includes(x.id))!;
+      expect(applyCommand(state, { type: 'TownTurn', n: t.n, acts: [{ ...keep, vecino: c2.id }], director: { sucesos: [{ id, motivo: 'Ya tocaba.' }], avisos: [] } }).ok).toBe(true);
+      expect(state.justice.robberies).toBe(robberies + 1);
+      expect(state.ai!.log.at(-1)!.lines[0]!.text).toContain('✦');
+      // Con el pueblo contento, nada malo cabe.
+      for (const x of state.citizens) x.happiness = 90;
+      expect(dramaBudget(state).bad).toBe(0);
+    }
+    expect(checkInvariants(state)).toEqual([]);
+  }, 120_000);
+
+  it('director: sin respuesta, las reglas vuelven a tirar los dados; el prompt y la respuesta se validan', () => {
+    const { state } = runSimulation({ seed: 2, days: 200, profile: 'constructor', aiMode: true, aiShare: 100, onTurn: fuzzTurn(4) });
+    expect(state.ai!.directed === true || state.ai!.directed === false).toBe(true);
+    // Un turno que vence sin respuesta devuelve los dados a las reglas.
+    while (!state.ai!.turn || state.ai!.turn.kind !== 'semana') step(state);
+    state.ai!.directed = true;
+    const req = buildDirectorRequest(state);
+    expect(req.user).toContain('presupuesto_drama');
+    const sent = `${req.shared}\n${req.user}`;
+    while (state.ai!.turn) step(state);
+    expect(directorOwns(state)).toBe(false);
+    // Ids fuera del menú y nombres inventados fuera.
+    const stranger = FIRST_NAMES.find((n) => !sent.includes(n))!;
+    const parsed = parseDirector(JSON.stringify({ sucesos: [{ id: 'robo_tienda:999999', motivo: 'x' }, ...(req.ids[0] ? [{ id: req.ids[0], motivo: `Lo dice ${stranger}.` }] : [])], avisos: [], foco: 'Semana tranquila', cronica: `${stranger} lo cuenta todo.` }), req.ids, sent);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.director.sucesos.every((x) => req.ids.includes(x.id))).toBe(true);
+    if (req.ids[0]) expect(parsed!.director.sucesos[0]!.motivo).toBe('');
+    expect(parsed!.chronicle).toBe('');
+    expect(parseDirector('nada', req.ids, sent)).toBeNull();
+  }, 120_000);
 });

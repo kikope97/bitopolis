@@ -1,6 +1,7 @@
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { rememberDeparted } from './family.ts';
 import { CAMPAIGN_MONTHS } from './balance.ts';
+import { directorOwns } from './director-core.ts';
 import { BUILD_NAMES } from './commands.ts';
 import { canFound, freeShopLot, saturated, taxLevels } from './economy.ts';
 import { hash32 } from './hash.ts';
@@ -76,6 +77,13 @@ export const MEMORY_KINDS = [
   'cerro_negocio',
   // v1.9.1: el alcalde no contestó a su petición de aplazamiento.
   'sin_respuesta',
+  // 2.0: sucesos del director del pueblo.
+  'discusion',
+  'agradecio',
+  'rumor',
+  'mitin',
+  'le_ayudaron',
+  'se_conocieron',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -297,6 +305,18 @@ export function memoryText(state: GameState, m: Memory): string {
       return 'Tuvo que cerrar su negocio';
     case 'sin_respuesta':
       return 'Pidió tiempo al alcalde y no le contestó';
+    case 'discusion':
+      return `Discutió con ${who}`;
+    case 'agradecio':
+      return 'Dio las gracias al alcalde en público';
+    case 'rumor':
+      return 'Oyó un rumor sobre el ayuntamiento';
+    case 'mitin':
+      return 'Fue a un mitin de la oposición';
+    case 'le_ayudaron':
+      return `Le echó una mano ${who}`;
+    case 'se_conocieron':
+      return `Conoció a ${who}`;
   }
 }
 
@@ -580,7 +600,8 @@ function directStories(state: GameState): void {
   const named = state.citizens.filter((c) => c.named);
   // Dos vecinos quieren el mismo (y único) local.
   const founders = named.filter((c) => canFound(state, c));
-  if (founders.length >= 2 && freeShopLot(state) !== null && chance(state.rng, 0.3)) {
+  // 2.0: en Modo IA con director, esta historia la abre el director.
+  if (!directorOwns(state) && founders.length >= 2 && freeShopLot(state) !== null && chance(state.rng, 0.3)) {
     const a = pick(state.rng, founders);
     const b = pick(state.rng, founders.filter((x) => x !== a));
     // La rivalidad solo si la historia arranca, y nunca entre pareja ni tras hacer las paces.

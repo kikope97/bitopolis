@@ -42,6 +42,21 @@ createServer((req, res) => {
     }
     // 2.0: turno del pueblo (bloque común + «Lote de vecinos»).
     const whole = data.messages?.[1]?.content ?? '';
+    // 2.0: director del pueblo: avisa de lo primero del menú y hace pasar lo bueno que haya.
+    const dir = whole.indexOf('Director de la semana');
+    if (dir >= 0) {
+      const d = JSON.parse(whole.slice(whole.indexOf('\n', dir) + 1));
+      const good = d.menu.filter((m) => !m.malo).slice(0, 1);
+      const out = {
+        sucesos: [...good, ...d.menu.filter((m) => m.malo && m.avisado).slice(0, d.presupuesto_drama.sucesos_malos_que_caben)].map((m) => ({ id: m.id, motivo: 'Es lo que toca esta semana en el pueblo.' })),
+        avisos: d.menu.filter((m) => m.malo && !m.avisado).slice(0, 2).map((m) => ({ id: m.id, motivo: 'Se nota en la calle.' })),
+        foco: 'El pueblo empieza a moverse',
+        cronica: 'Semana movida en el pueblo: los vecinos hablan del alcalde en el bar y en la plaza.',
+      };
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify(out) } }], usage: { prompt_tokens: 2500, completion_tokens: 200 } }));
+      return;
+    }
     const lote = whole.indexOf('Lote de vecinos');
     if (lote >= 0) {
       const list = JSON.parse(whole.slice(whole.indexOf('\n', lote) + 1));

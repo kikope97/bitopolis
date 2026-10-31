@@ -2,6 +2,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
+import type { Command } from '@bitopolis/shared';
 import { applyCommand, type GameState, hashState, step } from '@bitopolis/sim';
 import type { LLMRequest, LLMResult } from '../src/ai/providers.ts';
 import { AiService } from '../src/ai/service.ts';
@@ -24,6 +25,11 @@ let forget = false;
 ai.providerOverride = () => ({
   async complete(req): Promise<LLMResult> {
     calls.push(req);
+    if (req.user.startsWith('Director de la semana')) {
+      const d = JSON.parse(req.user.slice(req.user.indexOf('\n') + 1)) as { menu: { id: string; malo: boolean }[] };
+      const out = { sucesos: d.menu.filter((m) => !m.malo).slice(0, 1).map((m) => ({ id: m.id, motivo: 'Toca.' })), avisos: d.menu.filter((m) => m.malo).slice(0, 1).map((m) => ({ id: m.id, motivo: 'Se huele.' })), foco: 'Semana de obras', cronica: 'El pueblo crece y se nota en la plaza.' };
+      return { text: JSON.stringify(out), usage: { in: 3000, cachedIn: 2000, out: 200 } };
+    }
     const list = JSON.parse(req.user.slice(req.user.indexOf('\n') + 1)) as { vecino: number; acciones: string[] }[];
     const keep = forget && list.length > 1 ? list.slice(0, -1) : list;
     const decisiones = keep.map((v) => ({
@@ -59,24 +65,33 @@ async function aiGame(extra: Record<string, unknown> = {}) {
   return { token, state: claim.json().state as GameState };
 }
 
-/** Juega en «cliente» hasta que se abre un turno con al menos `min` vecinos y guarda en ese momento. */
+/** Juega en «cliente» hasta que se abre un turno con al menos `min` vecinos y guarda en ese momento (en tramos, como el cliente). */
 async function playUntilTurn(token: string, state: GameState, min = 2) {
-  const from = state.tick;
-  const cmds = [
-    { tick: state.tick, cmd: { type: 'Build', kind: 'house', x: 26, y: 25 } as const },
-    { tick: state.tick, cmd: { type: 'Build', kind: 'house', x: 22, y: 25 } as const },
+  let from = state.tick;
+  let cmds: { tick: number; cmd: Command }[] = [
+    { tick: state.tick, cmd: { type: 'Build', kind: 'house', x: 26, y: 25 } },
+    { tick: state.tick, cmd: { type: 'Build', kind: 'house', x: 22, y: 25 } },
   ];
   for (const c of cmds) applyCommand(state, c.cmd);
+  const save = async () => {
+    const r = await app.inject({
+      method: 'PUT',
+      url: `/api/games/${token}/save`,
+      payload: { sessionId: SID, fromTick: from, toTick: state.tick, commands: cmds, hash: hashState(state), live: true },
+    });
+    expect(r.json()).toMatchObject({ ok: true });
+    from = state.tick;
+    cmds = [];
+  };
   let guard = 0;
-  while (!(state.ai?.turn && state.ai.turn.ids.length >= min) && guard++ < 24 * 200) step(state);
+  while (!(state.ai?.turn && state.ai.turn.kind === 'semana' && state.ai.turn.ids.length >= min) && guard++ < 24 * 400) {
+    step(state);
+    // Un turno pequeño que no vale para la prueba: se cierra por reglas al vencer, como en el juego.
+    if (state.tick - from >= 24 * 10 && state.tick % 24 === 0 && !state.ai?.turn) await save();
+  }
   const t = state.ai!.turn!;
   expect(t).toBeTruthy();
-  const r = await app.inject({
-    method: 'PUT',
-    url: `/api/games/${token}/save`,
-    payload: { sessionId: SID, fromTick: from, toTick: state.tick, commands: cmds, hash: hashState(state), live: true },
-  });
-  expect(r.json()).toMatchObject({ ok: true });
+  await save();
   // Se espera a que el servidor termine de pedir el turno.
   for (let i = 0; i < 100; i++) {
     const g = (await app.inject({ method: 'GET', url: `/api/games/${token}/turn/${t.n}` })).json();
@@ -95,12 +110,18 @@ describe('turnos del pueblo en el servidor (2.0)', () => {
     expect(result.turn.status).toBe('ready');
     expect(result.turn.acts.map((a: { vecino: number }) => a.vecino).sort()).toEqual([...t.ids].sort());
     // Modo «Calidad» (por defecto): los turnos van con el modelo bueno.
-    expect(calls[0]!.model).toBe('claude-sonnet-5-5');
+    expect(calls.find((c) => c.user.startsWith('Lote'))!.model).toBe('claude-sonnet-5-5');
     expect(result.turn.rung).toBe('calidad');
+    // El director va en la misma ronda, con el modelo del director, y su respuesta llega validada.
+    expect(calls.some((c) => c.user.startsWith('Director de la semana'))).toBe(true);
+    expect(result.turn.director).toBeTruthy();
+    expect(result.turn.chronicle).toContain('pueblo');
     // Bloque común aparte (para la caché) y nada de la key.
-    expect(calls[0]!.shared).toBeTruthy();
+    expect(calls.find((c) => c.user.startsWith('Lote'))!.shared).toBeTruthy();
     expect(JSON.stringify(calls)).not.toContain('turnos-abcdef');
-    expect(applyCommand(state, { type: 'TownTurn', n: t.n, acts: result.turn.acts }).ok).toBe(true);
+    expect(applyCommand(state, { type: 'TownTurn', n: t.n, acts: result.turn.acts, director: result.turn.director, focus: result.turn.focus, chronicle: result.turn.chronicle }).ok).toBe(true);
+    expect(state.ai!.directed).toBe(true);
+    expect(state.ai!.log.at(-1)!.chronicle).toContain('pueblo');
     expect(state.ai!.turn ?? null).toBeNull();
     expect(state.ai!.log.at(-1)!.source).toBe('ia');
     const usage = (await app.inject({ method: 'GET', url: `/api/games/${token}/ai-usage` })).json();
@@ -115,7 +136,8 @@ describe('turnos del pueblo en el servidor (2.0)', () => {
     forget = false;
     // Lote completo y segunda pregunta solo con el que faltó.
     expect(calls.length).toBeGreaterThanOrEqual(2);
-    const second = JSON.parse(calls.at(-1)!.user.slice(calls.at(-1)!.user.indexOf('\n') + 1)) as unknown[];
+    const lots = calls.filter((c) => c.user.startsWith('Lote'));
+    const second = JSON.parse(lots.at(-1)!.user.slice(lots.at(-1)!.user.indexOf('\n') + 1)) as unknown[];
     expect(second.length).toBeLessThan(t.ids.length);
     // En la segunda pregunta también falta uno (el falso siempre se deja el último), salvo si iba solo.
     expect(result.turn.answered).toBeGreaterThanOrEqual(t.ids.length - 1);
@@ -132,9 +154,13 @@ describe('turnos del pueblo en el servidor (2.0)', () => {
       .insertInto('ai_usage')
       .values({ game_id: game.id, ts: now.getTime(), day: now.toISOString().slice(0, 10), month: now.toISOString().slice(0, 7), kind: 'turno', model: 'x', tokens_in: 0, tokens_cached: 0, tokens_out: 0, eur: 0.15, requested: 1, valid: 1, retried: 0, status: 'ok' })
       .execute();
-    const { result } = await playUntilTurn(token, state);
+    const { t, result } = await playUntilTurn(token, state);
     expect(result.turn.rung).toBe('cerca del tope');
-    expect(calls.every((c) => c.model === 'claude-haiku-5-5')).toBe(true);
+    const lots = calls.filter((c) => c.user.startsWith('Lote'));
+    expect(lots.length).toBeGreaterThan(0);
+    expect(lots.every((c) => c.model === 'claude-haiku-5-5')).toBe(true);
+    // Cerca del tope, el director solo un turno sí y otro no (los pares).
+    expect(calls.some((c) => c.user.startsWith('Director'))).toBe(t.n % 2 === 0);
 
     // Con el tope pasado, no se llama: el cliente suelta el reloj y deciden las reglas.
     calls = [];
@@ -146,7 +172,7 @@ describe('turnos del pueblo en el servidor (2.0)', () => {
       .values({ game_id: gb.id, ts: now.getTime(), day: now.toISOString().slice(0, 10), month: now.toISOString().slice(0, 7), kind: 'turno', model: 'x', tokens_in: 0, tokens_cached: 0, tokens_out: 0, eur: 0.5, requested: 1, valid: 1, retried: 0, status: 'ok' })
       .execute();
     const r2 = await playUntilTurn(b.token, b.state);
-    expect(calls).toHaveLength(0);
+    expect(calls.filter((c) => c.user.startsWith('Lote') || c.user.startsWith('Director'))).toHaveLength(0);
     expect(r2.result.turn.status).toBe('failed');
     expect(r2.result.capped).toBe(true);
   });

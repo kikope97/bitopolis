@@ -5,6 +5,7 @@ import { MIN_WAGE } from './balance.ts';
 import { BUILD_NAMES } from './commands.ts';
 import { debtBand, pocketOf } from './household.ts';
 import { daysToElection, FACTION_TEXT, factionOf, politicsActive } from './politics.ts';
+import { brewingNow, type DirectorChoice, directorMenu, dramaBudget } from './director.ts';
 import { inventedName, toneOf } from './prompt.ts';
 import { GOAL_TEXT, HOOK_TEXT, hookFor, memoryText, NEED_TEXT, NEEDS, needsOf } from './social.ts';
 import type { Citizen, GameState } from './state.ts';
@@ -260,3 +261,87 @@ export function parseTurn(text: string, ids: number[], sent: string): { acts: Tu
 
 /** Texto de las necesidades para los planes (para la interfaz). */
 export const PLAN_NEED_TEXT = NEED_TEXT;
+
+/* ---------------- director del pueblo (2.0) ---------------- */
+
+export const DIRECTOR_SYSTEM = `Eres el director de Bitópolis, un pueblo español pequeño en un juego de alcalde. Cada semana decides qué pasa en el pueblo además de lo que hacen los vecinos: eliges entre los sucesos posibles que te da el juego (todos son reales: quién, dónde y por qué), el foco de la semana y escribes la crónica.
+
+Devuelve:
+- "sucesos": los que pasan esta semana (0 a 3), cada uno con su "id" del menú y un "motivo" corto de por qué ahora.
+- "avisos": sucesos del menú que empiezan a cocerse (0 a 3), para que el alcalde pueda reaccionar a tiempo. Un suceso malo ("malo": true) solo puede pasar si ya estaba avisado ("avisado": true); si no, avísalo primero.
+- "foco": el tema de la semana en una frase corta (máx. 100 caracteres).
+- "cronica": 2 o 3 frases en español de España, como el periódico del pueblo, sobre lo que ha hecho el alcalde, cómo está el pueblo y lo que pasa esta semana (máx. 400 caracteres).
+
+Reglas:
+- Sé justo: respeta "presupuesto_drama" (cuántos sucesos malos caben). Un pueblo contento no tiene disturbios; si el alcalde lo hace bien, que pasen también cosas buenas.
+- Que tenga sentido: cada suceso sale de lo que ha hecho el alcalde y de cómo están los vecinos. Mejor pocos sucesos con historia que muchos sueltos. Si no pasa nada interesante, lista vacía.
+- No menciones a nadie ni nada que no esté en los datos, ni cifras inventadas, ni que eres una IA. Sin comillas ni emojis.
+- Responde solo con JSON que cumpla el esquema.`;
+
+export const DIRECTOR_SCHEMA = {
+  type: 'object',
+  properties: {
+    sucesos: {
+      type: 'array',
+      items: { type: 'object', properties: { id: { type: 'string' }, motivo: { type: 'string' } }, required: ['id', 'motivo'], additionalProperties: false },
+    },
+    avisos: {
+      type: 'array',
+      items: { type: 'object', properties: { id: { type: 'string' }, motivo: { type: 'string' } }, required: ['id', 'motivo'], additionalProperties: false },
+    },
+    foco: { type: 'string' },
+    cronica: { type: 'string' },
+  },
+  required: ['sucesos', 'avisos', 'foco', 'cronica'],
+  additionalProperties: false,
+} as const;
+
+export interface DirectorRequest {
+  system: string;
+  shared: string;
+  user: string;
+  schema: Record<string, unknown>;
+  ids: string[];
+}
+
+/** La petición del director: el mismo bloque común del turno y el menú de sucesos. */
+export function buildDirectorRequest(state: GameState, shared = turnShared(state)): DirectorRequest {
+  const menu = directorMenu(state);
+  const brewing = brewingNow(state, menu);
+  const budget = dramaBudget(state);
+  const paceTicks = Math.max(1, (state.ai?.paceDays ?? 7) * 24);
+  const data = {
+    presupuesto_drama: { sucesos_malos_que_caben: budget.bad, por_que: budget.why },
+    se_esta_cociendo: brewing.map((b) => ({ id: b.id, texto: b.text, hace_turnos: Math.max(0, Math.round((state.tick - b.since) / paceTicks)) })),
+    menu: menu.map((m) => ({ id: m.id, tipo: m.kind, malo: m.bad, avisado: brewing.some((b) => b.id === m.id), texto: m.text, por_que: m.why })),
+  };
+  const user = `Director de la semana (elige entre el menú):\n${JSON.stringify(data)}`;
+  return { system: DIRECTOR_SYSTEM, shared, user, schema: DIRECTOR_SCHEMA as unknown as Record<string, unknown>, ids: menu.map((m) => m.id) };
+}
+
+const PickSchema = z.object({ id: z.string().max(60), motivo: z.string().max(600) });
+const DirectorOut = z.object({ sucesos: z.array(PickSchema).max(10), avisos: z.array(PickSchema).max(10), foco: z.string().max(600), cronica: z.string().max(2000) });
+
+/** Lee la respuesta del director: solo ids del menú y textos sin nombres inventados. Null si no vale. */
+export function parseDirector(text: string, ids: string[], sent: string): { director: DirectorChoice; focus: string; chronicle: string } | null {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  const r = DirectorOut.safeParse(raw);
+  if (!r.success) return null;
+  const pick = (list: { id: string; motivo: string }[]) => {
+    const out: { id: string; motivo: string }[] = [];
+    for (const p of list) {
+      if (!ids.includes(p.id) || out.some((x) => x.id === p.id) || out.length >= 3) continue;
+      const motivo = clean(p.motivo, 160);
+      out.push({ id: p.id, motivo: inventedName(motivo, sent) ? '' : motivo });
+    }
+    return out;
+  };
+  const focus = clean(r.data.foco, 120);
+  const chronicle = clean(r.data.cronica, 500);
+  return { director: { sucesos: pick(r.data.sucesos), avisos: pick(r.data.avisos) }, focus: inventedName(focus, sent) ? '' : focus, chronicle: inventedName(chronicle, sent) ? '' : chronicle };
+}

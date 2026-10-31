@@ -525,3 +525,28 @@ export const TURN = {
   /** Cuánto mueve la actitud hacia el alcalde la intención de voto (por punto, de −2 a +2). */
   attitudeVote: 0.05,
 } as const;
+
+/** 2.0: el director del pueblo (sucesos que elige la IA entre los que propone el motor). */
+export const DIRECTOR = {
+  /** Delincuencia mínima en la calle para que un robo sea candidato. */
+  robCrime: 25,
+  /** Sucesos como mucho por turno, y buenos como mucho por turno. */
+  maxEvents: 3,
+  maxGood: 2,
+  /** Sucesos malos según el descontento (100 − felicidad): desde 35, uno por turno; desde 55, dos. */
+  badFrom: 35,
+  twoBadFrom: 55,
+  /** Sucesos malos como mucho al mes. */
+  maxBadPerMonth: 4,
+  /** Con el pueblo contento (felicidad ≥ esta), al menos un suceso bueno por cada dos malos. */
+  fairHappiness: 60,
+  /** Avisos («Se está cociendo») a la vez, y turnos que dura un aviso. */
+  maxBrewing: 5,
+  brewingTurns: 4,
+  /** Candidatos de cada tipo en el menú. */
+  perKind: 2,
+  /** Lo que da un vecino a un amigo en apuros (€, como mucho). */
+  helpAmount: 120,
+  /** Vecinos a los que llega un rumor. */
+  rumorReach: 6,
+} as const;

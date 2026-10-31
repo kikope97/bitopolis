@@ -1,4 +1,19 @@
-import { buildDecisionRequest, buildTurnRequest, type GameState, parseDecisions, parseText, parseTurn, type Pending, type TextRequest, turnBatches, turnShared, type TurnAct } from '@bitopolis/sim';
+import {
+  buildDecisionRequest,
+  buildDirectorRequest,
+  buildTurnRequest,
+  type DirectorChoice,
+  type GameState,
+  parseDecisions,
+  parseDirector,
+  parseText,
+  parseTurn,
+  type Pending,
+  type TextRequest,
+  turnBatches,
+  turnShared,
+  type TurnAct,
+} from '@bitopolis/sim';
 import type { Config } from '../config.ts';
 import type { Db } from '../db/index.ts';
 import type { SettingsStore } from '../settings.ts';
@@ -52,6 +67,10 @@ export interface TurnResult {
   reason?: string;
   /** Escalón de gasto con el que se pidió: calidad, ahorro o ahorro por estar cerca de un tope. */
   rung?: 'calidad' | 'ahorro' | 'cerca del tope';
+  /** Director del pueblo (solo en los turnos semanales). */
+  director?: DirectorChoice;
+  focus?: string;
+  chronicle?: string;
 }
 
 /** Con este % de cualquier tope gastado, los turnos bajan al modelo de ahorro. */
@@ -62,6 +81,8 @@ export const TURN_BATCH = 15;
 const TURN_PARALLEL = 4;
 const TURN_TIMEOUT_MS = 60_000;
 const TURN_OUT_PER_CITIZEN = 320;
+/** Tokens de salida del director (sucesos, avisos, foco y crónica). */
+const DIRECTOR_OUT = 900;
 
 const TIMEOUT_MS = 20_000;
 const MAX_OUT_PER_CITIZEN = 120;
@@ -310,11 +331,46 @@ export class AiService {
       }
       if (retry && missing.length && missing.length < ids.length) await one(missing, false);
     };
-    // El primer lote va solo (escribe la caché del bloque común); los demás, en paralelo.
+    /** El director del pueblo: una petición con el modelo del director (cerca del tope, un turno sí y otro no). */
+    const director = async (): Promise<void> => {
+      if (state.ai?.turn?.kind !== 'semana' || (rung === 'cerca del tope' && result.n % 2 === 1)) return;
+      const req = buildDirectorRequest(state, shared);
+      const dModel = rung === 'calidad' ? s.modelPremium : model;
+      const est = costEur(this.prices, dModel, s.provider, { in: Math.ceil((req.system.length + req.shared.length + req.user.length) / 3.2), cachedIn: 0, out: DIRECTOR_OUT }) * 1.5;
+      if (await this.reserve(gameId, s, est)) return;
+      const usage = { in: 0, cachedIn: 0, out: 0 };
+      let status = 'ok';
+      try {
+        const provider = this.providerOverride ? this.providerOverride(s) : makeProvider(s.provider, s.key, s.baseUrl);
+        const r = await provider.complete({ system: req.system, shared: req.shared, user: req.user, schema: req.schema, model: dModel, maxTokens: DIRECTOR_OUT }, AbortSignal.timeout(TURN_TIMEOUT_MS));
+        usage.in = r.usage.in;
+        usage.cachedIn = r.usage.cachedIn;
+        usage.out = r.usage.out;
+        const parsed = parseDirector(r.text, req.ids, `${req.shared}\n${req.user}`);
+        if (parsed) {
+          result.director = parsed.director;
+          if (parsed.focus) result.focus = parsed.focus;
+          if (parsed.chronicle) result.chronicle = parsed.chronicle;
+        } else status = 'invalid';
+      } catch (e) {
+        status = (e as Error).name === 'TimeoutError' ? 'timeout' : 'error';
+      } finally {
+        this.reserved.set(gameId, Math.max(0, (this.reserved.get(gameId) ?? 0) - est));
+        const now = new Date();
+        await this.db
+          .insertInto('ai_usage')
+          .values({ game_id: gameId, ts: now.getTime(), day: day(now), month: month(now), kind: 'director', model: dModel, tokens_in: usage.in, tokens_cached: usage.cachedIn, tokens_out: usage.out, eur: costEur(this.prices, dModel, s.provider, usage), requested: 1, valid: result.director ? 1 : 0, retried: 0, status })
+          .execute();
+      }
+    };
+    // El primer lote va solo (escribe la caché del bloque común); los demás, en paralelo, con el director.
     try {
       await one(batches[0]!);
       const rest = batches.slice(1);
-      for (let i = 0; i < rest.length; i += TURN_PARALLEL) await Promise.all(rest.slice(i, i + TURN_PARALLEL).map((b) => one(b).catch(() => undefined)));
+      const others = (async () => {
+        for (let i = 0; i < rest.length; i += TURN_PARALLEL) await Promise.all(rest.slice(i, i + TURN_PARALLEL).map((b) => one(b).catch(() => undefined)));
+      })();
+      await Promise.all([director().catch(() => undefined), others]);
     } catch (e) {
       result.reason = (e as Error).message;
     }

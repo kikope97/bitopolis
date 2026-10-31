@@ -80,6 +80,13 @@ export const Command = z.discriminatedUnion('type', [
       .max(300),
     focus: z.string().max(300).optional(),
     chronicle: z.string().max(1200).optional(),
+    /** Director del pueblo: sucesos que pasan esta semana y avisos de lo que se cuece. */
+    director: z
+      .object({
+        sucesos: z.array(z.object({ id: z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(40), motivo: z.string().max(400) })).max(6),
+        avisos: z.array(z.object({ id: z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(40), motivo: z.string().max(400) })).max(6),
+      })
+      .optional(),
   }),
   /** 2.0: % de vecinos con IA (solo sube: nadie deja de pensar con IA). */
   z.object({ type: z.literal('SetAiShare'), share: z.number().int().min(0).max(100) }),

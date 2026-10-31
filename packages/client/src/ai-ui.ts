@@ -1,5 +1,7 @@
 import { api, type AiMeta, type AiSettings } from './api.ts';
 import { loadModels, modelPicker } from './model-picker.ts';
+
+const KIND_LABEL: Record<string, string> = { decision: 'Decisiones', turno: 'Turnos del pueblo', director: 'Director del pueblo', consejero: 'Consejero', diario: 'Diario', conversacion: 'Conversaciones' };
 import { $, closeSheet, h, sheet, toast } from './ui.ts';
 
 /** Un único formato de euros: «0,42 €» o «menos de 1 céntimo». */
@@ -197,7 +199,7 @@ export async function openUsage(token: string): Promise<void> {
         'details',
         { class: 'advanced' },
         h('summary', {}, 'Detalle técnico'),
-        h('ul', { class: 'accounts' }, ...(kinds.length ? kinds.map(([k, v]) => h('li', {}, h('span', {}, k === 'decision' ? 'Decisiones' : k), h('span', {}, eur(v)))) : [h('li', {}, 'Sin llamadas todavía.')])),
+        h('ul', { class: 'accounts' }, ...(kinds.length ? kinds.map(([k, v]) => h('li', {}, h('span', {}, KIND_LABEL[k] ?? k), h('span', {}, eur(v)))) : [h('li', {}, 'Sin llamadas todavía.')])),
         h('p', {}, `${plural(u.calls, 'llamada', 'llamadas')}, ${plural(u.requested, 'decisión pedida', 'decisiones pedidas')} (${u.retried} tras reintento).`),
         h('p', {}, `Tokens: ${u.tokensIn} de entrada y ${u.tokensOut} de salida.`),
         u.caps.server ? h('p', {}, `Servidor (todas las partidas) este mes: ${eur(u.spend.serverMonth)} de ${eur(u.caps.server)}.`) : '',
