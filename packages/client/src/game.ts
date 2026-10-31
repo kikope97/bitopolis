@@ -232,7 +232,17 @@ export function startGame(opts: GameOptions): void {
   const happyText = h('span', { class: 'tb-text' });
   $('#hud-happy').replaceChildren(pixelIcon('smile'), happyText);
   let lastStats = state.stats.length;
+  let lastPop = state.citizens.length;
   function onState() {
+    // Ronda 12: al llegar a 10 vecinos, un momento de desbloqueo que lleva a la bandeja.
+    if (lastPop < ZONE_UNLOCK_POP && state.citizens.length >= ZONE_UNLOCK_POP) {
+      sfx.milestone();
+      vibrate(120);
+      toast('¡Zonas desbloqueadas! Toca aquí o «Construir» para pintar zonas R, C e I junto a la carretera.', { kind: 'good', sticky: true, onClick: () => openTray() });
+      tabBuild.classList.add('pulse');
+      setTimeout(() => tabBuild.classList.remove('pulse'), 8000);
+    }
+    lastPop = state.citizens.length;
     if (state.stats.length !== lastStats) {
       lastStats = state.stats.length;
       const m = state.stats.at(-1);

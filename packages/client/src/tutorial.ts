@@ -46,14 +46,20 @@ const STEPS: Step[] = [
     done: (s) => has(s, 'house'),
   },
   {
-    text: 'Las obras tardan unos días. Pon el tiempo en marcha con ▶ (arriba); el botón de al lado lo acelera.',
+    text: 'Las obras tardan unos días. Pon el tiempo en marcha con ▶ (arriba) y acelera con x3, al lado.',
     target: () => '#play-pause',
     done: (s) => s.citizens.length >= 2,
   },
   {
-    text: '¡Ya tienes vecinos! Con 10 se desbloquean las zonas R, C e I (abajo ves cuántos faltan). Si dudas, pulsa «?».',
-    target: () => '#whatnow',
-    done: () => false,
+    text: '¡Ya tienes vecinos! Con 10 se desbloquean las zonas R, C e I: abajo ves cuántos faltan. Si dudas, pulsa «?».',
+    target: () => null,
+    done: (s) => s.citizens.length >= 10,
+  },
+  {
+    // Ronda 12: el paso anterior no se cerraba nunca; ahora llega el momento del desbloqueo.
+    text: '¡Zonas desbloqueadas! Abre «Construir», elige «Zona R» y marca un rectángulo junto a la carretera: los vecinos construirán sus casas.',
+    target: (tool) => (tool === 'zoneR' ? null : inTray('zoneR')),
+    done: (s) => s.map.zones.some((z) => z === 1),
   },
 ];
 
@@ -111,6 +117,7 @@ export class Tutorial {
     this.step = STEPS.length;
     this.box.remove();
     this.arrow.remove();
+    document.documentElement.style.setProperty('--tut-h', '0px');
     this.save();
   }
 
@@ -127,6 +134,8 @@ export class Tutorial {
     const cur = STEPS[this.step]!;
     const p = this.box.querySelector('p')!;
     if (p.textContent !== cur.text) p.textContent = cur.text;
+    // Los botones del mapa suben por encima de la caja (ronda 12: la caja tapaba «Capas» y «?»).
+    if (this.box.isConnected) document.documentElement.style.setProperty('--tut-h', `${this.box.offsetHeight + 8}px`);
     const sel = cur.target(tool);
     const target = sel ? document.querySelector<HTMLElement>(sel) : null;
     if (!target) {

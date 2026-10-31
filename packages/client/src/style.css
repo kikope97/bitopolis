@@ -831,3 +831,9 @@ html[data-font='pixel'] body #hud-date, html[data-font='pixel'] body .bar-num, h
 @media (orientation: landscape) and (max-height: 500px) {
   .dock:has(#menu[aria-expanded='true']) .tab[aria-pressed='true'] { border-left-color: transparent; }
 }
+
+/* Ronda 12: los botones y la leyenda del mapa suben por encima de la caja del tutorial. */
+.map-btns { bottom: calc(8px + var(--tut-h, 0px)); }
+.legend { bottom: calc(8px + var(--tut-h, 0px)); }
+.tab.pulse { animation: pulse 0.6s steps(2) 8; }
+@keyframes pulse { 50% { background: var(--accent); } }
