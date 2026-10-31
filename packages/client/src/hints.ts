@@ -1,4 +1,4 @@
-import { type GameState, ZONE_UNLOCK_POP, freeHomes } from '@bitopolis/sim';
+import { type GameState, ZONE_UNLOCK_POP, freeHomes, taxLevels } from '@bitopolis/sim';
 import type { ToolId } from './tools.ts';
 
 export interface Hint {
@@ -12,6 +12,11 @@ export function nextHint(state: GameState): Hint {
   const pop = state.citizens.length;
   const roads = state.map.tiles.filter((t) => t === 1).length;
   if (state.bankrupt || state.treasury < 0) {
+    // Ronda 12: no pedir que suban los impuestos si ya están en «Alto».
+    const allHigh = Object.values(taxLevels(state)).every((l) => l === 'high');
+    if (allHigh) {
+      return { text: 'La caja está en negativo y los impuestos ya están altos. No construyas; prueba un presupuesto austero (☰ › Ayuntamiento) o derriba lo que no se usa.' };
+    }
     return { text: 'La caja está en negativo. Sube un poco los impuestos (menú ☰) y espera a que lleguen ingresos antes de construir.' };
   }
   if (roads <= 7) return { text: 'Alarga la calle: elige Carretera y arrastra desde la calle del ayuntamiento.', tool: 'road' };
