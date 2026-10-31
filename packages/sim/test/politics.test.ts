@@ -10,6 +10,7 @@ import {
   hashState,
   migrate,
   playerApproval,
+  newBuilding,
   saturated,
   serviceSaturation,
   runSimulation,
@@ -265,5 +266,29 @@ describe('servicios que escalan con la población (v1.3)', () => {
     expect(saturated(s, 'school')).toBe(true);
     s.buildings.push({ ...school, id: 999_999, built: false });
     expect(saturated(s, 'school')).toBe(false);
+  });
+
+  it('saturación por radio (v1.4): un colegio lejano no alivia al del barrio lleno; uno cercano, sí', () => {
+    const s = town(600);
+    const home = s.buildings.find((b) => b.kind === 'house' && b.built)!;
+    s.buildings = s.buildings.filter((b) => b.kind !== 'school');
+    const school = newBuilding(s, 'school', home.x + 2, home.y, 0);
+    school.built = true;
+    s.buildings.push(school);
+    for (const c of s.citizens) c.homeId = null;
+    for (let i = 0; i < 90; i++) s.citizens.push({ ...s.citizens[0]!, id: 800_000 + i, homeId: home.id, named: false, relations: [], memories: [] });
+    expect(serviceSaturation(s, 'school', school.id)).toBeLessThan(0.9);
+    const far = newBuilding(s, 'school', home.x + 40, home.y + 40, 0);
+    far.built = true;
+    s.buildings.push(far);
+    expect(serviceSaturation(s, 'school', school.id)).toBeLessThan(0.9);
+    expect(serviceSaturation(s, 'school', far.id)).toBe(1);
+    expect(saturated(s, 'school')).toBe(true);
+    // Uno al lado: los vecinos se reparten (cada uno al más cercano; empate, al más antiguo).
+    s.buildings = s.buildings.filter((b) => b !== far);
+    const near = newBuilding(s, 'school', home.x - 2, home.y, 0);
+    near.built = true;
+    s.buildings.push(near);
+    expect(serviceSaturation(s, 'school', school.id) + serviceSaturation(s, 'school', near.id)).toBeGreaterThan(1);
   });
 });

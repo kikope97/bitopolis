@@ -2,7 +2,7 @@ import { tickToDate } from '@bitopolis/shared';
 import { CAMPAIGN_COST, canCampaign, canMotion, daysToElection, type ElectionResult, FACTION_TEXT, FACTIONS, type GameState, OPPOSITION_POP, politicsActive } from '@bitopolis/sim';
 import { formatDate } from './i18n.ts';
 import { lowMotion } from './prefs.ts';
-import { $, h, sheet } from './ui.ts';
+import { $, confirmDialog, h, sheet } from './ui.ts';
 import type { SocialCtx } from './social-ui.ts';
 import { openCitizen } from './social-ui.ts';
 
@@ -94,6 +94,8 @@ export function openPolitics(ctx: SocialCtx): void {
     const btn = h('button', { class: 'btn small', ...(can.ok ? {} : { 'aria-disabled': 'true', 'aria-describedby': 'campaign-why' }) }, `Hacer campaña con ${FACTION_TEXT[f].toLowerCase()}`);
     btn.addEventListener('click', async () => {
       if (!can.ok) return;
+      // Gobernando, cada acto cuesta dinero: se confirma (ronda 10).
+      if (p.mayor === 'player' && !(await confirmDialog('Hacer campaña', `Un acto con ${FACTION_TEXT[f].toLowerCase()} cuesta ${CAMPAIGN_COST} €.`, 'Hacer campaña'))) return;
       if (await ctx.command({ type: 'Campaign', faction: f })) openPolitics(ctx);
     });
     items.push(
@@ -211,7 +213,6 @@ export function openElectionNight(ctx: SocialCtx): void {
   const won = r.winner === 'player';
   // El resultado se anuncia también al lector de pantalla.
   $('#sr-live').textContent = `Noche electoral. ${r.unopposed ? 'Sin rival: sigues de alcalde' : won ? 'Ganas las elecciones' : 'Pierdes las elecciones'}. ${resultText(r)}`;
-  document.body.classList.add('election-night');
   sheet(
     'Noche electoral',
     h('p', { class: 'big-number' }, r.unopposed ? 'Sin rival: sigues de alcalde' : won ? '¡Ganas las elecciones!' : 'Pierdes las elecciones'),
@@ -219,4 +220,5 @@ export function openElectionNight(ctx: SocialCtx): void {
     h('p', {}, resultText(r)),
     !won ? h('p', {}, 'Pasas a la oposición: no puedes gobernar, pero sí hablar con los vecinos y hacer campaña. No hay game over: en cuatro años vuelves a presentarte.') : '',
   );
+  document.body.classList.add('election-night');
 }

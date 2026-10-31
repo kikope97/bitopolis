@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { drag, state, tap } from './helpers.ts';
+import { drag, state, tap, setSpeed } from './helpers.ts';
 
 test('/healthz responde', async ({ request }) => {
   const r = await request.get('/healthz');
@@ -36,14 +36,14 @@ test('partida nueva: tutorial, obras, guardado y continuar', async ({ page }, in
   await tap(page, cx + 2, cy + 1);
   await page.locator('[data-tool="house"]').click();
   await tap(page, cx + 4, cy + 2);
-  await expect(page.locator('.tut-box')).toContainText('x3');
+  await expect(page.locator('.tut-box')).toContainText('▶');
   const s1 = await state(page);
   expect(s1.projects.length).toBe(3);
   await shot('3-obras');
 
-  await page.locator('[data-speed="10"]').click();
+  await setSpeed(page, 10);
   await expect(page.locator('#hud-pop')).not.toHaveText('1 vecino', { timeout: 25_000 });
-  await page.locator('[data-speed="0"]').click();
+  await setSpeed(page, 0);
   await page.locator('[data-tool="inspect"]').click();
   await tap(page, cx + 4, cy + 2);
   await expect(page.locator('.sheet')).toContainText('Viven aquí');

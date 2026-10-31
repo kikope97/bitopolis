@@ -212,7 +212,7 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
       const s = SERVICE[b.kind];
       if (!s || !b.built || dist(b, home) > s.radius) continue;
       // Un servicio saturado rinde en proporción a los vecinos que puede atender.
-      const load = serviceSaturation(state, b.kind);
+      const load = serviceSaturation(state, b.kind, b.id);
       if (load < 0.9) full.add(b.kind);
       services += (seen.has(b.kind) ? s.happiness / 2 : s.happiness) * load;
       seen.add(b.kind);

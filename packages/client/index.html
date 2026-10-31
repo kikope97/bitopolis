@@ -55,21 +55,25 @@
           <button id="whatnow" class="fab" aria-label="¿Qué hago ahora?">?</button>
           <button id="layers" class="fab fab-label" aria-label="Capas de datos: sin capa" aria-pressed="false"><span aria-hidden="true">▦</span><small>Capas</small></button>
         </div>
+        <p id="tool-info" class="tool-info"></p>
         <span id="saved" class="saved" aria-live="off"></span>
         <div id="bubbles" class="bubbles"></div>
         <div id="legend" class="legend" role="status" hidden></div>
         <div id="objectives" class="objectives" aria-label="Objetivos"></div>
+        <div id="confirm-bar" class="confirm-bar" role="group" aria-label="Confirmar obra" hidden>
+          <p id="confirm-text" aria-live="polite"></p>
+          <button id="confirm-no" class="btn" aria-label="Cancelar">✕</button>
+          <button id="confirm-yes" class="btn primary">Construir</button>
+        </div>
         <p id="ai-banner" class="ai-banner" role="status" hidden>IA en pausa: tope de gasto alcanzado. Deciden las reglas.</p>
       </div>
-      <p id="tool-info" class="tool-info"></p>
-      <nav id="tools" class="tools" aria-label="Herramientas"></nav>
-      <nav class="bottom" aria-label="Tiempo y menú">
-        <button class="sp" data-speed="0" aria-label="Pausa">❚❚</button>
-        <button class="sp" data-speed="1" aria-label="Velocidad x1">x1</button>
-        <button class="sp" data-speed="3" aria-label="Velocidad x3">x3</button>
-        <button class="sp" data-speed="10" aria-label="Velocidad x10">x10</button>
+      <!-- v1.4: una sola barra abajo (antes eran dos): tiempo, herramientas y menú. -->
+      <div id="dock" class="dock">
+        <button id="play-pause" class="sp" aria-label="Poner en marcha">▶</button>
+        <button id="speed" class="sp" aria-label="Velocidad x1. Toca para cambiarla">x1</button>
+        <nav id="tools" class="tools" aria-label="Herramientas"></nav>
         <button id="menu" class="sp" aria-label="Menú">☰</button>
-      </nav>
+      </div>
     </div>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>

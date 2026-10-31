@@ -32,6 +32,7 @@ import {
   TAX_SPLIT_POP,
   TRANSACTION_COST,
   BUY_CHANCE,
+  SERVICE,
   SERVICE_CAPACITY,
 } from './balance.ts';
 import { hash32 } from './hash.ts';
@@ -382,13 +383,46 @@ export function monthlyMarket(state: GameState): void {
   }
 }
 
-/** Cobertura de un servicio con capacidad: 1 = da abasto; menos de 1 = saturado (v1.3). */
-export function serviceSaturation(state: GameState, kind: BuildingKind): number {
-  const cap = SERVICE_CAPACITY[kind];
-  if (!cap) return 1;
-  const n = state.buildings.filter((b) => b.kind === kind && b.built).length;
-  if (n === 0) return 1;
-  return Math.min(1, (n * cap) / Math.max(1, state.citizens.length));
+/**
+ * Carga de cada servicio con capacidad (v1.4, aplazado de la ronda 09): cada
+ * vecino cuenta para el edificio más cercano de ese tipo que le alcanza, así
+ * que un colegio en una esquina vacía no alivia al del barrio lleno.
+ * 1 = da abasto; menos de 1 = saturado. Se calcula una vez por hora de juego.
+ */
+const loadCache = new WeakMap<GameState, { key: string; loads: Map<number, number> }>();
+export function serviceLoads(state: GameState): Map<number, number> {
+  const key = `${state.tick}:${state.citizens.length}:${state.buildings.length}`;
+  const hit = loadCache.get(state);
+  if (hit && hit.key === key) return hit.loads;
+  const served = state.buildings.filter((b) => b.built && SERVICE_CAPACITY[b.kind]);
+  const count = new Map<number, number>(served.map((b) => [b.id, 0]));
+  const byId = new Map(state.buildings.map((b) => [b.id, b]));
+  for (const c of state.citizens) {
+    const home = c.homeId !== null ? byId.get(c.homeId) : undefined;
+    if (!home) continue;
+    const nearest = new Map<BuildingKind, { id: number; d: number }>();
+    for (const b of served) {
+      const d = Math.abs(b.x - home.x) + Math.abs(b.y - home.y);
+      if (d > SERVICE[b.kind]!.radius) continue;
+      const best = nearest.get(b.kind);
+      if (!best || d < best.d || (d === best.d && b.id < best.id)) nearest.set(b.kind, { id: b.id, d });
+    }
+    for (const { id } of nearest.values()) count.set(id, count.get(id)! + 1);
+  }
+  const loads = new Map<number, number>();
+  for (const b of served) loads.set(b.id, Math.min(1, SERVICE_CAPACITY[b.kind]! / Math.max(1, count.get(b.id)!)));
+  loadCache.set(state, { key, loads });
+  return loads;
+}
+
+/** Cobertura de un edificio de servicio, o del peor de ese tipo si no se dice cuál. */
+export function serviceSaturation(state: GameState, kind: BuildingKind, buildingId?: number): number {
+  if (!SERVICE_CAPACITY[kind]) return 1;
+  const loads = serviceLoads(state);
+  if (buildingId !== undefined) return loads.get(buildingId) ?? 1;
+  let worst = 1;
+  for (const b of state.buildings) if (b.kind === kind && b.built) worst = Math.min(worst, loads.get(b.id) ?? 1);
+  return worst;
 }
 
 /**

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { state, tap } from './helpers.ts';
+import { state, tap, setSpeed } from './helpers.ts';
 
 test('Modo IA: configurar, jugar y ver un motivo de la IA', async ({ page }, info) => {
   test.setTimeout(120_000);
@@ -32,7 +32,7 @@ test('Modo IA: configurar, jugar y ver un motivo de la IA', async ({ page }, inf
   const cy = s0.map.h / 2;
   await page.locator('[data-tool="house"]').click();
   await tap(page, cx + 2, cy + 1);
-  await page.locator('[data-speed="3"]').click();
+  await setSpeed(page, 3);
   // La primera decisión (opinión o llegada) debe venir de la IA.
   await expect(page.locator('.bubble .ai-badge').first()).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('.bubble').first()).toContainText('promete');
@@ -41,7 +41,7 @@ test('Modo IA: configurar, jugar y ver un motivo de la IA', async ({ page }, inf
   const s1 = await state(page);
   expect(s1.decisionLog.some((d: { source: string }) => d.source === 'ai')).toBe(true);
 
-  await page.locator('[data-speed="0"]').click();
+  await setSpeed(page, 0);
   // Consejero con IA (modelo premium) en Modo IA.
   await page.locator('#menu').click();
   await page.getByRole('button', { name: 'Consejero' }).click();

@@ -57,6 +57,8 @@ export function toast(text: string, opts: { sticky?: boolean; kind?: 'info' | 'w
   }
   if (opts.sticky) {
     el.classList.add('sticky');
+    // v1.4: fuera del modo tranquilo, también los fijos se van solos (se acumulaban y tapaban el mapa).
+    if (!prefs().calm) el.dataset.timer = String(setTimeout(() => el.remove(), 15000));
     const x = h('button', { class: 'toast-close', 'aria-label': 'Cerrar aviso' }, '✕');
     x.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -86,8 +88,25 @@ export function toast(text: string, opts: { sticky?: boolean; kind?: 'info' | 'w
 let openSheetEl: HTMLElement | null = null;
 let lastFocus: HTMLElement | null = null;
 
-export function closeSheet() {
+/** La hoja abierta ahora (para refrescar solo la que toca). */
+export function currentSheet(): HTMLElement | null {
+  return openSheetEl;
+}
+
+let backBound = false;
+function bindBack() {
+  if (backBound) return;
+  backBound = true;
+  window.addEventListener('popstate', () => {
+    if (openSheetEl) closeSheet(true);
+  });
+}
+
+export function closeSheet(fromBack = false) {
+  bindBack();
   if (!openSheetEl) return;
+  // Cerrada con ✕ o Esc: se quita también la entrada del historial que puso la hoja.
+  if (!fromBack && history.state?.sheet) history.back();
   document.body.classList.remove('election-night');
   openSheetEl.remove();
   openSheetEl = null;
@@ -118,12 +137,17 @@ export function sheet(title: string | Node, ...content: (Node | string)[]): HTML
   }
   const keepFocus = openSheetEl ? lastFocus : (document.activeElement as HTMLElement | null);
   if (openSheetEl) {
+    // Sustituir la hoja también quita el ambiente de la noche electoral (lo pone esa hoja después).
+    document.body.classList.remove('election-night');
     openSheetEl.remove();
     openSheetEl = null;
   }
   lastFocus = keepFocus;
+  // El botón atrás del móvil cierra la hoja en vez de salir de la partida (ronda 10).
+  bindBack();
+  if (!history.state?.sheet) history.pushState({ ...(history.state ?? {}), sheet: true }, '');
   const close = h('button', { class: 'sheet-close', 'aria-label': 'Cerrar' }, '✕');
-  close.addEventListener('click', closeSheet);
+  close.addEventListener('click', () => closeSheet());
   const el = h(
     'section',
     { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'sheet-title' },

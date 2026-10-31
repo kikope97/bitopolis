@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { setSpeed } from './helpers.ts';
 
 test('audio: volúmenes en dB, ambiente y mute separados se guardan y no dan errores', async ({ page }) => {
   const errors: string[] = [];
@@ -18,7 +19,7 @@ test('audio: volúmenes en dB, ambiente y mute separados se guardan y no dan err
   expect(saved).toMatchObject({ musicDb: -10, music: true, ambience: true });
   // Juega unos segundos con música y ambiente activos.
   await page.locator('.sheet-close').click();
-  await page.locator('[data-speed="10"]').click();
+  await setSpeed(page, 10);
   await page.waitForTimeout(3000);
   expect(errors).toEqual([]);
 });
