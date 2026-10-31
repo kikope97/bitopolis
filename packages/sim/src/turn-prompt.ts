@@ -10,6 +10,7 @@ import { daysToElection, FACTION_TEXT, factionOf, politicsActive } from './polit
 import { brewingNow, type DirectorChoice, directorMenu, dramaBudget } from './director.ts';
 import { errandCandidates } from './errands.ts';
 import { weekNews } from './press.ts';
+import { rankCandidates } from './rank.ts';
 import { inventedName, inventedNumber, toneOf } from './prompt.ts';
 import { GOAL_TEXT, HOOK_TEXT, hookFor, memoryText, NEED_TEXT, NEEDS, needsOf } from './social.ts';
 import type { Citizen, GameState } from './state.ts';
@@ -37,6 +38,7 @@ Para cada vecino del lote devuelve exactamente un objeto con:
 - "plan": un ultimátum o propósito con plazo si de verdad le importa algo ("irse_si_no", "protestar_si_no", "votar_en_contra_si_no", con la "necesidad" de su lista y los "meses", de 1 a 6), o "ninguno". Úsalo con moderación: es una promesa que el pueblo recordará.
 - "pensamiento": una frase en primera persona, en español de España, con su tono y su vida (máx. 140 caracteres).
 - "motivo": por qué hace lo que hace esta semana, en una frase corta en primera persona (máx. 160 caracteres).
+- "escudo": solo si en el pueblo hay "votacion_escudo", su voto: una "pieza" y un "lema" (ids de esa votación), según lo que le importa; si no, "" y "".
 - "recuerdo": lo que apunta de esta semana para acordarse (un hecho, no un sentimiento; máx. 120 caracteres), o "" si no pasó nada. Sus notas anteriores están en "sus_notas".
 
 Reglas:
@@ -96,6 +98,8 @@ export function turnShared(state: GameState): string {
     // Solo lo que cuenta (lo que decidió la costumbre, «ahorrar» o «seguir», no dice nada).
     la_semana_pasada: ai.log.at(-1)?.source === 'ia' ? ai.log.at(-1)!.lines.slice(0, 10).map((l) => l.text) : [],
     oportunidades: opportunities(state),
+    // 2.1: el pueblo sube de rango y vota el escudo (menú cerrado).
+    ...(rankCandidates(state) ? { votacion_escudo: { rango: rankCandidates(state)!.rango, piezas: rankCandidates(state)!.piezas, lemas: rankCandidates(state)!.lemas } } : {}),
   };
   return `Así está el pueblo:\n${JSON.stringify(data)}`;
 }
@@ -202,8 +206,9 @@ export const TURN_SCHEMA = {
           pensamiento: { type: 'string' },
           motivo: { type: 'string' },
           recuerdo: { type: 'string' },
+          escudo: { type: 'object', properties: { pieza: { type: 'string' }, lema: { type: 'string' } }, required: ['pieza', 'lema'], additionalProperties: false },
         },
-        required: ['vecino', 'accion', 'gesto', 'actitud', 'gasto', 'plan', 'pensamiento', 'motivo', 'recuerdo'],
+        required: ['vecino', 'accion', 'gesto', 'actitud', 'gasto', 'plan', 'pensamiento', 'motivo', 'recuerdo', 'escudo'],
         additionalProperties: false,
       },
     },
@@ -249,6 +254,7 @@ const ActSchema = z.object({
   pensamiento: z.string().max(600),
   motivo: z.string().max(600),
   recuerdo: z.string().max(600).optional(),
+  escudo: z.object({ pieza: z.string().max(40), lema: z.string().max(60) }).optional(),
 });
 
 const clean = (s: string, max: number) =>
@@ -298,6 +304,7 @@ export function parseTurn(text: string, ids: number[], sent: string): { acts: Tu
       pensamiento,
       motivo,
       ...(recuerdo ? { recuerdo } : {}),
+      ...(a.escudo && /^[a-z_]+$/.test(a.escudo.pieza) && /^[a-z_]+$/.test(a.escudo.lema) ? { escudo: { pieza: a.escudo.pieza, lema: a.escudo.lema } } : {}),
     });
   }
   return { acts, missing: ids.filter((id) => !acts.some((a) => a.vecino === id)) };

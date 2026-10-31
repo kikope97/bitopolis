@@ -78,6 +78,7 @@ export const Command = z.discriminatedUnion('type', [
           pensamiento: z.string().max(300),
           motivo: z.string().max(400),
           recuerdo: z.string().max(300).optional(),
+          escudo: z.object({ pieza: z.string().max(20), lema: z.string().max(40) }).optional(),
         }),
       )
       .max(300),

@@ -86,6 +86,8 @@ export interface TurnAct {
   motivo: string;
   /** Lo que apunta de esta semana (su memoria escrita). */
   recuerdo?: string;
+  /** 2.1: su voto para el escudo, si hay votación abierta (ids del menú). */
+  escudo?: { pieza: string; lema: string };
 }
 
 export function emptyTownAi(share = TURN.defaultShare): TownAi {

@@ -330,6 +330,11 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
   switch (cmd.type) {
     case 'TownTurn':
       applyTownTurn(state, cmd.n, cmd.acts, { focus: cmd.focus, chronicle: cmd.chronicle, director: cmd.director });
+      // 2.1: si hay votación del escudo, los vecinos con IA votan en su turno (el resto, por reglas).
+      if (state.rank?.vote) {
+        const ballots = cmd.acts.filter((a) => a.escudo?.pieza && a.escudo.lema).map((a) => ({ vecino: a.vecino, pieza: a.escudo!.pieza, lema: a.escudo!.lema }));
+        if (ballots.some((b) => validBallot(state, b))) applyCrestVote(state, ballots);
+      }
       break;
     case 'ChooseCrest':
       applyCrestVote(state, cmd.votes);

@@ -19,6 +19,7 @@ import {
   runSimulation,
   seasonOf,
   step,
+  turnShared,
   validateCommand,
 } from '../src/index.ts';
 
@@ -104,6 +105,23 @@ describe('rangos del pueblo (2.1)', () => {
     // Que todos piensen con IA para que gane su voto.
     for (const c of s.citizens) c.named = true;
     expect(applyCommand(s, { type: 'ChooseCrest', votes }).ok).toBe(true);
+    expect(s.rank!.crest.pieces.at(-1)).toBe(pick);
+    expect(s.rank!.crest.motto).toBe(lema);
+    expect(rankCandidates(s)).toBeNull();
+  });
+
+  it('Modo IA: los votos llegan dentro del turno del pueblo (TownTurn) y el prompt lleva la votación', () => {
+    const s = townWith(RANKS[1].pop, 2, true);
+    for (const c of s.citizens) c.named = true;
+    rankDay(s);
+    const menu = rankCandidates(s)!;
+    expect(turnShared({ ...s, ai: s.ai ?? undefined } as GameState)).toContain('votacion_escudo');
+    // Se abre un turno a mano con todos los vecinos.
+    s.ai!.turn = { n: 1, opened: s.tick, due: s.tick + 12, kind: 'semana', ids: s.citizens.map((c) => c.id) };
+    const pick = menu.piezas.at(-1)!.id;
+    const lema = menu.lemas.at(-1)!.id;
+    const acts = s.citizens.map((c) => ({ vecino: c.id, accion: 'seguir', gesto: { con: 0, tipo: 'ninguno' }, actitud: 0, gasto: { donde: 'pueblo', tienda: 0, ocio: false }, plan: { tipo: 'ninguno', necesidad: '', meses: 0 }, pensamiento: '', motivo: '', escudo: { pieza: pick, lema } }));
+    expect(applyCommand(s, { type: 'TownTurn', n: 1, acts }).ok).toBe(true);
     expect(s.rank!.crest.pieces.at(-1)).toBe(pick);
     expect(s.rank!.crest.motto).toBe(lema);
     expect(rankCandidates(s)).toBeNull();
