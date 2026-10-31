@@ -121,7 +121,10 @@ function planner(name: string, o: PlannerOpts): Profile {
       }
       // v1.8: amplía el ayuntamiento en cuanto puede pagarlo sin tocar su reserva.
       const up = nextLevel(state);
-      if (up && canUpgradeTownhall(state).ok && state.treasury >= up.cost + o.reserve + 1_000) {
+      // El nivel 2 (las zonas) es lo primero; los demás, solo con el mes en positivo y colchón.
+      const prev = state.stats.at(-1);
+      const prudent = up && (up.level === 2 ? state.treasury >= up.cost : state.treasury >= up.cost * 2 + o.reserve && (!prev || prev.income >= prev.expenses));
+      if (up && prudent && canUpgradeTownhall(state).ok) {
         out.push({ type: 'UpgradeTownhall' });
         return out;
       }

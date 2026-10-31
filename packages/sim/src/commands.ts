@@ -154,6 +154,7 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       if ((cmd.kind === 'plaza' || cmd.kind === 'market') && !state.unlocked.includes(cmd.kind)) {
         return { ok: false, error: cmd.kind === 'plaza' ? 'La Plaza Mayor se desbloquea con el hito de 50 vecinos' : 'El Mercado se desbloquea con el hito de 200 vecinos' };
       }
+      if (state.citizens.length < BUILD[cmd.kind].unlockPop && cmd.kind !== 'plaza' && cmd.kind !== 'market') return { ok: false, error: `Se desbloquea con ${BUILD[cmd.kind].unlockPop} vecinos` };
       const t = state.map.tiles[tileIndex(state, cmd.x, cmd.y)];
       const ter = terrainAt(state, cmd.x, cmd.y);
       if (isWater(ter)) return { ok: false, error: ter === Terrain.Sea ? 'Ahí está el mar' : 'Ahí pasa el río: solo se puede cruzar con un puente (Carretera)' };

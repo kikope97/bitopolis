@@ -81,6 +81,7 @@ export function lockShort(tool: Tool, state: GameState): string | null {
   const lv = toolLevel(tool);
   if (townLevel(state) < lv) return `ayto. nivel ${lv}`;
   if ((tool.build === 'plaza' || tool.build === 'market') && !state.unlocked.includes(tool.build)) return `hito de ${unlockPop(tool)}`;
+  if (state.citizens.length < unlockPop(tool) && tool.build !== 'plaza' && tool.build !== 'market') return `${unlockPop(tool)} vecinos`;
   return null;
 }
 
@@ -91,7 +92,8 @@ export function lockLong(tool: Tool, state: GameState): string {
     const L = TOWNHALL_LEVELS[lv - 1]!;
     return `${tool.label}: llega con el ayuntamiento de nivel ${lv} (${L.name}; pide ${L.pop} vecinos y ${money(L.cost)}). Toca el ayuntamiento para ampliarlo.`;
   }
-  return `${tool.label}: es el premio del hito de ${unlockPop(tool)} vecinos (tienes ${state.citizens.length}).`;
+  if (tool.build === 'plaza' || tool.build === 'market') return `${tool.label}: es el premio del hito de ${unlockPop(tool)} vecinos (tienes ${state.citizens.length}).`;
+  return `${tool.label}: hacen falta ${unlockPop(tool)} vecinos (tienes ${state.citizens.length}).`;
 }
 
 /** Coste corto para la barra de confirmación: «hasta 3.500 €». */

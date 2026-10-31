@@ -1,4 +1,5 @@
 import type { BuildKind } from '@bitopolis/shared';
+import { BUILD } from './balance.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { type GameState, pushEvent } from './state.ts';
 
@@ -21,7 +22,7 @@ export interface TownhallLevel {
 
 export const TOWNHALL_LEVELS: TownhallLevel[] = [
   { level: 1, pop: 0, cost: 0, name: 'Casa consistorial', unlocks: ['carretera', 'casas', 'agua', 'luz', 'parque'] },
-  { level: 2, pop: 10, cost: 6_000, name: 'Ayuntamiento con reloj', unlocks: ['zonas R, C e I', 'colegio', 'policía', 'bar', 'ermita', 'cementerio', 'plenos'] },
+  { level: 2, pop: 10, cost: 3_000, name: 'Ayuntamiento con reloj', unlocks: ['zonas R, C e I', 'colegio', 'policía', 'bar', 'ermita', 'cementerio', 'plenos'] },
   { level: 3, pop: 30, cost: 15_000, name: 'Ayuntamiento con balcón', unlocks: ['centro de salud', 'biblioteca', 'polideportivo', 'Plaza Mayor (con su hito)'] },
   { level: 4, pop: 60, cost: 35_000, name: 'Casa del Pueblo', unlocks: ['cárcel', 'Mercado (con su hito)'] },
   { level: 5, pop: 120, cost: 70_000, name: 'Palacio Municipal', unlocks: ['más felicidad en todo el pueblo', 'más subvenciones de la Diputación'] },
@@ -51,11 +52,12 @@ export const townLevel = (state: GameState): number => state.townhallLevel ?? 1;
 export const zonesUnlocked = (state: GameState): boolean => townLevel(state) >= 2;
 export const plenoUnlocked = (state: GameState): boolean => townLevel(state) >= 2;
 
-/** ¿Se puede construir ya? (nivel; la Plaza y el Mercado, además, con su hito) */
+/** ¿Se puede construir ya? (nivel y vecinos; la Plaza y el Mercado, con su hito) */
 export function isUnlocked(state: GameState, kind: BuildKind): boolean {
   if (townLevel(state) < BUILD_LEVEL[kind]) return false;
   if (kind === 'plaza' || kind === 'market') return state.unlocked.includes(kind);
-  return true;
+  // Además del nivel, sus vecinos (petición del creador: «aparte de habitantes, nivel»).
+  return state.citizens.length >= BUILD[kind].unlockPop;
 }
 
 export function nextLevel(state: GameState): TownhallLevel | null {

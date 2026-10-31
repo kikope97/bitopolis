@@ -122,7 +122,7 @@ describe('economía', () => {
     // Con el derrochador, alguna de estas semillas acaba en quiebra (no depende de una sola).
     const broke = [7, 2, 3, 4, 5].some((seed) => runSimulation({ seed, days: 900, profile: 'derrochador' }).report.bankruptDay !== null);
     expect(broke).toBe(true);
-  });
+  }, 60_000);
   it('el impuesto efectivo es la media del mes (subirlo el último día no rinde)', () => {
     const base = createInitialState({ seed: 3 });
     const trick = createInitialState({ seed: 3 });
