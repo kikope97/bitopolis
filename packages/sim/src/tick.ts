@@ -24,6 +24,7 @@ import {
   WAGE_LOCAL,
   WAGE_OUTSIDE,
   ZONE_UNLOCK_POP,
+  CRIME,
   SOCIAL_PLACES,
   TERRAIN,
 } from './balance.ts';
@@ -51,6 +52,7 @@ import { Terrain } from './terrain.ts';
 import { weatherDay, weatherFx, weatherMood } from './weather.ts';
 import { associationsDay, associationsMonth } from './associations.ts';
 import { albumDay } from './album.ts';
+import { crimeDay, jailNear } from './crime.ts';
 import { lifeDay, lifeMonth, lifeYear } from './lifecycle.ts';
 import { FIRST_NAMES, SURNAMES } from './names.ts';
 import { goalFor, memoryMood, onCitizenLeaves, PROFESSIONS, relationMood, socialDay } from './social.ts';
@@ -239,7 +241,8 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
       if (v > 0) f.push({ label: `Servicios cerca (${[...seen].map((k) => BUILD_NAMES[k]!.toLowerCase()).join(', ')})`, value: v });
     }
     if (full.size) f.push({ label: `Servicio saturado (${[...full].map((k) => BUILD_NAMES[k]!.toLowerCase()).join(', ')})`, value: -2 });
-    if (state.buildings.some((b) => b.kind === 'shop' && b.built && dist(b, home) <= 6)) f.push({ label: 'Tienda cerca', value: 4 });
+    if (state.buildings.some((b) => b.kind === 'shop' && b.built && !b.damaged && dist(b, home) <= 6)) f.push({ label: 'Tienda cerca', value: 4 });
+    if (jailNear(state, home)) f.push({ label: 'Cárcel cerca', value: -CRIME.jailNuisanceMood });
     const i = home.y * state.map.w + home.x;
     const pol = state.fields.pollution[i] ?? 0;
     const noise = state.fields.noise[i] ?? 0;
@@ -484,6 +487,19 @@ function endOfDay(state: GameState): void {
   weatherDay(state);
   progressProjects(state);
   const served = updateNetworks(state);
+  // v1.8: días seguidos sin agua o sin luz (el icono sobre la casa sale cuando dura).
+  for (const b of state.buildings) {
+    if (!b.built || b.kind === 'water' || b.kind === 'power') continue;
+    b.dryDays = b.hasWater ? 0 : (b.dryDays ?? 0) + 1;
+    b.darkDays = b.hasPower ? 0 : (b.darkDays ?? 0) + 1;
+  }
+  // v1.8: reparaciones de lo que rompieron los disturbios.
+  for (const b of state.buildings) {
+    if (b.damaged && b.damaged.repairUntil >= 0 && b.damaged.repairUntil <= state.tick) {
+      delete b.damaged;
+      pushEvent(state, 'info', `Reabre ${b.name ?? BUILD_NAMES[b.kind]?.toLowerCase()} tras la reparación`, { ref: b.id });
+    }
+  }
   updateFields(state);
   assignHomesAndJobs(state);
   // Inercia: la felicidad baja más rápido de lo que sube.
@@ -506,12 +522,14 @@ function endOfDay(state: GameState): void {
   if (d.month === 1 && d.day === 1 && state.tick > 0) lifeYear(state);
   lifeDay(state);
   associationsDay(state);
+  crimeDay(state);
   albumDay(state);
   accumulateRates(state);
 }
 
 function payBusinesses(state: GameState, r: ReturnType<typeof monthRates>): void {
-  const shops = state.buildings.filter((b) => b.kind === 'shop' && b.built);
+  // Las tiendas dañadas en disturbios no venden hasta que se reparan (v1.8).
+  const shops = state.buildings.filter((b) => b.kind === 'shop' && b.built && !b.damaged);
   // Gasto de los vecinos: una parte a tiendas del pueblo, el resto fuera.
   for (const c of state.citizens) {
     const spend = Math.min(c.money, LIVING_COST);

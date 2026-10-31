@@ -25,3 +25,5 @@ export * from './weather.ts';
 export * from './associations.ts';
 export * from './family.ts';
 export * from './album.ts';
+export * from './crime.ts';
+export * from './barrio.ts';

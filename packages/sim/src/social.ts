@@ -60,6 +60,9 @@ export const MEMORY_KINDS = [
   'asociacion',
   'se_manifesto',
   'logro_vecinal',
+  // v1.8: delincuencia.
+  'le_robaron',
+  'detenido',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -221,6 +224,10 @@ export function memoryText(state: GameState, m: Memory): string {
       return 'Salió a manifestarse ante el ayuntamiento';
     case 'logro_vecinal':
       return 'El barrio consiguió lo que pedía';
+    case 'le_robaron':
+      return 'Le robaron en su negocio';
+    case 'detenido':
+      return 'Le detuvieron en unos disturbios';
   }
 }
 

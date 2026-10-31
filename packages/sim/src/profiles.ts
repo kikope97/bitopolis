@@ -112,6 +112,12 @@ function planner(name: string, o: PlannerOpts): Profile {
       if (built.some((b) => !b.hasPower) && !enough('power') && !state.projects.some((p) => buildingKindOf(state, p.buildingId) === 'power')) {
         if (tryBuild('power')) return out;
       }
+      // v1.8: repara lo que rompieron los disturbios si la caja lo permite.
+      const broken = state.buildings.find((b) => b.damaged && b.damaged.repairUntil < 0);
+      if (broken && state.treasury > broken.damaged!.cost + o.reserve) {
+        out.push({ type: 'RepairBuilding', buildingId: broken.id });
+        return out;
+      }
       // Un jugador razonable mira el parte: no añade servicios (y sus sueldos) con el mes en negativo.
       const last = state.stats.at(-1);
       if (pop >= ZONE_UNLOCK_POP && (!last || last.income >= last.expenses)) {
@@ -161,7 +167,7 @@ export const PROFILES: Record<string, Profile> = {
     tax: 'low',
     reserve: 0,
     activity: 1,
-    services: ['park', 'school', 'clinic'],
+    services: ['park', 'school', 'clinic', 'police'],
     municipalHousing: true,
     servicesPer: 6,
   }),
@@ -169,7 +175,7 @@ export const PROFILES: Record<string, Profile> = {
     tax: 'medium',
     reserve: 0,
     activity: 1,
-    services: ['park', 'school', 'clinic'],
+    services: ['park', 'school', 'clinic', 'police'],
     municipalHousing: true,
   }),
 };

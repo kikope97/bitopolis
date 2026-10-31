@@ -115,6 +115,8 @@ export const MIGRATIONS: Record<number, Migration> = {
     album: s.album ?? [],
     departed: s.departed ?? [],
   }),
+  // 10 → 11 (v1.8): delincuencia (calabozos, cárcel y robos).
+  10: (s) => ({ ...s, formatVersion: 11, justice: s.justice ?? { cells: [], jail: [], hot: [], robberies: 0, arrests: 0, fullWarned: -1 } }),
 };
 
 export function migrate(raw: unknown): GameState {

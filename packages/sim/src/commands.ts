@@ -1,7 +1,7 @@
 import { canMeetAssociation, meetAssociation } from './associations.ts';
 import { answerGrant, canAnswerGrant, canHoldFestival, canProposeBudget, holdFestival, materialsCost, proposeBudget } from './civic.ts';
-import { Command, tickToDate, type BuildKind, type ZoneKind } from '@bitopolis/shared';
-import { BUILD, DEBT_LIMIT, TERRAIN, WAGE_OUTSIDE, ZONE_COST_PER_TILE, ZONE_UNLOCK_POP } from './balance.ts';
+import { Command, TICKS_PER_DAY, tickToDate, type BuildKind, type ZoneKind } from '@bitopolis/shared';
+import { ASSOCIATIONS, BUILD, DEBT_LIMIT, TERRAIN, WAGE_OUTSIDE, ZONE_COST_PER_TILE, ZONE_UNLOCK_POP } from './balance.ts';
 import { isWater, Terrain } from './terrain.ts';
 import { applyDecision, canApplyDecision } from './decisions.ts';
 import { campaign, canCampaign, canMotion, motion } from './politics.ts';
@@ -36,6 +36,7 @@ export const BUILD_NAMES: Record<string, string> = {
   cemetery: 'Cementerio',
   library: 'Biblioteca',
   sports: 'Polideportivo',
+  jail: 'Cárcel',
   clinic: 'Centro de salud',
   police: 'Comisaría',
   plaza: 'Plaza Mayor',
@@ -193,6 +194,13 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       return canApplyDecision(state, cmd.citizenId, cmd.action) ? { ok: true } : { ok: false, error: 'Decisión ya no válida' };
     case 'MeetAssociation':
       return canMeetAssociation(state, cmd.associationId);
+    case 'RepairBuilding': {
+      const b = buildingById(state, cmd.buildingId);
+      if (!b?.damaged) return { ok: false, error: 'Ese edificio no necesita reparación' };
+      if (b.damaged.repairUntil >= 0) return { ok: false, error: 'Ya se está reparando' };
+      if (state.treasury < b.damaged.cost) return { ok: false, error: 'No hay dinero suficiente' };
+      return { ok: true };
+    }
     case 'ConvenePleno': {
       const r = canConvenePleno(state);
       return r.ok ? { ok: true } : { ok: false, error: r.error! };
@@ -330,6 +338,14 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
     case 'MeetAssociation':
       meetAssociation(state, cmd.associationId);
       break;
+    case 'RepairBuilding': {
+      // v1.8: el ayuntamiento paga la reparación de lo que rompieron los disturbios.
+      const b = buildingById(state, cmd.buildingId)!;
+      transfer(state, TREASURY, OUTSIDE, b.damaged!.cost, 'reparaciones (disturbios)');
+      b.damaged!.repairUntil = state.tick + ASSOCIATIONS.repairDays * TICKS_PER_DAY;
+      pushEvent(state, 'info', `Empieza la reparación de ${b.name ?? BUILD_NAMES[b.kind]?.toLowerCase()}: abrirá en ${ASSOCIATIONS.repairDays} días`, { ref: b.id });
+      break;
+    }
     case 'NotifyProject': {
       const p = state.projects.find((x) => x.buildingId === cmd.buildingId);
       if (p) p.notify = cmd.on;

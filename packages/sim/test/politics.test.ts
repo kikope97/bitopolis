@@ -88,9 +88,12 @@ describe('elecciones (v1.0)', () => {
     for (const c of s.citizens) count.set(factionOf(s, c), (count.get(factionOf(s, c)) ?? 0) + 1);
     const f = [...count.entries()].sort((a, b) => b[1] - a[1])[0]![0] as ReturnType<typeof factionOf>;
     const before = playerApproval(s);
+    const pushed = s.politics.campaign[f];
     expect(applyCommand(s, { type: 'Campaign', faction: f }).ok).toBe(true);
     expect(applyCommand(s, { type: 'Campaign', faction: f }).ok).toBe(false);
-    expect(playerApproval(s)).toBeGreaterThan(before);
+    // La campaña sube el empuje de esa facción; el porcentaje (redondeado y a veces ya muy alto) no baja.
+    expect(s.politics.campaign[f]).toBeGreaterThan(pushed);
+    expect(playerApproval(s)).toBeGreaterThanOrEqual(before);
   });
 
   it('determinista con la misma semilla (también en la oposición)', { timeout: 60_000 }, () => {

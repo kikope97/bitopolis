@@ -41,7 +41,7 @@ describe('asociaciones vecinales (v1.7)', () => {
     const a = s.associations[0]!;
     expect(a.members.length).toBeGreaterThanOrEqual(4);
     expect(a.members).toContain(a.leaderId);
-    expect(s.events.at(-1)!.text).toMatch(/^Nace la Asociación de vecinos por/);
+    expect(s.events.at(-1)!.text).toMatch(/^Nace la Asociación Vecinal/);
   });
 
   it('si nadie les hace caso, convocan una manifestación; los socios deciden y el día señalado se manifiestan', () => {
