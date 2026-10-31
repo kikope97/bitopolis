@@ -167,8 +167,18 @@ const glyphs = [
   new opentype.Glyph({ name: 'nbsp', unicode: 160, advanceWidth: 4 * U, path: new opentype.Path() }),
   ...chars.map(glyph),
 ];
-const font = new opentype.Font({ familyName: 'Bitopolis Pixel', styleName: 'Regular', unitsPerEm: 1100, ascender: 900, descender: -200, glyphs });
+const font = new opentype.Font({ familyName: 'Bitopolis Pixel', styleName: 'Regular', unitsPerEm: 1100, ascender: 900, descender: -200, glyphs, createdTimestamp: Date.UTC(2026, 0, 1) / 1000 });
 const out = new URL('../packages/client/public/fonts/', import.meta.url).pathname;
 mkdirSync(out, { recursive: true });
-writeFileSync(`${out}bitopolis-pixel.otf`, Buffer.from(font.toArrayBuffer()));
+// opentype.js pone la hora actual como «modificada»: con una fecha fija, la fuente
+// sale idéntica en cada build y git no la ve cambiada sin motivo.
+const RealDate = Date;
+globalThis.Date = class extends RealDate {
+  constructor() {
+    super(RealDate.UTC(2026, 0, 1));
+  }
+} as DateConstructor;
+const bytes = font.toArrayBuffer();
+globalThis.Date = RealDate;
+writeFileSync(`${out}bitopolis-pixel.otf`, Buffer.from(bytes));
 console.log(`Fuente pixel generada (${glyphs.length} glifos).`);
