@@ -8,6 +8,7 @@ import {
   type GameState,
   cellsUsed,
   coverageSummary,
+  CRIME,
   jailCapacity,
   canUpgradeBuilding,
   cellsOf,
@@ -1528,7 +1529,7 @@ export function startGame(opts: GameOptions): void {
       // v1.8: comisaría (calabozos) y cárcel (presos).
       if (b.kind === 'police') {
         const used = cellsUsed(state, b.id);
-        content.push(h('p', {}, `Calabozos: ${used} de ${cellsOf(b)} ocupados.`));
+        content.push(h('p', {}, `Calabozos: ${used} de ${cellsOf(b)} ocupados. Cada detenido paga ${money(CRIME.finePerDay)} de multa por día.`));
         if (used >= cellsOf(b)) content.push(h('p', { class: 'pol-tag' }, jailCapacity(state) ? 'Llenos: esperan sitio en la cárcel.' : 'Llenos: hace falta una cárcel para poder detener a más.'));
       }
       if (b.kind === 'jail') content.push(h('p', {}, `Presos: ${state.justice?.jail.length ?? 0} de ${jailCapacity(state)} plazas.`));

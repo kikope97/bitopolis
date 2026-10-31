@@ -125,6 +125,7 @@ export function openManagement(ctx: SocialCtx, links: ManageLinks): void {
     'handcuffs',
     row('Robos', String(j.robberies)),
     row('Detenciones', String(j.arrests)),
+    row(`Multas cobradas (${CRIME.finePerDay} €/día por detenido)`, money(j.fines ?? 0)),
     row('Calabozos', stations ? `${j.cells.length} de ${cap}` : 'sin comisaría', stations && j.cells.length >= cap ? 'neg' : ''),
     row('Cárcel', jail ? `${j.jail.length} de ${jail} presos` : lv >= 4 ? 'sin cárcel' : 'llega con el nivel 4', jail && j.jail.length >= jail ? 'neg' : ''),
   );

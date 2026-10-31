@@ -1,10 +1,10 @@
 import { TICKS_PER_DAY } from '@bitopolis/shared';
 import { CRIME } from './balance.ts';
 import { cellsOf, jailPlacesOf, radiusOf } from './levels.ts';
-import { OUTSIDE, transfer } from './money.ts';
+import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance } from './prng.ts';
 import { addMemory } from './social.ts';
-import { type Building, type GameState, pushEvent } from './state.ts';
+import { type Building, type Citizen, type GameState, pushEvent } from './state.ts';
 
 /**
  * v1.8: delincuencia. Las tiendas sufren robos según la delincuencia de la
@@ -15,7 +15,7 @@ import { type Building, type GameState, pushEvent } from './state.ts';
  */
 export interface Justice {
   /** Calabozos ocupados: comisaría, hasta cuándo y si espera traslado a la cárcel. */
-  cells: { stationId: number; until: number; toJail: boolean }[];
+  cells: { stationId: number; until: number; toJail: boolean; citizenId?: number }[];
   /** Presos en la cárcel (hasta cuándo). */
   jail: number[];
   /** Puntos calientes: robos sin resolver suben la inseguridad alrededor un tiempo. */
@@ -24,6 +24,8 @@ export interface Justice {
   arrests: number;
   /** Último aviso de calabozos llenos (para no repetirlo cada día). */
   fullWarned: number;
+  /** Multas cobradas a los detenidos (total, en euros). */
+  fines?: number;
 }
 
 export function emptyJustice(): Justice {
@@ -49,16 +51,22 @@ export function jailCapacity(state: GameState): number {
  * Intenta detener a `n` personas en (x, y). Devuelve cuántas se detienen.
  * Si hay comisaría cerca pero los calabozos están llenos, avisa (una vez al mes).
  */
-export function tryArrest(state: GameState, x: number, y: number, n: number): number {
+export function tryArrest(state: GameState, x: number, y: number, n: number, citizens: Citizen[] = []): number {
   const j = state.justice;
   if (!j) return 0;
   const stations = stationsFor(state, x, y);
   let done = 0;
   for (const s of stations) {
     while (done < n && cellsUsed(state, s.id) < cellsOf(s)) {
-      // Con cárcel y sitio, a los pocos días se les traslada; sin cárcel, cumplen en el calabozo.
-      const toJail = j.jail.length + j.cells.filter((c) => c.toJail).length < jailCapacity(state);
-      j.cells.push({ stationId: s.id, until: state.tick + (toJail ? CRIME.transferDays : CRIME.cellDays) * TICKS_PER_DAY, toJail });
+      const who = citizens[done];
+      if (who) {
+        // Un vecino detenido en unos disturbios: unos días de calabozo (y su multa), sin cárcel.
+        j.cells.push({ stationId: s.id, until: state.tick + CRIME.riotDays * TICKS_PER_DAY, toJail: false, citizenId: who.id });
+      } else {
+        // Con cárcel y sitio, a los pocos días se les traslada; sin cárcel, cumplen en el calabozo.
+        const toJail = j.jail.length + j.cells.filter((c) => c.toJail).length < jailCapacity(state);
+        j.cells.push({ stationId: s.id, until: state.tick + (toJail ? CRIME.transferDays : CRIME.cellDays) * TICKS_PER_DAY, toJail });
+      }
       done++;
     }
   }
@@ -80,6 +88,16 @@ export function tryArrest(state: GameState, x: number, y: number, n: number): nu
 export function crimeDay(state: GameState): void {
   const j = state.justice;
   if (!j) return;
+  // Multa diaria de cada detenido (petición del creador). Los ladrones son de fuera: la paga
+  // su familia (de fuera); un vecino la paga de su bolsillo, hasta donde le llegue.
+  let fines = 0;
+  for (const c of j.cells) {
+    const who = c.citizenId !== undefined ? state.citizens.find((x) => x.id === c.citizenId) : undefined;
+    if (c.citizenId !== undefined && !who) continue;
+    fines += who ? transfer(state, who.id, TREASURY, Math.min(who.money, CRIME.finePerDay), 'multas') : transfer(state, OUTSIDE, TREASURY, CRIME.finePerDay, 'multas');
+  }
+  if (j.jail.length) fines += transfer(state, OUTSIDE, TREASURY, CRIME.finePerDay * j.jail.length, 'multas');
+  j.fines = (j.fines ?? 0) + fines;
   // Salen del calabozo: a la cárcel (si tocaba y hay sitio) o a la calle.
   for (const c of [...j.cells]) {
     if (c.until > state.tick) continue;

@@ -51,6 +51,33 @@ describe('delincuencia (v1.8)', () => {
     expect(s.justice.cells.length).toBe(0);
   });
 
+  it('cada detenido paga una multa diaria al ayuntamiento (petición del creador)', () => {
+    const s = town();
+    const gone = new Set(s.buildings.filter((b) => b.kind === 'police' || b.kind === 'jail').map((b) => b.id));
+    s.buildings = s.buildings.filter((b) => !gone.has(b.id));
+    for (const c of s.citizens) if (c.jobId !== null && gone.has(c.jobId)) c.jobId = null;
+    const p = police(s);
+    expect(tryArrest(s, p.x, p.y, 1)).toBe(1);
+    // Un vecino detenido en disturbios paga de su bolsillo.
+    const vecino = s.citizens.find((c) => c.money > 100)!;
+    expect(tryArrest(s, p.x, p.y, 1, [vecino])).toBe(1);
+    const caja = s.treasury;
+    const bolsillo = vecino.money;
+    s.tick += TICKS_PER_DAY;
+    crimeDay(s);
+    expect(s.treasury).toBe(caja + 2 * CRIME.finePerDay);
+    expect(vecino.money).toBe(bolsillo - CRIME.finePerDay);
+    expect(s.justice.fines).toBe(2 * CRIME.finePerDay);
+    // El vecino sale a los días de disturbios; el ladrón sigue.
+    for (let i = 0; i < CRIME.riotDays; i++) {
+      s.tick += TICKS_PER_DAY;
+      crimeDay(s);
+    }
+    expect(s.justice.cells.some((c) => c.citizenId === vecino.id)).toBe(false);
+    expect(s.justice.cells.length).toBe(1);
+    expect(checkInvariants(s)).toEqual([]);
+  });
+
   it('con cárcel, los detenidos pasan a la cárcel y los calabozos se vacían en días', () => {
     const s = town();
     s.buildings = s.buildings.filter((b) => b.kind !== 'police' && b.kind !== 'jail');

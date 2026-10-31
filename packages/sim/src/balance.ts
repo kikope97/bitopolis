@@ -374,6 +374,10 @@ export const CRIME = {
   /** A los vecinos no les gusta la cárcel cerca. */
   jailNuisanceRadius: 4,
   jailNuisanceMood: 3,
+  /** Multa por cada día detenido (calabozo o cárcel), para el ayuntamiento. Petición del creador. */
+  finePerDay: 10,
+  /** Días de calabozo de un vecino detenido en unos disturbios (no pasa a la cárcel). */
+  riotDays: 10,
 } as const;
 
 /**

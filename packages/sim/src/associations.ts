@@ -287,7 +287,7 @@ function riot(state: GameState, a: Association, marchers: Citizen[], at: { x: nu
     .sort((p, q) => Math.abs(p.x - at.x) + Math.abs(p.y - at.y) - (Math.abs(q.x - at.x) + Math.abs(q.y - at.y)))
     .slice(0, canArrest ? 1 : 2);
   for (const b of shops) b.damaged = { cost: ASSOCIATIONS.repairCost, repairUntil: -1 };
-  const arrested = tryArrest(state, at.x, at.y, Math.min(3, marchers.length));
+  const arrested = tryArrest(state, at.x, at.y, Math.min(3, marchers.length), marchers.slice(0, 3));
   for (const c of marchers.slice(0, arrested)) addMemory(state, c, 'detenido', 5, -5);
   const broken = shops.map((b) => b.name ?? 'una tienda').join(' y ');
   pushEvent(

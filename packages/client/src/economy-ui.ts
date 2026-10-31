@@ -126,6 +126,8 @@ const CONCEPT: Record<string, string> = {
   plusvalía: 'Plusvalía',
   PIE: 'PIE (Estado)',
   'venta de viviendas': 'Venta de viviendas',
+  multas: 'Multas a los detenidos',
+  'reparaciones (disturbios)': 'Reparaciones tras disturbios',
 };
 
 /** Parte mensual: ingresos y gastos con flechas y «por qué baja tu saldo» con nombres. */
