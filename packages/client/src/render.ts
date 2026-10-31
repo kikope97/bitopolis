@@ -482,14 +482,17 @@ export function render(
         ctx.fillStyle = P(12);
         ctx.fillRect(fxp + (jet - 1) * 2 * z, fyp - (jet + 1) * z, z, z);
       }
-      if (b.kind !== 'water' && b.kind !== 'power' && b.kind !== 'park' && blink) {
+      // v1.8 (petición del creador): el icono sale cuando el problema dura (un día o más) y,
+      // si pasa de una semana, parpadea para llamar la atención. Recién terminado no avisa.
+      if (b.kind !== 'water' && b.kind !== 'power' && b.kind !== 'park') {
         let ix = px + ts - 12 * z;
         const iy = py + 2 * z;
-        if (!b.hasWater) {
+        const show = (days: number | undefined) => (days ?? 0) >= 1 && ((days ?? 0) < 7 || blink);
+        if (!b.hasWater && show(b.dryDays)) {
           ctx.drawImage(iconSprite('noWater'), ix, iy, 11 * z, 13 * z);
           ix -= 12 * z;
         }
-        if (!b.hasPower) ctx.drawImage(iconSprite('noPower'), ix, iy, 11 * z, 13 * z);
+        if (!b.hasPower && show(b.darkDays)) ctx.drawImage(iconSprite('noPower'), ix, iy, 11 * z, 13 * z);
       }
     }
   }

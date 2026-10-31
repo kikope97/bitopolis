@@ -6,7 +6,12 @@ import {
   unitValue,
   type GameEvent,
   type GameState,
+  cellsUsed,
   coverageSummary,
+  CRIME,
+  jailCapacity,
+  type NeedKey,
+  stationsFor,
   SEASON_TEXT,
   seasonOf,
   WEATHER_TEXT,
@@ -445,6 +450,15 @@ export function startGame(opts: GameOptions): void {
         vibrate(80);
         calmPause();
         toast(e.text, { kind: 'warn', sticky: true, onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+      } else if (e.kind === 'crime') {
+        // v1.8: robos, detenciones, calabozos llenos y disturbios.
+        const bad = /Disturbios|llenos|escapa/.test(e.text);
+        if (quiet && !bad) continue;
+        if (bad) {
+          sfx.warn();
+          calmPause();
+        }
+        toast(e.text, { kind: bad ? 'warn' : 'good', sticky: /Disturbios|llenos/.test(e.text), onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
       } else if (e.kind === 'protest') {
         sfx.warn();
         duck(1.5);
@@ -1279,25 +1293,48 @@ export function startGame(opts: GameOptions): void {
         h('label', { class: 'check' }, notify, ' Avísame cuando acabe'),
       );
     } else {
-      const pills: HTMLElement[] = [];
-      if (b.kind !== 'water' && b.kind !== 'power') {
-        pills.push(h('span', { class: `pill ${b.hasWater ? 'good' : 'bad'}` }, b.hasWater ? 'Agua ✓' : 'SIN AGUA'));
-        pills.push(h('span', { class: `pill ${b.hasPower ? 'good' : 'bad'}` }, b.hasPower ? 'Luz ✓' : 'SIN LUZ'));
-      }
-      if (b.kind === 'house' || b.kind === 'res' || b.kind === 'shop' || b.kind === 'factory') {
-        pills.push(h('span', { class: 'pill' }, `${money(unitValue(state, b))}${b.kind === 'house' || b.kind === 'res' ? '/vivienda' : ''}`));
-      }
-      // v1.7: qué servicio le falta a esta vivienda (o lo tiene lleno).
-      if (b.kind === 'house' || b.kind === 'res') {
-        for (const n of missingServices(state, b.x, b.y)) {
-          if (n.key === 'agua' || n.key === 'luz') continue;
-          pills.push(h('span', { class: `pill ${n.status === 'falta' ? 'bad' : 'warn'}` }, `${n.status === 'falta' ? 'Sin' : 'Lleno:'} ${NEED_LABEL[n.key]}`));
+      // v1.8: destrozado en unos disturbios: no funciona hasta que se repara.
+      if (b.damaged) {
+        const dmg = b.damaged;
+        const box = h('div', { class: 'petition danger-box' }, h('p', {}, h('strong', {}, 'Destrozada en unos disturbios. '), 'No vende ni paga sueldos hasta repararla; si pasa mucho tiempo, cierra.'));
+        if (dmg.repairUntil >= 0) box.append(h('p', { class: 'muted small' }, `En reparación: reabre el ${formatDate(tickToDate(dmg.repairUntil))}.`));
+        else {
+          const fix = h('button', { class: 'btn primary wide' }, `Reparar · ${money(dmg.cost)}`);
+          fix.addEventListener('click', () => void command({ type: 'RepairBuilding', buildingId: b.id }));
+          box.append(fix);
         }
+        content.push(box);
       }
-      if (pills.length) content.push(h('div', { class: 'status-row' }, ...pills));
+      const home = b.kind === 'house' || b.kind === 'res';
+      if (home) content.push(servicesTable(b));
+      else {
+        const pills: HTMLElement[] = [];
+        if (b.kind !== 'water' && b.kind !== 'power') {
+          pills.push(h('span', { class: `pill ${b.hasWater ? 'good' : 'bad'}` }, b.hasWater ? 'Agua ✓' : `SIN AGUA${b.dryDays ? ` (${plural(b.dryDays, 'día', 'días')})` : ''}`));
+          pills.push(h('span', { class: `pill ${b.hasPower ? 'good' : 'bad'}` }, b.hasPower ? 'Luz ✓' : `SIN LUZ${b.darkDays ? ` (${plural(b.darkDays, 'día', 'días')})` : ''}`));
+        }
+        if (b.kind === 'shop' || b.kind === 'factory') pills.push(h('span', { class: 'pill' }, money(unitValue(state, b))));
+        if (pills.length) content.push(h('div', { class: 'status-row' }, ...pills));
+      }
+      // v1.8: comisaría (calabozos) y cárcel (presos).
+      if (b.kind === 'police') {
+        const used = cellsUsed(state, b.id);
+        content.push(h('p', {}, `Calabozos: ${used} de ${CRIME.cellsPerStation} ocupados.`));
+        if (used >= CRIME.cellsPerStation) content.push(h('p', { class: 'pol-tag' }, jailCapacity(state) ? 'Llenos: esperan sitio en la cárcel.' : 'Llenos: hace falta una cárcel para poder detener a más.'));
+      }
+      if (b.kind === 'jail') content.push(h('p', {}, `Presos: ${state.justice?.jail.length ?? 0} de ${jailCapacity(state)} plazas.`));
       const res = occupants(state, b);
-      if (res.length) content.push(h('h3', {}, 'Viven aquí'), citizenList(res));
       const workers = state.citizens.filter((c) => c.jobId === b.id);
+      if (home && res.length) {
+        // Resumen de quien vive aquí antes de la lista.
+        const avg = Math.round(res.reduce((t, c) => t + c.happiness, 0) / res.length);
+        const inTown = res.filter((c) => c.jobId !== null).length;
+        content.push(
+          h('h3', {}, 'Viven aquí'),
+          h('p', { class: 'muted small' }, `${plural(res.length, 'vecino', 'vecinos')} · felicidad media ${avg} · ${inTown} trabajan en el pueblo, ${res.length - inTown} fuera`),
+          citizenList(res),
+        );
+      } else if (res.length) content.push(h('h3', {}, 'Viven aquí'), citizenList(res));
       if (workers.length) content.push(h('h3', {}, 'Trabajan aquí'), citizenList(workers));
       if (b.kind === 'house') {
         const sale = !!b.forSale;
@@ -1321,6 +1358,34 @@ export function startGame(opts: GameOptions): void {
     inspectSheet.classList.add('half');
     const body = document.querySelector('.sheet-body');
     if (body) body.scrollTop = prevScroll;
+  }
+
+  /**
+   * v1.8: tabla de servicios de una vivienda (petición del creador): agua y
+   * luz (con los días que lleva sin ellas), seguridad, colegio, salud, ocio y
+   * tienda, cada uno con su estado. Valor de la vivienda al pie.
+   */
+  function servicesTable(b: Building): HTMLElement {
+    const needs = new Map(missingServices(state, b.x, b.y).map((n) => [n.key, n.status] as const));
+    const row = (icon: string, label: string, ok: boolean | 'warn', text: string) =>
+      h('div', { class: `svc ${ok === true ? 'ok' : ok === 'warn' ? 'warn' : 'bad'}` }, pixelIcon(icon), h('span', { class: 'svc-label' }, label), h('span', { class: 'svc-state' }, text));
+    const svc = (key: NeedKey, icon: string, label: string) => {
+      const st = needs.get(key);
+      return row(icon, label, st === undefined ? true : st === 'lleno' ? 'warn' : false, st === undefined ? 'Cubierto' : st === 'lleno' ? 'Lleno' : 'No llega');
+    };
+    const i = b.y * state.map.w + b.x;
+    const crime = state.fields.crime[i] ?? 0;
+    const police = stationsFor(state, b.x, b.y).length > 0;
+    const pop = state.citizens.length;
+    const rows = [
+      row('drop', 'Agua', b.hasWater, b.hasWater ? 'Sí' : b.dryDays ? `Sin agua desde hace ${plural(b.dryDays, 'día', 'días')}` : 'Sin agua'),
+      row('bolt', 'Luz', b.hasPower, b.hasPower ? 'Sí' : b.darkDays ? `Sin luz desde hace ${plural(b.darkDays, 'día', 'días')}` : 'Sin luz'),
+      row('police', 'Seguridad', crime < 20 ? true : crime < 40 ? 'warn' : false, `${crime < 20 ? 'Tranquilo' : crime < 40 ? 'Algo de delincuencia' : 'Inseguro'}${police ? ' · comisaría cerca' : pop >= 20 ? ' · sin comisaría cerca' : ''}`),
+      ...(pop >= 25 ? [svc('colegio', 'school', 'Colegio'), svc('salud', 'health', 'Salud')] : []),
+      ...(pop >= 10 ? [svc('ocio', 'leaf', 'Parque o plaza')] : []),
+      row('bar', 'Tienda', state.buildings.some((s) => s.kind === 'shop' && s.built && !s.damaged && Math.abs(s.x - b.x) + Math.abs(s.y - b.y) <= 6), state.buildings.some((s) => s.kind === 'shop' && s.built && !s.damaged && Math.abs(s.x - b.x) + Math.abs(s.y - b.y) <= 6) ? 'Cerca' : 'Lejos'),
+    ];
+    return h('div', { class: 'svc-table' }, ...rows, h('p', { class: 'muted small' }, `Valor: ${money(unitValue(state, b))} por vivienda`));
   }
 
   /** Vecinos de un edificio: una fila por persona con retrato y lo esencial (v1.6). */

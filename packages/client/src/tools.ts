@@ -23,6 +23,7 @@ export type ToolId =
   | 'cemetery'
   | 'library'
   | 'sports'
+  | 'jail'
   | 'demolish';
 
 export interface Tool {
@@ -57,6 +58,8 @@ export const TOOLS: Tool[] = [
   { id: 'cemetery', label: 'Cementerio', shape: 'tap', build: 'cemetery', key: 'n', help: 'Para despedir a los que se van: el duelo pesa menos. Sin él, se nota.' },
   { id: 'library', label: 'Biblioteca', shape: 'tap', build: 'library', key: 'y', help: 'Felicidad en 8 casillas; más aún para quien quiere prosperar.' },
   { id: 'sports', label: 'Polideportivo', shape: 'tap', build: 'sports', key: 'g', help: 'Felicidad en 8 casillas; los mayores de cerca viven más.' },
+  // v1.8: la cárcel vacía los calabozos de las comisarías.
+  { id: 'jail', label: 'Cárcel', shape: 'tap', build: 'jail', key: 'j', help: '30 plazas: los detenidos pasan aquí y los calabozos de las comisarías se vacían. A los vecinos no les gusta tenerla cerca.' },
   { id: 'dezone', label: 'Sin zona', shape: 'rect', zone: 'none', key: 'z', help: 'Quita la zona (no derriba lo construido).' },
   { id: 'demolish', label: 'Derribar', shape: 'tap', key: 'x', help: 'Derriba un edificio o una carretera. Pide confirmación.' },
 ];
@@ -84,7 +87,7 @@ export function trayCost(tool: Tool): string {
 export const TRAY: { title: string; tools: ToolId[] }[] = [
   { title: 'Lo básico', tools: ['house', 'water', 'power'] },
   { title: 'Zonas (los vecinos construyen)', tools: ['zoneR', 'zoneC', 'zoneI', 'dezone'] },
-  { title: 'Servicios', tools: ['park', 'school', 'clinic', 'police'] },
+  { title: 'Servicios', tools: ['park', 'school', 'clinic', 'police', 'jail'] },
   { title: 'Vida social', tools: ['bar', 'chapel', 'cemetery', 'library', 'sports'] },
   { title: 'Premios de los hitos', tools: ['plaza', 'market'] },
 ];

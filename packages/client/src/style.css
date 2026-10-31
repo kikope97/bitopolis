@@ -888,3 +888,13 @@ html[data-font='pixel'] body .hud-weather { font-size: 0.5rem; }
 .tray .tool-label { overflow-wrap: anywhere; hyphens: auto; }
 html[data-text='200'] .tray-grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
 .kin { min-height: 44px; }
+/* v1.8: tabla de servicios de la vivienda y aviso de destrozos. */
+.svc-table { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 8px; }
+.svc { display: grid; grid-template-columns: 16px 6.5em 1fr; gap: 8px; align-items: center; padding: 4px 8px; border-left: 4px solid var(--line); background: var(--bg); }
+.svc .px-icon { width: 16px; height: 16px; }
+.svc-label { font-weight: 600; }
+.svc.ok { border-left-color: var(--good); }
+.svc.warn { border-left-color: var(--accent); }
+.svc.bad { border-left-color: var(--bad); }
+.svc.bad .svc-state { color: var(--bad); font-weight: 600; }
+.danger-box { border-left-color: #b13e53; }
