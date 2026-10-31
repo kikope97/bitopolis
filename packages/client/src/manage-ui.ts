@@ -112,7 +112,7 @@ export function openManagement(ctx: SocialCtx, links: ManageLinks): void {
   has.append(grid);
   const broken = s.buildings.filter((b) => b.damaged);
   for (const b of broken) {
-    const go = h('button', { class: 'btn small danger' }, `${b.name ?? 'Tienda'}: destrozada`);
+    const go = h('button', { class: 'btn small danger' }, `${b.name ?? BUILD_NAMES[b.kind] ?? 'Tienda'}: ${b.damaged?.cause === 'fuego' ? 'quemado' : 'destrozada'}`);
     go.addEventListener('click', () => links.focus(b.x, b.y));
     has.append(go);
   }

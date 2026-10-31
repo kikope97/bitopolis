@@ -25,6 +25,12 @@ import {
   upgradeReqs,
   type NeedKey,
   stationsFor,
+  CIVIL,
+  FIRE,
+  fireCovered,
+  hasDike,
+  isUnlocked,
+  volunteerPlaces,
   SEASON_TEXT,
   seasonOf,
   WEATHER_TEXT,
@@ -683,6 +689,23 @@ export function startGame(opts: GameOptions): void {
           if (/Disturbios|llenos/.test(e.text)) attention(refSpot(e.ref) ?? state.buildings.find((b) => b.kind === 'police' && b.built));
         }
         toast(e.text, { kind: bad ? 'warn' : 'good', sticky: /Disturbios|llenos/.test(e.text), onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+      } else if (e.kind === 'fire') {
+        // 2.1: riesgos, incendios, bomberos y urgencias.
+        const go = e.ref !== undefined ? () => focusBuilding(e.ref!) : undefined;
+        if (e.text.startsWith('¡Fuego') || e.text.startsWith('El fuego salta')) {
+          sfx.warn();
+          duck(1.5);
+          calmPause();
+          attention(refSpot(e.ref));
+          toast(e.text, { kind: 'warn', sticky: true, onClick: go });
+        } else if (e.text.startsWith('El fuego deja')) {
+          sfx.warn();
+          toast(e.text, { kind: 'warn', sticky: true, onClick: go });
+        } else if (e.text.startsWith('Riesgo de incendio')) {
+          if (!quiet) toast(e.text, { kind: 'warn', onClick: go });
+        } else if (!quiet || e.text.startsWith('Urgencia')) {
+          toast(e.text, { kind: /no llega/.test(e.text) ? 'warn' : 'good', onClick: go });
+        }
       } else if (e.kind === 'protest') {
         sfx.warn();
         duck(1.5);
@@ -1122,7 +1145,7 @@ export function startGame(opts: GameOptions): void {
       // v1.6: se confirma en la franja de abajo, en rojo (antes, una ventana que tapaba el mapa).
       const b = state.buildings.find((x) => x.x === tile.x && x.y === tile.y);
       const onRiver = terrainAt(state, tile.x, tile.y) === Terrain.River;
-      const what = b ? (b.name ?? BUILD_NAMES[b.kind]) : state.map.tiles[tile.y * state.map.w + tile.x] === Tile.Road ? (onRiver ? 'Puente' : 'Carretera') : null;
+      const what = b ? (b.name ?? BUILD_NAMES[b.kind]) : state.map.tiles[tile.y * state.map.w + tile.x] === Tile.Road ? (onRiver ? 'Puente' : 'Carretera') : hasDike(state, tile.x, tile.y) ? 'Dique' : null;
       if (!what) {
         $('#tool-info').replaceChildren(h('b', {}, 'Derribar'), ': ahí no hay nada que derribar. Toca un edificio o una carretera.');
         return refreshStrip();
@@ -1172,7 +1195,7 @@ export function startGame(opts: GameOptions): void {
       await command(line);
       return;
     }
-    if (touchInput && tool.build) {
+    if (touchInput && (tool.build || tool.id === 'dike')) {
       // Con el dedo solo construye el botón «Construir»: un doble toque no gasta (ronda 10).
       return proposePlace(tile, tile);
     }
@@ -1216,7 +1239,7 @@ export function startGame(opts: GameOptions): void {
     preview = previewFor(a, b);
     const v = validateCommand(state, cmd);
     const hill = tool.build && tool.shape === 'tap' && terrainAt(state, a.x, a.y) === Terrain.Hill;
-    const cost = tool.build && tool.shape === 'tap' ? `${shortCost(tool)}${hill ? ' (colina: materiales +50 %)' : ''}` : lineText(a, b);
+    const cost = tool.id === 'dike' ? shortCost(tool) : tool.build && tool.shape === 'tap' ? `${shortCost(tool)}${hill ? ' (colina: materiales +50 %)' : ''}` : lineText(a, b);
     // Ronda 13: el precio va en su propia línea y siempre se ve (también si no se puede: «no hay dinero»).
     const what = demolishText && v.ok ? demolishText : v.ok ? `${tool.label} aquí` : `${tool.label}: no se puede (${v.error})`;
     // v1.9.1: si con lo que falta por pagar de las obras en marcha la caja quedaría en negativo, se avisa (no se bloquea).
@@ -1360,8 +1383,8 @@ export function startGame(opts: GameOptions): void {
   /* ---------- herramientas (v1.6: cinco pestañas y la bandeja «Construir») ---------- */
   function toolIcon(tl: Tool): HTMLElement {
     const wrap = h('span', { class: 'tool-icon', 'aria-hidden': 'true' });
-    if (tl.build && tl.build !== 'road') {
-      const c = buildingSprite(tl.build, 1);
+    if ((tl.build && tl.build !== 'road') || tl.id === 'dike') {
+      const c = buildingSprite(tl.build ?? tl.id, 1);
       const img = document.createElement('canvas');
       img.width = c.width;
       img.height = c.height;
@@ -1593,10 +1616,17 @@ export function startGame(opts: GameOptions): void {
       const z = state.map.zones[tile.y * state.map.w + tile.x];
       const tt = state.map.tiles[tile.y * state.map.w + tile.x];
       const ter = state.map.terrain?.[tile.y * state.map.w + tile.x] ?? 0;
+      const dike = hasDike(state, tile.x, tile.y);
       const name =
         tt === Tile.Road
           ? ter === Terrain.River ? 'Puente' : 'Carretera'
-          : ter === Terrain.River ? 'Río' : ter === Terrain.Sea ? 'Mar' : tt === Tile.Tree ? 'Árboles' : ter === Terrain.Hill ? 'Colina' : 'Solar';
+          : dike ? 'Dique' : ter === Terrain.River ? 'Río' : ter === Terrain.Sea ? 'Mar' : tt === Tile.Tree ? 'Árboles' : ter === Terrain.Hill ? 'Colina' : 'Solar';
+      if (dike) {
+        sheet(name, h('p', {}, 'Muro de piedra en la orilla: aquí y en las casillas de alrededor no llega la riada.'), h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`)).classList.add('half');
+        openInspect = null;
+        inspectSheet = null;
+        return;
+      }
       const zone = z ? `Zona ${['', 'residencial (R)', 'comercial (C)', 'industrial (I)'][z]}` : 'Sin zona';
       sheet(name, h('p', {}, zone), h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`)).classList.add('half');
       openInspect = null;
@@ -1642,10 +1672,25 @@ export function startGame(opts: GameOptions): void {
         h('label', { class: 'check' }, notify, ' Avísame cuando acabe'),
       );
     } else {
-      // v1.8: destrozado en unos disturbios: no funciona hasta que se repara.
+      // 2.1: ardiendo o en riesgo de incendio.
+      if (b.fire) {
+        const left = Math.max(1, b.fire.until - state.tick);
+        content.push(h('div', { class: 'petition danger-box', 'data-fire': 'ardiendo' }, pixelIcon('fire'), h('p', {}, h('strong', {}, '¡Ardiendo! '), b.fire.covered ? `Los bomberos lo están apagando: unas ${plural(left, 'hora', 'horas')} más.` : `No hay bomberos que lleguen: arderá unas ${plural(left, 'hora', 'horas')} y quedará destrozado. Puede saltar a lo de al lado.`)));
+      } else if (b.risk) {
+        const covered = fireCovered(state, b);
+        content.push(h('div', { class: 'petition warn-box', 'data-fire': 'riesgo' }, pixelIcon('fire'), h('p', {}, h('strong', {}, 'En riesgo de incendio '), `(${b.risk.why}). `, covered ? 'Los bomberos llegan a tiempo: si prende, solo será un susto.' : 'No hay bomberos cerca: si prende, quedará destrozado. Un parque de bomberos en 9 casillas lo evita.')));
+      }
+      // v1.8: destrozado en unos disturbios (2.1: o por el fuego): no funciona hasta que se repara.
       if (b.damaged) {
         const dmg = b.damaged;
-        const box = h('div', { class: 'petition danger-box' }, h('p', {}, h('strong', {}, 'Destrozada en unos disturbios. '), 'No vende hasta repararla, pero sigue pagando sueldos e impuestos con sus ahorros: si dos meses seguidos no llega a las nóminas, cierra.'));
+        const fire = dmg.cause === 'fuego';
+        const home = b.kind === 'house' || b.kind === 'res';
+        const why = fire
+          ? home
+            ? 'Quien vivía aquí está sin casa hasta que se repare (lo nota en su felicidad) y no entra nadie nuevo.'
+            : 'No funciona ni contrata hasta repararlo. Nunca se pierde: se arregla pagando la obra.'
+          : 'No vende hasta repararla, pero sigue pagando sueldos e impuestos con sus ahorros: si dos meses seguidos no llega a las nóminas, cierra.';
+        const box = h('div', { class: 'petition danger-box' }, h('p', {}, h('strong', {}, fire ? 'Destrozado por el fuego. ' : 'Destrozada en unos disturbios. '), why));
         if (dmg.repairUntil >= 0) box.append(h('p', { class: 'muted small' }, `En reparación: reabre el ${formatDate(tickToDate(dmg.repairUntil))}.`));
         else {
           const fix = h('button', { class: 'btn primary wide' }, `Reparar · ${money(dmg.cost)}`);
@@ -1678,6 +1723,18 @@ export function startGame(opts: GameOptions): void {
         if (used >= cellsOf(b)) content.push(h('p', { class: 'pol-tag' }, jailCapacity(state) ? 'Llenos: esperan sitio en la cárcel.' : 'Llenos: hace falta una cárcel para poder detener a más.'));
       }
       if (b.kind === 'jail') content.push(h('p', {}, `Presos: ${state.justice?.jail.length ?? 0} de ${jailCapacity(state)} plazas.`));
+      // 2.1: bomberos y protección civil.
+      if (b.kind === 'firestation') {
+        const lv = b.level ?? 1;
+        const em = state.emergencies;
+        content.push(h('p', {}, `Llega a ${radiusOf(b)} casillas: ahí, un incendio se apaga en ${FIRE.coveredHours[0]}–${FIRE.coveredHours[1]} horas y sin daños. ${lv >= FIRE.hillLevel ? 'Con cisterna: también en las colinas.' : 'En las colinas no llega hasta el nivel 2 (cisterna).'}${lv >= FIRE.floodLevel ? ' Ayuda en las riadas: reparaciones a la mitad en su radio.' : ''}`));
+        if (em) content.push(h('p', { class: 'muted small' }, `Incendios en el pueblo: ${em.fires} · apagados a tiempo: ${em.putOut}`));
+      }
+      if (b.kind === 'civilprotection') {
+        const vols = state.citizens.filter((c) => c.volunteer);
+        content.push(h('p', {}, `En ${radiusOf(b)} casillas, las riadas un ${Math.round(CIVIL.floodCut * 100)} % menos y el quitanieves a mitad de precio. Con la caseta puedes levantar diques en la orilla (${money(CIVIL.dikeCost)} cada uno).`));
+        content.push(h('p', { class: 'muted small' }, `Voluntarios: ${vols.length}${vols.length ? ` (${vols.slice(0, 4).map((c) => c.name.split(' ')[0]).join(', ')}${vols.length > 4 ? '…' : ''})` : ''} · plazas libres: ${Math.max(0, volunteerPlaces(state))} · riadas evitadas: ${state.emergencies?.floodsAvoided ?? 0}`));
+      }
       // v1.8 (petición del creador): los servicios suben de nivel.
       if (UPGRADABLE.includes(b.kind)) content.push(levelBox(b));
       const res = occupants(state, b);
@@ -1743,6 +1800,8 @@ export function startGame(opts: GameOptions): void {
       row('police', 'Seguridad', crime < 20 ? true : crime < 40 ? 'warn' : false, `${crime < 20 ? 'Tranquilo' : crime < 40 ? 'Algo de delincuencia' : 'Inseguro'}${police ? ' · comisaría cerca' : pop >= 20 ? ' · sin comisaría cerca' : ''}`),
       ...(pop >= 25 ? [svc('colegio', 'school', 'Colegio'), svc('salud', 'health', 'Salud')] : []),
       ...(pop >= 10 ? [svc('ocio', 'leaf', 'Parque o plaza')] : []),
+      // 2.1: bomberos (en cuanto se pueden construir).
+      ...(isUnlocked(state, 'firestation') || state.buildings.some((s) => s.kind === 'firestation') ? [svc('bomberos', 'fire', 'Bomberos')] : []),
       row('bar', 'Tienda', state.buildings.some((s) => s.kind === 'shop' && s.built && !s.damaged && Math.abs(s.x - b.x) + Math.abs(s.y - b.y) <= 6), state.buildings.some((s) => s.kind === 'shop' && s.built && !s.damaged && Math.abs(s.x - b.x) + Math.abs(s.y - b.y) <= 6) ? 'Cerca' : 'Lejos'),
     ];
     return h('div', {}, h('dl', { class: 'svc-table', 'aria-label': 'Servicios de la vivienda' }, ...rows), h('p', { class: 'muted small' }, `Valor: ${money(unitValue(state, b))} por vivienda`));
@@ -1954,7 +2013,7 @@ export function startGame(opts: GameOptions): void {
     legendDay = Math.floor(state.tick / 24);
     // Ronda 13: ordenada por lo que más falta, con «Construir» al lado; plegable para ver el mapa.
     const sum = coverageSummary(state).sort((a, b) => b.falta - a.falta || b.lleno - a.lleno);
-    const TOOL_FOR: Record<string, ToolId> = { agua: 'water', luz: 'power', colegio: 'school', salud: 'clinic', policia: 'police', ocio: 'park' };
+    const TOOL_FOR: Record<string, ToolId> = { agua: 'water', luz: 'power', colegio: 'school', salud: 'clinic', policia: 'police', ocio: 'park', bomberos: 'firestation' };
     const rows = sum.map((r) => {
       const name = `${NEED_LABEL[r.key][0]!.toUpperCase()}${NEED_LABEL[r.key].slice(1)}`;
       const count = r.falta ? `falta en ${plural(r.falta, 'casa', 'casas')}` : `lleno en ${plural(r.lleno, 'casa', 'casas')}`;

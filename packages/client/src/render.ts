@@ -1,4 +1,4 @@
-import { type GameState, isWater, Terrain, Tile, Zone } from '@bitopolis/sim';
+import { ambulanceFor, type GameState, isWater, Terrain, Tile, Zone } from '@bitopolis/sim';
 import { happinessMarks, type LayerId, layerCanvas, missingMarks, NEED_ICON } from './layers.ts';
 import { pixelIcon } from './icons.ts';
 
@@ -36,6 +36,12 @@ import {
   thiefSprite,
   townhallSprite,
   zoneTile,
+  ambulanceSprite,
+  burntSprite,
+  dikeSprite,
+  fireTruckSprite,
+  flamesSprite,
+  riskSprite,
 } from './sprites.ts';
 
 export interface Camera {
@@ -302,7 +308,8 @@ const roadCache = new Map<string, Pix>();
 
 /** Sprite de un edificio: destrozado, el ayuntamiento según su nivel (v1.8) o el normal. */
 function bSprite(b: GameState['buildings'][number], tod: TimeOfDay, snowing: boolean, state: GameState): HTMLCanvasElement {
-  if (b.damaged) return damagedSprite(b.kind, b.id, tod);
+  // 2.1: lo que destrozó el fuego, quemado (no con pintadas como en los disturbios).
+  if (b.damaged) return b.damaged.cause === 'fuego' ? burntSprite(b.kind, b.id, tod) : damagedSprite(b.kind, b.id, tod);
   if (b.kind === 'townhall') return townhallSprite(state.townhallLevel ?? 1, tod, snowing);
   if (b.level && b.level > 1) return serviceSprite(b.kind, b.id, b.level, tod, snowing);
   return buildingSprite(b.kind, b.id, tod, snowing);
@@ -431,6 +438,8 @@ export function render(
 
   const byTile = new Map<number, GameState['buildings'][number]>();
   for (const b of state.buildings) byTile.set(b.y * w + b.x, b);
+  // 2.1: diques en la orilla.
+  const dikes = new Set(state.dikes ?? []);
   const projects = new Map(state.projects.map((p) => [p.buildingId, p]));
   const blink = opts.reducedMotion || Math.floor(opts.time / 600) % 2 === 0;
 
@@ -449,6 +458,10 @@ export function render(
       const py = (y * T - (BH - T)) * z - cam.y;
       const b = byTile.get(y * w + x);
       if (!b && tiles[y * w + x] === Tile.Road && lampAt(state, byTile, x, y)) drawLamp(ctx, px, y * ts - cam.y, z, tod);
+      if (!b && dikes.has(y * w + x)) {
+        ctx.drawImage(dikeSprite(tod), px, y * ts - cam.y, ts, ts);
+        continue;
+      }
       if (!b) {
         if (tiles[y * w + x] === Tile.Tree) {
           // Viento: la copa se mece con un desfase por árbol.
@@ -477,6 +490,15 @@ export function render(
         const dh = Math.round(BH * z * sy);
         ctx.drawImage(bSprite(b, tod, snowing, state), px + Math.round((ts - dw) / 2), py + BH * z - dh, dw, dh);
       }
+      // 2.1: llamas (2 fotogramas, sin destellos) y aviso de riesgo encima.
+      if (b.fire) {
+        const frame = still ? 0 : Math.floor(opts.time / 280 + b.id) % 2;
+        ctx.drawImage(flamesSprite(frame, tod), px, py, ts, BH * z);
+        for (let k = 0; k < 3; k++) {
+          const life = still ? (k + 0.5) / 3 : ((opts.time / 1800 + k / 3 + hash(b.id, k, 5) * 0.2) % 1);
+          puffs.push({ x: x * T + 14 + Math.round(life * 6 + Math.sin(life * 5 + b.id) * 2), y: y * T - (BH - T) + 4 - Math.round(life * 18), size: Math.min(2, 1 + Math.floor(life * 2)) });
+        }
+      } else if (b.risk) ctx.drawImage(riskSprite(), px + 2 * z, py + 2 * z, 11 * z, 13 * z);
       // Humo de chimeneas (fábricas, central y casas): bocanadas que suben y crecen.
       // En casas solo alguna chimenea y una bocanada: que no parezca contaminación.
       const homeSmoke = b.kind === 'house' && hash(b.id, 9) < 0.2;
@@ -591,6 +613,8 @@ export function render(
   drawProtest(ctx, state, cam, opts.time, opts.reducedMotion, tod);
   drawPolice(ctx, state, cam, opts.time, opts.reducedMotion, tod);
   drawThief(ctx, state, cam, opts.time, opts.reducedMotion, tod);
+  drawFireTrucks(ctx, state, cam, opts.time, opts.reducedMotion, tod);
+  drawAmbulance(ctx, state, cam, opts.time, opts.reducedMotion, tod);
   if (opts.highlight) drawHighlight(ctx, cam, opts.highlight, opts.time, opts.reducedMotion);
   drawWeather(ctx, state, opts.time, opts.reducedMotion);
 
@@ -859,6 +883,43 @@ function drawThief(ctx: CanvasRenderingContext2D, state: GameState, cam: Camera,
   const p = along(path, d);
   const img = thiefSprite(Math.floor(time / 90) % 4, p.dir, tod);
   ctx.drawImage(img, (p.fx - 3) * z - cam.x, (p.fy - 11) * z - cam.y, img.width * z, img.height * z);
+}
+
+/**
+ * 2.1: con un incendio que los bomberos pueden apagar, el camión rojo sale del
+ * parque y va por las calles hasta el fuego; allí se queda hasta que se apaga.
+ */
+function drawFireTrucks(ctx: CanvasRenderingContext2D, state: GameState, cam: Camera, time: number, still: boolean, tod: TimeOfDay): void {
+  const z = cam.zoom;
+  for (const b of state.buildings) {
+    if (!b.fire?.covered) continue;
+    const station = state.buildings
+      .filter((s) => s.kind === 'firestation' && s.built)
+      .sort((p, q) => Math.abs(p.x - b.x) + Math.abs(p.y - b.y) - (Math.abs(q.x - b.x) + Math.abs(q.y - b.y)))[0];
+    if (!station) continue;
+    const path = roadPath(state, station, b);
+    if (path.length < 2) continue;
+    const d = still ? path.length - 1 : Math.min(path.length - 1, (sinceSeen(`f${b.id}-${b.fire.since}`, time) / 1000) * 3);
+    const p = along(path, d);
+    const img = fireTruckSprite(still || d >= path.length - 1 ? 0 : Math.floor(time / 120) % 2, p.dir, tod);
+    ctx.drawImage(img, (p.fx - 7) * z - cam.x, (p.fy - 9) * z - cam.y, img.width * z, img.height * z);
+  }
+}
+
+/** 2.1: en una urgencia que se salva, la ambulancia (sin destellos) va del centro de salud a la casa. */
+function drawAmbulance(ctx: CanvasRenderingContext2D, state: GameState, cam: Camera, time: number, still: boolean, tod: TimeOfDay): void {
+  const e = [...state.events].reverse().find((x) => x.kind === 'fire' && (x.text.startsWith('Urgencia') || x.text.includes('la ambulancia llega')));
+  if (!e || state.tick - e.tick > 10 || e.ref === undefined) return;
+  const home = state.buildings.find((b) => b.id === e.ref);
+  const clinic = home ? ambulanceFor(state, home) : undefined;
+  if (!home || !clinic) return;
+  const path = roadPath(state, clinic, home);
+  if (path.length < 2) return;
+  const z = cam.zoom;
+  const d = still ? path.length - 1 : Math.min(path.length - 1, (sinceSeen(`a${e.tick}`, time) / 1000) * 2.5);
+  const p = along(path, d);
+  const img = ambulanceSprite(still || d >= path.length - 1 ? 0 : Math.floor(time / 120) % 2, p.dir, tod);
+  ctx.drawImage(img, (p.fx - 6) * z - cam.x, (p.fy - 9) * z - cam.y, img.width * z, img.height * z);
 }
 
 /** v1.8: destello sobre lo que ha hecho volver a x1 (unos segundos). */

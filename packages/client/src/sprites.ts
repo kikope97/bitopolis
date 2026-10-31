@@ -2097,6 +2097,7 @@ const UPGRADES: Record<string, readonly [() => Pix, () => Pix]> = {
   park: [() => park2(11), () => park3(11)],
   library: [() => library2(15), () => library3(15)],
   sports: [() => sports2(16), () => sports3(16)],
+  firestation: [() => fireStation(18, 2), () => fireStation(18, 3)],
 };
 
 /**
@@ -2816,6 +2817,17 @@ function buildingSpec(kind: string, id: number): [string, () => Pix] | null {
       return ['sports', () => sports(16)];
     case 'jail':
       return ['jail', () => jail(17)];
+    // 2.1: emergencias.
+    case 'firestation':
+      return ['firestation', () => fireStation(18, 1)];
+    case 'civilprotection':
+      return ['civilprotection', () => civilPost(19)];
+    case 'dike':
+      return ['dike-tool', () => {
+        const p = new Pix(T, BH);
+        p.blit(dikePix(), 0, 16);
+        return p;
+      }];
     case 'factory':
       return [`factory${id % 4}`, () => factory(id % 4)];
     case 'shop':
@@ -3385,3 +3397,238 @@ export function puff(size: number): Pix {
   return p;
 }
 export const puffSprite = (size: number, tod: TimeOfDay = 'day') => sprite(`puff${size}`, () => puff(size), tod);
+
+/* -------------------- 2.1: emergencias -------------------- */
+
+/** Camión de bomberos aparcado (para los sprites de edificio), 11×6. */
+function truckParked(p: Pix, x: number, y: number, cistern: boolean) {
+  p.shadow(x + 1, y + 6, 11, 1);
+  p.rect(x, y + 1, 8, 4, MAT.red[1]);
+  p.hline(x, y + 1, 8, MAT.red[0]);
+  if (cistern) {
+    p.rect(x + 1, y - 1, 6, 2, MAT.metal[1]);
+    p.hline(x + 1, y - 1, 6, MAT.metal[0]);
+  } else {
+    p.hline(x, y, 8, MAT.metal[2]); // escalera
+    for (let i = 0; i < 8; i += 2) p.set(x + i, y, MAT.metal[0]);
+  }
+  p.rect(x + 8, y + 2, 3, 3, MAT.red[1]);
+  p.rect(x + 9, y + 2, 2, 1, MAT.glass[1]);
+  p.hline(x, y + 4, 11, MAT.red[3]);
+  p.hline(x + 1, y + 3, 6, 12);
+  for (const dx of [1, 8]) p.rect(x + dx, y + 5, 2, 1, 0);
+  p.set(x + 9, y + 1, nightLights ? C.lampWarm : 4);
+}
+
+/** Parque de bomberos por niveles: 1 nave con portón y torre de mangueras; 2 con cisterna; 3 con dos portones y foco. */
+function fireStation(seed: number, level: number): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 1, 14, 30, 32);
+  // Torre de secado de mangueras.
+  const towerTop = level >= 3 ? 2 : 6;
+  facade(p, 22, towerTop + 4, 9, 42 - towerTop, MAT.brick, 'brick', seed);
+  flatRoof(p, 21, towerTop, 11, 5, MAT.slate, seed);
+  windowAt(p, 25, towerTop + 9, 3, 4, { frame: 12 });
+  windowAt(p, 25, towerTop + 19, 3, 4, { frame: 12 });
+  // Nave principal.
+  facade(p, 1, 20, 22, 26, MAT.red, 'brick', seed);
+  flatRoof(p, 0, 14, 23, 7, MAT.red, seed);
+  // Franja blanca con el rótulo (rayas como letras).
+  p.rect(2, 22, 20, 4, 12);
+  for (let i = 0; i < 6; i++) p.rect(4 + i * 3, 23, 2, 2, MAT.red[2]);
+  // Portones (uno o dos), con lamas y marco blanco.
+  const doors: [number, number][] = level >= 3 ? [[3, 8], [12, 8]] : [[4, 14]];
+  for (const [dx, dw] of doors) {
+    p.frame(dx - 1, 28, dw + 2, 18, 12);
+    p.rect(dx, 29, dw, 16, MAT.red[3]);
+    for (let y = 30; y < 45; y += 2) p.hline(dx, y, dw, MAT.red[2]);
+    p.hline(dx, 29, dw, nightLights ? C.lampWarm : MAT.metal[1]);
+  }
+  // Sirena (fija: sin destellos) y escudo.
+  p.rect(10, 11, 3, 3, MAT.metal[2]);
+  p.set(11, 11, nightLights ? C.lampWarm : MAT.red[0]);
+  p.ball(26, towerTop + 2, 1.6, MAT.yellow, seed);
+  if (level >= 2) truckParked(p, 19, 40, true);
+  if (level >= 3) {
+    floodlight(p, 30, 26, 40);
+    p.hline(2, 47, 20, MAT.stone[2]);
+  }
+  return p;
+}
+
+/** Caseta de protección civil: casita blanca con franja naranja y el triángulo azul en un círculo naranja. */
+function civilPost(seed: number): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 4, 22, 24, 24);
+  facade(p, 4, 26, 24, 20, MAT.white, 'plaster', seed);
+  gableRoof(p, 3, 18, 26, 3, 6, MAT.terracotta);
+  // Franja naranja.
+  p.hline(4, 34, 24, 3);
+  p.hline(4, 35, 24, MAT.red[1]);
+  // Emblema: círculo naranja con triángulo azul.
+  p.ball(16, 30, 3.4, [4, 3, 19, 18], seed);
+  for (let j = 0; j < 4; j++) p.hline(16 - j, 28 + j, 1 + j * 2, MAT.blue[1]);
+  doorAt(p, 13, 38, 6, 7, MAT.blue, 12);
+  windowAt(p, 7, 38, 3, 4, { frame: 12 });
+  windowAt(p, 23, 38, 3, 4, { frame: 12 });
+  // Sacos terreros y un cono.
+  for (const x of [1, 4, 26]) p.ball(x + 1, 45, 1.6, [45, 46, 47, 47], seed + x);
+  p.set(30, 42, 3);
+  p.rect(29, 43, 3, 2, 3);
+  p.hline(29, 44, 3, 12);
+  return p;
+}
+
+/** Dique de piedra en la orilla (casilla de 32×32, sobre el suelo). */
+export function dikePix(): Pix {
+  const p = new Pix(T, T);
+  // Muro de sillares.
+  p.rect(0, 10, 32, 14, MAT.stone[1]);
+  for (let row = 0; row < 3; row++) {
+    const y = 10 + row * 5;
+    p.hline(0, y, 32, MAT.stone[0]);
+    p.hline(0, y + 4, 32, MAT.stone[3]);
+    for (let x = (row % 2) * 4; x < 32; x += 8) p.vline(x, y, 5, MAT.stone[2]);
+  }
+  p.hline(0, 24, 32, MAT.stone[3]);
+  p.dither(0, 25, 32, 3, MAT.stone[2], 0);
+  // Remate y sacos terreros.
+  p.hline(0, 9, 32, MAT.stone[0]);
+  for (let x = 2; x < 32; x += 6) p.ball(x + 1, 8, 1.6, [45, 46, 47, 47], x);
+  return p;
+}
+export const dikeSprite = (tod: TimeOfDay = 'day') => sprite('dique', dikePix, tod);
+
+/** Llamas y humo sobre un edificio que arde (2 fotogramas, sin destellos: se mecen). */
+export function flamesPix(frame: number): Pix {
+  const p = new Pix(T, BH);
+  const f = frame % 2;
+  const flame = (cx: number, base: number, h: number, k: number) => {
+    for (let j = 0; j < h; j++) {
+      const w = Math.max(1, Math.round((1 - j / h) * 3 + (j % 2 === f ? 0.5 : 0)));
+      const sway = (j > h / 2 ? (f ? 1 : -1) : 0) * (k % 2 ? 1 : -1);
+      const c = j < h * 0.35 ? 4 : j < h * 0.7 ? 3 : MAT.red[1];
+      p.hline(cx - Math.floor(w / 2) + sway, base - j, w, c);
+    }
+    p.set(cx + (f ? 1 : -1), base - h - 1, MAT.red[2]);
+  };
+  // Lenguas de fuego en ventanas y tejado.
+  flame(8, 34, 7 + f, 0);
+  flame(24, 36, 6 + (1 - f), 1);
+  flame(15, 22, 10 + f * 2, 2);
+  flame(21, 20, 7 + (1 - f) * 2, 3);
+  // Humo que sube.
+  const smoke: Mat = [C.smoke, C.smokeMid, C.smokeDark, 55];
+  p.ball(14 + f, 8, 3.2, smoke, 7);
+  p.ball(19 - f, 3, 2.6, smoke, 9);
+  p.ball(10, 12 - f, 2.2, smoke, 11);
+  return p;
+}
+export const flamesSprite = (frame: number, tod: TimeOfDay = 'day') => sprite(`llamas${frame % 2}`, () => flamesPix(frame), tod);
+
+/** Aviso de riesgo de incendio sobre el edificio: llama pequeña en un rombo amarillo, 11×13. */
+function riskIcon(): Pix {
+  const p = new Pix(11, 13);
+  for (let j = 0; j < 11; j++) {
+    const w = j <= 5 ? j * 2 + 1 : (10 - j) * 2 + 1;
+    p.hline(5 - Math.floor(w / 2), j, w, 0);
+  }
+  for (let j = 1; j < 10; j++) {
+    const w = j <= 5 ? j * 2 - 1 : (10 - j) * 2 - 1;
+    if (w > 0) p.hline(5 - Math.floor(w / 2), j, w, 4);
+  }
+  // Llama.
+  p.vline(5, 3, 5, MAT.red[1]);
+  p.hline(4, 5, 3, MAT.red[1]);
+  p.hline(4, 6, 3, 3);
+  p.set(5, 6, 4);
+  p.hline(4, 7, 3, MAT.red[1]);
+  p.hline(3, 12, 5, 24);
+  return p;
+}
+export const riskSprite = () => sprite('icon-riesgo', riskIcon);
+
+/** Camión de bomberos por la calle, 14×9, mirando a la derecha (dir 1) o a la izquierda; 2 fotogramas de ruedas. */
+export function fireTruckPix(frame: number, dir: 1 | -1): Pix {
+  const p = new Pix(14, 9);
+  const fx = (x: number) => (dir === 1 ? x : 13 - x);
+  const set = (x: number, y: number, c: number) => p.set(fx(x), y, c);
+  const rect = (x: number, y: number, w: number, h: number, c: number) => {
+    for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) set(i, j, c);
+  };
+  for (let x = 1; x < 13; x++) set(x, 8, 24); // sombra
+  rect(0, 2, 10, 4, MAT.red[1]);
+  rect(0, 2, 10, 1, MAT.red[0]);
+  rect(10, 3, 3, 3, MAT.red[1]);
+  rect(11, 3, 2, 1, MAT.glass[1]);
+  rect(0, 5, 13, 1, MAT.red[3]);
+  rect(1, 4, 8, 1, 12);
+  // Escalera en el techo.
+  rect(0, 1, 10, 1, MAT.metal[2]);
+  for (let i = frame % 2; i < 10; i += 2) set(i, 1, MAT.metal[0]);
+  // Faro fijo (sin destellos).
+  set(12, 2, 4);
+  // Ruedas.
+  for (const x of [2, 10]) {
+    rect(x, 6, 2, 2, 0);
+    set(x + (frame % 2), 6, 55);
+  }
+  return p;
+}
+export const fireTruckSprite = (frame: number, dir: 1 | -1, tod: TimeOfDay = 'day') => sprite(`camion-${frame % 2}-${dir}`, () => fireTruckPix(frame, dir), tod);
+
+/** Ambulancia por la calle, 13×9 (sin destellos: la luz azul está quieta). */
+export function ambulancePix(frame: number, dir: 1 | -1): Pix {
+  const p = new Pix(13, 9);
+  const fx = (x: number) => (dir === 1 ? x : 12 - x);
+  const set = (x: number, y: number, c: number) => p.set(fx(x), y, c);
+  const rect = (x: number, y: number, w: number, h: number, c: number) => {
+    for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) set(i, j, c);
+  };
+  for (let x = 1; x < 12; x++) set(x, 8, 24);
+  rect(0, 1, 8, 5, 12);
+  rect(0, 1, 8, 1, 31);
+  rect(8, 3, 4, 3, 12);
+  rect(9, 3, 2, 1, MAT.glass[1]);
+  rect(0, 4, 12, 1, MAT.red[1]);
+  rect(3, 2, 1, 3, MAT.red[1]);
+  rect(2, 3, 3, 1, MAT.red[1]);
+  rect(0, 5, 12, 1, 13);
+  set(1, 0, MAT.blue[1]);
+  for (const x of [1, 9]) {
+    rect(x, 6, 2, 2, 0);
+    set(x + (frame % 2), 6, 55);
+  }
+  return p;
+}
+export const ambulanceSprite = (frame: number, dir: 1 | -1, tod: TimeOfDay = 'day') => sprite(`ambulancia-${frame % 2}-${dir}`, () => ambulancePix(frame, dir), tod);
+
+/** Edificio quemado: el mismo sprite con hollín en ventanas y tejado, vigas negras y humo. */
+function burn(p: Pix, seed: number): Pix {
+  const burnt: Record<number, number> = { 12: 30, 31: 29, 21: 28, 20: 27, 19: 27, 18: 26, 3: 17, 2: 16, 4: 19, 10: 15, 11: 14, 9: 26 };
+  for (let y = 0; y < p.h; y++) {
+    for (let x = 0; x < p.w; x++) {
+      const c = p.get(x, y);
+      if (c === NONE) continue;
+      const k = hash(x, y, seed, 41);
+      if (k < 0.45) p.set(x, y, burnt[c] ?? (k < 0.15 ? 26 : c));
+    }
+  }
+  soot(p, 6, 30, 8, 10, seed);
+  soot(p, 20, 30, 8, 10, seed + 1);
+  // Vigas quemadas en el tejado.
+  let top = 0;
+  while (top < p.h && p.get(16, top) === NONE) top++;
+  for (const x of [9, 15, 22]) p.vline(x, top + 1, 5, 0);
+  shards(p, 2, 45, 28, seed);
+  smokeColumn(p, 15, seed);
+  return p;
+}
+
+/** Edificio destrozado por el fuego (2.1). */
+export function burntSprite(kind: string, id: number, tod: TimeOfDay = 'day'): HTMLCanvasElement {
+  const spec = buildingSpec(kind, id);
+  if (!spec) return constructionSprite(0, id, tod);
+  const [key, make] = spec;
+  return sprite(`quemado-${key}`, () => burn(make(), id % 3), tod);
+}
