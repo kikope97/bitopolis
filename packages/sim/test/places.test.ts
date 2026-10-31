@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyCommand,
-  BUILD,
   checkInvariants,
   dies,
   festivalMood,
@@ -36,16 +35,17 @@ function buildNear(s: GameState, kind: 'bar' | 'chapel' | 'cemetery' | 'library'
 }
 
 describe('lugares de vida social (v1.7)', () => {
-  it('se desbloquean por población', () => {
+  it('se desbloquean con el nivel del ayuntamiento', () => {
     const { state } = runSimulation({ seed: 1, days: 5, profile: 'casual' });
     transfer(state, OUTSIDE, TREASURY, 60_000, 'subvencion');
     const r = validateCommand(state, { type: 'Build', kind: 'library', x: 1, y: 1 });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toMatch(String(BUILD.library.unlockPop));
+    if (!r.ok) expect(r.error).toMatch(/nivel 3/);
   });
 
   it('la biblioteca alegra más a quien quiere prosperar', () => {
     const s = town();
+    s.townhallLevel = 5;
     const c = s.citizens.find((x) => x.named && x.homeId !== null)!;
     c.desire = 'prosperar';
     const home = s.buildings.find((b) => b.id === c.homeId)!;

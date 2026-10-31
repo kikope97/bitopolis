@@ -27,3 +27,4 @@ export * from './family.ts';
 export * from './album.ts';
 export * from './crime.ts';
 export * from './barrio.ts';
+export * from './townhall.ts';

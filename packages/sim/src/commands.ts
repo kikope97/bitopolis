@@ -1,7 +1,8 @@
 import { canMeetAssociation, meetAssociation } from './associations.ts';
+import { BUILD_LEVEL, canUpgradeTownhall, plenoUnlocked, townLevel, upgradeTownhall, zonesUnlocked } from './townhall.ts';
 import { answerGrant, canAnswerGrant, canHoldFestival, canProposeBudget, holdFestival, materialsCost, proposeBudget } from './civic.ts';
 import { Command, TICKS_PER_DAY, tickToDate, type BuildKind, type ZoneKind } from '@bitopolis/shared';
-import { ASSOCIATIONS, BUILD, DEBT_LIMIT, TERRAIN, WAGE_OUTSIDE, ZONE_COST_PER_TILE, ZONE_UNLOCK_POP } from './balance.ts';
+import { ASSOCIATIONS, BUILD, DEBT_LIMIT, TERRAIN, WAGE_OUTSIDE, ZONE_COST_PER_TILE } from './balance.ts';
 import { isWater, Terrain } from './terrain.ts';
 import { applyDecision, canApplyDecision } from './decisions.ts';
 import { campaign, canCampaign, canMotion, motion } from './politics.ts';
@@ -131,7 +132,6 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
   const parsed = Command.safeParse(raw);
   if (!parsed.success) return { ok: false, error: 'comando mal formado' };
   const cmd = parsed.data;
-  const pop = state.citizens.length;
   const pol = state.politics;
   if (pol && pol.mayor !== 'player' && !governing && !OPPOSITION_ALLOWED.has(cmd.type)) {
     const year = tickToDate(pol.nextElection).year;
@@ -149,11 +149,11 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
     case 'Build': {
       if (cmd.kind === 'road') return validateCommand(state, { type: 'BuildRoad', x: cmd.x, y: cmd.y, x2: cmd.x, y2: cmd.y });
       if (!inBounds(state, cmd.x, cmd.y)) return { ok: false, error: 'Fuera del mapa' };
-      const spec = BUILD[cmd.kind];
+      // v1.8: lo desbloquea el nivel del ayuntamiento (la Plaza y el Mercado, además, su hito).
+      if (townLevel(state) < BUILD_LEVEL[cmd.kind]) return { ok: false, error: `Se desbloquea con el ayuntamiento de nivel ${BUILD_LEVEL[cmd.kind]}` };
       if ((cmd.kind === 'plaza' || cmd.kind === 'market') && !state.unlocked.includes(cmd.kind)) {
         return { ok: false, error: cmd.kind === 'plaza' ? 'La Plaza Mayor se desbloquea con el hito de 50 vecinos' : 'El Mercado se desbloquea con el hito de 200 vecinos' };
       }
-      if (pop < spec.unlockPop && cmd.kind !== 'plaza' && cmd.kind !== 'market') return { ok: false, error: `Se desbloquea con ${spec.unlockPop} vecinos` };
       const t = state.map.tiles[tileIndex(state, cmd.x, cmd.y)];
       const ter = terrainAt(state, cmd.x, cmd.y);
       if (isWater(ter)) return { ok: false, error: ter === Terrain.Sea ? 'Ahí está el mar' : 'Ahí pasa el río: solo se puede cruzar con un puente (Carretera)' };
@@ -172,7 +172,7 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       return { ok: true };
     }
     case 'Zone': {
-      if (cmd.zone !== 'none' && pop < ZONE_UNLOCK_POP) return { ok: false, error: `Las zonas se desbloquean con ${ZONE_UNLOCK_POP} vecinos` };
+      if (cmd.zone !== 'none' && !zonesUnlocked(state)) return { ok: false, error: 'Las zonas se desbloquean con el ayuntamiento de nivel 2' };
       if (!inBounds(state, cmd.x, cmd.y) || !inBounds(state, cmd.x + cmd.w - 1, cmd.y + cmd.h - 1)) {
         return { ok: false, error: 'Fuera del mapa' };
       }
@@ -201,7 +201,10 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       if (state.treasury < b.damaged.cost) return { ok: false, error: 'No hay dinero suficiente' };
       return { ok: true };
     }
+    case 'UpgradeTownhall':
+      return canUpgradeTownhall(state);
     case 'ConvenePleno': {
+      if (!plenoUnlocked(state)) return { ok: false, error: 'Los plenos llegan con el ayuntamiento de nivel 2' };
       const r = canConvenePleno(state);
       return r.ok ? { ok: true } : { ok: false, error: r.error! };
     }
@@ -337,6 +340,9 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
     }
     case 'MeetAssociation':
       meetAssociation(state, cmd.associationId);
+      break;
+    case 'UpgradeTownhall':
+      upgradeTownhall(state);
       break;
     case 'RepairBuilding': {
       // v1.8: el ayuntamiento paga la reparación de lo que rompieron los disturbios.

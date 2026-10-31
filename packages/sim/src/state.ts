@@ -290,6 +290,8 @@ export interface GameState {
   /** v1.7: momentos del álbum y fichas de quien ya no está (árbol genealógico). */
   album: Moment[];
   departed: Departed[];
+  /** v1.8: nivel del ayuntamiento (1–5): desbloquea edificios y partes del juego. */
+  townhallLevel: number;
   /** v1.8: calabozos, cárcel y robos. */
   justice: Justice;
   /** Última despedida (como mucho una por semana). */
@@ -385,6 +387,7 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20 }: Ne
     album: [],
     departed: [],
     justice: { cells: [], jail: [], hot: [], robberies: 0, arrests: 0, fullWarned: -1 },
+    townhallLevel: 1,
   };
   // Árboles dispersos (se talan gratis al construir encima).
   for (let i = 0; i < tiles.length; i++) {

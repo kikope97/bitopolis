@@ -1,4 +1,6 @@
+import type { BuildKind } from '@bitopolis/shared';
 import { BUILD, SERVICE } from './balance.ts';
+import { isUnlocked } from './townhall.ts';
 import { serviceSaturation } from './economy.ts';
 import { DIRS, type GameState, inBounds, Tile, tileIndex, Zone } from './state.ts';
 
@@ -72,8 +74,9 @@ export function activeNeeds(state: GameState): NeedKey[] {
   const pop = state.citizens.length;
   return NEED_KEYS.filter((k) => {
     if (k === 'agua' || k === 'luz') return true;
+    // v1.8: lo que ya se puede construir (nivel del ayuntamiento); el parque, desde 10 vecinos.
     if (k === 'ocio') return pop >= BUILD.park.unlockPop;
-    return pop >= BUILD[NEED_KINDS[k][0] as keyof typeof BUILD].unlockPop;
+    return isUnlocked(state, NEED_KINDS[k][0] as BuildKind);
   });
 }
 

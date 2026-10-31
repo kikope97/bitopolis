@@ -23,7 +23,6 @@ import {
   SERVICE_SALARY,
   WAGE_LOCAL,
   WAGE_OUTSIDE,
-  ZONE_UNLOCK_POP,
   CRIME,
   SOCIAL_PLACES,
   TERRAIN,
@@ -53,6 +52,7 @@ import { weatherDay, weatherFx, weatherMood } from './weather.ts';
 import { associationsDay, associationsMonth } from './associations.ts';
 import { albumDay } from './album.ts';
 import { crimeDay, jailNear } from './crime.ts';
+import { townLevel, zonesUnlocked } from './townhall.ts';
 import { lifeDay, lifeMonth, lifeYear } from './lifecycle.ts';
 import { FIRST_NAMES, SURNAMES } from './names.ts';
 import { goalFor, memoryMood, onCitizenLeaves, PROFESSIONS, relationMood, socialDay } from './social.ts';
@@ -207,9 +207,10 @@ export function computeDemand(state: GameState): GameState['demand'] {
   const free = freeHomes(state);
   const happy = averageHappiness(state);
   const clamp = (v: number) => Math.round(Math.max(-100, Math.min(100, v)));
-  const R = 40 + vacancies(state) * 5 - Math.max(0, free - 8) * 1.5 + (happy - 55) + averageTaxMood(state) - (pop >= ZONE_UNLOCK_POP ? jobless * 2 : 0);
-  const C = pop < ZONE_UNLOCK_POP ? 0 : (pop / 12 - shops) * 25;
-  const I = pop < ZONE_UNLOCK_POP ? 0 : jobless * 6 - factories * 10 + 20;
+  const zones = zonesUnlocked(state);
+  const R = 40 + vacancies(state) * 5 - Math.max(0, free - 8) * 1.5 + (happy - 55) + averageTaxMood(state) - (zones ? jobless * 2 : 0);
+  const C = !zones ? 0 : (pop / 12 - shops) * 25;
+  const I = !zones ? 0 : jobless * 6 - factories * 10 + 20;
   return { R: clamp(R), C: clamp(C), I: clamp(I) };
 }
 
@@ -269,6 +270,8 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
   if (!state.buildings.some((b) => b.kind === 'cemetery' && b.built) && c.memories.some((m) => m.kind === 'perdio_a' && state.tick - m.tick < 360 * TICKS_PER_DAY)) {
     f.push({ label: 'Sin cementerio donde despedir a los suyos', value: -SOCIAL_PLACES.noCemeteryMood });
   }
+  // v1.8: el Palacio Municipal (nivel 5) es motivo de orgullo.
+  if (townLevel(state) >= 5) f.push({ label: 'Orgullo de su ayuntamiento', value: 2 });
   // v1.7: el calor sin sombra cerca.
   const heat = weatherMood(state, home);
   if (heat) f.push(heat);
@@ -568,7 +571,8 @@ function endOfMonth(state: GameState): void {
   // PIE: el Estado paga por vecino empadronado, más si el pueblo está contento.
   const pie = Math.round(PIE_PER_CITIZEN * state.citizens.length * Math.max(0.6, Math.min(1.2, averageHappiness(state) / 60)));
   transfer(state, OUTSIDE, TREASURY, pie, 'PIE');
-  for (const b of state.buildings) if (b.built) transfer(state, TREASURY, OUTSIDE, Math.round(MAINTENANCE[b.kind] * budgetFx(state).maintenance), 'mantenimiento');
+  // El ayuntamiento cuesta más de mantener cuanto más grande (v1.8).
+  for (const b of state.buildings) if (b.built) transfer(state, TREASURY, OUTSIDE, Math.round(MAINTENANCE[b.kind] * (b.kind === 'townhall' ? townLevel(state) : 1) * budgetFx(state).maintenance), 'mantenimiento');
   lifeMonth(state);
   if (state.treasury < 0) {
     const debt = -state.treasury;
