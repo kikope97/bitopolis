@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { state, tap } from './helpers.ts';
+import { state, tap, skipTutorial } from './helpers.ts';
 
 test('v0.5: ajustes de accesibilidad, teclado y carretera con dos toques', async ({ page }, info) => {
   const errors: string[] = [];
@@ -8,7 +8,7 @@ test('v0.5: ajustes de accesibilidad, teclado y carretera con dos toques', async
   await page.goto('/');
   await page.getByRole('button', { name: 'Jugar' }).click();
   await expect(page.locator('#game')).toBeVisible();
-  await page.locator('.tut-box button').click();
+  await skipTutorial(page);
   const s0 = await state(page);
   const cx = Math.floor(s0.map.w / 2);
   const cy = Math.floor(s0.map.h / 2);

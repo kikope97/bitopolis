@@ -1,3 +1,4 @@
+import { skipTutorial } from './helpers.ts';
 import { expect, test } from '@playwright/test';
 
 /** v1.3: interfaz (skyline animado, icono de píxeles, atajo de Ajustes, enlace). */
@@ -25,7 +26,7 @@ test('v1.3: skyline que se mueve, llave de píxeles, tecla O y nota del enlace',
 
   await page.getByRole('button', { name: 'Jugar' }).click();
   await expect(page.locator('#game')).toBeVisible();
-  await page.locator('.tut-box button').click();
+  await skipTutorial(page);
   await page.locator('#map').focus();
   await page.keyboard.press('o');
   await expect(page.locator('.sheet h2')).toHaveText('Ajustes');

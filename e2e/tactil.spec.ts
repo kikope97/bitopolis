@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { state, tile, setSpeed } from './helpers.ts';
+import { state, tile, setSpeed, skipTutorial } from './helpers.ts';
 
 /**
  * v1.4: juego con el dedo de verdad (eventos táctiles por CDP, no ratón).
@@ -29,7 +29,7 @@ async function start(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Jugar' }).click();
   await expect(page.locator('#game')).toBeVisible();
-  await page.locator('.tut-box button').click();
+  await skipTutorial(page);
 }
 
 test('táctil: tocar enseña la obra y solo se construye al confirmar, en la casilla tocada', async ({ page }, info) => {

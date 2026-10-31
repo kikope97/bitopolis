@@ -1,6 +1,6 @@
 import { gzipSync } from 'node:zlib';
 import { expect, test } from '@playwright/test';
-import { setSpeed } from './helpers.ts';
+import { setSpeed, skipTutorial } from './helpers.ts';
 import { runSimulation } from '../packages/sim/src/index.ts';
 
 /** Gama media: CPU ×4 más lenta (Chromium). Se mide el render a x3 en un pueblo grande. */
@@ -14,7 +14,7 @@ test('rendimiento: fluido con la CPU ×4 más lenta', async ({ page, request, br
   const { token } = await r.json();
   await page.goto(`/p/${token}`);
   await page.getByRole('button', { name: 'Continuar' }).click();
-  await page.locator('.tut-box button').click();
+  await skipTutorial(page);
   await setSpeed(page, 3);
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });

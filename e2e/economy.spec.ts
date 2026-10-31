@@ -1,4 +1,5 @@
 import { gzipSync } from 'node:zlib';
+import { skipTutorial } from './helpers.ts';
 import { expect, test } from '@playwright/test';
 import { applyCommand, runSimulation } from '../packages/sim/src/index.ts';
 
@@ -23,7 +24,7 @@ test('v0.3: tributos separados, capas, venta de vivienda, parte y vecinos', asyn
   await expect(page.locator('.stats-card')).toContainText('vecinos');
   await page.getByRole('button', { name: 'Continuar' }).click();
   await expect(page.locator('#game')).toBeVisible();
-  await page.locator('.tut-box button').click();
+  await skipTutorial(page);
   await shot('1-pueblo');
 
   // Tributos separados con glosario y nombres afectados.

@@ -1,4 +1,5 @@
 import { gzipSync } from 'node:zlib';
+import { skipTutorial } from './helpers.ts';
 import { expect, test } from '@playwright/test';
 import { runSimulation } from '../packages/sim/src/index.ts';
 
@@ -13,7 +14,7 @@ test('v1.5: en enero se presenta el presupuesto y el pleno lo vota', async ({ pa
   const { token } = await (await request.post('/api/import', { data, headers: { 'content-type': 'application/octet-stream' } })).json();
   await page.goto(`/p/${token}`);
   await page.getByRole('button', { name: 'Continuar' }).click();
-  if (await page.locator('.tut-box button').count()) await page.locator('.tut-box button').click();
+  await skipTutorial(page);
   await page.locator('#menu').click();
   await page.locator('.menu-grid').getByRole('button', { name: 'Ayuntamiento', exact: true }).click();
   await expect(page.locator('.sheet h2')).toHaveText('Ayuntamiento');

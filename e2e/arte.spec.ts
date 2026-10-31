@@ -1,4 +1,5 @@
 import { gzipSync } from 'node:zlib';
+import { skipTutorial } from './helpers.ts';
 import { expect, test } from '@playwright/test';
 import { runSimulation, step } from '../packages/sim/src/index.ts';
 
@@ -22,7 +23,7 @@ for (const [name, hours] of [
     const { token } = await r.json();
     await page.goto(`/p/${token}`);
     await page.getByRole('button', { name: 'Continuar' }).click();
-    await page.locator('.tut-box button').click();
+    await skipTutorial(page);
     await expect(page.locator('#game')).toBeVisible();
     await page.waitForTimeout(400);
     await page.screenshot({ path: `test-results/capturas/${info.project.name}-v05-${name}.png` });

@@ -39,3 +39,14 @@ export async function setSpeed(page: Page, n: 0 | 1 | 3 | 10) {
   for (let i = 0; i < 3 && (await page.locator('#speed').textContent()) !== `x${n}`; i++) await page.locator('#speed').click();
   if (await paused()) await page.locator('#play-pause').click();
 }
+
+/** Salta el tutorial si aparece (los pueblos importados ya no lo empiezan, ronda 11). */
+export async function skipTutorial(page: Page) {
+  const b = page.locator('.tut-box button');
+  try {
+    await b.waitFor({ state: 'visible', timeout: 1500 });
+    await b.click();
+  } catch {
+    /* sin tutorial */
+  }
+}
