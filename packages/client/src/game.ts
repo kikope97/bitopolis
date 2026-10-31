@@ -1848,6 +1848,10 @@ export function startGame(opts: GameOptions): void {
       return state;
     },
     sprite: (kind: string, id: number) => buildingSprite(kind, id),
+    /** Para las pruebas: centra la cámara en una casilla (no toca el estado). */
+    centerOn(tx: number, ty: number) {
+      centerOn(tx, ty);
+    },
     tileCenter(tx: number, ty: number) {
       const r = canvas.getBoundingClientRect();
       return { x: r.left + ((tx + 0.5) * tileSize() - cam.x) / dpr(), y: r.top + ((ty + 0.5) * tileSize() - cam.y) / dpr() };
