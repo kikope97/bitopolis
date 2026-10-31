@@ -1,6 +1,7 @@
-import { TICKS_PER_MONTH } from '@bitopolis/shared';
+import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import {
   DEBT,
+  GRUDGE_MAX,
   JOBS_OUTSIDE,
   LIVING_BASIC,
   LIVING_CUSHION,
@@ -105,8 +106,29 @@ export function settleDebt(state: GameState, c: Citizen, mode: 'aplazar' | 'perd
     return;
   }
   d.plan = { perMonth: Math.ceil(d.town / DEBT.planMonths), until: state.tick + DEBT.planMonths * TICKS_PER_MONTH, kind: 'aplazamiento' };
+  delete d.askedAt;
   d.fresh = 0;
   d.aged = 0;
+}
+
+/**
+ * v1.9.1: quien pidió un aplazamiento y en DEBT.answerDays no lo tiene (ni se le
+ * perdonó ni ha saldado lo que debe al ayuntamiento) se lo guarda: un recuerdo
+ * «sin_respuesta» y algo de rencor. Una vez al día, sin azar.
+ */
+export function unansweredDeferrals(state: GameState): void {
+  for (const c of state.citizens) {
+    const d = c.debt;
+    if (d?.askedAt === undefined) continue;
+    if (d.plan || d.town <= 0) {
+      delete d.askedAt;
+      continue;
+    }
+    if (state.tick - d.askedAt < DEBT.answerDays * TICKS_PER_DAY) continue;
+    delete d.askedAt;
+    addMemory(state, c, 'sin_respuesta', 3, DEBT.unansweredMood);
+    c.grudge = Math.min(GRUDGE_MAX, c.grudge + DEBT.unansweredGrudge);
+  }
 }
 
 export function canSettleDebt(state: GameState, c: Citizen | undefined, mode: 'aplazar' | 'perdonar'): { ok: true } | { ok: false; error: string } {

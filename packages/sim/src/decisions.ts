@@ -231,6 +231,8 @@ export function applyDecision(state: GameState, citizenId: number, action: strin
       effect = 'se aprieta el cinturón para pagar lo que debe';
       break;
     case 'pedir_aplazamiento':
+      // v1.9.1: espera respuesta; si en DEBT.answerDays no se aplaza ni se perdona, se lo guarda.
+      if (c.debt) c.debt.askedAt = state.tick;
       effect = `pide al alcalde que le aplace lo que debe al ayuntamiento (${c.debt?.town ?? 0} €)`;
       break;
     case 'manifestarse':

@@ -189,6 +189,8 @@ export interface CitizenDebt {
   aged: number;
   /** Aplazamiento concedido por el alcalde: cuota fija sin recargo hasta `until`. */
   plan?: { perMonth: number; until: number; kind?: 'aplazamiento' | 'microcredito' };
+  /** v1.9.1: cuándo pidió al alcalde un aplazamiento (tick) que aún no tiene respuesta. */
+  askedAt?: number;
 }
 
 export type TaxKey = 'ibi' | 'tasas' | 'plusvalia';

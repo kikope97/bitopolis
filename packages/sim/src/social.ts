@@ -74,6 +74,8 @@ export const MEMORY_KINDS = [
   'en_paro',
   'deuda_perdonada',
   'cerro_negocio',
+  // v1.9.1: el alcalde no contestó a su petición de aplazamiento.
+  'sin_respuesta',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -293,6 +295,8 @@ export function memoryText(state: GameState, m: Memory): string {
       return 'El alcalde le perdonó lo que debía';
     case 'cerro_negocio':
       return 'Tuvo que cerrar su negocio';
+    case 'sin_respuesta':
+      return 'Pidió tiempo al alcalde y no le contestó';
   }
 }
 
@@ -885,6 +889,7 @@ const MEMORY_LINE: Partial<Record<MemoryKind, (who: string) => string>> = {
   en_paro: () => 'Sigo buscando trabajo.',
   deuda_perdonada: () => 'El alcalde me perdonó lo que debía. No lo olvido.',
   cerro_negocio: () => 'Tuve que cerrar mi negocio; las nóminas me comían.',
+  sin_respuesta: () => 'Pedí tiempo al alcalde para pagar y ni me contestó.',
 };
 
 /** Frase de un recuerdo; las pérdidas, distintas para la pareja y para una amistad (ronda 11). */

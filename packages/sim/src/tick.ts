@@ -55,7 +55,7 @@ import { crimeDay, jailNear } from './crime.ts';
 import { townLevel, zonesUnlocked } from './townhall.ts';
 import { finishUpgrades, jobsOf, maintenanceOf, plantCapacityOf, radiusOf, serviceHappiness } from './levels.ts';
 import { lifeDay, lifeMonth, lifeYear } from './lifecycle.ts';
-import { basicLiving, drownedInDebt, economyStats, outsideJobsMonth, settleMonth, totalDebt } from './household.ts';
+import { basicLiving, drownedInDebt, economyStats, outsideJobsMonth, settleMonth, totalDebt, unansweredDeferrals } from './household.ts';
 import { FIRST_NAMES, SURNAMES } from './names.ts';
 import { addMemory, goalFor, memoryMood, onCitizenLeaves, PROFESSIONS, relationMood, socialDay } from './social.ts';
 import { politicsDay } from './politics.ts';
@@ -555,6 +555,8 @@ function endOfDay(state: GameState): void {
   lifeDay(state);
   associationsDay(state);
   crimeDay(state);
+  // v1.9.1: peticiones de aplazamiento sin respuesta.
+  unansweredDeferrals(state);
   // v1.8: mejoras de servicios terminadas.
   for (const b of finishUpgrades(state)) {
     pushEvent(state, 'built', `${b.name ?? BUILD_NAMES[b.kind] ?? b.kind} sube a nivel ${b.level}: llega más lejos y atiende a más gente`, { ref: b.id });
