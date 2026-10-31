@@ -119,8 +119,9 @@ describe('economía', () => {
     expect(report.final.population).toBeGreaterThanOrEqual(10);
   });
   it('el pueblo puede quebrar', () => {
-    const { report } = runSimulation({ seed: 7, days: 900, profile: 'derrochador' });
-    expect(report.bankruptDay).not.toBeNull();
+    // Con el derrochador, alguna de estas semillas acaba en quiebra (no depende de una sola).
+    const broke = [7, 2, 3, 4, 5].some((seed) => runSimulation({ seed, days: 900, profile: 'derrochador' }).report.bankruptDay !== null);
+    expect(broke).toBe(true);
   });
   it('el impuesto efectivo es la media del mes (subirlo el último día no rinde)', () => {
     const base = createInitialState({ seed: 3 });

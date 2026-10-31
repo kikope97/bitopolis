@@ -95,6 +95,8 @@ export const MIGRATIONS: Record<number, Migration> = {
       factions: Object.fromEntries(Object.entries(s.politics?.factions ?? {}).map(([k, v]: [string, any]) => [k, { demands: v.demand ? [v.demand] : [], unmet: v.demand ? [v.demand] : [], ...v }])),
     },
   }),
+  // 7 → 8 (v1.3): registro de lo que hace el gobierno rival.
+  7: (s) => ({ ...s, formatVersion: 8, politics: { ...s.politics, log: s.politics?.log ?? [] } }),
 };
 
 export function migrate(raw: unknown): GameState {

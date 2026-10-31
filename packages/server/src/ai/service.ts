@@ -218,7 +218,7 @@ export class AiService {
         usage.out += r.usage.out;
         // Un motivo repetido se acepta: el modelo no ve sus motivos anteriores (no se reinyectan)
         // y reintentar por eso solo gastaba tokens.
-        return parseDecisions(r.text, list);
+        return parseDecisions(r.text, list, {}, false, system + '\n' + user);
       };
       let parsed = await call(req.system, req.user, pendings);
       const add = (ds: typeof parsed.decisions) => {

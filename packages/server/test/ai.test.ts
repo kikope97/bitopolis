@@ -296,6 +296,17 @@ describe('textos con IA (v0.4)', () => {
     expect(Object.keys(usage.byKind)).toEqual(expect.arrayContaining(['conversacion', 'consejero', 'diario']));
   });
 
+  it('una crónica no válida no se vuelve a pedir en el mismo mes (ronda 09)', async () => {
+    const { token } = await aiGame();
+    textMode = 'cifras';
+    const n = calls.length;
+    const a = (await app.inject({ method: 'POST', url: `/api/games/${token}/chronicle` })).json();
+    const b = (await app.inject({ method: 'POST', url: `/api/games/${token}/chronicle` })).json();
+    textMode = 'ok';
+    expect([a.text, b.text]).toEqual([null, null]);
+    expect(calls.length).toBe(n + 1);
+  });
+
   it('rechaza cifras inventadas y no acepta texto libre del jugador', async () => {
     const { token, state } = await aiGame();
     textMode = 'cifras';

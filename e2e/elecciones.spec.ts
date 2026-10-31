@@ -21,6 +21,8 @@ test('v1.0: intención de voto, facciones, noche electoral y oposición', async 
 
   // Indicador de intención de voto y hoja de política.
   await expect(page.locator('#hud-poll')).toContainText('%');
+  // Quedan menos de 3 meses: el indicador lleva la cuenta atrás (v1.3).
+  await expect(page.locator('#hud-poll')).toHaveText(/· \d+ d$/);
   await page.locator('#hud-poll').click();
   await expect(page.locator('.sheet')).toContainText('Intención de voto');
   await expect(page.locator('.sheet')).toContainText('Jóvenes por Bitópolis');

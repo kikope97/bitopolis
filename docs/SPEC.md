@@ -171,6 +171,7 @@ Mudarse al pueblo o no, irse y vender la casa, comprar o alquilar casa, buscar o
 - Memoria en 3 capas, cada una con límite de tokens: hechos estructurados (relaciones, deudas, metas, promesas), unos pocos recuerdos por importancia y un resumen narrativo que se reescribe cada mes de juego.
 - **Director de historias** (determinista): detecta ganchos (dos vecinos quieren el mismo local, alguien pierde el trabajo y tiene hipoteca) y los inyecta en el prompt. Sus eventos varían con la semilla para que no compense guardar y recargar.
 - Control de calidad: se penalizan los motivos repetidos y se comprueba que cada decisión encaja con la ficha del vecino.
+- *(v1.3)* Cada gancho termina con un **desenlace** en el diario y un recuerdo (salir adelante, pasar página, hacer las paces, volver a confiar). Plazas, mercados y parques crean amistades entre vecinos cercanos. Cada vecino lleva un **tono** sacado de sus rasgos, y se descartan los textos que nombran a personas que no están en los datos.
 - **Momento "wow" en los primeros 10 minutos**: el 3.er vecino toma una decisión visible, con su `motivo` en una burbuja.
 
 ### 9.4 Modelos y proveedores
@@ -266,6 +267,13 @@ El alcance está congelado hasta la v1.0. Todo lo de la sección 15 solo entra s
 - **v0.4 — Social**: fichas completas (deseo, miedo, relaciones), memoria en 3 capas, director de historias, plenos con promesas, consejero, hablar con vecinos, diario, resumen al volver, objetivos e hitos.
 - **v0.5 — Pulido**: arte final, sonido y feedback, accesibilidad completa, rendimiento en móviles de gama media, PWA.
 - **v1.0 — Elecciones**: facciones, elecciones, oposición emergente y avisos de popularidad.
+- **v1.1 — Oposición jugable y pulido** (ronda 07). **v1.2 — Panel `/admin`** sin variables de entorno (ronda 08).
+- **v1.3 — Historias, política e interfaz** (ronda 09):
+  - desenlaces de los ganchos y amistades de barrio;
+  - registro del gobierno rival, cuenta atrás y pregunta de la oposición en el pleno;
+  - servicios con capacidad: colegio 60, centro de salud 80 y comisaría 120 vecinos;
+  - tono por vecino y filtro de nombres inventados;
+  - farolas y skyline animado.
 
 ## 15. Después de la v1.0 (backlog, no implementar antes)
 

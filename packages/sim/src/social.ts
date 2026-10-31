@@ -1,10 +1,12 @@
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
+import { CAMPAIGN_MONTHS, SERVICE } from './balance.ts';
 import { BUILD_NAMES } from './commands.ts';
-import { canFound, freeShopLot, taxLevels } from './economy.ts';
+import { canFound, freeShopLot, saturated, taxLevels } from './economy.ts';
 import { hash32 } from './hash.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance, pick } from './prng.ts';
-import type { Citizen, GameState } from './state.ts';
+import type { Building, Citizen, GameState } from './state.ts';
+import type { Faction } from './politics-core.ts';
 import { pushEvent } from './state.ts';
 
 /**
@@ -42,6 +44,11 @@ export const MEMORY_KINDS = [
   'voto',
   'gano_elecciones',
   'perdio_elecciones',
+  // v1.3: desenlaces de las historias.
+  'salio_adelante',
+  'paso_pagina',
+  'se_reconcilio',
+  'sigue_en_paro',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -53,6 +60,8 @@ export interface Memory {
   importance: number;
   /** Efecto en la felicidad mientras dura (60 días). */
   valence: number;
+  /** Nombres de pila de `about` cuando se creó (v1.3). */
+  names?: string[];
 }
 
 export const PROFESSIONS = [
@@ -83,6 +92,8 @@ export interface Petition {
   /** Vecinos con nombre que votan a favor (para premiar o castigar). */
   supporters: number[];
   answer: null | 'promise' | 'reject';
+  /** v1.3: pregunta del partido de la oposición (la hace su líder). */
+  opposition?: boolean;
 }
 export interface Pleno {
   tick: number;
@@ -99,6 +110,8 @@ export interface PromiseRecord {
   status: 'pending' | 'kept' | 'broken';
   /** Promesas fiscales: desde cuándo se mantiene la bajada. */
   metSince?: number;
+  /** v1.3: prometida a la oposición en el pleno; si se rompe, esa facción lo castiga. */
+  oppositionFaction?: Faction;
 }
 
 export const MEMORY_MAX = 5;
@@ -116,21 +129,28 @@ const HOOKS_MAX = 3;
 /* ---------------- memoria ---------------- */
 
 export function addMemory(state: GameState, c: Citizen, kind: MemoryKind, importance: number, valence: number, about: number[] = []): void {
-  c.memories.push({ tick: state.tick, kind, about, importance, valence });
+  // Se guarda el nombre de pila: si esa persona se va, el recuerdo no se queda sin nombre.
+  const names = about.map((id) => state.citizens.find((x) => x.id === id)?.name.split(' ')[0] ?? '');
+  c.memories.push({ tick: state.tick, kind, about, importance, valence, ...(about.length ? { names } : {}) });
   if (c.memories.length > MEMORY_MAX) {
-    // Se olvida el menos importante, ponderado por antigüedad.
+    // Se olvida el menos importante, ponderado por antigüedad; nunca lo que acaba de vivir.
     const score = (m: Memory) => m.importance - (state.tick - m.tick) / (TICKS_PER_DAY * 60);
     let worst = 0;
-    for (let i = 1; i < c.memories.length; i++) if (score(c.memories[i]!) < score(c.memories[worst]!)) worst = i;
+    for (let i = 1; i < c.memories.length - 1; i++) if (score(c.memories[i]!) < score(c.memories[worst]!)) worst = i;
     c.memories.splice(worst, 1);
   }
 }
 
 const nameOf = (state: GameState, id: number) => state.citizens.find((c) => c.id === id)?.name.split(' ')[0] ?? 'alguien que ya no vive aquí';
 
+/** Nombres de un recuerdo: los actuales o, si ya no vive aquí, los que se guardaron. */
+function memoryWho(state: GameState, m: Memory): string {
+  return m.about.map((id, k) => (state.citizens.some((c) => c.id === id) ? nameOf(state, id) : m.names?.[k] || nameOf(state, id))).join(' y ');
+}
+
 /** Texto de un recuerdo con plantillas del motor. */
 export function memoryText(state: GameState, m: Memory): string {
-  const who = m.about.map((id) => nameOf(state, id)).join(' y ');
+  const who = memoryWho(state, m);
   switch (m.kind) {
     case 'llego':
       return 'Llegó al pueblo';
@@ -166,6 +186,14 @@ export function memoryText(state: GameState, m: Memory): string {
       return 'Ganó las elecciones y llegó a la alcaldía';
     case 'perdio_elecciones':
       return 'Perdió las elecciones';
+    case 'salio_adelante':
+      return 'Salió adelante cuando peor lo tenía';
+    case 'paso_pagina':
+      return `Pasó página tras la marcha de ${who}`;
+    case 'se_reconcilio':
+      return `Hizo las paces con ${who}`;
+    case 'sigue_en_paro':
+      return 'Sigue sin trabajo y con la hipoteca encima';
   }
 }
 
@@ -269,23 +297,53 @@ export function relationMood(c: Citizen): { label: string; value: number }[] {
   return out;
 }
 
-/** Las relaciones nacen de compartir casa o trabajo (con el PRNG de la partida). */
+/** Plaza, mercado o parque cuyo radio alcanza las casas de los dos (v1.3). */
+export function meetingPlace(state: GameState, a: Citizen, b: Citizen): Building | undefined {
+  const home = (c: Citizen) => state.buildings.find((x) => x.id === c.homeId);
+  const ha = home(a);
+  const hb = home(b);
+  if (!ha || !hb || ha === hb) return undefined;
+  return state.buildings.find((p) => {
+    if (!p.built || !MEETING_KINDS.includes(p.kind)) return false;
+    const r = SERVICE[p.kind]!.radius;
+    return Math.abs(p.x - ha.x) + Math.abs(p.y - ha.y) <= r && Math.abs(p.x - hb.x) + Math.abs(p.y - hb.y) <= r;
+  });
+}
+const MEETING_KINDS: Building['kind'][] = ['plaza', 'market', 'park'];
+const MEETING_TEXT: Partial<Record<Building['kind'], string>> = { plaza: 'en la plaza', market: 'en el mercado', park: 'paseando por el parque' };
+
+/**
+ * Las relaciones nacen de compartir casa o trabajo y, más despacio, de
+ * coincidir en la plaza, el mercado o el parque del barrio (con el PRNG de la partida).
+ */
 function updateRelations(state: GameState): void {
   const named = state.citizens.filter((c) => c.named);
+  let barrioToday = false;
   for (let i = 0; i < named.length; i++) {
     for (let j = i + 1; j < named.length; j++) {
       const a = named[i]!;
       const b = named[j]!;
       const together = (a.homeId !== null && a.homeId === b.homeId) || (a.jobId !== null && a.jobId === b.jobId);
       const r = relation(a, b.id);
-      if (!together) continue;
-      if (!r) {
-        if (chance(state.rng, 0.04 + (a.traits.social + b.traits.social) / 4000)) {
+      const place = together || r ? undefined : meetingPlace(state, a, b);
+      if (!together && !place) continue;
+      // Una amistad nueva no expulsa a otra: con 5 relaciones ya no caben más
+      // (antes se soltaba la más débil y se rehacía al día siguiente, en bucle).
+      const room = a.relations.length < RELATIONS_MAX && b.relations.length < RELATIONS_MAX;
+      if (!r && room) {
+        const p = (place ? 0.015 : 0.04) + (a.traits.social + b.traits.social) / 4000;
+        if (chance(state.rng, p)) {
           setRelation(state, a, b, 'amistad', 30);
           addMemory(state, a, 'nueva_amistad', 2, 2, [b.id]);
           addMemory(state, b, 'nueva_amistad', 2, 2, [a.id]);
+          // Como mucho un suceso de barrio al día; con el mismo nombre de pila, el nombre completo.
+          if (place && !barrioToday) {
+            barrioToday = true;
+            const [na, nb] = [a, b].map((x) => x.name.split(' ')[0]!);
+            pushEvent(state, 'info', `${na === nb ? `${a.name} y ${b.name}` : `${na} y ${nb}`} han hecho amistad ${MEETING_TEXT[place.kind]}`, { ref: a.id });
+          }
         }
-      } else if (r.kind === 'amistad') {
+      } else if (r?.kind === 'amistad') {
         r.strength = Math.min(100, r.strength + 1);
         const back = relation(b, a.id);
         if (back) back.strength = r.strength;
@@ -318,35 +376,103 @@ export function onCitizenLeaves(state: GameState, leaving: Citizen): void {
 
 /* ---------------- director de historias ---------------- */
 
-export function addHook(state: GameState, kind: HookKind, actors: number[]): void {
-  if (state.hooks.length >= HOOKS_MAX) return;
-  if (state.hooks.some((h) => h.actors.some((a) => actors.includes(a)))) return;
+export function addHook(state: GameState, kind: HookKind, actors: number[]): boolean {
+  if (state.hooks.length >= HOOKS_MAX) return false;
+  if (state.hooks.some((h) => h.actors.some((a) => actors.includes(a)))) return false;
   state.hooks.push({ id: state.nextId++, kind, actors, createdTick: state.tick, expires: state.tick + TICKS_PER_DAY * 15 });
   // El director se ve también en Modo normal: el gancho sale en el diario.
   const lead = state.citizens.find((c) => c.id === actors[0]);
   if (lead) pushEvent(state, 'info', `${lead.name} ${HOOK_TEXT[kind]}`, { ref: lead.id });
+  return true;
+}
+
+/**
+ * Desenlaces (v1.3): un gancho no se apaga sin más. Si la situación se
+ * resuelve, o al caducar, el diario cuenta cómo acabó y el vecino lo recuerda.
+ */
+function resolveHooks(state: GameState): void {
+  const byId = (id: number) => state.citizens.find((c) => c.id === id);
+  const first = (c: Citizen) => c.name.split(' ')[0];
+  const keep: Hook[] = [];
+  for (const h of state.hooks) {
+    const lead = byId(h.actors[0]!);
+    const other = h.actors[1] !== undefined ? byId(h.actors[1]) : undefined;
+    const expired = h.expires <= state.tick;
+    if (!lead) continue; // se fue del pueblo: su marcha ya deja recuerdo en los demás
+    let done = false;
+    switch (h.kind) {
+      case 'despido_con_hipoteca':
+        if (lead.jobId !== null || lead.mortgage === 0) {
+          pushEvent(state, 'info', `${first(lead)} ha salido adelante: ${lead.jobId !== null ? 'ya tiene trabajo' : 'ha terminado de pagar la casa'}`, { ref: lead.id });
+          addMemory(state, lead, 'salio_adelante', 4, 4);
+          done = true;
+        } else if (expired) {
+          pushEvent(state, 'warning', `${first(lead)} sigue sin trabajo y con la hipoteca encima`, { ref: lead.id });
+          addMemory(state, lead, 'sigue_en_paro', 3, -3);
+          done = true;
+        }
+        break;
+      case 'amigo_se_va':
+        // Una amistad nueva ayuda a pasar página.
+        if (lead.relations.some((r) => (r.kind === 'amistad' || r.kind === 'pareja') && r.since > h.createdTick) || expired) {
+          pushEvent(state, 'info', `${first(lead)} ha pasado página tras la marcha de ${nameOf(state, h.actors[1]!)}`, { ref: lead.id });
+          addMemory(state, lead, 'paso_pagina', 2, 2, h.actors.slice(1));
+          done = true;
+        }
+        break;
+      case 'mismo_local':
+        if (expired) {
+          // Nadie se quedó el local: con el tiempo, la rivalidad se apaga.
+          if (other && relation(lead, other.id)?.kind === 'rivalidad') {
+            setRelation(state, lead, other, 'amistad', 20);
+            addMemory(state, lead, 'se_reconcilio', 2, 2, [other.id]);
+            addMemory(state, other, 'se_reconcilio', 2, 2, [lead.id]);
+            pushEvent(state, 'info', `${first(lead)} y ${first(other)} han hecho las paces: al final nadie se ha quedado el local`, { ref: lead.id });
+          }
+          done = true;
+        }
+        break;
+      case 'promesa_incumplida':
+        // Cumplirle otra promesa después le devuelve algo de confianza.
+        if (lead.memories.some((m) => m.kind === 'promesa_cumplida' && m.tick > h.createdTick)) {
+          pushEvent(state, 'info', `${first(lead)} vuelve a confiar en el ${state.politics.mayor === 'player' ? 'alcalde' : 'concejal'}`, { ref: lead.id });
+          lead.grudge = Math.max(0, lead.grudge - 4);
+          done = true;
+        } else done = expired;
+        break;
+      default:
+        done = expired;
+    }
+    // En «amigo_se_va» el segundo actor es quien se fue: es normal que no esté.
+    if (!done && (h.kind !== 'mismo_local' || other)) keep.push(h);
+  }
+  state.hooks = keep;
 }
 
 /** Ganchos deterministas (varían con la semilla, no compensa recargar). */
 function directStories(state: GameState): void {
-  state.hooks = state.hooks.filter((h) => h.expires > state.tick && h.actors.every((a) => state.citizens.some((c) => c.id === a)));
+  resolveHooks(state);
   const named = state.citizens.filter((c) => c.named);
   // Dos vecinos quieren el mismo (y único) local.
   const founders = named.filter((c) => canFound(state, c));
   if (founders.length >= 2 && freeShopLot(state) !== null && chance(state.rng, 0.3)) {
     const a = pick(state.rng, founders);
     const b = pick(state.rng, founders.filter((x) => x !== a));
-    addHook(state, 'mismo_local', [a.id, b.id]);
-    setRelation(state, a, b, 'rivalidad', 40);
+    // La rivalidad solo si la historia arranca, y nunca entre pareja ni tras hacer las paces.
+    const kind = relation(a, b.id)?.kind;
+    const reconciled = a.memories.some((m) => m.kind === 'se_reconcilio' && m.about.includes(b.id));
+    if (kind !== 'pareja' && !reconciled && addHook(state, 'mismo_local', [a.id, b.id])) setRelation(state, a, b, 'rivalidad', 40);
   }
   // Se queda sin trabajo con hipoteca.
   for (const c of named) {
-    if (c.mortgage > 0 && c.jobId === null && c.money < 800) addHook(state, 'despido_con_hipoteca', [c.id]);
+    // Si la historia ya acabó mal hace poco, no se vuelve a abrir al día siguiente.
+    const recent = c.memories.some((m) => m.kind === 'sigue_en_paro' && state.tick - m.tick < TICKS_PER_DAY * MEMORY_DAYS);
+    if (!recent && c.mortgage > 0 && c.jobId === null && c.money < 800) addHook(state, 'despido_con_hipoteca', [c.id]);
   }
 }
 
 export const HOOK_TEXT: Record<HookKind, string> = {
-  mismo_local: 'compite con otro vecino por el único local comercial libre',
+  mismo_local: 'se disputa con alguien del pueblo el único local comercial libre',
   despido_con_hipoteca: 'no tiene trabajo en el pueblo y le cuesta pagar la hipoteca',
   promesa_incumplida: 'el alcalde le prometió algo y no lo cumplió',
   amigo_se_va: 'una persona querida se ha ido del pueblo',
@@ -362,6 +488,7 @@ export function onBusinessFounded(state: GameState, founder: Citizen): void {
   const h = state.hooks.find((x) => x.kind === 'mismo_local' && x.actors.includes(founder.id));
   if (!h) return;
   const other = state.citizens.find((c) => h.actors.includes(c.id) && c.id !== founder.id);
+  pushEvent(state, 'info', `${founder.name.split(' ')[0]} se queda el local${other ? `: ${other.name.split(' ')[0]} no se lo perdona` : ''}`, { ref: founder.id });
   if (other) {
     setRelation(state, other, founder, 'rencor', 60);
     addMemory(state, other, 'le_quitaron_el_local', 4, -4, [founder.id]);
@@ -413,7 +540,9 @@ function canLower(state: GameState, n: Need): boolean {
 /** Necesidades de un vecino por orden (para que el pleno traiga peticiones distintas). */
 export function needsOf(state: GameState, c: Citizen): Need[] {
   const first = needOf(state, c);
-  const rest = NEEDS.filter((n) => n !== first && (NEED_KIND[n] ? !state.buildings.some((b) => b.kind === NEED_KIND[n]) : n === 'bajar_tasas' && canLower(state, n)));
+  // Un servicio saturado cuenta como carencia: piden otro.
+  const lacks = (kind: string) => !state.buildings.some((b) => b.kind === kind) || saturated(state, kind as never);
+  const rest = NEEDS.filter((n) => n !== first && (NEED_KIND[n] ? lacks(NEED_KIND[n]!) : n === 'bajar_tasas' && canLower(state, n)));
   return [first, ...rest.sort((a, b) => (hash32(c.id, a.length) % 7) - (hash32(c.id, b.length) % 7))];
 }
 
@@ -456,9 +585,16 @@ export function convenePleno(state: GameState): void {
   state.lastPlenoTick = state.tick;
   const named = state.citizens.filter((c) => c.named).sort((a, b) => a.happiness - b.happiness);
   const petitions: Petition[] = [];
+  // Lo que ya está prometido y pendiente no se vuelve a pedir: una obra no cumple dos promesas (ronda 09).
+  const promised = (n: Need) => state.promises.some((p) => p.status === 'pending' && p.need === n);
+  // Con un partido en la oposición, su líder también pregunta (v1.3, aplazado de la ronda 07).
+  // Su pregunta se reserva antes: si no, los vecinos podían haber pedido ya todo lo suyo.
+  const party = state.politics.party;
+  const leader = party && state.politics.mayor === 'player' ? state.citizens.find((c) => c.id === party.leaderId) : undefined;
+  const oppNeed = leader ? needsOf(state, leader).find((n) => !promised(n)) : undefined;
   for (const c of named) {
     if (petitions.length >= 3) break;
-    const need = needsOf(state, c).find((n) => !petitions.some((p) => p.need === n));
+    const need = needsOf(state, c).find((n) => !petitions.some((p) => p.need === n) && !promised(n) && n !== oppNeed);
     if (!need) continue;
     let yes = 0;
     const supporters: number[] = [];
@@ -470,8 +606,22 @@ export function convenePleno(state: GameState): void {
     }
     petitions.push({ id: state.nextId++, citizenId: c.id, need, yes, no: state.citizens.length - yes, supporters, answer: null });
   }
+  if (leader) {
+    const need = oppNeed;
+    if (need) {
+      let yes = 0;
+      const supporters: number[] = [];
+      for (const v of state.citizens) {
+        if (wantsNeed(state, v, need)) {
+          yes++;
+          if (v.named) supporters.push(v.id);
+        }
+      }
+      petitions.push({ id: state.nextId++, citizenId: leader.id, need, yes, no: state.citizens.length - yes, supporters, answer: null, opposition: true });
+    }
+  }
   state.pleno = { tick: state.tick, petitions };
-  pushEvent(state, 'info', `Pleno municipal: ${petitions.length} peticiones de los vecinos`);
+  pushEvent(state, 'info', `Pleno municipal: ${petitions.length} peticiones${leader ? ', una de la oposición' : ' de los vecinos'}`);
 }
 
 export function answerPetition(state: GameState, petitionId: number, answer: 'promise' | 'reject'): boolean {
@@ -494,7 +644,20 @@ export function answerPetition(state: GameState, petitionId: number, answer: 'pr
       if (c) c.happiness = Math.min(100, c.happiness + 3);
     }
     pushEvent(state, 'info', `El alcalde promete ${NEED_TEXT[p.need]} (lo pidió ${asker?.name ?? 'un vecino'})`);
+    // Aceptar lo que pide la oposición le quita bandera: su facción se acerca un poco.
+    // Cuenta como un acto de campaña: mismo tope (3) y solo en el último año (ronda 09).
+    const party = state.politics.party;
+    const pol = state.politics;
+    if (p.opposition && party) {
+      state.promises.at(-1)!.oppositionFaction = party.faction;
+      if (pol.nextElection - state.tick <= CAMPAIGN_MONTHS * TICKS_PER_MONTH) pol.campaign[party.faction] = Math.max(pol.campaign[party.faction], Math.min(3, pol.campaign[party.faction] + 1));
+    }
   } else {
+    const party = state.politics.party;
+    if (p.opposition && party) {
+      state.politics.campaign[party.faction] = Math.max(0, state.politics.campaign[party.faction] - 1);
+      pushEvent(state, 'politics', `«${party.name}» critica que rechaces su pregunta: ${NEED_TEXT[p.need]}`);
+    }
     for (const id of p.supporters) {
       const c = state.citizens.find((x) => x.id === id);
       if (c) {
@@ -548,6 +711,9 @@ function checkPromises(state: GameState): void {
         c.grudge = Math.min(40, c.grudge + 8);
       }
       if (supporters[0]) addHook(state, 'promesa_incumplida', supporters.slice(0, 2).map((c) => c.id));
+      // Incumplir lo prometido a la oposición le da munición (ronda 09).
+      const f = p.oppositionFaction;
+      if (f) state.politics.campaign[f] = Math.max(0, state.politics.campaign[f] - 2);
       pushEvent(state, 'warning', `Promesa incumplida: ${NEED_TEXT[p.need]}. Quien la apoyó no lo olvidará`);
     }
   }
@@ -571,16 +737,58 @@ export function ruleAnswer(state: GameState, c: Citizen, q: Question, worst: str
   return state.politics.mayor === 'player' ? text : text.replace(/alcalde/g, 'concejal').replace('Lo está haciendo bien', 'Desde la oposición lo hace bien');
 }
 
+/** Frase sobre lo que ha vivido hace poco (v1.3). Plantillas del motor; nada del LLM ni del jugador. */
+const MEMORY_LINE: Partial<Record<MemoryKind, (who: string) => string>> = {
+  promesa_rota: () => 'Desde que no cumplió lo que prometió, ya no me fío igual.',
+  promesa_cumplida: () => 'Cumplió lo que prometió, y eso se agradece.',
+  perdio_trabajo: () => 'Desde que perdí el trabajo, no levanto cabeza.',
+  salio_adelante: () => 'Lo pasé mal, pero he salido adelante.',
+  se_fue_amigo: (who) => `Echo de menos a ${who}.`,
+  paso_pagina: (who) => `Todavía me acuerdo de ${who}, pero hay que seguir.`,
+  nueva_pareja: (who) => `Desde que salgo con ${who}, todo va mejor.`,
+  nueva_amistad: (who) => `Ahora tengo amistad con ${who}, y se nota.`,
+  se_reconcilio: (who) => `Al final hice las paces con ${who}.`,
+  le_quitaron_el_local: (who) => `Todavía me escuece que ${who} se quedara el local.`,
+  sigue_en_paro: () => 'Sigo sin trabajo y la hipoteca no perdona.',
+  compro_casa: () => 'Con la casa ya en mis manos, duermo con más calma.',
+  abrio_negocio: () => 'Con mi negocio en marcha, ganas no me faltan.',
+  subida_impuestos: () => 'Y la última subida de impuestos no ayuda.',
+};
+
+function recentMemory(state: GameState, c: Citizen): Memory | undefined {
+  return c.memories
+    .filter((m) => state.tick - m.tick < TICKS_PER_DAY * MEMORY_DAYS && MEMORY_LINE[m.kind])
+    .sort((a, b) => b.importance - a.importance || b.tick - a.tick)[0];
+}
+
+export function memoryLine(state: GameState, c: Citizen): string | null {
+  const recent = recentMemory(state, c);
+  return recent ? MEMORY_LINE[recent.kind]!(memoryWho(state, recent)) : null;
+}
+
 function answerText(state: GameState, c: Citizen, q: Question, worst: string | undefined): string {
+  const base = baseAnswer(state, c, q, worst);
+  if (q !== 'como_estas') return base;
+  const m = recentMemory(state, c);
+  if (!m) return base;
+  const line = MEMORY_LINE[m.kind]!(memoryWho(state, m));
+  // Si el recuerdo va en contra del ánimo, un enlace para que no suene incoherente.
+  const lower = line.charAt(0).toLowerCase() + line.slice(1);
+  if (c.happiness >= 70 && m.valence < 0) return `${base} Eso sí, ${lower}`;
+  if (c.happiness < 45 && m.valence > 0) return `${base} Al menos, ${lower}`;
+  return `${base} ${line}`;
+}
+
+function baseAnswer(state: GameState, c: Citizen, q: Question, worst: string | undefined): string {
   const first = c.name.split(' ')[0];
   const pending = state.promises.find((p) => p.status === 'pending' && p.supporters.includes(c.id));
   const broken = state.promises.find((p) => p.status === 'broken' && p.supporters.includes(c.id));
   const v = hash32(c.id, state.tick, q.length) % 3;
   switch (q) {
     case 'como_estas':
-      if (c.happiness >= 70) return ['Muy bien, alcalde. Este pueblo me sienta de maravilla.', 'No me puedo quejar, de verdad.', 'Contento. Aquí estoy a gusto.'][v]!;
+      if (c.happiness >= 70) return ['Muy bien, alcalde. Este pueblo me sienta de maravilla.', 'No me puedo quejar, de verdad.', 'Aquí estoy a gusto, de verdad.'][v]!;
       if (c.happiness >= 45) return worst ? `Tirando. Lo que más me pesa es esto: ${worst.toLowerCase()}.` : 'Tirando, como todos.';
-      return worst ? `Mal, alcalde. ${worst}. Así no se puede.` : 'Mal. Me estoy pensando irme.';
+      return worst ? `Mal, alcalde. ${worst}. Así no se puede.` : 'Mal. Estoy pensando en irme.';
     case 'que_necesitas':
       if (pending) return `Que cumpla lo que prometió: ${NEED_TEXT[pending.need]}.`;
       return `Lo que más falta aquí es ${NEED_TEXT[needOf(state, c)]}.`;

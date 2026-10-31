@@ -171,15 +171,17 @@ export function openPleno(ctx: SocialCtx): void {
     const who = state.citizens.find((c) => c.id === p.citizenId);
     const fiscal = p.need === 'bajar_tasas' || p.need === 'bajar_ibi';
     const n = p.supporters.length;
+    const party = state.politics.party;
     const card = h(
       'div',
-      { class: 'petition' },
+      { class: p.opposition ? 'petition opposition' : 'petition' },
+      p.opposition && party ? h('p', { class: 'pol-tag' }, `Pregunta de la oposición · «${party.name}»`) : '',
       h('p', {}, h('strong', {}, who?.name ?? 'Un vecino'), ` pide ${NEED_TEXT[p.need]}.`),
       h('p', {}, `Votos: ${p.yes} a favor, ${p.no} en contra.`),
     );
     if (p.answer) card.append(done(p.answer));
     else {
-      const terms = h('p', { class: 'muted' }, `Si prometes: plazo hasta el ${deadline}${fiscal ? ' y hay que mantener la bajada 60 días' : ''}. Si no cumples, ${n} ${n === 1 ? 'vecino con nombre se enfada' : 'vecinos con nombre se enfadan'}.`);
+      const terms = h('p', { class: 'muted' }, `Si prometes: plazo hasta el ${deadline}${fiscal ? ' y hay que mantener la bajada 60 días' : ''}. Si no cumples, ${n} ${n === 1 ? 'vecino con nombre se enfada' : 'vecinos con nombre se enfadan'}.${p.opposition ? ' Si la aceptas, su facción se acerca a ti; si la rechazas, la oposición lo usará en tu contra.' : ''}`);
       const yes = h('button', { class: 'btn primary' }, 'Prometer');
       const no = h('button', { class: 'btn' }, 'Rechazar');
       const row = h('div', { class: 'row' }, yes, no);

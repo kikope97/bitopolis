@@ -47,6 +47,13 @@ Monorepo pnpm + TypeScript:
 - Detonante `elecciones` en `decisions.ts`: los vecinos con nombre eligen `votar_gobierno`, `votar_oposicion` o `abstenerse` (IA o reglas); el prompt recibe la política como datos.
 - Cliente: `politics-ui.ts` (indicador 🗳, hoja de política, noche electoral).
 
+## Historias, política e interfaz (v1.3)
+- `social.ts`: `resolveHooks` (desenlaces), `meetingPlace` (amistades de barrio), `memoryLine` (frases que recuerdan). Una amistad nueva no expulsa a otra.
+- `politics.ts`: `rivalAct` y `politics.log` (formato 8), impuestos del rival con margen; pregunta de la oposición en `convenePleno` (cuenta como campaña).
+- `economy.ts`: `serviceSaturation` y `saturated` (`SERVICE_CAPACITY`, margen del 90 %, las obras cuentan).
+- `prompt.ts`: `toneOf` e `inventedName` (lista de nombres en `names.ts`, palabras enteras sin tildes). PROMPT_VERSION 3.
+- Cliente: farolas en `render.ts`, `skyline.ts` animado, `icons.ts` (iconos de píxeles), avisos agrupados, atajos de una tecla desactivables (`prefs.shortcuts`).
+
 ## Comandos
 ```
 pnpm install | pnpm dev | pnpm build | pnpm lint | pnpm typecheck | pnpm test

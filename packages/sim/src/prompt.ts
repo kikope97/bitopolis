@@ -1,3 +1,4 @@
+import { COMMON_NAMES, FIRST_NAMES, SURNAMES } from './names.ts';
 import { tickToDate } from '@bitopolis/shared';
 import { z } from 'zod';
 import { ACTION_LABELS, cleanMotivo, MOTIVO_MAX } from './decisions.ts';
@@ -14,7 +15,7 @@ import { daysToElection, FACTION_TEXT, factionOf, politicsActive } from './polit
  * - Salida estructurada con enum de acciones válidas; se valida con zod.
  */
 
-export const PROMPT_VERSION = 2;
+export const PROMPT_VERSION = 3;
 
 export const SYSTEM_PROMPT = `Eres el narrador de Bitópolis, un pueblo español pequeño. Interpretas a vecinos con nombre que toman UNA decisión cada uno.
 
@@ -23,6 +24,8 @@ Reglas:
 - Decide según su personalidad (rasgos 0-100), su deseo, su miedo, su situación y sus recuerdos. La "terquedad" alta puede llevarle a decisiones poco racionales.
 - "motivo": una frase corta (máx. ${MOTIVO_MAX} caracteres) en primera persona, en español de España, natural y con personalidad. Sin comillas, sin emojis, sin mencionar números de rasgos ni que eres una IA.
 - Cada motivo debe ser distinto: usa su profesión, relaciones, recuerdos y el "gancho" si lo hay. Nada de cifras ni euros en el motivo.
+- Habla con el "tono" de cada vecino: no todos suenan igual. El tono cambia cómo habla, no lo que sabe: sin cifras ni personas fuera de los datos.
+- No menciones a nadie que no esté en los datos (ni nombres inventados).
 - Responde solo con JSON que cumpla el esquema.
 
 Ejemplos de tono (no los copies):
@@ -77,6 +80,42 @@ function politicsView(state: GameState) {
   };
 }
 
+/**
+ * Tono de voz (v1.3): sale de los rasgos y, si ninguno destaca, del id. Da
+ * variedad a los motivos sin texto libre: es una etiqueta del motor.
+ */
+export function toneOf(c: Citizen): string {
+  const t = c.traits;
+  const top = Math.max(t.terco, t.social, t.ahorro, t.ambicion);
+  if (top >= 70) {
+    if (top === t.terco) return 'cabezota, no da su brazo a torcer';
+    if (top === t.social) return 'cercano y bromista';
+    if (top === t.ahorro) return 'prudente, habla de ahorrar sin dar cantidades';
+    return 'ambicioso y directo';
+  }
+  return ['tranquilo, de pocas palabras', 'irónico', 'seco pero noble', 'entrañable, habla del pueblo con cariño', 'quejica con gracia'][c.id % 5]!;
+}
+
+/**
+ * ¿Menciona a una persona que no está en los datos? Solo cuentan palabras que
+ * son nombres o apellidos de verdad (los del juego y los habituales en España),
+ * también al principio de la frase, comparadas enteras y sin tildes (ronda 09:
+ * antes, «Lunes», «Don» o «Comisaría» tiraban respuestas buenas).
+ */
+const fold = (w: string) => w.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+const PERSON_NAMES = new Set([...FIRST_NAMES, ...SURNAMES, ...COMMON_NAMES].map(fold));
+export function inventedName(text: string, sent: string): string | null {
+  const known = new Set((sent.match(/\p{L}+/gu) ?? []).map(fold));
+  for (const m of text.matchAll(/\p{Lu}\p{Ll}+/gu)) {
+    const w = fold(m[0]);
+    // Dentro de otra palabra («McDonald») no cuenta.
+    const prev = text[m.index - 1];
+    if (prev && /\p{L}/u.test(prev)) continue;
+    if (PERSON_NAMES.has(w) && !known.has(w)) return m[0];
+  }
+  return null;
+}
+
 function citizenView(state: GameState, c: Citizen, p: Pending) {
   const job = state.buildings.find((b) => b.id === c.jobId);
   const home = state.buildings.find((b) => b.id === c.homeId);
@@ -88,6 +127,7 @@ function citizenView(state: GameState, c: Citizen, p: Pending) {
       ? { faccion: FACTION_TEXT[factionOf(state, c)].toLowerCase(), faccion_pide: state.politics.factions[factionOf(state, c)].demand ?? 'nada en especial' }
       : {}),
     rasgos: { terquedad: c.traits.terco, ahorrador: c.traits.ahorro, sociable: c.traits.social, ambicioso: c.traits.ambicion },
+    tono: toneOf(c),
     deseo: c.desire.replace('_', ' '),
     miedo: c.fear,
     felicidad: Math.round(c.happiness),
@@ -180,7 +220,8 @@ export interface ParsedDecisions {
 const norm = (s: string) => s.toLowerCase().replace(/[^a-záéíóúñü ]/g, '').replace(/\s+/g, ' ').trim();
 
 /** Valida la respuesta: JSON, esquema y acción permitida para cada vecino. */
-export function parseDecisions(raw: string, pendings: Pending[], recent: Record<number, string[]> = {}, allowRepeat = false): ParsedDecisions {
+/** `known`: el texto enviado (prompt); si se pasa, se rechazan motivos con nombres que no salen en él. */
+export function parseDecisions(raw: string, pendings: Pending[], recent: Record<number, string[]> = {}, allowRepeat = false, known?: string): ParsedDecisions {
   const all = pendings.map((p) => p.citizenId);
   let data: unknown;
   try {
@@ -208,6 +249,7 @@ export function parseDecisions(raw: string, pendings: Pending[], recent: Record<
     if (motivo.length < 4) bad('motivo_vacio');
     else if (/[0-9€]/.test(motivo)) bad('motivo_con_cifras');
     else if (!allowRepeat && (recent[p.citizenId] ?? []).some((m) => norm(m) === norm(motivo))) bad('motivo_repetido');
+    else if (known !== undefined && inventedName(motivo, known)) bad('nombre_inventado');
     else decisions.push({ citizenId: p.citizenId, action: d.accion, motivo });
   }
   const ok = new Set(decisions.map((d) => d.citizenId));
@@ -297,5 +339,7 @@ export function parseText(raw: string, req: TextRequest): string | null {
     const v = Number(n.replace(/[.,]$/, '').replace(/\.(?=\d{3}\b)/g, '').replace(',', '.'));
     if (!allowed.has(String(v))) return null;
   }
+  // Nada de vecinos ni sitios inventados.
+  if (inventedName(text, req.user + '\n' + req.system)) return null;
   return text;
 }

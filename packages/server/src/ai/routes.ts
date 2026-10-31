@@ -10,6 +10,7 @@ import {
   FORMAT_VERSION,
   type GameState,
   migrate,
+  SYSTEM_PROMPT,
   townFacts,
   validActions,
 } from '@bitopolis/sim';
@@ -22,20 +23,34 @@ import { encryptSecret, maskKey } from './crypto.ts';
 import type { AiService, AiSettings } from './service.ts';
 
 /** Medido con `pnpm sim` (ver docs/rondas): decisiones por vecino con nombre y día. */
-export const DECISIONS_PER_CITIZEN_DAY = 0.1;
-const TOKENS_IN_BASE = 330;
-const TOKENS_IN_PER_CITIZEN = 200;
+export const DECISIONS_PER_CITIZEN_DAY = 0.085;
+/** Las «opiniones» salen con cualquier número de vecinos: nunca menos de media decisión al día. */
+const MIN_DECISIONS_PER_DAY = 0.5;
+// Ronda 09: la base es el prompt de sistema real (≈3,2 caracteres por token) más el resumen del pueblo.
+const TOKENS_IN_BASE = Math.ceil(SYSTEM_PROMPT.length / 3.2) + 120;
+const TOKENS_IN_PER_CITIZEN = 230;
 const TOKENS_OUT_PER_CITIZEN = 40;
 
-/** Estimación de coste en €/hora real según modelo, vecinos y velocidad. */
-export function estimatePerHour(ai: AiService, provider: ProviderId, model: string, citizens: number, speed: number): number {
-  const daysPerHour = (3600 / 20) * speed;
-  const decisionsPerDay = citizens * DECISIONS_PER_CITIZEN_DAY;
+/** Margen para los reintentos de respuestas no válidas (v1.3; medido: casi siempre valen a la primera). */
+export const RETRY_RATE = 0.15;
+/** Crónica del diario: una al mes con el modelo premium. */
+const CHRONICLE = { in: 800, out: 260 };
+
+/** Coste en € de un día de juego: decisiones (con reintentos) y la parte de la crónica del mes. */
+export function estimatePerGameDay(ai: AiService, provider: ProviderId, model: string, premium: string, citizens: number): number {
+  const decisionsPerDay = Math.max(MIN_DECISIONS_PER_DAY, citizens * DECISIONS_PER_CITIZEN_DAY);
   // Las decisiones del mismo día van en un lote.
   const batchesPerDay = Math.min(1, decisionsPerDay);
   const tokensIn = batchesPerDay * TOKENS_IN_BASE + decisionsPerDay * TOKENS_IN_PER_CITIZEN;
   const tokensOut = decisionsPerDay * TOKENS_OUT_PER_CITIZEN;
-  return costEur(ai.prices, model, provider, { in: tokensIn, cachedIn: 0, out: tokensOut }) * daysPerHour;
+  const decisions = costEur(ai.prices, model, provider, { in: tokensIn, cachedIn: 0, out: tokensOut }) * (1 + RETRY_RATE);
+  const chronicle = costEur(ai.prices, premium, provider, { in: CHRONICLE.in, cachedIn: 0, out: CHRONICLE.out }) / 30;
+  return decisions + chronicle;
+}
+
+/** Estimación de coste en €/hora real según modelo, vecinos y velocidad (1 día = 20 s a x1). */
+export function estimatePerHour(ai: AiService, provider: ProviderId, model: string, citizens: number, speed: number, premium = PROVIDER_INFO[provider].premium): number {
+  return estimatePerGameDay(ai, provider, model, premium, citizens) * (3600 / 20) * speed;
 }
 
 function publicSettings(s: AiSettings) {
@@ -81,10 +96,11 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
     const q = req.query as Record<string, string>;
     const provider = (PROVIDERS as readonly string[]).includes(q.provider ?? '') ? (q.provider as ProviderId) : 'openai';
     const model = q.model || PROVIDER_INFO[provider].cheap;
+    const premium = q.premium || PROVIDER_INFO[provider].premium;
     const citizens = Math.max(1, Math.min(20, Number(q.citizens) || store.get().ai.maxCitizens));
     const out: Record<string, number> = {};
-    for (const sp of [1, 3, 10]) out[`x${sp}`] = estimatePerHour(ai, provider, model, citizens, sp);
-    return { eurPerHour: out, known: model in ai.prices || provider === 'openai-compatible' };
+    for (const sp of [1, 3, 10]) out[`x${sp}`] = estimatePerHour(ai, provider, model, citizens, sp, premium);
+    return { eurPerHour: out, eurPerGameMonth: estimatePerGameDay(ai, provider, model, premium, citizens) * 30, known: model in ai.prices || provider === 'openai-compatible' };
   });
 
   app.get('/api/games/:token/ai-config', async (req, reply) => {
@@ -222,13 +238,16 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
     const key = `${g.row.id}:${monthIdx}`;
     const cached = chronicles.get(key);
     if (cached) return { text: cached };
+    // Si la IA ya falló este mes, no se repite la llamada (premium) cada vez que se abre el diario.
+    if (cached === '') return { text: null, reason: 'no disponible este mes' };
     // Sucesos del motor; los motivos del LLM no se reinyectan.
     const events = g.state.events
       .filter((e) => e.kind !== 'decision' && e.kind !== 'tax')
       .map((e) => e.text)
       .slice(-25);
     const r = await ai.text(g.row.id, 'diario', buildChronicleRequest(g.state, townFacts(g.state), events), true);
-    if (r.text) chronicles.set(key, r.text);
+    // Un texto no válido se recuerda como fallo; si fue por tope o por red, se puede reintentar luego.
+    if (r.text || r.reason === 'invalid') chronicles.set(key, r.text ?? '');
     return r;
   });
 

@@ -84,6 +84,13 @@ export const SERVICE: Partial<Record<BuildingKind, { radius: number; happiness: 
   market: { radius: 8, happiness: 6 },
 };
 
+/**
+ * Vecinos que atiende cada servicio (v1.3, aplazado de la ronda 07). Con más
+ * población el servicio se satura: su efecto baja en proporción y los vecinos
+ * piden otro.
+ */
+export const SERVICE_CAPACITY: Partial<Record<BuildingKind, number>> = { school: 60, clinic: 80, police: 120 };
+
 /** Edificios a los que llega cada planta por la red. */
 // Ronda 06: con 30/40 los pueblos medianos acumulaban plantas (y sus sueldos) hasta quebrar.
 export const PLANT_CAPACITY = { water: 45, power: 60 } as const;

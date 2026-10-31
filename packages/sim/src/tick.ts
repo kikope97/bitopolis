@@ -41,8 +41,10 @@ import {
   sellOnDeparture,
   taxMood,
   updateGrudges,
+  serviceSaturation,
 } from './economy.ts';
 import { updateFields } from './fields.ts';
+import { FIRST_NAMES, SURNAMES } from './names.ts';
 import { goalFor, memoryMood, onCitizenLeaves, PROFESSIONS, relationMood, socialDay } from './social.ts';
 import { politicsDay } from './politics.ts';
 import {
@@ -61,17 +63,6 @@ import {
   tileIndex,
   Zone,
 } from './state.ts';
-
-const FIRST_NAMES = [
-  'Ana', 'Pablo', 'Carmen', 'Javier', 'Elena', 'Diego', 'Rosa', 'Marcos', 'Nuria', 'Iker',
-  'Marta', 'Andrés', 'Lola', 'Sergio', 'Inés', 'Raúl', 'Pilar', 'Hugo', 'Sara', 'Tomás',
-  'Julia', 'Álvaro', 'Irene', 'Mario', 'Alba', 'Rubén', 'Clara', 'Óscar', 'Noelia', 'Adrián',
-  'Celia', 'Gonzalo', 'Paula', 'Víctor', 'Lorena', 'Emilio', 'Teresa', 'Jaime', 'Aitana', 'Félix',
-];
-const SURNAMES = [
-  'García', 'López', 'Martín', 'Sánchez', 'Romero', 'Navarro', 'Torres', 'Gil', 'Ruiz', 'Molina',
-  'Ortega', 'Delgado', 'Castro', 'Vidal', 'Rubio', 'Serrano', 'Marín', 'Iglesias', 'Pascual', 'Prieto',
-];
 
 /* ---------- consultas ---------- */
 
@@ -216,16 +207,21 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
     // Servicios con rendimiento decreciente: no se acumulan sin límite.
     let services = 0;
     const seen = new Set<string>();
+    const full = new Set<string>();
     for (const b of state.buildings) {
       const s = SERVICE[b.kind];
       if (!s || !b.built || dist(b, home) > s.radius) continue;
-      services += seen.has(b.kind) ? s.happiness / 2 : s.happiness;
+      // Un servicio saturado rinde en proporción a los vecinos que puede atender.
+      const load = serviceSaturation(state, b.kind);
+      if (load < 0.9) full.add(b.kind);
+      services += (seen.has(b.kind) ? s.happiness / 2 : s.happiness) * load;
       seen.add(b.kind);
     }
     if (services > 0) {
       const v = Math.round(10 * (1 - Math.exp(-services / 10)) * (state.bankrupt ? 0.5 : 1));
       if (v > 0) f.push({ label: `Servicios cerca (${[...seen].map((k) => BUILD_NAMES[k]!.toLowerCase()).join(', ')})`, value: v });
     }
+    if (full.size) f.push({ label: `Servicio saturado (${[...full].map((k) => BUILD_NAMES[k]!.toLowerCase()).join(', ')})`, value: -2 });
     if (state.buildings.some((b) => b.kind === 'shop' && b.built && dist(b, home) <= 6)) f.push({ label: 'Tienda cerca', value: 4 });
     const i = home.y * state.map.w + home.x;
     const pol = state.fields.pollution[i] ?? 0;

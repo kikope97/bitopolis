@@ -50,6 +50,12 @@ test('admin: primer acceso, ajustes que valen al momento y vista móvil', async 
   // Sin la casilla, la contraseña para jugar no se puede escribir.
   await expect(acceso.getByRole('textbox', { name: 'Contraseña para jugar' })).toBeDisabled();
 
+  // Avisos compactos: el mismo aviso dos veces se agrupa con un contador.
+  await saved(acceso.getByRole('button', { name: 'Guardar acceso' }));
+  await saved(acceso.getByRole('button', { name: 'Guardar acceso' }));
+  await expect(page.locator('.toast', { hasText: 'Guardado' })).toHaveCount(1);
+  await expect(page.locator('.toast .toast-count')).toHaveText(/×\d/);
+
   // Partidas nuevas desactivadas: el enlace nuevo no lleva a ninguna partida.
   await acceso.getByLabel('Permitir partidas nuevas').uncheck();
   await saved(acceso.getByRole('button', { name: 'Guardar acceso' }));
@@ -102,6 +108,10 @@ test('admin: primer acceso, ajustes que valen al momento y vista móvil', async 
 
   // Partidas y copias.
   await page.reload();
+  // Partidas, copias y cuenta empiezan plegadas (v1.3).
+  await page.getByRole('button', { name: 'Partidas', exact: true }).click();
+  // Sin copias recientes, «Copias de seguridad» ya viene abierta (ronda 09).
+  if ((await page.getByRole('button', { name: 'Copias de seguridad' }).getAttribute('aria-expanded')) !== 'true') await page.getByRole('button', { name: 'Copias de seguridad' }).click();
   const partidas = page.getByRole('region', { name: 'Partidas', exact: true });
   await expect(partidas.locator('li')).not.toHaveCount(0);
   const before = await partidas.locator('li').count();

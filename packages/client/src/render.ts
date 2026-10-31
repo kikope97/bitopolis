@@ -223,6 +223,57 @@ export function toolCanvas(kind: string): HTMLCanvasElement {
 
 export { toCanvas };
 
+/* ---------- farolas (v1.3) ---------- */
+
+/** Farola en esta casilla de carretera: algunas, junto a edificios (no en mitad del campo). */
+function lampAt(state: GameState, byTile: Map<number, unknown>, x: number, y: number): boolean {
+  if (hash(x, y, 11) > 0.14) return false;
+  const { w } = state.map;
+  return byTile.has(y * w + x - 1) || byTile.has(y * w + x + 1) || byTile.has((y - 1) * w + x) || byTile.has((y + 1) * w + x);
+}
+
+const halos = new Map<string, HTMLCanvasElement>();
+/** Halo tramado (sin alfa ni colores fuera de la paleta): más denso cerca de la bombilla. */
+function haloSprite(tod: TimeOfDay): HTMLCanvasElement {
+  const key = tod;
+  let c = halos.get(key);
+  if (c) return c;
+  const R = 13;
+  c = document.createElement('canvas');
+  c.width = c.height = R * 2 + 1;
+  const g = c.getContext('2d')!;
+  g.fillStyle = P(tod === 'night' ? C.lampWarm : C.lamp);
+  // Trama Bayer 4×4: degradado uniforme, más denso cerca de la bombilla (sin rayas).
+  const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+  const strength = tod === 'night' ? 0.55 : 0.35;
+  for (let y = -R; y <= R; y++) {
+    for (let x = -R; x <= R; x++) {
+      // Un poco aplastado: la luz cae sobre el suelo.
+      const d = Math.hypot(x, y * 1.3) / R;
+      if (d >= 1) continue;
+      const level = (1 - d) * (1 - d) * strength * 16;
+      if (level > BAYER[((y + 64) % 4) * 4 + ((x + 64) % 4)]!) g.fillRect(x + R, y + R, 1, 1);
+    }
+  }
+  halos.set(key, c);
+  return c;
+}
+
+function drawLamp(ctx: CanvasRenderingContext2D, px: number, py: number, z: number, tod: TimeOfDay): void {
+  // Poste en la esquina de la casilla; la luz, solo al atardecer y de noche.
+  const lx = px + 27 * z;
+  const ly = py + 6 * z;
+  if (tod !== 'day') {
+    const halo = haloSprite(tod);
+    ctx.drawImage(halo, lx - 13 * z, ly - 6 * z, halo.width * z, halo.height * z);
+  }
+  ctx.fillStyle = P(0);
+  ctx.fillRect(lx, ly, z, 9 * z);
+  ctx.fillRect(lx - z, ly + 9 * z, 3 * z, z);
+  ctx.fillStyle = P(tod === 'day' ? 14 : C.lampWarm);
+  ctx.fillRect(lx - z, ly - z, 3 * z, 2 * z);
+}
+
 export function render(
   ctx: CanvasRenderingContext2D,
   state: GameState,
@@ -301,6 +352,7 @@ export function render(
       const px = x * ts - cam.x;
       const py = (y * T - (BH - T)) * z - cam.y;
       const b = byTile.get(y * w + x);
+      if (!b && tiles[y * w + x] === Tile.Road && lampAt(state, byTile, x, y)) drawLamp(ctx, px, y * ts - cam.y, z, tod);
       if (!b) {
         if (tiles[y * w + x] === Tile.Tree) {
           // Viento: la copa se mece con un desfase por árbol.

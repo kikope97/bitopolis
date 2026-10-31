@@ -102,7 +102,7 @@ for (let seed = 1; seed <= Number(values.seeds); seed++) {
       if (values.record) recordings.set(ReplayProvider.key({ system, user }), r);
       totals.tokensIn += r.usage.in || tokens(system + user);
       totals.tokensOut += r.usage.out || tokens(r.text);
-      const parsed = parseDecisions(r.text, list);
+      const parsed = parseDecisions(r.text, list, {}, false, system + '\n' + user);
       for (const [k, v] of Object.entries(parsed.reasons)) reasons[k] = (reasons[k] ?? 0) + v;
       return parsed;
     };

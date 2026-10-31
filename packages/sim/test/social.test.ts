@@ -1,9 +1,11 @@
+import { TICKS_PER_MONTH } from '@bitopolis/shared';
 import { describe, expect, it } from 'vitest';
 import {
   activeObjectives,
   addMemory,
   applyCommand,
   buildDecisionRequest,
+  buildTalkRequest,
   checkInvariants,
   createInitialState,
   type GameState,
@@ -12,16 +14,28 @@ import {
   migrate,
   narrativeSummary,
   OBJECTIVES,
+  OUTSIDE,
+  TREASURY,
+  transfer,
   onCitizenLeaves,
   parseText,
+  inventedName,
+  meetingPlace,
+  parseDecisions,
+  toneOf,
+  memoryLine,
+  newBuilding,
   ruleAnswer,
   runSimulation,
+  socialDay,
   step,
   validActions,
 } from '../src/index.ts';
 
 function town(): GameState {
   const { state } = runSimulation({ seed: 1, days: 200, profile: 'constructor' });
+  // Caja holgada para poder convocar plenos (entra desde fuera: el dinero se conserva).
+  transfer(state, OUTSIDE, TREASURY, 20_000, 'subvencion');
   return state;
 }
 
@@ -235,3 +249,215 @@ describe('determinismo y migración', () => {
   });
 });
 
+
+describe('historias con desenlace (v1.3)', () => {
+  it('despido con hipoteca: al encontrar trabajo, el diario lo cuenta y el vecino lo recuerda', () => {
+    const s = town();
+    const c = s.citizens.find((x) => x.named)!;
+    s.hooks = [{ id: 9001, kind: 'despido_con_hipoteca', actors: [c.id], createdTick: s.tick, expires: s.tick + 24 * 15 }];
+    c.mortgage = 5000;
+    c.jobId = s.buildings.find((b) => b.built && b.kind !== 'house')!.id;
+    s.tick += 24;
+    socialDay(s);
+    expect(s.hooks.some((h) => h.id === 9001)).toBe(false);
+    expect(c.memories.some((m) => m.kind === 'salio_adelante')).toBe(true);
+    expect(s.events.some((e) => e.text.includes('ha salido adelante'))).toBe(true);
+  });
+
+  it('amigo que se va: el gancho no desaparece al día siguiente y acaba en «pasar página»', () => {
+    const s = town();
+    const [a, b] = s.citizens.filter((x) => x.named);
+    s.hooks = [{ id: 9002, kind: 'amigo_se_va', actors: [a!.id, 999_999], createdTick: s.tick, expires: s.tick + 24 * 15 }];
+    s.tick += 24;
+    socialDay(s);
+    expect(s.hooks.some((h) => h.id === 9002)).toBe(true);
+    s.tick += 24 * 15;
+    socialDay(s);
+    expect(s.hooks.some((h) => h.id === 9002)).toBe(false);
+    expect(a!.memories.some((m) => m.kind === 'paso_pagina')).toBe(true);
+    void b;
+  });
+
+  it('mismo local: si nadie se lo queda, los rivales hacen las paces', () => {
+    const s = town();
+    const [a, b] = s.citizens.filter((x) => x.named);
+    a!.relations = a!.relations.filter((r) => r.id !== b!.id);
+    b!.relations = b!.relations.filter((r) => r.id !== a!.id);
+    a!.relations.push({ id: b!.id, kind: 'rivalidad', strength: 40, since: s.tick });
+    b!.relations.push({ id: a!.id, kind: 'rivalidad', strength: 40, since: s.tick });
+    s.hooks = [{ id: 9003, kind: 'mismo_local', actors: [a!.id, b!.id], createdTick: s.tick, expires: s.tick + 1 }];
+    s.tick += 24;
+    socialDay(s);
+    expect(a!.relations.find((r) => r.id === b!.id)?.kind).toBe('amistad');
+    expect(b!.memories.some((m) => m.kind === 'se_reconcilio')).toBe(true);
+  });
+});
+
+describe('amistades de barrio (v1.3)', () => {
+  it('una plaza cerca de las dos casas es punto de encuentro; lejos, no', () => {
+    const s = town();
+    const homes = s.buildings.filter((b) => b.kind === 'house' && b.built);
+    const [a, b] = s.citizens.filter((x) => x.named && x.homeId !== null);
+    const ha = s.buildings.find((x) => x.id === a!.homeId)!;
+    const other = homes.find((h) => h.id !== ha.id && Math.abs(h.x - ha.x) + Math.abs(h.y - ha.y) <= 6)!;
+    b!.homeId = other.id;
+    s.buildings = s.buildings.filter((x) => !['plaza', 'park', 'market'].includes(x.kind));
+    expect(meetingPlace(s, a!, b!)).toBeUndefined();
+    const plaza = newBuilding(s, 'plaza', ha.x, ha.y + 1, 0);
+    plaza.built = true;
+    s.buildings.push(plaza);
+    expect(meetingPlace(s, a!, b!)?.kind).toBe('plaza');
+    plaza.x += 40;
+    expect(meetingPlace(s, a!, b!)).toBeUndefined();
+  });
+
+  it('con plaza, en tres meses salen más amistades que sin ella (misma semilla)', () => {
+    const count = (withPlaza: boolean) => {
+      const { state } = runSimulation({ seed: 7, days: 120, profile: 'constructor' });
+      if (withPlaza) {
+        const homes = state.buildings.filter((b) => b.kind === 'house' && b.built);
+        for (const h of homes.slice(0, 6)) {
+          const p = newBuilding(state, 'plaza', h.x, h.y, 0);
+          p.built = true;
+          state.buildings.push(p);
+        }
+      }
+      for (const c of state.citizens) c.relations = [];
+      for (let d = 0; d < 90; d++) {
+        state.tick += 24;
+        socialDay(state);
+      }
+      return state.citizens.reduce((n, c) => n + c.relations.filter((r) => r.kind !== 'rivalidad' && r.kind !== 'rencor').length, 0);
+    };
+    expect(count(true)).toBeGreaterThan(count(false));
+  });
+});
+
+describe('respuestas que recuerdan (v1.3)', () => {
+  it('«¿Cómo estás?» menciona lo último importante que ha vivido', () => {
+    const s = town();
+    const [c, friend] = s.citizens.filter((x) => x.named);
+    c!.memories = [];
+    expect(memoryLine(s, c!)).toBeNull();
+    addMemory(s, c!, 'nueva_pareja', 4, 4, [friend!.id]);
+    const line = memoryLine(s, c!)!;
+    expect(line).toContain(friend!.name.split(' ')[0]);
+    expect(ruleAnswer(s, c!, 'como_estas', undefined)).toContain(line);
+    // Los recuerdos de hace más de 60 días ya no salen.
+    s.tick += 24 * 61;
+    expect(memoryLine(s, c!)).toBeNull();
+  });
+});
+
+describe('IA: tono y nombres inventados (v1.3)', () => {
+  it('cada vecino lleva un tono en el prompt, y no todos el mismo', () => {
+    const s = town();
+    const named = s.citizens.filter((c) => c.named);
+    const tones = new Set(named.map(toneOf));
+    expect(tones.size).toBeGreaterThan(2);
+    const c = named[0]!;
+    const pend = { citizenId: c.id, trigger: 'infeliz' as const, actions: validActions(s, c, 'infeliz'), createdTick: s.tick, dueTick: s.tick + 12 };
+    const req = buildDecisionRequest(s, [pend]);
+    expect(JSON.parse(req.user).vecinos[0].tono).toBe(toneOf(c));
+  });
+
+  it('detecta nombres que no están en los datos, pero no el inicio de frase ni los conocidos', () => {
+    const sent = '{"nombre":"Lucía Pérez","relaciones":[{"con":"Gonzalo"}]}';
+    expect(inventedName('Me quedo por Lucía y por Gonzalo.', sent)).toBeNull();
+    expect(inventedName('Pues me quedo. Aquí estoy bien.', sent)).toBeNull();
+    expect(inventedName('Lo hago por el Ayuntamiento y por Bitópolis.', sent)).toBeNull();
+    expect(inventedName('Me lo dijo Marisa en la panadería.', sent)).toBe('Marisa');
+    // Ronda 09: ni días, ni tratamientos, ni edificios, ni lugares; sí nombres al empezar la frase.
+    for (const ok of ['El Lunes lo pienso.', 'Señor alcalde, así no.', 'Como Médica, lo veo claro.', 'Que pongan la Comisaría.', 'Vengo de Ávila.', 'Ni un McDonald.', 'Por Lucia lo hago.']) expect(inventedName(ok, sent)).toBeNull();
+    expect(inventedName('Paco me dijo que me quede.', sent)).toBe('Paco');
+    expect(inventedName('Me quedo: Fernando lo dice.', sent)).toBe('Fernando');
+  });
+
+  it('un motivo con un nombre inventado no vale; uno normal, sí', () => {
+    const s = town();
+    const c = s.citizens.find((x) => x.named)!;
+    const actions = validActions(s, c, 'infeliz');
+    const pend = [{ citizenId: c.id, trigger: 'infeliz' as const, actions, createdTick: s.tick, dueTick: s.tick + 12 }];
+    const req = buildDecisionRequest(s, pend);
+    const known = req.system + '\n' + req.user;
+    const raw = (motivo: string) => JSON.stringify({ decisiones: [{ vecino: c.id, accion: actions[0], motivo }] });
+    expect(parseDecisions(raw('Me lo ha aconsejado Wenceslao y le hago caso.'), pend, {}, false, known).reasons).toEqual({ nombre_inventado: 1 });
+    expect(parseDecisions(raw('Me lo he pensado mucho y lo tengo claro.'), pend, {}, false, known).decisions).toHaveLength(1);
+  });
+
+  it('un texto premium con un nombre inventado se descarta', () => {
+    const s = town();
+    const c = s.citizens.find((x) => x.named)!;
+    const req = buildTalkRequest(s, c, 'como_estas');
+    expect(parseText(JSON.stringify({ texto: 'Aquí andamos, con ganas de que el pueblo crezca.' }), req)).not.toBeNull();
+    expect(parseText(JSON.stringify({ texto: 'Mi primo Anacleto dice que esto va bien.' }), req)).toBeNull();
+  });
+});
+
+describe('ronda 09: arreglos de la vida social y el pleno', () => {
+  it('nadie pasa de 5 relaciones y las amistades no se rehacen en bucle', () => {
+    const { state } = runSimulation({ seed: 3, days: 600, profile: 'constructor' });
+    for (const c of state.citizens) expect(c.relations.length).toBeLessThanOrEqual(5);
+    let barrio = 0;
+    for (let d = 0; d < 120; d++) {
+      state.tick += 24;
+      const before = state.events.length;
+      socialDay(state);
+      barrio += state.events.slice(before).filter((e) => e.text.includes('han hecho amistad')).length;
+    }
+    // Como mucho uno al día, y en la práctica muy pocos.
+    expect(barrio).toBeLessThan(30);
+    expect(state.events.some((e) => / amigos /.test(e.text))).toBe(false);
+  });
+
+  it('un recuerdo conserva el nombre aunque esa persona se vaya', () => {
+    const s = town();
+    const [c, friend] = s.citizens.filter((x) => x.named);
+    c!.memories = [];
+    addMemory(s, c!, 'se_fue_amigo', 3, -3, [friend!.id]);
+    const first = friend!.name.split(' ')[0]!;
+    s.citizens = s.citizens.filter((x) => x !== friend);
+    expect(memoryLine(s, c!)).toContain(first);
+  });
+
+  it('«¿Cómo estás?» enlaza el recuerdo con el ánimo', () => {
+    const s = town();
+    const [c, friend] = s.citizens.filter((x) => x.named);
+    c!.memories = [];
+    addMemory(s, c!, 'se_fue_amigo', 3, -3, [friend!.id]);
+    c!.happiness = 90;
+    expect(ruleAnswer(s, c!, 'como_estas', undefined)).toContain('Eso sí, echo de menos');
+    c!.memories = [];
+    addMemory(s, c!, 'abrio_negocio', 3, 3);
+    c!.happiness = 20;
+    expect(ruleAnswer(s, c!, 'como_estas', undefined)).toContain('Al menos, con mi negocio');
+  });
+
+  it('pleno: la oposición no da campaña fuera del último año ni por encima de 3; incumplirle resta', () => {
+    const s = town();
+    const leader = s.citizens.find((x) => x.named)!;
+    s.politics.party = { leaderId: leader.id, leaderName: leader.name, name: 'Bitópolis Joven', faction: 'jovenes', founded: s.tick, promises: [] };
+    s.politics.nextElection = s.tick + 30 * TICKS_PER_MONTH;
+    s.politics.campaign.jovenes = 0;
+    applyCommand(s, { type: 'ConvenePleno' });
+    const q = s.pleno!.petitions.find((p) => p.opposition)!;
+    applyCommand(s, { type: 'AnswerPetition', petitionId: q.id, answer: 'promise' });
+    // Faltan 30 meses: no cuenta como campaña.
+    expect(s.politics.campaign.jovenes).toBe(0);
+    const promise = s.promises.at(-1)!;
+    expect(promise.oppositionFaction).toBe('jovenes');
+    // Lo ya prometido no se vuelve a pedir.
+    applyCommand(s, { type: 'ClosePleno' });
+    s.lastPlenoTick = -1e9;
+    applyCommand(s, { type: 'ConvenePleno' });
+    expect(s.pleno!.petitions.some((p) => p.need === promise.need)).toBe(false);
+    applyCommand(s, { type: 'ClosePleno' });
+    // Incumplida: la facción de la oposición lo castiga.
+    s.politics.campaign.jovenes = 3;
+    promise.deadline = s.tick;
+    promise.baseline = 1e9;
+    s.tick += 24;
+    socialDay(s);
+    if (promise.status === 'broken') expect(s.politics.campaign.jovenes).toBe(1);
+  });
+});

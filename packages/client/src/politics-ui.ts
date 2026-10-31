@@ -40,7 +40,11 @@ export function renderPollChip(state: GameState, onOpen: () => void): void {
   if (!active) return;
   const p = state.politics;
   const opp = p.mayor !== 'player';
-  chip.textContent = opp ? `🗳 Oposición · ${p.approval} %` : `🗳 ${p.approval} %`;
+  // Cuenta atrás en los últimos 3 meses (v1.3).
+  const d = daysToElection(state);
+  const countdown = d <= 90 ? ` · ${d} d` : '';
+  chip.textContent = (opp ? `🗳 Oposición · ${p.approval} %` : `🗳 ${p.approval} %`) + countdown;
+  chip.classList.toggle('soon', d <= 90);
   chip.classList.toggle('neg', p.approval < 50);
   chip.setAttribute('aria-label', `${opp ? 'Estás en la oposición. ' : ''}Intención de voto: ${p.approval} %. Elecciones: ${left(state)}. Ver política`);
   if (!chip.dataset.bound) {
@@ -105,6 +109,14 @@ export function openPolitics(ctx: SocialCtx): void {
   }
   items.splice(items.length - FACTIONS.length, 0, why);
   if (opp && p.party) items.splice(items.length - FACTIONS.length, 0, motionIntro(state));
+
+  // Registro del gobierno rival (v1.3): qué ha hecho, de lo último a lo primero.
+  if (p.log.length) {
+    items.push(
+      h('h3', {}, opp ? 'Lo que ha hecho el gobierno' : 'Lo que hizo el último gobierno rival'),
+      h('ul', { class: 'pol-log' }, ...[...p.log].reverse().slice(0, 8).map((e) => h('li', {}, h('span', { class: 'muted small' }, formatDate(tickToDate(e.tick))), ' ', e.text))),
+    );
+  }
 
   if (p.party) {
     const leader = h('button', { class: 'btn small' }, `Ver la ficha de ${p.party.leaderName}`);

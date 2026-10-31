@@ -5,7 +5,7 @@ import type { Goal, Hook, Memory, Pleno, PromiseRecord, Relation } from './socia
 import { emptyPolitics, type Politics } from './politics-core.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
-export const FORMAT_VERSION = 7;
+export const FORMAT_VERSION = 8;
 
 export const MAP_W = 48;
 export const MAP_H = 48;
