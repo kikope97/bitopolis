@@ -962,3 +962,7 @@ body.cal-on .legend { top: 86px; }
 .pocket-tag.holgado { color: var(--good); border-color: var(--good); }
 .pocket-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .pocket-warn { color: var(--bad); }
+/* Ronda 15: cifras que no se parten y tarjetas que no se salen a 360 px con texto grande. */
+.mg-card { min-width: 0; }
+.mg-row strong, .accounts .num { white-space: nowrap; }
+.legend { max-width: min(60%, calc(100% - 180px)); }

@@ -375,7 +375,7 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       const c = state.citizens.find((x) => x.id === cmd.citizenId)!;
       const amount = c.debt?.town ?? 0;
       settleDebt(state, c, cmd.mode);
-      if (cmd.mode === 'perdonar') addMemory(state, c, 'logro_vecinal', 3, 4);
+      if (cmd.mode === 'perdonar') addMemory(state, c, 'deuda_perdonada', 4, 5);
       pushEvent(state, 'info', cmd.mode === 'aplazar' ? `Aplazas la deuda de ${c.name}: pagará ${c.debt?.plan?.perMonth ?? 0} € al mes durante un año, sin recargo` : `Perdonas a ${c.name} los ${amount} € que debía al ayuntamiento`, { ref: c.id });
       break;
     }

@@ -92,7 +92,8 @@ export function validActions(state: GameState, c: Citizen, trigger: Trigger): st
       // v1.9: debe dinero. Aplazar solo si lo debe al ayuntamiento.
       return [
         'apretarse',
-        ...(c.debt && c.debt.town > 0 && !c.debt.plan ? ['pedir_aplazamiento'] : []),
+        // Ronda 15: aplazar solo si lo que debe al ayuntamiento es de verdad (no por 24 €).
+        ...(c.debt && c.debt.town >= DEBT.noticeable && !c.debt.plan ? ['pedir_aplazamiento'] : []),
         ...vacantJobs(state, c).map((b) => `aceptar_trabajo:${b.id}`),
         'irse',
       ];
@@ -230,7 +231,7 @@ export function applyDecision(state: GameState, citizenId: number, action: strin
       effect = 'se aprieta el cinturón para pagar lo que debe';
       break;
     case 'pedir_aplazamiento':
-      effect = `pide al alcalde que le aplace lo que debe al ayuntamiento (${c.debt?.town ?? 0} €; tócalo para decidir)`;
+      effect = `pide al alcalde que le aplace lo que debe al ayuntamiento (${c.debt?.town ?? 0} €)`;
       break;
     case 'manifestarse':
     case 'no_ir': {
@@ -315,7 +316,14 @@ function score(c: Citizen, state: GameState, action: string): number {
   const [verb, arg] = action.split(':');
   switch (verb) {
     case 'irse':
-      return (40 - c.happiness) * 2 - t.terco * 0.6 + (c.fear === 'impuestos' ? 15 : 0) + (totalDebt(c) > 2_000 && c.money === 0 ? 30 : 0);
+      return (
+        (40 - c.happiness) * 2 -
+        t.terco * 0.6 +
+        (c.fear === 'impuestos' ? 15 : 0) +
+        (totalDebt(c) > 2_000 && c.money === 0 ? 30 : 0) +
+        // Ronda 15: tras un desahucio o un embargo, irse pesa mucho más.
+        (recentBlow(state, c) ? 45 : 0)
+      );
     case 'quejarse':
       return 20 + t.social * 0.4 - t.terco * 0.1 + (c.fear === 'impuestos' ? 10 : 0);
     case 'quedarse':
@@ -347,7 +355,8 @@ function score(c: Citizen, state: GameState, action: string): number {
     case 'no_ir':
       return 30 + t.ahorro * 0.1 + (c.happiness >= 60 ? 15 : 0);
     case 'apretarse':
-      return 35 + t.ahorro * 0.4 + t.terco * 0.2 + (c.fear === 'deudas' ? 10 : 0);
+      // Ronda 15: no se aprieta el cinturón una y otra vez sin probar otra cosa.
+      return 35 + t.ahorro * 0.4 + t.terco * 0.2 + (c.fear === 'deudas' ? 10 : 0) - (lastDebtChoice(state, c) === 'apretarse' ? 30 : 0);
     case 'pedir_aplazamiento':
       return 30 + t.social * 0.3 + (totalDebt(c) > 1_000 ? 20 : 0);
     case 'pedir': {
@@ -359,6 +368,26 @@ function score(c: Citizen, state: GameState, action: string): number {
   }
   return 10;
 }
+
+/** Ronda 15: lo último que decidió sobre sus deudas. */
+function lastDebtChoice(state: GameState, c: Citizen): string | undefined {
+  for (let i = state.decisionLog.length - 1; i >= 0; i--) {
+    const d = state.decisionLog[i]!;
+    if (d.citizenId === c.id && d.trigger === 'deudas') return d.action.split(':')[0];
+  }
+  return undefined;
+}
+
+/** Ronda 15: le han echado de casa o le han embargado hace poco. */
+function recentBlow(state: GameState, c: Citizen): boolean {
+  return c.memories.some((m) => (m.kind === 'desahuciado' || m.kind === 'embargado') && state.tick - m.tick < 60 * TICKS_PER_DAY);
+}
+
+const AFTER_BLOW: Record<string, string[]> = {
+  apretarse: ['Me han echado de casa, pero voy a pagar lo que debo.', 'Sin casa y con deudas. Toca aguantar como sea.'],
+  irse: ['Me han echado de casa. No sé cuánto más aguanto aquí.', 'Sin casa no hay nada que me retenga. Me voy.'],
+  pedir_aplazamiento: ['Me han quitado la casa. Alcalde, deme tiempo para lo que debo.'],
+};
 
 /** Decisión por reglas: determinista (no consume el PRNG de la partida). */
 export function ruleDecide(state: GameState, p: Pending): { action: string; motivo: string } {
@@ -373,13 +402,14 @@ export function ruleDecide(state: GameState, p: Pending): { action: string; moti
     }
   }
   const [verb, arg] = best.split(':');
-  const options = TEMPLATES[verb!] ?? TEMPLATES.quedarse!;
+  const options = (p.trigger === 'deudas' && recentBlow(state, c) && AFTER_BLOW[verb!]) || TEMPLATES[verb!] || TEMPLATES.quedarse!;
   const base = options[hash32(state.seed, c.id, state.tick) % options.length]!.replace('{x}', NEED_TEXT[arg ?? ''] ?? 'más cosas');
   const top = (Object.entries(c.traits) as [keyof Citizen['traits'], number][]).sort((a, b) => b[1] - a[1])[0]!;
   // «Ya lo comentaré en el bar» solo si hay bar en el pueblo.
   const hasBar = state.buildings.some((b) => b.kind === 'bar' && b.built);
   const flavors = FLAVOR[top[0]].filter((f) => hasBar || !f.includes('bar'));
-  const motivo = top[1] >= 60 ? `${base} ${flavors[hash32(c.id, state.tick, 7) % flavors.length]}` : base;
+  // Ronda 15: sin coletillas en las decisiones sobre deudas (desentonaban: «Aspiro a más» tras un desahucio).
+  const motivo = top[1] >= 60 && p.trigger !== 'deudas' ? `${base} ${flavors[hash32(c.id, state.tick, 7) % flavors.length]}` : base;
   return { action: best, motivo: cleanMotivo(motivo) };
 }
 

@@ -203,7 +203,7 @@ function homeRobbery(state: GameState, b: Building, thief: Citizen | undefined):
   if (!victim) return;
   j.robberies++;
   j.homeRobberies = (j.homeRobberies ?? 0) + 1;
-  const who = thief ? `${thief.name}, un vecino del pueblo` : 'un ladrón de fuera';
+  const who = thief ? `${thief.name}, del pueblo` : 'un ladrón de fuera';
   const caught = tryArrest(state, b.x, b.y, 1, thief ? [thief] : [], 'theft');
   if (caught) {
     pushEvent(state, 'crime', `Entran a robar en casa de ${victim.name}, pero la policía detiene a ${who}`, { ref: b.id });
@@ -214,7 +214,8 @@ function homeRobbery(state: GameState, b: Building, thief: Citizen | undefined):
   addMemory(state, victim, 'robo_en_casa', 4, -5);
   if (thief) j.localThefts = (j.localThefts ?? 0) + 1;
   const why = stationsFor(state, b.x, b.y).length ? 'los calabozos están llenos' : 'no hay policía cerca';
-  pushEvent(state, 'crime', `Entran a robar en casa de ${victim.name}: se llevan ${loss} € y el ladrón escapa (${why})`, { ref: b.id });
+  const all = victim.money === 0 ? 'todos sus ahorros' : 'sus ahorros';
+  pushEvent(state, 'crime', `Entran a robar en casa de ${victim.name}: se llevan ${loss} € de ${all} y el ladrón escapa (${why})`, { ref: b.id });
 }
 
 /** ¿Hay una cárcel cerca de la casa? (a los vecinos no les gusta) */

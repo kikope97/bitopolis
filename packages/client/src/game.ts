@@ -625,6 +625,12 @@ export function startGame(opts: GameOptions): void {
         toast(e.text, { kind: 'warn', sticky: true, onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
       } else if (e.kind === 'crime') {
         // v1.8: robos, detenciones, calabozos llenos y disturbios.
+        // Ronda 15: los robos en casas (muchos) se avisan sin parar el juego ni llamar la atención.
+        const home = e.text.startsWith('Entran a robar en casa') || e.text.startsWith('Intentan robar');
+        if (home) {
+          if (!quiet) toast(e.text, { kind: e.text.includes('escapa') ? 'warn' : 'info', onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+          continue;
+        }
         const bad = /Disturbios|llenos|escapa/.test(e.text);
         if (quiet && !bad) continue;
         if (bad) {
@@ -1541,7 +1547,7 @@ export function startGame(opts: GameOptions): void {
         if ((b.kind === 'shop' || b.kind === 'factory') && b.books) {
           const k = b.books;
           const profit = k.sales - k.wages - k.taxes;
-          content.push(h('p', { class: profit < 0 ? 'neg' : '' }, `El mes pasado: vendió ${money(k.sales)}, pagó ${money(k.wages)} en sueldos y ${money(k.taxes)} en impuestos → ${profit >= 0 ? `ganó ${money(profit)}` : `perdió ${money(-profit)}`}. Caja: ${money(b.cash)}.`));
+          content.push(h('p', { class: profit < 0 ? 'neg' : '' }, `El mes pasado: vendió ${money(k.sales)}, pagó ${money(k.wages)} en sueldos y ${money(k.taxes)} en impuestos → ${profit >= 0 ? `ganó ${money(profit)}` : `perdió ${money(-profit)}`}. `));
         }
         if (pills.length) content.push(h('div', { class: 'status-row' }, ...pills));
       }

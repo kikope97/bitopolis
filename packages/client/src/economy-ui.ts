@@ -89,7 +89,7 @@ export function openTaxes(getState: () => GameState, command: Cmd): void {
       'button',
       { class: 'btn choice', role: 'radio', 'aria-checked': String(cur === lv) },
       h('strong', {}, `${cur === lv ? '✓ ' : ''}${MIN_WAGE_NAME[lv]}${cur === lv ? ' (actual)' : ''}`),
-      h('span', {}, `${money(MIN_WAGE[lv])} al mes${extra > 0 ? ` · las empresas pagan ${money(extra)} más al mes en nóminas` : ''}`),
+      h('span', {}, `${lv === 'none' ? `pagan lo de siempre (${money(MIN_WAGE[lv])} al mes)` : `${money(MIN_WAGE[lv])} al mes`}${extra > 0 ? ` · las empresas pagan ${money(extra)} más al mes en nóminas` : ''}`),
     );
     b.addEventListener('click', async () => {
       await command({ type: 'SetMinimumWage', level: lv });
@@ -195,7 +195,7 @@ export function openReport(state: GameState): void {
     rows(spend, prev?.breakdown),
     // v1.9: los vecinos que no llegan y la salud de las empresas.
     h('h3', {}, 'Vecinos y empresas'),
-    h('ul', { class: 'accounts' }, ...economyLines(state).map((l) => h('li', { class: l.bad ? 'neg' : '' }, h('span', {}, l.label), h('span', {}, l.value)))),
+    h('ul', { class: 'accounts' }, ...economyLines(state).map((l) => h('li', { class: l.bad ? 'neg' : '' }, h('span', {}, l.label), h('span', { class: 'num' }, l.bad ? `⚠ ${l.value}` : l.value)))),
     live ? h('details', { class: 'advanced' }, h('summary', {}, 'Este mes (en curso)'), rows(state.month.breakdown, undefined)) : '',
   );
 }
@@ -236,8 +236,8 @@ export function openNeighbours(state: GameState, onPick: (c: Citizen) => void, o
       h('span', { 'aria-hidden': 'true' }, `${mood[0]} `),
       h('strong', {}, c.name),
       h('span', {}, ` (${mood[1]})`),
-      h('span', { class: 'muted' }, ` · ${c.age} años · ${job ? (job.name ?? BUILD_NAMES[job.kind]) : c.unemployedSince !== undefined ? 'en paro' : 'trabaja fuera'}${c.owns ? ' · propietario' : ''}`),
-      totalDebt(c) > 0 ? h('span', { class: 'pocket-warn' }, ` · debe ${money(totalDebt(c))}`) : '',
+      // Ronda 15: todo el detalle en una línea propia (la rejilla tiene 3 columnas).
+      h('span', { class: 'p-sub muted' }, `${c.age} años · ${job ? (job.name ?? BUILD_NAMES[job.kind]) : c.unemployedSince !== undefined ? 'en paro' : 'trabaja fuera'}${c.owns ? ' · propietario' : ''}`, totalDebt(c) > 0 ? h('span', { class: 'pocket-warn' }, ` · debe ${money(totalDebt(c))}`) : ''),
     );
     btn.addEventListener('click', () => onPick(c));
     ul.append(h('li', {}, btn));
@@ -250,7 +250,7 @@ export function openNeighbours(state: GameState, onPick: (c: Citizen) => void, o
     'Vecinos',
     h('div', { class: 'mg-actions' }, filter),
     onlyDebts
-      ? h('p', {}, `${debtors.length} vecinos deben dinero: ${money(debtors.reduce((a, c) => a + (c.debt?.town ?? 0), 0))} al ayuntamiento y ${money(debtors.reduce((a, c) => a + (c.debt?.bank ?? 0), 0))} a bancos y caseros.${rest > 0 ? ` ${rest} de ellos son vecinos sin nombre.` : ''} Toca a uno para aplazar, perdonar o darle un microcrédito.`)
+      ? h('p', {}, `${debtors.length} vecinos deben dinero: ${money(debtors.reduce((a, c) => a + (c.debt?.town ?? 0), 0))} al ayuntamiento y ${money(debtors.reduce((a, c) => a + (c.debt?.bank ?? 0), 0))} a bancos y caseros.${rest > 0 ? ` ${rest} de ellos son vecinos sin nombre.` : ''} ${named.length ? ' Toca a uno con nombre para aplazar, perdonar o darle un microcrédito.' : ''}`)
       : h('p', {}, `${named.length} vecinos con nombre${rest > 0 ? ` y ${rest} vecinos más (población estadística, siguen la media de su barrio)` : ''}.`),
     ul,
   );

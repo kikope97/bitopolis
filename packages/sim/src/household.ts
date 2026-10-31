@@ -11,7 +11,8 @@ import {
 } from './balance.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance } from './prng.ts';
-import type { Building, Citizen, CitizenDebt, GameState } from './state.ts';
+import { addMemory } from './social.ts';
+import { type Building, type Citizen, type CitizenDebt, type GameState, pushEvent } from './state.ts';
 
 /**
  * v1.9 (petición del creador): la economía de cada vecino. Cada uno tiene su
@@ -193,7 +194,9 @@ export function settleMonth(state: GameState, shops: Building[]): void {
       if (dd.plan && dd.plan.until <= state.tick) delete dd.plan;
     }
     const f = c.flow ?? [0, 0];
-    c.last = { in: f[0], out: f[1], repaid };
+    // Ronda 15: cuánto creció (o bajó) lo que debe este mes, para la ficha.
+    const owed = totalDebt(c);
+    c.last = { in: f[0], out: f[1], repaid, owed, grew: owed - (c.last?.owed ?? 0) };
     c.flow = [0, 0];
   }
 }
@@ -210,6 +213,9 @@ export function outsideJobsMonth(state: GameState): void {
       if (chance(state.rng, JOBS_OUTSIDE.loseChance)) {
         c.unemployedSince = state.tick;
         c.benefitLeft = JOBS_OUTSIDE.benefitMonths;
+        // Ronda 15: que el paro deje rastro (recuerdo y, con nombre, en el diario).
+        addMemory(state, c, 'en_paro', 4, -4);
+        if (c.named) pushEvent(state, 'info', `${c.name} se queda sin su trabajo de fuera: cobrará el paro ${JOBS_OUTSIDE.benefitMonths} meses`, { ref: c.id });
       }
     } else if (chance(state.rng, JOBS_OUTSIDE.findChance)) {
       delete c.unemployedSince;

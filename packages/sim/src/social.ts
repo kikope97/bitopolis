@@ -71,6 +71,7 @@ export const MEMORY_KINDS = [
   'robo_en_casa',
   'antecedentes',
   'en_paro',
+  'deuda_perdonada',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -246,6 +247,8 @@ export function memoryText(state: GameState, m: Memory): string {
       return 'Le detuvieron por robar';
     case 'en_paro':
       return 'Se quedó sin trabajo';
+    case 'deuda_perdonada':
+      return 'El alcalde le perdonó lo que debía';
   }
 }
 
@@ -260,7 +263,7 @@ export function narrativeSummary(state: GameState, c: Citizen): string {
   const parts: string[] = [];
   const job = state.buildings.find((b) => b.id === c.jobId);
   parts.push(`${c.name.split(' ')[0]}, ${c.profession}, ${c.age} años.`);
-  parts.push(job ? `Trabaja en ${(job.name ?? BUILD_NAMES[job.kind] ?? '').toLowerCase()}.` : 'Trabaja fuera del pueblo.');
+  parts.push(job ? `Trabaja en ${(job.name ?? BUILD_NAMES[job.kind] ?? '').toLowerCase()}.` : c.unemployedSince !== undefined ? 'Está en paro.' : 'Trabaja fuera del pueblo.');
   if (c.owns) parts.push(c.mortgage > 0 ? 'Paga la hipoteca de su casa.' : 'Su casa ya es suya.');
   const friends = c.relations.filter((r) => r.kind === 'amistad').map((r) => nameOf(state, r.id));
   if (friends.length) parts.push(`Se lleva bien con ${friends.slice(0, 2).join(' y ')}.`);
@@ -825,6 +828,12 @@ const MEMORY_LINE: Partial<Record<MemoryKind, (who: string) => string>> = {
   compro_casa: () => 'Con la casa ya en mis manos, duermo con más calma.',
   abrio_negocio: () => 'Con mi negocio en marcha, ganas no me faltan.',
   subida_impuestos: () => 'Y la última subida de impuestos no ayuda.',
+  // v1.9 (ronda 15).
+  desahuciado: () => 'Desde que me echaron de casa, duermo donde puedo.',
+  embargado: () => 'El banco se quedó mi casa; ahora pago alquiler en ella.',
+  robo_en_casa: () => 'Me entraron a robar en casa; ya no estoy tranquilo.',
+  en_paro: () => 'Sigo buscando trabajo.',
+  deuda_perdonada: () => 'El alcalde me perdonó lo que debía. No lo olvido.',
 };
 
 /** Frase de un recuerdo; las pérdidas, distintas para la pareja y para una amistad (ronda 11). */

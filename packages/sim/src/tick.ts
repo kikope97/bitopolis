@@ -408,15 +408,19 @@ function assignHomesAndJobs(state: GameState): void {
     if (c.homeId !== null) homeUse.set(c.homeId, (homeUse.get(c.homeId) ?? 0) + 1);
     if (c.jobId !== null) jobUse.set(c.jobId, (jobUse.get(c.jobId) ?? 0) + 1);
   }
+  // v1.9: quien está detenido no busca trabajo; a quien desahuciaron nadie le alquila en unos meses.
+  const detained = new Set<number>();
+  for (const x of state.justice?.cells ?? []) if (x.citizenId !== undefined) detained.add(x.citizenId);
+  for (const x of state.justice?.jail ?? []) if (x.citizenId !== undefined) detained.add(x.citizenId);
   for (const c of state.citizens) {
-    if (c.homeId === null) {
+    if (c.homeId === null && !(c.evictedUntil !== undefined && c.evictedUntil > state.tick)) {
       const h = state.buildings.find((b) => homeCapacity(b) > (homeUse.get(b.id) ?? 0));
       if (h) {
         c.homeId = h.id;
         homeUse.set(h.id, (homeUse.get(h.id) ?? 0) + 1);
       }
     }
-    if (c.jobId === null) {
+    if (c.jobId === null && !detained.has(c.id)) {
       // Prefiere el empleo más cercano a casa.
       const home = state.buildings.find((b) => b.id === c.homeId);
       let best: Building | undefined;
@@ -499,7 +503,7 @@ function departures(state: GameState): void {
       onCitizenLeaves(state, c);
       transfer(state, c.id, OUTSIDE, c.money);
       state.citizens = state.citizens.filter((x) => x !== c);
-      const why = broke ? 'sin casa ni dinero' : drowned ? 'ahogado por las deudas' : 'descontento';
+      const why = broke ? 'sin casa ni dinero' : drowned ? 'no puede con las deudas' : 'descontento';
       pushEvent(state, 'departure', `${c.name} se va del pueblo (${why})`);
     }
   }

@@ -157,7 +157,7 @@ export interface Citizen {
   /** v1.9: ingresos y gastos del mes en curso [entra, sale] (los anota transfer). */
   flow?: [number, number];
   /** v1.9: el mes pasado: lo que entró, salió y devolvió de deudas. */
-  last?: { in: number; out: number; repaid: number };
+  last?: { in: number; out: number; repaid: number; owed?: number; grew?: number };
   /** v1.9: antecedentes penales (ladrones del pueblo). */
   record?: number;
   /** v1.9: meses seguidos sin pagar todo el alquiler privado / la hipoteca. */
@@ -168,6 +168,9 @@ export interface Citizen {
   benefitLeft?: number;
   /** v1.9: última vez que decidió qué hacer con sus deudas (tick). */
   debtAsked?: number;
+  /** v1.9: tras un desahucio, nadie le alquila hasta este tick; tras un embargo, no puede comprar hasta este tick. */
+  evictedUntil?: number;
+  seizedUntil?: number;
 }
 
 export interface CitizenDebt {

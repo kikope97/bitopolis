@@ -138,7 +138,6 @@ function citizenView(state: GameState, c: Citizen, p: Pending) {
     dinero: band(c.money, [300, 1_500, 4_000], ['casi nada', 'poco', 'algo', 'bastante']),
     // v1.9: la deuda va por tramos, nunca la cifra.
     deuda: debtBand(c),
-    ...(c.jobId === null && c.unemployedSince !== undefined ? { en_paro: true } : {}),
     casa: home ? (c.owns ? 'vivienda en propiedad' : home.kind === 'house' ? 'casa municipal de alquiler' : 'piso de alquiler') : 'sin casa',
     hipoteca: c.mortgage > 0,
     trabajo: job ? BUILD_NAMES[job.kind]!.toLowerCase() : c.unemployedSince !== undefined ? 'en paro' : 'fuera del pueblo',

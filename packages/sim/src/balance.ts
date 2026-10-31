@@ -439,6 +439,8 @@ export const DEBT = {
   repayMin: 50,
   /** Meses de alquiler privado impagado hasta el desahucio. */
   evictMonths: 3,
+  /** Meses sin que nadie le alquile tras un desahucio (si no tiene dinero, se acaba yendo). */
+  evictedMonths: 6,
   /** Cuotas de hipoteca impagadas hasta que el banco ejecuta y vende la vivienda. */
   foreclosureMonths: 3,
   /** Deuda a partir de la que «debe dinero» se nota y salta la decisión (vecinos con nombre). */

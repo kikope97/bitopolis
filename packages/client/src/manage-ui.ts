@@ -153,7 +153,7 @@ export function openManagement(ctx: SocialCtx, links: ManageLinks): void {
   pol.append(h('div', { class: 'mg-actions' }, polBtn, thBtn));
 
   /* --- v1.9: el bolsillo de los vecinos y la salud de las empresas --- */
-  const pockets = card('Vecinos y empresas', 'coin', ...economyLines(s).map((l) => row(l.label, l.value, l.bad ? 'neg' : '')));
+  const pockets = card('Vecinos y empresas', 'coin', ...economyLines(s).map((l) => row(l.label, l.bad ? `⚠ ${l.value}` : l.value, l.bad ? 'neg' : '')));
   const taxesBtn = h('button', { class: 'btn' }, 'Impuestos y sueldo mínimo');
   taxesBtn.addEventListener('click', links.taxes);
   pockets.append(h('div', { class: 'mg-actions' }, taxesBtn));

@@ -1,4 +1,4 @@
-import type { TaxLevel } from '@bitopolis/shared';
+import { TICKS_PER_MONTH, type TaxLevel } from '@bitopolis/shared';
 import {
   TAX_RELIEF_DAYS,
   BUSINESS_CASH_CAP,
@@ -38,7 +38,7 @@ import {
   MIN_WAGE_FX,
 } from './balance.ts';
 import { hash32 } from './hash.ts';
-import { charge } from './household.ts';
+import { charge, totalDebt } from './household.ts';
 import { radiusOf, serviceCapacityOf } from './levels.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance } from './prng.ts';
@@ -197,6 +197,8 @@ function municipalUnits(b: Building): number {
 /** ¿Puede comprar la vivienda en la que vive? */
 export function canBuyHome(state: GameState, c: Citizen): boolean {
   if (c.owns || c.homeId === null) return false;
+  // v1.9: con deudas, o tras un embargo reciente, el banco no le da hipoteca.
+  if (totalDebt(c) > 0 || (c.seizedUntil !== undefined && c.seizedUntil > state.tick)) return false;
   const home = state.buildings.find((b) => b.id === c.homeId);
   if (!home || !home.built) return false;
   if (home.kind === 'house' && !home.forSale) return false;
@@ -269,11 +271,13 @@ export function housingTroubles(state: GameState): void {
     if (c.owns && (c.missedQuotas ?? 0) >= DEBT.foreclosureMonths) {
       sellOnDeparture(state, c);
       c.missedQuotas = 0;
+      c.seizedUntil = state.tick + 12 * TICKS_PER_MONTH;
       addMemory(state, c, 'embargado', 5, -6);
       pushEvent(state, 'info', `El banco se queda la vivienda de ${c.name}: llevaba ${DEBT.foreclosureMonths} cuotas de hipoteca sin pagar. Sigue en ella de alquiler`, { ref: c.id });
     } else if (!c.owns && c.homeId !== null && (c.rentArrears ?? 0) >= DEBT.evictMonths) {
       c.homeId = null;
       c.rentArrears = 0;
+      c.evictedUntil = state.tick + DEBT.evictedMonths * TICKS_PER_MONTH;
       addMemory(state, c, 'desahuciado', 6, -6);
       pushEvent(state, 'info', `Desahucian a ${c.name}: debía ${DEBT.evictMonths} meses de alquiler`, { ref: c.id });
     }

@@ -2,7 +2,7 @@ import { tickToDate } from '@bitopolis/shared';
 import { type Citizen, canMicrocredit, canSettleDebt, type GameState, MICROCREDIT, type Pocket, pocketOf, totalDebt } from '@bitopolis/sim';
 import { formatDate, money } from './i18n.ts';
 import type { SocialCtx } from './social-ui.ts';
-import { confirmDialog, h } from './ui.ts';
+import { confirmDialog, h, toast } from './ui.ts';
 
 /**
  * v1.9 (petición del creador): el balance de cada vecino. Una línea con lo que
@@ -47,6 +47,8 @@ export function pocketBox(ctx: SocialCtx, c: Citizen, reopen: () => void): HTMLE
   if (d && totalDebt(c) > 0) {
     const parts = [d.town ? `al ayuntamiento ${money(d.town)}` : '', d.bank ? `al banco o casero ${money(d.bank)}` : ''].filter(Boolean).join(', ');
     box.append(h('p', {}, h('strong', {}, `Debe ${money(totalDebt(c))}`), ` (${parts}), desde el ${formatDate(tickToDate(d.since))}.`));
+    // Ronda 15: «le sobraron 0 €» no contaba nada: si la deuda creció, se dice.
+    if ((last?.grew ?? 0) > 0) box.append(h('p', { class: 'neg' }, `El mes pasado no le llegó: debe ${money(last!.grew!)} más.`));
     if (d.plan && d.plan.until > state.tick) box.append(h('p', { class: 'muted small' }, `Aplazado: paga ${money(d.plan.perMonth)} al mes hasta el ${formatDate(tickToDate(d.plan.until))}, sin recargo.`));
     else if (d.town > 0) box.append(h('p', { class: 'muted small' }, 'Lo que debe al ayuntamiento lleva un recargo del 10 % si pasa un mes sin pagarlo.'));
   }
@@ -58,7 +60,11 @@ export function pocketBox(ctx: SocialCtx, c: Citizen, reopen: () => void): HTMLE
       b.title = ok.error ?? '';
     }
     b.addEventListener('click', async () => {
-      if (!ok.ok) return;
+      // Ronda 15: en el móvil no hay tooltip: tocarlo explica por qué no se puede.
+      if (!ok.ok) {
+        toast(`${label}: ${ok.error ?? 'no se puede ahora'}`, { kind: 'info' });
+        return;
+      }
       await run();
       reopen();
     });

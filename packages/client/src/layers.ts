@@ -81,13 +81,15 @@ function values(state: GameState, layer: LayerId): (number | null)[] {
   for (const c of state.citizens) {
     if (c.homeId === null) continue;
     const e = sum.get(c.homeId) ?? [0, 0];
-    e[0] += layer === 'pocket' ? POCKET_VALUE[pocketOf(c)] : c.happiness;
+    // Ronda 15: en el bolsillo cuenta el peor de la casa (la media escondía a los endeudados).
+    if (layer === 'pocket') e[0] = e[1] === 0 ? POCKET_VALUE[pocketOf(c)] : Math.min(e[0], POCKET_VALUE[pocketOf(c)]);
+    else e[0] += c.happiness;
     e[1]++;
     sum.set(c.homeId, e);
   }
   for (const b of state.buildings) {
     const e = sum.get(b.id);
-    if (e) out[b.y * w + b.x] = e[0] / e[1];
+    if (e) out[b.y * w + b.x] = layer === 'pocket' ? e[0] : e[0] / e[1];
   }
   return out;
 }
