@@ -74,6 +74,8 @@ export interface Politics {
   lastMotion: number;
   /** Mociones presentadas (la misma exigencia no se repite en 6 meses) y su resultado. */
   motions: { need: string; faction: Faction; tick: number; approved: boolean }[];
+  /** v1.3: lo que ha hecho el gobierno rival (obras, impuestos, recortes, promesas), lo último al final. */
+  log: { tick: number; text: string }[];
 }
 
 export function emptyPolitics(tick = 0): Politics {
@@ -91,6 +93,7 @@ export function emptyPolitics(tick = 0): Politics {
     perceivedTax: { ibi: 1, tasas: 1, plusvalia: 1 },
     lastMotion: -1,
     motions: [],
+    log: [],
   };
 }
 

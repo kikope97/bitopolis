@@ -32,6 +32,7 @@ import {
   TAX_SPLIT_POP,
   TRANSACTION_COST,
   BUY_CHANCE,
+  SERVICE_CAPACITY,
 } from './balance.ts';
 import { hash32 } from './hash.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
@@ -39,6 +40,7 @@ import { chance } from './prng.ts';
 import { addMemory, onBusinessFounded } from './social.ts';
 import {
   type Building,
+  type BuildingKind,
   type Citizen,
   DIRS,
   type GameState,
@@ -378,4 +380,17 @@ export function monthlyMarket(state: GameState): void {
     if (!foundFirst && canBuyHome(state, c) && chance(state.rng, BUY_CHANCE)) buyHome(state, c);
     else if (canFound(state, c) && chance(state.rng, FOUND_CHANCE)) foundBusiness(state, c, shopTypesFor(state, c)[0]!);
   }
+}
+
+/** Cobertura de un servicio con capacidad: 1 = da abasto; menos de 1 = saturado (v1.3). */
+export function serviceSaturation(state: GameState, kind: BuildingKind): number {
+  const cap = SERVICE_CAPACITY[kind];
+  if (!cap) return 1;
+  const n = state.buildings.filter((b) => b.kind === kind && b.built).length;
+  if (n === 0) return 1;
+  return Math.min(1, (n * cap) / Math.max(1, state.citizens.length));
+}
+
+export function saturated(state: GameState, kind: BuildingKind): boolean {
+  return serviceSaturation(state, kind) < 1;
 }

@@ -1,7 +1,7 @@
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
-import { SERVICE } from './balance.ts';
+import { CAMPAIGN_MAX, SERVICE } from './balance.ts';
 import { BUILD_NAMES } from './commands.ts';
-import { canFound, freeShopLot, taxLevels } from './economy.ts';
+import { canFound, freeShopLot, saturated, taxLevels } from './economy.ts';
 import { hash32 } from './hash.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance, pick } from './prng.ts';
@@ -88,6 +88,8 @@ export interface Petition {
   /** Vecinos con nombre que votan a favor (para premiar o castigar). */
   supporters: number[];
   answer: null | 'promise' | 'reject';
+  /** v1.3: pregunta del partido de la oposición (la hace su líder). */
+  opposition?: boolean;
 }
 export interface Pleno {
   tick: number;
@@ -508,7 +510,9 @@ function canLower(state: GameState, n: Need): boolean {
 /** Necesidades de un vecino por orden (para que el pleno traiga peticiones distintas). */
 export function needsOf(state: GameState, c: Citizen): Need[] {
   const first = needOf(state, c);
-  const rest = NEEDS.filter((n) => n !== first && (NEED_KIND[n] ? !state.buildings.some((b) => b.kind === NEED_KIND[n]) : n === 'bajar_tasas' && canLower(state, n)));
+  // Un servicio saturado cuenta como carencia: piden otro.
+  const lacks = (kind: string) => !state.buildings.some((b) => b.kind === kind) || saturated(state, kind as never);
+  const rest = NEEDS.filter((n) => n !== first && (NEED_KIND[n] ? lacks(NEED_KIND[n]!) : n === 'bajar_tasas' && canLower(state, n)));
   return [first, ...rest.sort((a, b) => (hash32(c.id, a.length) % 7) - (hash32(c.id, b.length) % 7))];
 }
 
@@ -565,8 +569,25 @@ export function convenePleno(state: GameState): void {
     }
     petitions.push({ id: state.nextId++, citizenId: c.id, need, yes, no: state.citizens.length - yes, supporters, answer: null });
   }
+  // Con un partido en la oposición, su líder también pregunta (v1.3, aplazado de la ronda 07).
+  const party = state.politics.party;
+  const leader = party && state.politics.mayor === 'player' ? state.citizens.find((c) => c.id === party.leaderId) : undefined;
+  if (leader) {
+    const need = needsOf(state, leader).find((n) => !petitions.some((p) => p.need === n));
+    if (need) {
+      let yes = 0;
+      const supporters: number[] = [];
+      for (const v of state.citizens) {
+        if (wantsNeed(state, v, need)) {
+          yes++;
+          if (v.named) supporters.push(v.id);
+        }
+      }
+      petitions.push({ id: state.nextId++, citizenId: leader.id, need, yes, no: state.citizens.length - yes, supporters, answer: null, opposition: true });
+    }
+  }
   state.pleno = { tick: state.tick, petitions };
-  pushEvent(state, 'info', `Pleno municipal: ${petitions.length} peticiones de los vecinos`);
+  pushEvent(state, 'info', `Pleno municipal: ${petitions.length} peticiones${leader ? ', una de la oposición' : ' de los vecinos'}`);
 }
 
 export function answerPetition(state: GameState, petitionId: number, answer: 'promise' | 'reject'): boolean {
@@ -589,7 +610,15 @@ export function answerPetition(state: GameState, petitionId: number, answer: 'pr
       if (c) c.happiness = Math.min(100, c.happiness + 3);
     }
     pushEvent(state, 'info', `El alcalde promete ${NEED_TEXT[p.need]} (lo pidió ${asker?.name ?? 'un vecino'})`);
+    // Aceptar lo que pide la oposición le quita bandera: su facción se acerca un poco.
+    const party = state.politics.party;
+    if (p.opposition && party) state.politics.campaign[party.faction] = Math.min(CAMPAIGN_MAX, state.politics.campaign[party.faction] + 1);
   } else {
+    const party = state.politics.party;
+    if (p.opposition && party) {
+      state.politics.campaign[party.faction] = Math.max(0, state.politics.campaign[party.faction] - 1);
+      pushEvent(state, 'politics', `«${party.name}» critica que rechaces su pregunta: ${NEED_TEXT[p.need]}`);
+    }
     for (const id of p.supporters) {
       const c = state.citizens.find((x) => x.id === id);
       if (c) {

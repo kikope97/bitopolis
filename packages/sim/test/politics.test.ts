@@ -10,6 +10,7 @@ import {
   hashState,
   migrate,
   playerApproval,
+  serviceSaturation,
   runSimulation,
   step,
   validActions,
@@ -171,7 +172,7 @@ describe('elecciones (v1.0)', () => {
     for (const f of Object.values(v6.politics.factions) as Record<string, unknown>[]) delete f.demands;
     v6.politics.party = { leaderId: 1, leaderName: 'Lucía', name: 'Bitópolis Verde', faction: 'ecologistas', founded: 0 };
     const m = migrate(v6);
-    expect(m.formatVersion).toBe(7);
+    expect(m.formatVersion).toBeGreaterThanOrEqual(7);
     expect(m.politics.lastMotion).toBe(-1);
     expect(m.politics.party!.promises).toEqual([]);
     expect(m.politics.factions.jovenes.demands).toEqual([]);
@@ -197,5 +198,60 @@ describe('elecciones (v1.0)', () => {
     expect(applyCommand(s, { type: 'Motion', faction: f }).ok).toBe(true);
     expect(s.politics.motions.at(-1)!.approved).toBe(false);
     expect(s.politics.campaign[f]).toBe(Math.min(6, before + 2));
+  });
+
+  it('migración 7 → 8: registro del gobierno rival vacío', () => {
+    const v7 = JSON.parse(JSON.stringify(createInitialState({ seed: 1 })));
+    v7.formatVersion = 7;
+    delete v7.politics.log;
+    const m = migrate(v7);
+    expect(m.formatVersion).toBe(8);
+    expect(m.politics.log).toEqual([]);
+  });
+
+  it('el gobierno rival deja registro de lo que hace (obras, impuestos, promesas)', () => {
+    const s = rivalTown();
+    for (let i = 0; i < 6 * TICKS_PER_MONTH; i++) step(s);
+    expect(s.politics.log.length).toBeGreaterThan(0);
+    expect(s.politics.log.length).toBeLessThanOrEqual(20);
+    for (const e of s.politics.log) expect(e.text).toMatch(/alcalde|«/);
+    // Ordenado: lo último al final.
+    const ticks = s.politics.log.map((e) => e.tick);
+    expect([...ticks].sort((a, b) => a - b)).toEqual(ticks);
+  });
+
+  it('con un partido en la oposición, su líder pregunta en el pleno; rechazarle tiene coste', () => {
+    const s = town();
+    const leader = s.citizens.find((c) => c.named)!;
+    s.politics.party = { leaderId: leader.id, leaderName: leader.name, name: 'Bitópolis Joven', faction: 'jovenes', founded: s.tick, promises: [] };
+    s.politics.campaign.jovenes = 2;
+    expect(applyCommand(s, { type: 'ConvenePleno' }).ok).toBe(true);
+    const q = s.pleno!.petitions.find((p) => p.opposition);
+    expect(q?.citizenId).toBe(leader.id);
+    expect(applyCommand(s, { type: 'AnswerPetition', petitionId: q!.id, answer: 'reject' }).ok).toBe(true);
+    expect(s.politics.campaign.jovenes).toBe(1);
+    expect(checkInvariants(s)).toEqual([]);
+  });
+
+  it('sin partido de oposición no hay pregunta de la oposición', () => {
+    const s = town();
+    s.politics.party = null;
+    applyCommand(s, { type: 'ConvenePleno' });
+    expect(s.pleno!.petitions.some((p) => p.opposition)).toBe(false);
+  });
+});
+
+describe('servicios que escalan con la población (v1.3)', () => {
+  it('un colegio atiende a 60 vecinos: con más, se satura y piden otro', () => {
+    const s = town(900);
+    const schools = s.buildings.filter((b) => b.kind === 'school' && b.built);
+    if (!schools.length) return;
+    s.buildings = s.buildings.filter((b) => b.kind !== 'school' || b === schools[0]);
+    const extra = Math.max(0, 90 - s.citizens.length);
+    for (let i = 0; i < extra; i++) s.citizens.push({ ...s.citizens[0]!, id: 900_000 + i, named: false, relations: [], memories: [] });
+    expect(serviceSaturation(s, 'school')).toBeLessThan(1);
+    step(s);
+    const all = Object.values(s.politics.factions).flatMap((f) => f.unmet);
+    expect(all).toContain('otro colegio');
   });
 });

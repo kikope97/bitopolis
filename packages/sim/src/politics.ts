@@ -15,7 +15,7 @@ import {
   VOTE_ABSTENTION_BASE,
 } from './balance.ts';
 import { BUILD_NAMES, buildCost, governmentCommand } from './commands.ts';
-import { felt, updateFeltTaxes } from './economy.ts';
+import { felt, saturated, taxLevels, updateFeltTaxes } from './economy.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { hash32 } from './hash.ts';
 import { addHook, addMemory } from './social.ts';
@@ -64,13 +64,15 @@ function unmetDemands(state: GameState, f: Faction, members: Citizen[]): string[
   const out: string[] = [];
   if (f === 'jubilados') {
     if (!has('clinic')) out.push('un centro de salud');
-    if (avgAtHomes(state, state.fields.crime, members) > 25 && !has('police')) out.push('más seguridad');
+    else if (saturated(state, 'clinic')) out.push('otro centro de salud');
+    if (avgAtHomes(state, state.fields.crime, members) > 25 && (!has('police') || saturated(state, 'police'))) out.push('más seguridad');
     if (lv.ibi === 'high') out.push('bajar el IBI');
   } else if (f === 'jovenes') {
     if (freeHomes(state) < 2 && state.demand.R > 30) out.push('vivienda');
     if (members.filter((c) => c.jobId === null).length > members.length * 0.3) out.push('empleo en el pueblo');
     if (!has('park')) out.push('un parque');
     if (!has('school')) out.push('un colegio');
+    else if (saturated(state, 'school')) out.push('otro colegio');
   } else if (f === 'empresarios') {
     if (lv.tasas === 'high' || lv.ibi === 'high') out.push('bajar los impuestos');
     if (!has('shop') || state.demand.C > 40) out.push('más comercio');
@@ -251,10 +253,23 @@ function freeSpot(state: GameState): { x: number; y: number } | null {
 }
 
 /** El alcalde rival gobierna a fin de mes según las prioridades de su facción. */
+const LOG_MAX = 20;
+
+/** Lo que hace el gobierno rival: sale en el diario y queda en su registro (v1.3). */
+function rivalAct(state: GameState, text: string): void {
+  pushEvent(state, 'politics', text);
+  const log = state.politics.log;
+  log.push({ tick: state.tick, text });
+  if (log.length > LOG_MAX) log.splice(0, log.length - LOG_MAX);
+}
+
+const LEVEL_TEXT = { low: 'bajo', medium: 'medio', high: 'alto' } as const;
+
 function rivalGovern(state: GameState): void {
   const p = state.politics;
   if (p.mayor === 'player' || !p.party) return;
   const f = p.party.faction;
+  const taxesBefore = JSON.stringify(taxLevels(state));
   // Impuestos según la facción; con déficit y la caja baja, como cualquier gobierno, los sube.
   const last = state.stats.at(-1);
   const deficit = !!last && last.income < last.expenses && state.treasury < 10_000;
@@ -269,10 +284,15 @@ function rivalGovern(state: GameState): void {
   const owesTax = (need: string) => p.party!.promises.some((x) => x.status === 'pending' && x.need === need);
   if (!deficit && owesTax('bajar el IBI')) governmentCommand(state, state.taxesSplit ? { type: 'SetTaxes', ibi: 'low' } : { type: 'SetTax', level: 'low' });
   if (!deficit && owesTax('bajar los impuestos')) governmentCommand(state, state.taxesSplit ? { type: 'SetTaxes', tasas: 'low', ibi: 'low' } : { type: 'SetTax', level: 'low' });
+  if (JSON.stringify(taxLevels(state)) !== taxesBefore) {
+    const t = taxLevels(state);
+    const what = state.taxesSplit ? `IBI ${LEVEL_TEXT[t.ibi]}, tasas ${LEVEL_TEXT[t.tasas]}` : `impuestos en ${LEVEL_TEXT[t.ibi]}`;
+    rivalAct(state, `El alcalde ${p.party.leaderName} cambia los impuestos: ${what}${deficit ? ' (hay déficit)' : ''}`);
+  }
   // Con deuda seria, recorta: derriba su último parque o casa municipal (como haría cualquiera).
   if (state.treasury < -5_000) {
     const cut = [...state.buildings].reverse().find((b) => (b.kind === 'park' || b.kind === 'house') && b.built);
-    if (cut && governmentCommand(state, { type: 'Demolish', x: cut.x, y: cut.y })) pushEvent(state, 'politics', `El alcalde ${p.party.leaderName} recorta gastos: derriba ${cut.kind === 'park' ? 'un parque' : 'una casa municipal'}`);
+    if (cut && governmentCommand(state, { type: 'Demolish', x: cut.x, y: cut.y })) rivalAct(state, `El alcalde ${p.party.leaderName} recorta gastos: derriba ${cut.kind === 'park' ? 'un parque' : 'una casa municipal'}`);
   }
   // Una obra al mes si hay caja, por orden de prioridad de la facción.
   if (deficit) return;
@@ -280,7 +300,7 @@ function rivalGovern(state: GameState): void {
   const owed = p.party.promises.filter((x) => x.status === 'pending' && NEED_BUILD[x.need]).map((x) => NEED_BUILD[x.need]!);
   for (const kind of [...owed, ...FACTION_BUILD[f]]) {
     const exists = state.buildings.filter((b) => b.kind === kind).length;
-    if (kind !== 'house' && kind !== 'park' && exists > 0) continue;
+    if (kind !== 'house' && kind !== 'park' && exists > 0 && !saturated(state, kind as never)) continue;
     // Como mucho un parque por cada 25 vecinos y una casa municipal por cada 15.
     if (kind === 'park' && exists >= Math.ceil(state.citizens.length / 25)) continue;
     if (kind === 'house' && exists >= Math.ceil(state.citizens.length / 15)) continue;
@@ -288,7 +308,7 @@ function rivalGovern(state: GameState): void {
     const spot = freeSpot(state);
     if (!spot) break;
     if (governmentCommand(state, { type: 'Build', kind: kind as never, x: spot.x, y: spot.y })) {
-      pushEvent(state, 'politics', `El alcalde ${p.party.leaderName} empieza ${BUILD_NAMES[kind]?.toLowerCase() === 'parque' ? 'un parque' : `la obra: ${BUILD_NAMES[kind]}`}`);
+      rivalAct(state, `El alcalde ${p.party.leaderName} empieza ${BUILD_NAMES[kind]?.toLowerCase() === 'parque' ? 'un parque' : `la obra: ${BUILD_NAMES[kind]}`}`);
       break;
     }
   }
@@ -301,6 +321,8 @@ const TAX_NEEDS = new Set(['bajar el IBI', 'bajar los impuestos']);
 const NEED_BUILD: Record<string, string> = {
   'un centro de salud': 'clinic',
   'un colegio': 'school',
+  'otro colegio': 'school',
+  'otro centro de salud': 'clinic',
   'un parque': 'park',
   'más seguridad': 'police',
   vivienda: 'house',
@@ -315,12 +337,12 @@ function checkRivalPromises(state: GameState): void {
     const governing = p.mayor === p.party.leaderId;
     if (!p.factions[pr.faction].unmet.includes(pr.need) && governing) {
       pr.status = 'kept';
-      pushEvent(state, 'politics', `«${p.party.name}» cumple lo prometido a ${FACTION_TEXT[pr.faction].toLowerCase()}: ${pr.need}`);
+      rivalAct(state, `«${p.party.name}» cumple lo prometido a ${FACTION_TEXT[pr.faction].toLowerCase()}: ${pr.need}`);
     } else if (governing && state.tick > pr.deadline) {
       pr.status = 'broken';
       // Una promesa rota es munición para la oposición: esa facción se acerca al jugador.
       p.campaign[pr.faction] = Math.min(CAMPAIGN_MAX, p.campaign[pr.faction] + 2);
-      pushEvent(state, 'politics', `«${p.party.name}» incumple su promesa a ${FACTION_TEXT[pr.faction].toLowerCase()} (${pr.need}). Lo recordarán en las urnas`);
+      rivalAct(state, `«${p.party.name}» incumple su promesa a ${FACTION_TEXT[pr.faction].toLowerCase()} (${pr.need}). Lo recordarán en las urnas`);
     }
   }
 }

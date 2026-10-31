@@ -512,3 +512,9 @@ html[data-font='pixel'] .sheet-head h2, html[data-font='pixel'] .sheet h3, html[
 .admin-card h2:focus-visible { outline: 3px solid var(--accent); }
 .invite { padding: 8px 12px; border-left: 4px solid var(--good); background: var(--panel-2); margin: 0 0 12px; }
 .invite p { margin: 4px 0; }
+/* v1.3: oposición en el pleno, registro del rival y cuenta atrás. */
+.petition.opposition { border-left-color: var(--bad); }
+.pol-tag { margin: 0 0 4px; font-size: 0.85rem; color: var(--bad); font-weight: 600; }
+.pol-log { list-style: none; margin: 4px 0 8px; padding: 0; }
+.pol-log li { padding: 4px 0; border-bottom: 1px solid var(--line); }
+#hud-poll.soon { border-color: var(--accent); }
