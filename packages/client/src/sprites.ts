@@ -690,6 +690,442 @@ function park(seed: number): Pix {
   return p;
 }
 
+/* ===================== lugares de vida social (v1.7) ===================== */
+
+/** Letras de 3×5 para rótulos pequeños. */
+const MINI: Record<string, string[]> = {
+  B: ['##.', '#.#', '##.', '#.#', '##.'],
+  A: ['.#.', '#.#', '###', '#.#', '#.#'],
+  R: ['##.', '#.#', '##.', '#.#', '#.#'],
+};
+function miniText(p: Pix, x: number, y: number, text: string, c: number) {
+  [...text].forEach((ch, k) => MINI[ch]?.forEach((r, j) => [...r].forEach((b, i) => b === '#' && p.set(x + k * 4 + i, y + j, c))));
+}
+
+/** Ciprés: huso alto y estrecho, luz a la izquierda. */
+function cypress(p: Pix, x: number, top: number, base: number, seed: number) {
+  const m: Mat = [42, 24, 43, 44];
+  p.ellipse(x + 2, base + 1, 3.5, 1.2, 24);
+  p.vline(x, base - 2, 3, MAT.wood[2]);
+  const h = base - 2 - top;
+  for (let j = 0; j <= h; j++) {
+    const t = j / h;
+    const half = t < 0.2 ? 0.4 + t * 9 : t < 0.75 ? 2.2 + (t - 0.2) * 1.2 : 2.9 - (t - 0.75) * 4;
+    const r = Math.round(half);
+    for (let i = -r; i <= r; i++) {
+      const n = hash(x + i, top + j, seed);
+      let c = i < -r / 3 ? m[0] : i <= r / 3 ? m[1] : m[2];
+      if (n > 0.8) c = c === m[0] ? m[1] : m[2];
+      if (i === r || (j % 3 === 2 && n > 0.5 && i > -r)) c = m[3];
+      p.set(x + i, top + j, c);
+    }
+  }
+  p.set(x, top - 1, m[1]);
+}
+
+/** Mesa redonda de terraza con dos sillas. */
+function terraceTable(p: Pix, x: number, y: number, chair: Mat) {
+  // Sillas a los lados (respaldo detrás).
+  for (const dx of [-3, 3]) {
+    p.vline(x + dx + (dx < 0 ? 0 : 1), y - 2, 4, chair[2]);
+    p.set(x + dx + (dx < 0 ? 1 : 0), y + 1, chair[1]);
+    p.set(x + dx + (dx < 0 ? 0 : 1), y + 2, chair[3]);
+    p.set(x + dx + (dx < 0 ? 1 : 0), y + 2, chair[3]);
+  }
+  p.shadow(x - 1, y + 3, 4, 1);
+  p.vline(x + 1, y + 1, 2, MAT.metal[3]);
+  p.hline(x - 1, y, 5, MAT.metal[1]);
+  p.hline(x - 1, y - 1, 5, 12);
+  p.set(x - 1, y - 1, 31);
+  p.set(x + 3, y, MAT.metal[2]);
+}
+
+function bar(seed: number): Pix {
+  const p = new Pix(T, BH);
+  // Suelo de la terraza: baldosas de barro.
+  for (let y = 37; y < 47; y++) for (let x = 0; x < 32; x++) p.set(x, y, (Math.floor(x / 3) + Math.floor(y / 3)) % 2 ? MAT.terracotta[1] : MAT.terracotta[0]);
+  for (let x = 0; x < 32; x++) if (hash(x, seed, 4) > 0.8) p.set(x, 37 + Math.floor(hash(seed, x) * 10), MAT.terracotta[2]);
+  p.hline(0, 46, 32, MAT.terracotta[3]);
+  p.hline(0, 47, 32, MAT.terracotta[2]);
+  castShadow(p, 2, 16, 28, 21);
+  facade(p, 2, 18, 28, 20, MAT.white, 'plaster', seed);
+  // Zócalo de color, como en los bares de pueblo.
+  p.rect(2, 34, 28, 3, MAT.moss[2]);
+  p.hline(2, 34, 28, MAT.moss[1]);
+  gableRoof(p, 1, 7, 30, 4, 7, MAT.terracotta);
+  chimney(p, 6, 3, 6, false, seed);
+  // Rótulo «BAR» con bombilla.
+  p.rect(9, 19, 15, 8, MAT.wood[3]);
+  p.rect(10, 20, 13, 6, MAT.red[2]);
+  p.hline(10, 20, 13, MAT.red[1]);
+  miniText(p, 11, 21, 'BAR', nightLights ? C.lamp : 12);
+  p.set(16, 18, nightLights ? C.lamp : 4);
+  windowAt(p, 4, 20, 3, 4, { shutters: undefined });
+  windowAt(p, 26, 20, 3, 4);
+  // Toldo verde y blanco que cubre la terraza.
+  for (let x = 1; x < 31; x++) {
+    const stripe = Math.floor((x - 1) / 3) % 2 === 0;
+    p.set(x, 27, stripe ? MAT.moss[0] : 31);
+    p.vline(x, 28, 3, stripe ? MAT.moss[1] : 12);
+    p.set(x, 31, stripe ? MAT.moss[2] : 13);
+    if ((x - 1) % 3 === 1) p.set(x, 32, stripe ? MAT.moss[2] : 13);
+  }
+  p.hline(1, 27, 30, MAT.moss[0]);
+  p.vline(1, 32, 12, MAT.metal[2]);
+  p.vline(30, 32, 12, MAT.metal[3]);
+  // Guirnalda de bombillas bajo el toldo.
+  for (let x = 3; x < 30; x += 3) p.set(x, 33 + ((x / 3) % 2), nightLights ? C.lamp : 30);
+  // Puerta y ventana de la barra.
+  doorAt(p, 13, 31, 6, 6, MAT.wood, MAT.wood[3]);
+  p.rect(14, 32, 4, 2, nightLights ? C.lampWarm : MAT.glass[1]);
+  p.set(14, 32, nightLights ? C.lamp : MAT.glass[0]);
+  p.rect(4, 32, 7, 4, MAT.wood[3]);
+  p.rect(5, 32, 5, 3, nightLights ? C.lampWarm : MAT.glass[2]);
+  if (!nightLights) p.hline(5, 32, 5, MAT.glass[1]);
+  for (let i = 0; i < 3; i++) p.vline(6 + i * 1 + i, 33, 2, [6, 2, 4][i]!);
+  p.rect(22, 32, 7, 4, MAT.wood[3]);
+  p.rect(23, 32, 5, 3, nightLights ? C.lamp : MAT.glass[2]);
+  if (!nightLights) p.hline(23, 32, 5, MAT.glass[1]);
+  // Mesas, sillas y un parroquiano.
+  terraceTable(p, 7, 41, MAT.wood);
+  terraceTable(p, 22, 41, MAT.wood);
+  p.set(19, 37, C.hairDark);
+  p.set(20, 37, C.hairDark);
+  p.rect(19, 38, 2, 1, C.skin);
+  p.rect(18, 39, 3, 2, MAT.blue[1]);
+  p.set(18, 39, MAT.blue[0]);
+  p.set(23, 39, 4); // caña
+  p.set(23, 38, 12);
+  p.set(6, 39, 2); // vino
+  // Macetas en las esquinas.
+  p.rect(13, 44, 2, 2, MAT.terracotta[2]);
+  bush(p, 14, 43, 1.6, seed, true);
+  return p;
+}
+
+function chapel(seed: number): Pix {
+  const p = new Pix(T, BH);
+  const wm = MAT.white;
+  castShadow(p, 7, 18, 19, 27);
+  // Faldones del tejado que se alejan hacia el fondo desde el hastial.
+  const D = 7;
+  const edge = (x: number) => 15 + Math.abs(x + 0.5 - 16) * 0.9;
+  for (let x = 6; x < 26; x++) {
+    const e = Math.round(edge(x));
+    for (let k = 1; k <= D; k++) {
+      const left = x < 16;
+      const row = (k + (x % 2)) % 3 === 0;
+      let c = left ? (row ? MAT.terracotta[1] : MAT.terracotta[0]) : row ? MAT.terracotta[3] : MAT.terracotta[2];
+      if (k === D) c = MAT.terracotta[3];
+      if (k === 1) c = left ? MAT.terracotta[1] : MAT.terracotta[3];
+      p.set(x, e - k, c);
+    }
+  }
+  p.vline(16, Math.round(edge(16)) - D, D, MAT.terracotta[0]); // cumbrera
+  p.vline(15, Math.round(edge(15)) - D, D, MAT.terracotta[1]);
+  // Muro de la fachada con hastial triangular.
+  facade(p, 7, 24, 18, 21, wm, 'plaster', seed);
+  for (let y = 15; y < 24; y++) {
+    const half = (y - 15) / 0.9;
+    for (let x = Math.ceil(16 - half); x < 16 + half; x++) p.set(x, y, x < 9 ? wm[0] : x > 22 ? wm[2] : wm[1]);
+  }
+  for (let x = 7; x < 25; x++) {
+    const y = Math.round(edge(x));
+    p.set(x, y, 12);
+    p.set(x, y + 1, wm[0]);
+  }
+  // Zócalo de almagra.
+  p.rect(7, 41, 18, 3, MAT.terracotta[1]);
+  p.hline(7, 41, 18, MAT.terracotta[0]);
+  p.hline(7, 44, 18, MAT.terracotta[3]);
+  // Espadaña con campana y cruz.
+  p.rect(13, 6, 7, 10, wm[1]);
+  p.vline(13, 6, 10, wm[0]);
+  p.vline(19, 6, 10, wm[2]);
+  p.hline(13, 5, 7, wm[0]);
+  p.hline(14, 4, 5, wm[1]);
+  p.rect(15, 8, 3, 5, MAT.stone[3]);
+  p.hline(16, 7, 1, MAT.stone[3]);
+  p.rect(15, 10, 3, 2, MAT.yellow[1]);
+  p.set(16, 9, MAT.yellow[1]);
+  p.set(15, 10, MAT.yellow[0]);
+  p.set(17, 11, MAT.yellow[2]);
+  p.set(16, 12, MAT.yellow[3]);
+  p.vline(16, 0, 4, MAT.metal[3]);
+  p.hline(15, 1, 3, MAT.metal[3]);
+  // Óculo y puerta de arco de medio punto.
+  p.ellipse(16, 21, 1.6, 1.6, MAT.stone[2]);
+  p.set(16, 21, nightLights ? C.lamp : MAT.glass[1]);
+  p.set(15, 20, MAT.stone[3]);
+  p.rect(13, 33, 6, 11, MAT.stone[0]);
+  p.rect(14, 34, 4, 10, MAT.wood[2]);
+  p.hline(15, 33, 2, MAT.wood[2]);
+  p.rect(14, 32, 4, 1, MAT.stone[0]);
+  p.hline(15, 31, 2, MAT.stone[0]);
+  p.vline(16, 35, 9, MAT.wood[3]);
+  p.vline(14, 35, 9, MAT.wood[1]);
+  p.set(15, 39, 4);
+  p.set(17, 39, 4);
+  if (nightLights) p.rect(15, 34, 1, 1, C.lampWarm);
+  windowAt(p, 9, 30, 2, 4, { frame: wm[2] });
+  windowAt(p, 21, 30, 2, 4, { frame: wm[2] });
+  // Escalones, ciprés y banco.
+  p.rect(11, 44, 10, 1, MAT.stone[0]);
+  p.rect(10, 45, 12, 1, MAT.stone[1]);
+  p.hline(10, 46, 12, MAT.stone[3]);
+  cypress(p, 28, 14, 43, seed);
+  bush(p, 3, 43, 2.5, seed + 1, true);
+  p.rect(1, 37, 5, 2, MAT.wood[1]);
+  p.hline(1, 36, 5, MAT.wood[2]);
+  p.vline(1, 39, 2, MAT.wood[3]);
+  p.vline(5, 39, 2, MAT.wood[3]);
+  return p;
+}
+
+/** Tapia baja encalada vista en 3/4: albardilla arriba y cara al sur. */
+function lowWall(p: Pix, x: number, y: number, w: number, h: number) {
+  p.hline(x, y, w, 31);
+  p.rect(x, y + 1, w, h - 1, MAT.white[1]);
+  for (let i = 0; i < w; i++) if (hash(x + i, y, 5) > 0.85) p.set(x + i, y + 1 + Math.floor(hash(y, x + i) * (h - 1)), MAT.white[2]);
+  p.hline(x, y + h - 1, w, MAT.white[2]);
+  p.hline(x, y + h, w, MAT.white[3]);
+}
+
+function tombstone(p: Pix, x: number, y: number, kind: number) {
+  p.shadow(x + 1, y + 5, 3, 1);
+  if (kind === 0) {
+    // Lápida de remate redondo.
+    p.rect(x, y + 1, 3, 4, MAT.stone[1]);
+    p.set(x + 1, y, MAT.stone[0]);
+    p.vline(x, y + 1, 4, MAT.stone[0]);
+    p.vline(x + 2, y + 1, 4, MAT.stone[2]);
+    p.set(x + 1, y + 2, MAT.stone[3]);
+  } else {
+    // Cruz blanca.
+    p.vline(x + 1, y, 5, 12);
+    p.hline(x, y + 1, 3, 12);
+    p.set(x + 2, y + 1, 13);
+    p.vline(x + 1, y + 3, 2, 13);
+  }
+  p.set(x + 3, y + 4, [2, 4, 61, 12][(x + y) % 4]!); // flores
+}
+
+function cemetery(seed: number): Pix {
+  const p = new Pix(T, BH);
+  // Césped del recinto con un camino de grava hasta la cancela.
+  for (let y = 22; y < 44; y++) for (let x = 1; x < 31; x++) {
+    const r = hash(x, y, seed);
+    p.set(x, y, r > 0.9 ? 22 : r < 0.12 ? 24 : 23);
+  }
+  p.rect(13, 24, 6, 20, MAT.stone[1]);
+  p.dither(13, 24, 6, 20, MAT.stone[0], 1);
+  p.vline(13, 24, 20, MAT.stone[2]);
+  for (let i = 0; i < 6; i++) p.set(14 + Math.floor(hash(i, seed, 3) * 5), 25 + Math.floor(hash(seed, i, 4) * 18), MAT.stone[3]);
+  // Muro de nichos al fondo, con su tejadillo.
+  castShadow(p, 1, 9, 30, 15);
+  gableRoof(p, 1, 9, 30, 2, 3, MAT.terracotta);
+  p.rect(2, 14, 28, 10, MAT.white[1]);
+  p.vline(2, 14, 10, MAT.white[0]);
+  p.vline(29, 14, 10, MAT.white[2]);
+  for (let r = 0; r < 3; r++) {
+    for (let k = 0; k < 6; k++) {
+      const nx = 4 + k * 4 + (k > 2 ? 1 : 0);
+      const ny = 15 + r * 3;
+      p.rect(nx, ny, 3, 2, MAT.stone[1]);
+      p.hline(nx, ny, 3, MAT.stone[0]);
+      p.set(nx + 2, ny + 1, MAT.stone[2]);
+      if (hash(k, r, seed) > 0.6) p.set(nx + 1, ny + 1, [2, 4, 61][(k + r) % 3]!);
+    }
+  }
+  // Crucifijo en el centro del muro.
+  p.vline(16, 14, 8, MAT.stone[3]);
+  p.hline(15, 16, 3, MAT.stone[3]);
+  p.hline(2, 23, 28, MAT.white[2]);
+  p.hline(2, 24, 28, 24);
+  // Tapias laterales (se ve su albardilla).
+  p.rect(0, 22, 2, 21, 31);
+  p.vline(1, 22, 21, MAT.white[1]);
+  p.rect(30, 22, 2, 21, MAT.white[1]);
+  p.vline(31, 22, 21, MAT.white[2]);
+  // Lápidas y cruces.
+  for (const [x, y, k] of [
+    [8, 26, 0], [3, 32, 1], [8, 33, 0], [21, 26, 1], [21, 33, 0], [26, 32, 0], [3, 37, 0], [8, 38, 1], [21, 38, 1],
+  ] as const) tombstone(p, x, y, (k + seed) % 2);
+  // Cipreses en las esquinas del fondo.
+  cypress(p, 4, 6, 29, seed);
+  cypress(p, 27, 4, 29, seed + 3);
+  // Tapia delantera con pilares y cancela de hierro.
+  lowWall(p, 0, 42, 12, 4);
+  lowWall(p, 20, 42, 12, 4);
+  for (const x of [11, 19]) {
+    p.rect(x, 38, 3, 8, MAT.white[1]);
+    p.hline(x, 38, 3, 31);
+    p.vline(x, 39, 7, MAT.white[0]);
+    p.vline(x + 2, 39, 7, MAT.white[2]);
+    p.hline(x, 37, 3, MAT.terracotta[1]);
+  }
+  for (let x = 14; x < 19; x++) {
+    if (x % 2 === 0) p.vline(x, 40, 6, MAT.slate[3]);
+    p.set(x, x === 16 ? 39 : 40, MAT.slate[3]);
+  }
+  p.hline(14, 40, 5, MAT.slate[3]);
+  p.hline(14, 43, 5, MAT.slate[3]);
+  p.set(16, 38, MAT.slate[3]);
+  return p;
+}
+
+function library(seed: number): Pix {
+  const p = new Pix(T, BH);
+  const wall = MAT.cream;
+  castShadow(p, 1, 16, 30, 30);
+  flatRoof(p, 1, 13, 30, 8, MAT.stone, seed);
+  facade(p, 2, 21, 28, 25, wall, 'stone', seed);
+  // Cornisa.
+  p.hline(1, 21, 30, MAT.stone[0]);
+  p.hline(1, 22, 30, MAT.stone[2]);
+  // Frontón con un libro abierto en el tímpano.
+  for (let y = 11; y < 21; y++) {
+    const half = (y - 10) * 1.25;
+    for (let x = Math.ceil(16 - half); x < 16 + half; x++) p.set(x, y, wall[1]);
+  }
+  for (let y = 11; y < 21; y++) {
+    const half = (y - 10) * 1.25;
+    p.set(Math.ceil(16 - half), y, 12);
+    p.set(Math.ceil(16 - half) + 1, y, wall[0]);
+    p.set(Math.ceil(16 + half) - 1, y, MAT.stone[2]);
+  }
+  p.hline(4, 20, 24, MAT.stone[0]);
+  p.rect(13, 15, 3, 4, 12);
+  p.rect(16, 15, 3, 4, MAT.white[1]);
+  p.vline(16, 15, 4, MAT.stone[3]);
+  p.hline(13, 19, 6, MAT.stone[3]);
+  p.set(14, 16, MAT.stone[2]);
+  p.set(17, 16, MAT.stone[2]);
+  p.set(14, 17, MAT.stone[2]);
+  p.set(17, 17, MAT.stone[2]);
+  // Ventanales de medio punto en la planta alta.
+  for (const x of [5, 14, 23]) {
+    windowAt(p, x, 25, 4, 7);
+    p.set(x - 1, 24, wall[1]);
+    p.set(x + 4, 24, wall[1]);
+    p.set(x, 24, 12);
+    p.set(x + 3, 24, 12);
+    p.hline(x + 1, 23, 2, 12);
+    p.set(x + 1, 22, MAT.stone[0]);
+  }
+  // Pilastras.
+  for (const x of [11, 20]) {
+    p.rect(x, 23, 2, 21, wall[0]);
+    p.vline(x + 1, 23, 21, wall[2]);
+  }
+  // Escaparates con lomos de libros.
+  const books = [2, 9, 6, 4, 1, 3, 7, 17, 10];
+  for (const x0 of [3, 22]) {
+    p.rect(x0, 35, 7, 8, MAT.wood[3]);
+    p.rect(x0 + 1, 36, 5, 6, nightLights ? C.lampWarm : MAT.glass[2]);
+    if (!nightLights) {
+      p.hline(x0 + 1, 36, 5, MAT.glass[1]);
+      p.set(x0 + 1, 37, MAT.glass[0]);
+    }
+    p.hline(x0 + 1, 39, 5, MAT.wood[2]);
+    for (let i = 0; i < 5; i++) {
+      const h = 2 + Math.floor(hash(x0, i, seed) * 2);
+      p.vline(x0 + 1 + i, 42 - h, h, books[(x0 + i * 3 + seed) % books.length]!);
+    }
+    p.hline(x0, 42, 7, MAT.stone[0]);
+  }
+  doorAt(p, 14, 35, 4, 9, MAT.wood, MAT.stone[0]);
+  if (nightLights) p.rect(15, 36, 2, 3, C.lampWarm);
+  // Escalinata.
+  p.rect(10, 45, 12, 1, MAT.stone[0]);
+  p.hline(9, 46, 14, MAT.stone[1]);
+  p.hline(9, 47, 14, MAT.stone[3]);
+  // Farolillos.
+  for (const x of [12, 20]) p.set(x, 34, nightLights ? C.lamp : MAT.metal[3]);
+  return p;
+}
+
+function sports(seed: number): Pix {
+  const p = new Pix(T, BH);
+  // Pista exterior (media cancha) con líneas blancas.
+  const court = MAT.blue;
+  p.rect(0, 31, 32, 17, MAT.stone[2]);
+  p.rect(1, 32, 30, 15, court[2]);
+  for (let i = 0; i < 40; i++) p.set(1 + Math.floor(hash(i, seed) * 30), 32 + Math.floor(hash(seed, i) * 15), court[3]);
+  p.rect(12, 32, 8, 8, MAT.red[2]);
+  p.frame(2, 32, 28, 14, 12);
+  p.frame(12, 32, 8, 8, 12);
+  for (let x = 12; x < 20; x++) {
+    const dy = Math.round(Math.sqrt(Math.max(0, 16 - (x + 0.5 - 16) ** 2)) * 0.6);
+    p.set(x, 39 + dy, 12);
+  }
+  for (let x = 4; x < 28; x++) {
+    const dx = (x + 0.5 - 16) / 12;
+    const dy = Math.round(Math.sqrt(Math.max(0, 1 - dx * dx)) * 10);
+    if (dy > 0) p.set(x, 32 + dy, 12);
+  }
+  p.vline(4, 32, 2, 12);
+  p.vline(27, 32, 2, 12);
+  p.hline(0, 47, 32, MAT.stone[3]);
+  // Nave: muro delantero con remate curvo.
+  castShadow(p, 1, 12, 30, 19);
+  const arc = (x: number) => 13 + Math.round(((x + 0.5 - 16) / 15) ** 2 * 6);
+  // Tejado curvo de chapa (bóveda que se aleja hacia el fondo).
+  const D = 7;
+  for (let x = 1; x < 31; x++) {
+    const a = arc(x);
+    const u = (x - 1) / 29;
+    const tone = u < 0.22 ? 0 : u < 0.6 ? 1 : u < 0.85 ? 2 : 3;
+    for (let k = 1; k <= D; k++) {
+      let c = MAT.metal[tone];
+      if (k % 2 === 0) c = MAT.metal[Math.min(3, tone + 1)];
+      if (k === D) c = MAT.metal[3];
+      p.set(x, a - k, c);
+    }
+  }
+  for (let y = 0; y < 31; y++) for (let x = 1; x < 31; x++) {
+    if (y < arc(x) || y > 30) continue;
+    p.set(x, y, MAT.metal[1]);
+  }
+  facade(p, 1, 20, 30, 11, MAT.brick, 'brick', seed);
+  for (let x = 1; x < 31; x++) {
+    const a = arc(x);
+    for (let y = a; y < 20; y++) p.set(x, y, x % 3 === 2 ? MAT.metal[2] : x === 1 ? MAT.metal[0] : MAT.metal[1]);
+    p.set(x, a, 12);
+  }
+  p.vline(30, arc(30), 20 - arc(30), MAT.metal[3]);
+  // Franja de lucernarios y franja de color.
+  for (let x = 3; x < 29; x++) if (x % 4 !== 2) p.set(x, 16, nightLights ? C.lamp : MAT.glass[1]);
+  for (let x = 3; x < 29; x++) if (x % 4 !== 2) p.set(x, 17, nightLights ? C.lampWarm : MAT.glass[2]);
+  p.hline(1, 19, 30, MAT.terracotta[0]);
+  p.hline(1, 20, 30, MAT.terracotta[2]);
+  // Portón enrollable y puerta acristalada.
+  p.rect(3, 23, 7, 8, MAT.metal[3]);
+  for (let y = 24; y < 31; y += 2) p.hline(4, y, 5, MAT.metal[2]);
+  p.hline(3, 22, 7, MAT.metal[0]);
+  doorAt(p, 23, 24, 5, 6, MAT.glass, MAT.metal[2]);
+  if (nightLights) p.rect(24, 24, 3, 5, C.lampWarm);
+  // Canasta frente a la nave: tablero, aro y red.
+  p.vline(16, 26, 6, MAT.metal[3]);
+  p.rect(12, 21, 9, 6, 12);
+  p.frame(12, 21, 9, 6, MAT.metal[2]);
+  p.frame(14, 23, 5, 3, MAT.red[1]);
+  p.hline(14, 27, 5, 3);
+  p.hline(13, 27, 1, MAT.red[2]);
+  p.set(14, 28, 12);
+  p.set(16, 28, 12);
+  p.set(18, 28, 12);
+  p.set(15, 29, 12);
+  p.set(17, 29, 12);
+  // Balón y banco.
+  p.ball(24, 41, 1.6, MAT.terracotta, seed);
+  p.set(24, 41, MAT.terracotta[3]);
+  p.rect(26, 28, 4, 1, MAT.wood[1]);
+  p.set(26, 29, MAT.wood[3]);
+  p.set(29, 29, MAT.wood[3]);
+  return p;
+}
+
 /** Árbol: copa redonda o pino, con tronco y sombra. */
 function tree(p: Pix, x: number, y: number, seed: number, kind: 'round' | 'pine') {
   p.ellipse(x + 3, y + 13, 6, 2, 24);
@@ -865,6 +1301,328 @@ export function roadTile(n: boolean, e: boolean, s: boolean, w: boolean, v: numb
   if (!n && v % 3 === 0) {
     p.vline(T - 3, 0, 4, MAT.metal[3]);
     p.set(T - 3, 0, 4);
+  }
+  return p;
+}
+
+/* ====================== geografía y estaciones (v1.7) ====================== */
+
+/**
+ * Distancia (en px) a la tierra más cercana dentro de una casilla de agua,
+ * con las esquinas exteriores redondeadas. `side` dice qué orilla manda:
+ * 0 N, 1 E, 2 S, 3 O, −1 si no hay tierra.
+ */
+function shoreDist(x: number, y: number, land: readonly boolean[], R: number): { d: number; side: number } {
+  const dist = [y + 0.5, T - x - 0.5, T - y - 0.5, x + 0.5];
+  let d = Infinity;
+  let side = -1;
+  for (let k = 0; k < 4; k++) {
+    if (land[k] && dist[k]! < d) {
+      d = dist[k]!;
+      side = k;
+    }
+  }
+  for (const [a, b] of [[0, 1], [1, 2], [2, 3], [3, 0]] as const) {
+    if (!land[a] || !land[b] || dist[a]! >= R || dist[b]! >= R) continue;
+    const dc = R - Math.hypot(R - dist[a]!, R - dist[b]!);
+    if (dc < d) d = dc;
+  }
+  return { d, side };
+}
+
+/** Ondulación de la orilla: nula en los bordes de la casilla para que encajen. */
+function shoreWobble(x: number, y: number, v: number, amp: number): number {
+  const taper = Math.min(1, Math.min(x, T - 1 - x, y, T - 1 - y) / 7);
+  return (smooth(x + v * 13, y + v * 7, 6, 31) - 0.5) * 2 * amp * taper;
+}
+
+/** Hierba de orilla (casi igual que grassTile para que no se note la costura). */
+function bankGrass(x: number, y: number, v: number): number {
+  const r = hash(x, y, v, 41);
+  return r > 0.9 ? 22 : r < 0.06 ? 24 : 23;
+}
+
+function liquidTile(land: readonly boolean[], v: number, frame: 0 | 1, sea: boolean): Pix {
+  const p = new Pix(T, T);
+  const deep = sea ? [49, 50, 8] : [48, 49, 50];
+  const vertical = !land[0] && !land[2] ? false : land[1] === false && land[3] === false;
+  for (let y = 0; y < T; y++) {
+    for (let x = 0; x < T; x++) {
+      const { d: d0, side } = shoreDist(x, y, land, 9);
+      const d = d0 + shoreWobble(x, y, v, 1.6);
+      const grass = sea ? 2 : 3;
+      let c: number;
+      if (d < grass) c = bankGrass(x, y, v);
+      else if (sea) {
+        // Playa: arena, arena mojada, espuma (avanza y retrocede) y bajío.
+        const foam = grass + 5 - frame;
+        if (d < grass + 1) c = side === 0 ? MAT.dirt[2] : 45;
+        else if (d < foam - 1) c = hash(x, y, v, 5) > 0.88 ? (hash(y, x) > 0.5 ? 30 : 21) : (x + y) % 2 && d < grass + 2 ? 21 : 45;
+        else if (d < foam) c = 46;
+        else if (d < foam + 1) c = (x + frame) % 3 ? 12 : 31;
+        else if (d < foam + 2) c = (x + y + frame) % 2 ? 31 : 48;
+        else if (d < foam + 5) c = (x + y) % 2 ? 10 : 49;
+        else c = deep[1];
+      } else if (side === 0) {
+        // Orilla norte: se ve el talud de tierra y su sombra en el agua.
+        if (d < grass + 1) c = 22;
+        else if (d < grass + 2) c = hash(x, 3, v) > 0.7 ? 29 : MAT.dirt[1];
+        else if (d < grass + 3) c = hash(x, 4, v) > 0.75 ? 28 : MAT.dirt[2];
+        else if (d < grass + 4) c = 50;
+        else if (d < grass + 5) c = (x + y) % 2 ? 49 : 50;
+        else c = deep[1];
+      } else {
+        // Orilla sur, este u oeste: arena con guijarros y agua somera.
+        if (d < grass + 1) c = hash(x, y, v, 6) > 0.8 ? 30 : 45;
+        else if (d < grass + 2) c = hash(x, y, v, 7) > 0.7 ? 29 : 46;
+        else if (d < grass + 3) c = 10;
+        else if (d < grass + 4) c = (x + y) % 2 ? 10 : 49;
+        else c = deep[1];
+      }
+      // Pozas profundas en el centro del cauce.
+      const inner = Math.min(x, y, T - 1 - x, T - 1 - y) >= 4;
+      if (inner && c === deep[1] && d > (sea ? 10 : 8) && smooth(x + v * 5, y + v * 3, 7, sea ? 12 : 13) > 0.55 && (x + y) % 2 === 0) c = deep[2];
+      p.set(x, y, c);
+    }
+  }
+  // Ondas y destellos que se desplazan entre fotogramas (en el sentido de la corriente).
+  const shift = frame * 2;
+  for (let gy = 0; gy < 5; gy++) {
+    for (let gx = 0; gx < 4; gx++) {
+      const h1 = hash(gx, gy, v, 17);
+      const ox = gx * 8 + Math.floor(h1 * 5) + (vertical ? 0 : shift);
+      const oy = gy * 7 + Math.floor(hash(gy, gx, v) * 4) + 1 + (vertical ? shift : 0);
+      const len = 2 + Math.floor(hash(gx, gy, 3) * 3);
+      for (let i = 0; i < len; i++) {
+        const x = (ox + i) % T;
+        const y = oy % T;
+        const cur = p.get(x, y);
+        if (cur !== deep[1] && cur !== deep[2]) continue;
+        p.set(x, y, i === 0 ? deep[0] : sea ? 49 : 10);
+        if (p.get(x, y + 1) === deep[1] && i > 0) p.set(x, y + 1, deep[2]);
+      }
+      if (hash(gx, gy, v, frame + 21) > 0.7) {
+        const x = (gx * 8 + 3 + Math.floor(hash(gy, gx, frame) * 4)) % T;
+        const y = (gy * 7 + 4) % T;
+        if (p.get(x, y) === deep[1]) p.set(x, y, 31);
+      }
+    }
+  }
+  return p;
+}
+
+/** Agua de río (n, e, s, w: el vecino de ese lado también es agua). Dos fotogramas. */
+export function waterTile(n: boolean, e: boolean, s: boolean, w: boolean, v: number, frame: 0 | 1): Pix {
+  return liquidTile([!n, !e, !s, !w], v, frame, false);
+}
+
+/** Mar: más hondo y oscuro, con playa y espuma en la orilla. Dos fotogramas. */
+export function seaTile(n: boolean, e: boolean, s: boolean, w: boolean, v: number, frame: 0 | 1): Pix {
+  return liquidTile([!n, !e, !s, !w], v, frame, true);
+}
+
+/** Colina: hierba alta y oscura con relieve y rocas; talud hacia lo que no es colina. */
+export function hillTile(v: number, n: boolean, e: boolean, s: boolean, w: boolean): Pix {
+  const p = new Pix(T, T);
+  // Base: hierba oscura con manchas suaves.
+  for (let y = 0; y < T; y++) {
+    for (let x = 0; x < T; x++) {
+      const k = smooth(x + v * 11, y + v * 5, 7, 23);
+      p.set(x, y, k > 0.72 ? ((x + y) % 2 ? 41 : 42) : k < 0.25 ? ((x + y) % 2 ? 43 : 42) : 42);
+    }
+  }
+  // Lomas: montículos redondos con luz arriba a la izquierda.
+  const bumps = 1 + (hash(v, 9) > 0.5 ? 1 : 0);
+  for (let b = 0; b < bumps; b++) {
+    const cx = 9 + hash(v, b, 1) * 14;
+    const cy = 9 + hash(v, b, 2) * 12;
+    const rx = 6 + hash(v, b, 3) * 3;
+    const ry = rx * 0.7;
+    for (let y = Math.floor(cy - ry); y <= cy + ry; y++) {
+      for (let x = Math.floor(cx - rx); x <= cx + rx; x++) {
+        const dx = (x + 0.5 - cx) / rx;
+        const dy = (y + 0.5 - cy) / ry;
+        const d = dx * dx + dy * dy;
+        if (d > 1) continue;
+        const l = -(dx + dy * 1.2);
+        let c = 42;
+        if (l > 0.75) c = 40;
+        else if (l > 0.35) c = 41;
+        else if (l > 0.05) c = (x + y) % 2 ? 41 : 42;
+        else if (l < -0.85) c = 43;
+        else if (l < -0.45) c = (x + y) % 2 ? 43 : 42;
+        if (d > 0.82 && l < -0.2) c = 43;
+        p.set(x, y, c);
+      }
+    }
+  }
+  // Matas altas: brizna clara arriba, sombra abajo.
+  for (let i = 0; i < 9; i++) {
+    const x = 2 + Math.floor(hash(i, v, 31) * 27);
+    const y = 2 + Math.floor(hash(v, i, 32) * 22);
+    p.set(x, y, 40);
+    p.set(x - 1, y + 1, 41);
+    p.set(x + 1, y + 1, 41);
+    p.set(x, y + 1, 42);
+    p.set(x, y + 2, 44);
+    p.set(x + 1, y + 2, 43);
+  }
+  // Rocas sueltas.
+  const rocks = v % 3;
+  for (let i = 0; i < rocks; i++) {
+    const x = 4 + Math.floor(hash(i, v, 33) * 22);
+    const y = 4 + Math.floor(hash(v, i, 34) * 16);
+    const w2 = 3 + (hash(i, v, 35) > 0.5 ? 1 : 0);
+    p.rect(x, y, w2, 2, 29);
+    p.hline(x + 1, y - 1, w2 - 2, 30);
+    p.set(x, y, 30);
+    p.hline(x + 1, y + 1, w2 - 1, 28);
+    p.set(x + w2 - 1, y, 28);
+    p.hline(x, y + 2, w2 + 1, 44);
+  }
+  // Bordes hacia el llano.
+  const wob = (k: number) => Math.round((smooth(k + v * 9, v, 5, 37) - 0.5) * 2 * Math.min(1, Math.min(k, T - 1 - k) / 6));
+  if (!n) {
+    for (let x = 0; x < T; x++) {
+      p.set(x, 0, 43);
+      p.set(x, 1, 40);
+      p.set(x, 2, hash(x, v, 38) > 0.5 ? 41 : 42);
+    }
+  }
+  if (!w) {
+    for (let y = 0; y < T; y++) {
+      p.set(0, y, 43);
+      p.set(1, y, 40);
+      p.set(2, y, hash(y, v, 39) > 0.5 ? 41 : 42);
+    }
+  }
+  if (!e) {
+    for (let y = 0; y < T; y++) {
+      const k = 3 + wob(y);
+      for (let i = 0; i <= k; i++) p.set(T - 1 - i, y, i === 0 ? 44 : i === k ? ((y % 2) ? 43 : 42) : i === 1 ? 44 : 43);
+    }
+  }
+  if (!s) {
+    // Talud: borde de hierba que cuelga sobre una cara de tierra en sombra.
+    for (let x = 0; x < T; x++) {
+      const top = 23 + wob(x);
+      p.set(x, top - 1, 40);
+      for (let y = top; y < T; y++) {
+        const t = y - top;
+        let c: number;
+        if (t === 0) c = 42;
+        else if (t === 1) c = 43;
+        else if (t === 2) c = hash(x, v, 41) > 0.45 ? 44 : 47;
+        else if (t === 3 && hash(x, v, 42) > 0.6) c = 44;
+        else c = hash(x, y, v, 2) > 0.78 ? 46 : hash(y, x, v) > 0.88 ? 28 : 47;
+        if (!e && x > T - 4 - (y - top) / 3) c = y % 2 ? 47 : 44;
+        if (y === T - 1) c = 44;
+        p.set(x, y, c);
+      }
+    }
+  }
+  return p;
+}
+
+/** Puente: tablero con pretiles de piedra; transparente donde se ve el agua. */
+export function bridgeTile(horizontal: boolean, v: number): Pix {
+  const p = new Pix(T, T);
+  // (a, b): a recorre el puente, b lo cruza. Se dibuja igual en los dos sentidos.
+  const set = (a: number, b: number, c: number) => (horizontal ? p.set(a, b, c) : p.set(b, a, c));
+  for (let a = 0; a < T; a++) {
+    for (let b = 5; b < 27; b++) {
+      const r = hash(a, b, v);
+      set(a, b, r > 0.92 ? 14 : r < 0.06 ? 26 : 15);
+    }
+    if (a % 8 >= 2 && a % 8 < 6) for (const b of [15, 16]) set(a, b, 30);
+    if (a === 0) for (let b = 6; b < 26; b++) set(a, b, b % 2 ? 14 : 26); // junta de dilatación
+    // Pretil de arriba/izquierda: albardilla con luz, sombra sobre el tablero.
+    set(a, 2, MAT.stone[0]);
+    set(a, 3, a % 5 === 0 ? MAT.stone[2] : MAT.stone[1]);
+    set(a, 4, MAT.stone[2]);
+    set(a, 5, 26);
+    // Pretil de abajo/derecha y canto del tablero.
+    set(a, 26, MAT.stone[0]);
+    set(a, 27, (a + 2) % 5 === 0 || hash(a, v, 9) > 0.9 ? MAT.stone[2] : MAT.stone[1]);
+    set(a, 28, MAT.stone[2]);
+    set(a, 29, (a + v) % 4 === 0 ? MAT.stone[2] : MAT.stone[3]);
+    set(a, 30, MAT.stone[3]);
+    set(a, 31, 50); // sombra sobre el agua
+  }
+  // Postes cada 8 px: cara superior clara y canto sombreado.
+  for (let a = 3; a < T; a += 8) {
+    for (const b of [1, 25]) {
+      for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) set(a + i, b + j, MAT.stone[1]);
+      for (let i = 0; i < 3; i++) set(a + i, b, MAT.stone[0]);
+      set(a, b + 1, MAT.stone[0]);
+      for (let i = 0; i < 3; i++) set(a + i, b + 2, MAT.stone[3]);
+    }
+  }
+  if (!horizontal) {
+    // De norte a sur la cara visible de los postes es la de abajo.
+    for (let a = 3; a < T; a += 8) for (const b of [1, 25]) for (let i = 0; i < 3; i++) p.set(b + i, a + 2, MAT.stone[3]);
+  }
+  return p;
+}
+
+const SNOW: Record<number, number> = {
+  22: 12, 5: 12, 40: 12, 41: 12, 23: 31, 42: 31, 6: 31, 24: 54, 43: 54, 25: 13, 44: 13, 47: 13, 46: 54,
+};
+
+/** Hierba nevada: blanco y gris claro con algo de verde asomando. */
+export function snowGrass(base: Pix, v: number): Pix {
+  const p = new Pix(base.w, base.h);
+  for (let y = 0; y < base.h; y++) {
+    for (let x = 0; x < base.w; x++) {
+      const c = base.get(x, y);
+      if (c === NONE) continue;
+      const s0 = SNOW[c];
+      if (s0 === undefined) {
+        p.set(x, y, c);
+        continue;
+      }
+      // Ventisqueros: sombras suaves de la nieve acumulada.
+      const drift = smooth(x + v * 17, y + v * 3, 9, 61);
+      const r = hash(x, y, v, 53);
+      let s = drift > 0.66 ? 12 : drift < 0.3 ? ((x + y) % 2 ? 54 : 31) : 31;
+      if (s0 === 54 || s0 === 13) s = drift < 0.45 ? 54 : 31;
+      if ((c === 24 || c === 43 || c === 44) && r > 0.9) s = c; // matas que asoman
+      else if ((c === 22 || c === 23) && r > 0.985) s = 23;
+      p.set(x, y, s);
+    }
+  }
+  // Briznas que asoman en grupos de dos.
+  for (let i = 0; i < 3; i++) {
+    const x = 2 + Math.floor(hash(i, v, 54) * 27);
+    const y = 2 + Math.floor(hash(v, i, 55) * 27);
+    if (SNOW[base.get(x, y)] !== undefined) {
+      p.set(x, y, 24);
+      p.set(x + 1, y - 1, 23);
+      p.set(x, y + 1, 54);
+    }
+  }
+  return p;
+}
+
+/** Cubre de nieve los tejados y lo alto de un sprite (invierno). */
+export function snowify(src: Pix): Pix {
+  const p = new Pix(src.w, src.h);
+  p.data.set(src.data);
+  for (let x = 0; x < src.w; x++) {
+    for (let y = 0; y < src.h; y++) {
+      const top = src.get(x, y);
+      if (top === NONE || src.get(x, y - 1) !== NONE) continue;
+      if ((top === 24 || top === 25) && y >= src.h - 20) continue; // sombras en el suelo
+      // Capa de 3–5 px que se deshace por abajo, con su sombra.
+      const depth = 3 + Math.floor(hash(x, y, 71) * 2.2) + (hash(x >> 2, y, 72) > 0.5 ? 1 : 0);
+      for (let k = 0; k <= depth; k++) {
+        const c = src.get(x, y + k);
+        if (c === NONE || LIGHTS.has(c)) break;
+        if (k === depth) {
+          if ((x + y) % 2 === 0) p.set(x, y + k, 54);
+        } else p.set(x, y + k, k === 0 ? 31 : k === depth - 1 ? 54 : 12);
+      }
+    }
   }
   return p;
 }
@@ -1062,6 +1820,16 @@ export function buildingSprite(kind: string, id: number, tod: TimeOfDay = 'day')
       return s('plaza', () => plaza(8));
     case 'market':
       return s('market', () => market(9));
+    case 'bar':
+      return s('bar', () => bar(12));
+    case 'chapel':
+      return s('chapel', () => chapel(13));
+    case 'cemetery':
+      return s('cemetery', () => cemetery(14));
+    case 'library':
+      return s('library', () => library(15));
+    case 'sports':
+      return s('sports', () => sports(16));
     case 'factory':
       return s(`factory${id % 4}`, () => factory(id % 4));
     case 'shop':
