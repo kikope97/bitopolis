@@ -375,3 +375,31 @@ export const CRIME = {
   jailNuisanceRadius: 4,
   jailNuisanceMood: 3,
 } as const;
+
+/**
+ * v1.8 (petición del creador): los servicios suben de nivel (1–3). Cada subida
+ * cuesta más, pide nivel de ayuntamiento, vecinos y que el servicio ya se use
+ * (que haga falta), y tarda unos días de obra (el servicio sigue abierto).
+ */
+export const SERVICE_LEVELS = {
+  maxLevel: 3,
+  /** Capacidad (vecinos atendidos, edificios con agua/luz, plazas de cárcel, calabozos) por nivel. */
+  capacity: [1, 1.6, 2.3],
+  /** Casillas de radio de más por cada nivel por encima del 1. */
+  radiusPlus: 2,
+  /** Felicidad de más por nivel (en su radio). */
+  happinessPlus: 1,
+  /** Empleos de más por nivel (solo donde trabajan 2 o más). */
+  jobsPlus: 1,
+  maintenance: [1, 1.6, 2.4],
+  /** Coste de subir AL nivel i: × materiales del edificio. */
+  cost: [0, 0, 2, 4.5],
+  days: [0, 0, 4, 7],
+  /** Nivel de ayuntamiento y vecinos que pide subir al nivel i. */
+  townhall: [0, 0, 3, 4],
+  pop: [0, 0, 40, 100],
+  /** Uso mínimo (respecto a lo que atiende ahora) para que tenga sentido ampliarlo. */
+  usage: 0.75,
+  /** En parques, biblioteca y polideportivo: vecinos que viven en su radio, por nivel. */
+  residents: [0, 0, 20, 50],
+} as const;

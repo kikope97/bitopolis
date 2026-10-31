@@ -1,6 +1,7 @@
 import type { BuildKind } from '@bitopolis/shared';
-import { BUILD, SERVICE } from './balance.ts';
+import { BUILD } from './balance.ts';
 import { isUnlocked } from './townhall.ts';
+import { radiusOf } from './levels.ts';
 import { serviceSaturation } from './economy.ts';
 import { DIRS, type GameState, inBounds, Tile, tileIndex, Zone } from './state.ts';
 
@@ -107,7 +108,7 @@ export function missingServices(state: GameState, x: number, y: number, ctx: Cov
       continue;
     }
     const reach = state.buildings.filter(
-      (s) => s.built && NEED_KINDS[key].includes(s.kind) && Math.abs(s.x - x) + Math.abs(s.y - y) <= (SERVICE[s.kind]?.radius ?? 0),
+      (s) => s.built && NEED_KINDS[key].includes(s.kind) && Math.abs(s.x - x) + Math.abs(s.y - y) <= radiusOf(s),
     );
     if (!reach.length) out.push({ key, status: 'falta' });
     // Llega, pero todos los que llegan están saturados (atienden a menos del 90 % de quien lo usa).

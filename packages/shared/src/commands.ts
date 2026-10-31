@@ -32,6 +32,7 @@ export const Command = z.discriminatedUnion('type', [
   z.object({ type: z.literal('MeetAssociation'), associationId: z.number().int() }),
   z.object({ type: z.literal('RepairBuilding'), buildingId: z.number().int() }),
   z.object({ type: z.literal('UpgradeTownhall') }),
+  z.object({ type: z.literal('UpgradeBuilding'), buildingId: z.number().int() }),
   // v1.5: presupuesto anual, fiestas y subvenciones.
   z.object({ type: z.literal('ProposeBudget'), plan: z.enum(['austero', 'equilibrado', 'inversor']) }),
   z.object({ type: z.literal('HoldFestival'), size: z.enum(['pequena', 'grande']) }),

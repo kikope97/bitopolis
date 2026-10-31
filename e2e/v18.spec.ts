@@ -94,3 +94,27 @@ test('v1.8: el ayuntamiento abre el panel de gestión y se amplía; calendario a
   await expect(page.locator('#calendar')).toBeHidden();
   expect(errors).toEqual([]);
 });
+
+test('v1.8: los servicios muestran su nivel y qué pide mejorarlos', async ({ page, request }, info) => {
+  test.setTimeout(120_000);
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  const { state } = runSimulation({ seed: 3, days: 900, profile: 'constructor' });
+  state.townhallLevel = 5;
+  transfer(state, OUTSIDE, TREASURY, 100_000, 'subvencion');
+  const pump = state.buildings.find((b) => b.kind === 'water' && b.built)!;
+  // Una segunda bomba ya mejorada (se dibuja con su aspecto de nivel 3).
+  pump.level = 3;
+  await openTown(page, request, state);
+  await inspect(page, pump.x, pump.y);
+  await expect(page.locator('.sheet .level-box')).toContainText('Nivel 3 de 3');
+  await expect(page.locator('.sheet .level-box')).toContainText('nivel más alto');
+  await page.locator('.sheet-close').click();
+  const police = state.buildings.find((b) => b.kind === 'police' && b.built)!;
+  await inspect(page, police.x, police.y);
+  await expect(page.locator('.sheet .level-box')).toContainText('Nivel 1 de 3');
+  await expect(page.locator('.sheet .level-box .reqs li')).toHaveCount(4);
+  await expect(page.locator('.sheet')).toContainText('Calabozos');
+  await page.screenshot({ path: `test-results/capturas/${info.project.name}-v18-4-nivel-servicio.png` });
+  expect(errors).toEqual([]);
+});

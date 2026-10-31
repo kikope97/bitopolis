@@ -21,6 +21,7 @@ import {
   ruleAdvice,
   ruleAnswer,
   topNeeds,
+  plenoUnlocked,
 } from '@bitopolis/sim';
 import { tickToDate } from '@bitopolis/shared';
 import { api } from './api.ts';
@@ -168,7 +169,14 @@ export function openPleno(ctx: SocialCtx): void {
     : h('p', { class: 'muted' }, 'Aún no has prometido nada.');
   if (!state.pleno) {
     const go = h('button', { class: 'btn primary wide' }, `Convocar pleno (${money(PLENO_COST)})`);
+    // Ronda 14: en el nivel 1 se dice antes de tocar, no al final.
+    const locked = !plenoUnlocked(state);
+    if (locked) {
+      go.setAttribute('aria-disabled', 'true');
+      go.textContent = '🔒 Los plenos llegan con el ayuntamiento de nivel 2 (toca el ayuntamiento)';
+    }
     go.addEventListener('click', async () => {
+      if (locked) return;
       // Cuesta dinero: se confirma (ronda 10).
       if (!(await confirmDialog('Convocar pleno', `Cuesta ${money(PLENO_COST)} y solo hay uno al mes.`, 'Convocar'))) return;
       if (await ctx.command({ type: 'ConvenePleno' })) {

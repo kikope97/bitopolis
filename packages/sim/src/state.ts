@@ -67,6 +67,9 @@ export interface Building {
   darkDays?: number;
   /** v1.8: dañado en unos disturbios: no funciona hasta que se repara. */
   damaged?: { cost: number; repairUntil: number };
+  /** v1.8: nivel del servicio (1–3; sin definir = 1) y fin de la obra de mejora. */
+  level?: number;
+  upgradeUntil?: number;
   /** Meses seguidos sin poder pagar nóminas (empresas). */
   unpaidMonths: number;
   /** Nombre propio (empresas fundadas por vecinos: «Panadería de Lucía»). */

@@ -11,12 +11,9 @@ import {
   FACTORY_REVENUE_PER_WORKER,
   GROWTH,
   HOMES,
-  JOBS,
   LIVING_COST,
   LOCAL_SPEND_SHARE,
-  MAINTENANCE,
   PIE_PER_CITIZEN,
-  PLANT_CAPACITY,
   PRIVATE_SALARY,
   PUBLIC_SALARY,
   SERVICE,
@@ -53,6 +50,7 @@ import { associationsDay, associationsMonth } from './associations.ts';
 import { albumDay } from './album.ts';
 import { crimeDay, jailNear } from './crime.ts';
 import { townLevel, zonesUnlocked } from './townhall.ts';
+import { finishUpgrades, jobsOf, maintenanceOf, plantCapacityOf, radiusOf, serviceHappiness } from './levels.ts';
 import { lifeDay, lifeMonth, lifeYear } from './lifecycle.ts';
 import { FIRST_NAMES, SURNAMES } from './names.ts';
 import { goalFor, memoryMood, onCitizenLeaves, PROFESSIONS, relationMood, socialDay } from './social.ts';
@@ -86,7 +84,7 @@ export function homeCapacity(b: Building): number {
 }
 
 export function jobCapacity(b: Building): number {
-  return b.built ? JOBS[b.kind] : 0;
+  return b.built ? jobsOf(b) : 0;
 }
 
 export function occupants(state: GameState, b: Building): Citizen[] {
@@ -156,7 +154,7 @@ export function updateNetworks(state: GameState): { water: Set<number>; power: S
     for (const plant of state.buildings) {
       if (plant.kind !== kind || !plant.built) continue;
       plant[flag] = true;
-      let capacity = Math.round(PLANT_CAPACITY[kind] * (kind === 'water' ? weatherFx(state).water : weatherFx(state).power));
+      let capacity = Math.round(plantCapacityOf(plant) * (kind === 'water' ? weatherFx(state).water : weatherFx(state).power));
       // v1.7: una bomba a la orilla del río da agua a más edificios.
       if (kind === 'water' && riverside(state, plant.x, plant.y)) capacity = Math.round(capacity * TERRAIN.riverPumpBonus);
       const queue: number[] = [];
@@ -230,11 +228,12 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
     const full = new Set<string>();
     for (const b of state.buildings) {
       const s = SERVICE[b.kind];
-      if (!s || !b.built || dist(b, home) > s.radius) continue;
+      if (!s || !b.built || dist(b, home) > radiusOf(b)) continue;
       // Un servicio saturado rinde en proporción a los vecinos que puede atender.
       const load = serviceSaturation(state, b.kind, b.id);
       if (load < 0.9) full.add(b.kind);
-      services += (seen.has(b.kind) ? s.happiness / 2 : s.happiness) * load * budgetFx(state).services;
+      const hp = serviceHappiness(b);
+      services += (seen.has(b.kind) ? hp / 2 : hp) * load * budgetFx(state).services;
       seen.add(b.kind);
     }
     if (services > 0) {
@@ -264,7 +263,7 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
   if (fest) f.push(fest);
   if (c.kids?.length) f.push({ label: c.kids.length === 1 ? 'Un hijo en casa' : `${c.kids.length} hijos en casa`, value: 3 });
   // v1.7: la biblioteca, para quien quiere prosperar; sin cementerio, el duelo pesa.
-  if (home && c.desire === 'prosperar' && state.buildings.some((b) => b.kind === 'library' && b.built && dist(b, home) <= SERVICE.library!.radius)) {
+  if (home && c.desire === 'prosperar' && state.buildings.some((b) => b.kind === 'library' && b.built && dist(b, home) <= radiusOf(b))) {
     f.push({ label: 'Biblioteca cerca para formarse', value: SOCIAL_PLACES.libraryProsper });
   }
   if (!state.buildings.some((b) => b.kind === 'cemetery' && b.built) && c.memories.some((m) => m.kind === 'perdio_a' && state.tick - m.tick < 360 * TICKS_PER_DAY)) {
@@ -526,6 +525,10 @@ function endOfDay(state: GameState): void {
   lifeDay(state);
   associationsDay(state);
   crimeDay(state);
+  // v1.8: mejoras de servicios terminadas.
+  for (const b of finishUpgrades(state)) {
+    pushEvent(state, 'built', `${b.name ?? BUILD_NAMES[b.kind] ?? b.kind} sube a nivel ${b.level}: llega más lejos y atiende a más gente`, { ref: b.id });
+  }
   albumDay(state);
   accumulateRates(state);
 }
@@ -572,7 +575,7 @@ function endOfMonth(state: GameState): void {
   const pie = Math.round(PIE_PER_CITIZEN * state.citizens.length * Math.max(0.6, Math.min(1.2, averageHappiness(state) / 60)));
   transfer(state, OUTSIDE, TREASURY, pie, 'PIE');
   // El ayuntamiento cuesta más de mantener cuanto más grande (v1.8).
-  for (const b of state.buildings) if (b.built) transfer(state, TREASURY, OUTSIDE, Math.round(MAINTENANCE[b.kind] * (b.kind === 'townhall' ? townLevel(state) : 1) * budgetFx(state).maintenance), 'mantenimiento');
+  for (const b of state.buildings) if (b.built) transfer(state, TREASURY, OUTSIDE, Math.round(maintenanceOf(b) * (b.kind === 'townhall' ? townLevel(state) : 1) * budgetFx(state).maintenance), 'mantenimiento');
   lifeMonth(state);
   if (state.treasury < 0) {
     const debt = -state.treasury;

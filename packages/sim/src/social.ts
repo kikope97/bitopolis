@@ -1,9 +1,10 @@
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { rememberDeparted } from './family.ts';
-import { CAMPAIGN_MONTHS, SERVICE } from './balance.ts';
+import { CAMPAIGN_MONTHS } from './balance.ts';
 import { BUILD_NAMES } from './commands.ts';
 import { canFound, freeShopLot, saturated, taxLevels } from './economy.ts';
 import { hash32 } from './hash.ts';
+import { radiusOf } from './levels.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance, pick } from './prng.ts';
 import type { Building, Citizen, GameState } from './state.ts';
@@ -341,7 +342,7 @@ export function meetingPlace(state: GameState, a: Citizen, b: Citizen): Building
   const places = state.buildings.filter((p) => p.built && MEETING_KINDS.includes(p.kind)).sort((x, y) => MEETING_KINDS.indexOf(x.kind) - MEETING_KINDS.indexOf(y.kind));
   return places.find((p) => {
     if (!p.built || !MEETING_KINDS.includes(p.kind)) return false;
-    const r = SERVICE[p.kind]!.radius;
+    const r = radiusOf(p);
     return Math.abs(p.x - ha.x) + Math.abs(p.y - ha.y) <= r && Math.abs(p.x - hb.x) + Math.abs(p.y - hb.y) <= r;
   });
 }
@@ -902,7 +903,7 @@ export const OBJECTIVES: ObjectiveDef[] = [
   { id: 'diez', text: 'Llega a 10 vecinos', reward: 1_000, done: (s) => s.citizens.length >= 10 },
   { id: 'zonas', text: 'Crea zonas R, C e I', reward: 1_000, done: (s) => [1, 2, 3].every((z) => s.map.zones.includes(z)) },
   { id: 'parque', text: 'Construye un parque', reward: 800, done: (s) => has(s, 'park') },
-  { id: 'pleno', text: 'Celebra un pleno (Pueblo › Pleno municipal)', reward: 500, done: (s) => s.lastPlenoTick >= 0 },
+  { id: 'pleno', text: 'Celebra un pleno (Pueblo › Pleno municipal; llega con el ayuntamiento de nivel 2)', reward: 500, done: (s) => s.lastPlenoTick >= 0 },
   { id: 'empresa', text: 'Que un vecino abra su negocio', reward: 1_000, done: (s) => s.buildings.some((b) => b.owner > 0) },
   { id: 'propietarios', text: 'Ten 5 vecinos propietarios', reward: 1_500, done: (s) => s.citizens.filter((c) => c.owns).length >= 5 },
   { id: 'cincuenta', text: 'Llega a 50 vecinos', reward: 5_000, unlock: 'plaza', done: (s) => s.citizens.length >= 50 },

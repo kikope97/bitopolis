@@ -68,7 +68,7 @@ export function canUpgradeTownhall(state: GameState): { ok: true } | { ok: false
   const next = nextLevel(state);
   if (!next) return { ok: false, error: 'El ayuntamiento ya está en su nivel más alto' };
   if (state.citizens.length < next.pop) return { ok: false, error: `Hacen falta ${next.pop} vecinos (hay ${state.citizens.length})` };
-  if (state.treasury < next.cost) return { ok: false, error: `Hacen falta ${next.cost} € en la caja` };
+  if (state.treasury < next.cost) return { ok: false, error: `Faltan ${next.cost - state.treasury} € en la caja (cuesta ${next.cost} €; hay ${state.treasury} €)` };
   return { ok: true };
 }
 

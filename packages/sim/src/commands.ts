@@ -1,4 +1,6 @@
 import { canMeetAssociation, meetAssociation } from './associations.ts';
+import { canUpgradeBuilding, startUpgrade } from './levels.ts';
+import { serviceCounts } from './economy.ts';
 import { BUILD_LEVEL, canUpgradeTownhall, plenoUnlocked, townLevel, upgradeTownhall, zonesUnlocked } from './townhall.ts';
 import { answerGrant, canAnswerGrant, canHoldFestival, canProposeBudget, holdFestival, materialsCost, proposeBudget } from './civic.ts';
 import { Command, TICKS_PER_DAY, tickToDate, type BuildKind, type ZoneKind } from '@bitopolis/shared';
@@ -204,6 +206,10 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
     }
     case 'UpgradeTownhall':
       return canUpgradeTownhall(state);
+    case 'UpgradeBuilding': {
+      const b = state.buildings.find((x) => x.id === cmd.buildingId);
+      return canUpgradeBuilding(state, b, b ? serviceCounts(state).get(b.id) : undefined);
+    }
     case 'ConvenePleno': {
       if (!plenoUnlocked(state)) return { ok: false, error: 'Los plenos llegan con el ayuntamiento de nivel 2' };
       const r = canConvenePleno(state);
@@ -345,6 +351,12 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
     case 'UpgradeTownhall':
       upgradeTownhall(state);
       break;
+    case 'UpgradeBuilding': {
+      const b = state.buildings.find((x) => x.id === cmd.buildingId)!;
+      startUpgrade(state, b);
+      pushEvent(state, 'info', `Empieza la mejora de ${b.name ?? BUILD_NAMES[b.kind] ?? b.kind} al nivel ${(b.level ?? 1) + 1}: sigue abierto mientras dura la obra`, { ref: b.id });
+      break;
+    }
     case 'RepairBuilding': {
       // v1.8: el ayuntamiento paga la reparación de lo que rompieron los disturbios.
       const b = buildingById(state, cmd.buildingId)!;

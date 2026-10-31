@@ -31,6 +31,7 @@ import {
   damagedSprite,
   marcherSprite,
   policeSprite,
+  serviceSprite,
   sparkleSprite,
   thiefSprite,
   townhallSprite,
@@ -303,6 +304,7 @@ const roadCache = new Map<string, Pix>();
 function bSprite(b: GameState['buildings'][number], tod: TimeOfDay, snowing: boolean, state: GameState): HTMLCanvasElement {
   if (b.damaged) return damagedSprite(b.kind, b.id, tod);
   if (b.kind === 'townhall') return townhallSprite(state.townhallLevel ?? 1, tod, snowing);
+  if (b.level && b.level > 1) return serviceSprite(b.kind, b.id, b.level, tod, snowing);
   return buildingSprite(b.kind, b.id, tod, snowing);
 }
 
@@ -711,6 +713,10 @@ function along(path: { x: number; y: number }[], d: number): { fx: number; fy: n
 
 /** Cuándo se vio por primera vez cada suceso animado (la animación va en tiempo real). */
 const seenAt = new Map<string, number>();
+/** Ronda 14: al llegar la cámara, las animaciones empiezan de nuevo (para verlas enteras). */
+export function restartAnimations(): void {
+  seenAt.clear();
+}
 function sinceSeen(key: string, time: number): number {
   if (!seenAt.has(key)) {
     if (seenAt.size > 50) seenAt.clear();
@@ -732,11 +738,12 @@ function drawProtest(ctx: CanvasRenderingContext2D, state: GameState, cam: Camer
   if (!crowd || !hall) return;
   const z = cam.zoom;
   const a = state.associations?.find((x) => x.id === e.ref);
-  const path = a?.x !== undefined && a.y !== undefined ? roadPath(state, { x: a.x, y: a.y }, { x: hall.x, y: hall.y + 1 }) : [];
+  const from = a?.x !== undefined && a.y !== undefined ? marchStart(state, { x: a.x, y: a.y }, hall) : null;
+  const path = from ? roadPath(state, from, { x: hall.x, y: hall.y + 1 }) : [];
   // Recorrido a 1,2 casillas por segundo; quien llega, se queda en la plaza.
   const walked = still ? Infinity : (sinceSeen(`p${e.tick}`, time) / 1000) * 1.2;
   for (let i = 0; i < crowd; i++) {
-    const behind = i * 0.35;
+    const behind = i * 0.18;
     const d = walked - behind;
     let fx: number;
     let fy: number;
@@ -766,6 +773,35 @@ function drawProtest(ctx: CanvasRenderingContext2D, state: GameState, cam: Camer
       ctx.drawImage(img, (fx - 3) * z - cam.x, (fy - 11 - bob) * z - cam.y, 7 * z, 12 * z);
     }
   }
+}
+
+/**
+ * Ronda 14: la marcha sale de una calle a 6–10 casillas del ayuntamiento (la
+ * más cercana al barrio de la asociación), para que se vea recorrer calles
+ * aunque la asociación sea del centro.
+ */
+const startCache = new Map<string, { x: number; y: number }>();
+function marchStart(state: GameState, home: { x: number; y: number }, hall: { x: number; y: number }): { x: number; y: number } {
+  const key = `${home.x},${home.y}:${mapSignature(state)}`;
+  const hit = startCache.get(key);
+  if (hit) return hit;
+  const { w, h, tiles } = state.map;
+  let best = home;
+  let bestD = Infinity;
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      if (tiles[y * w + x] !== Tile.Road) continue;
+      const fromHall = Math.abs(x - hall.x) + Math.abs(y - hall.y);
+      if (fromHall < 6 || fromHall > 10) continue;
+      const d = Math.abs(x - home.x) + Math.abs(y - home.y);
+      if (d < bestD) {
+        bestD = d;
+        best = { x, y };
+      }
+    }
+  if (startCache.size > 20) startCache.clear();
+  startCache.set(key, best);
+  return best;
 }
 
 /** v1.8: tras un robo resuelto, un agente va de la comisaría a la tienda (medio día). */
@@ -818,8 +854,8 @@ function drawThief(ctx: CanvasRenderingContext2D, state: GameState, cam: Camera,
   const path = roadPath(state, shop, best);
   if (path.length < 2) return;
   const z = cam.zoom;
-  const d = still ? 1 : Math.min(path.length - 1, (sinceSeen(`t${e.tick}`, time) / 1000) * 2.5);
-  if (!still && d >= path.length - 1) return; // ya se ha perdido de vista
+  // Ronda 14: más despacio y en bucle mientras dura el suceso, para que dé tiempo a verlo.
+  const d = still ? 1 : ((sinceSeen(`t${e.tick}`, time) / 1000) * 1.3) % (path.length - 1);
   const p = along(path, d);
   const img = thiefSprite(Math.floor(time / 90) % 4, p.dir, tod);
   ctx.drawImage(img, (p.fx - 3) * z - cam.x, (p.fy - 11) * z - cam.y, img.width * z, img.height * z);

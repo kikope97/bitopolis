@@ -79,7 +79,7 @@ export function toolLevel(tool: Tool): number {
 /** Qué falta, en dos palabras («nivel 3», «hito de 50»), o null si está libre. */
 export function lockShort(tool: Tool, state: GameState): string | null {
   const lv = toolLevel(tool);
-  if (townLevel(state) < lv) return `ayto. nivel ${lv}`;
+  if (townLevel(state) < lv) return `ayto. nivel\u00a0${lv}`;
   if ((tool.build === 'plaza' || tool.build === 'market') && !state.unlocked.includes(tool.build)) return `hito de ${unlockPop(tool)}`;
   if (state.citizens.length < unlockPop(tool) && tool.build !== 'plaza' && tool.build !== 'market') return `${unlockPop(tool)} vecinos`;
   return null;

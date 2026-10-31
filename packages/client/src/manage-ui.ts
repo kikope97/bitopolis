@@ -149,6 +149,8 @@ export function openManagement(ctx: SocialCtx, links: ManageLinks): void {
 
   const el = sheet('Gestión del pueblo', h('div', { class: 'mg' }, hall, how, missing, has, safety, pol));
   el.classList.add('full');
+  // Tapa toda la pantalla: modal también en tableta y horizontal (ronda 14).
+  el.setAttribute('aria-modal', 'true');
 }
 
 const KIND_TEXT: Record<string, string> = { res: 'Pisos', shop: 'Tiendas', factory: 'Fábricas', office: 'Oficinas' };

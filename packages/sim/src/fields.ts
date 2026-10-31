@@ -1,6 +1,7 @@
 import type { GameState } from './state.ts';
 import { Tile } from './state.ts';
 import { CRIME, FIELDS, TERRAIN } from './balance.ts';
+import { radiusOf } from './levels.ts';
 import { isWater, Terrain } from './terrain.ts';
 
 /**
@@ -81,7 +82,7 @@ export function updateFields(state: GameState): void {
         stamp(good, w, h, b.x, b.y, 4, -12);
         break;
       case 'police':
-        stamp(police, w, h, b.x, b.y, 10, 1);
+        stamp(police, w, h, b.x, b.y, radiusOf(b), 1);
         stamp(good, w, h, b.x, b.y, 6, 5);
         break;
       default:

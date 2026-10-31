@@ -8,8 +8,19 @@ import {
   type GameState,
   cellsUsed,
   coverageSummary,
-  CRIME,
   jailCapacity,
+  canUpgradeBuilding,
+  cellsOf,
+  jailPlacesOf,
+  levelOf,
+  plantCapacityOf,
+  radiusOf,
+  SERVICE_LEVELS,
+  serviceCapacityOf,
+  serviceCounts,
+  UPGRADABLE,
+  upgradeCost,
+  upgradeReqs,
   type NeedKey,
   stationsFor,
   SEASON_TEXT,
@@ -41,7 +52,7 @@ import { api, ApiError } from './api.ts';
 import { nextHint } from './hints.ts';
 import { openManagement } from './manage-ui.ts';
 import { formatDate, money, MONTHS, plural, shortDate, t } from './i18n.ts';
-import { type Camera, type Preview, render } from './render.ts';
+import { type Camera, type Preview, render, restartAnimations } from './render.ts';
 import type { FromWorker, SaveBatch, ToWorker } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
 import { buildingSprite, letterSprite, T } from './sprites.ts';
@@ -287,10 +298,13 @@ export function startGame(opts: GameOptions): void {
   function paintCalendar(d: { year: number; month: number; day: number }) {
     const cal = $('#calendar');
     const on = speed >= 3;
-    if (cal.hidden === on) cal.hidden = !on;
+    if (cal.hidden === on) {
+      cal.hidden = !on;
+      document.body.classList.toggle('cal-on', on);
+    }
     if (!on || d.day === calDay) return;
     calDay = d.day;
-    cal.querySelector('.cal-m')!.textContent = `${MONTHS[d.month - 1]} A${d.year}`;
+    cal.querySelector('.cal-m')!.textContent = `${MONTHS[d.month - 1]!.toLowerCase()} A${d.year}`;
     cal.querySelector('.cal-d')!.textContent = String(d.day);
     if (!reducedMotion()) {
       cal.classList.remove('flip');
@@ -332,17 +346,33 @@ export function startGame(opts: GameOptions): void {
   function attention(at: { x: number; y: number } | undefined) {
     const now = performance.now();
     if (at) highlight = { x: at.x, y: at.y, since: now };
-    if (speed < 3 || now - lastAttention < 45_000) return;
+    // Ronda 14: si en este mismo lote ya se bajó a x1 (una oferta con plazo), el motivo
+    // que llega detrás sí se enseña; si no, como mucho una parada cada 45 s.
+    const sameBatch = now - lastAttention < 2_000;
+    if (!sameBatch && (speed < 3 || now - lastAttention < 45_000)) return;
     lastAttention = now;
-    setSpeed(1);
+    if (speed >= 3) setSpeed(1);
     shake(5, 450);
     vibrate(100);
-    if (at && !reducedMotion()) {
-      glide({ x: cam.x, y: cam.y }, () => {
-        centerOn(at.x, at.y);
-        return { x: cam.x, y: cam.y };
-      }, () => {});
+    if (!at) return;
+    // Ronda 14: acercar lo bastante para que se vea la animación (la marcha, el ladrón).
+    const want = Math.max(touchZoom(), Math.round(dpr() * 2));
+    if (cam.zoom < want) setZoom(want);
+    if (reducedMotion()) {
+      centerOn(at.x, at.y);
+      restartAnimations();
+      return;
     }
+    glide({ x: cam.x, y: cam.y }, () => {
+      centerOn(at.x, at.y);
+      return { x: cam.x, y: cam.y };
+    }, () => restartAnimations());
+  }
+  /** Una oferta con plazo baja a x1 (sin temblor) y cuenta como parada (ronda 14). */
+  function slowDown() {
+    if (speed < 3) return;
+    setSpeed(1);
+    lastAttention = performance.now();
   }
   const hallSpot = () => state.buildings.find((b) => b.kind === 'townhall');
   const refSpot = (ref?: number) => (ref !== undefined ? state.buildings.find((b) => b.id === ref) : undefined);
@@ -483,8 +513,11 @@ export function startGame(opts: GameOptions): void {
       const btn = document.querySelector<HTMLButtonElement>(`#tray [data-tool="${tl.id}"]`);
       if (!btn) continue;
       const locked = isLocked(tl, state);
-      if (btn.classList.contains('locked') === locked && btn.dataset.ready) continue;
+      // Ronda 14: también cambia el motivo («ayto. nivel 2» → «25 vecinos»), no solo el candado.
+      const sig = locked ? lockText(tl) : '';
+      if (btn.dataset.ready && btn.dataset.lock === sig) continue;
       btn.dataset.ready = '1';
+      btn.dataset.lock = sig;
       btn.classList.toggle('locked', locked);
       btn.setAttribute('aria-disabled', String(locked));
       btn.querySelector('.tool-cost')!.textContent = locked ? `🔒 ${lockText(tl)}` : trayCost(tl);
@@ -566,7 +599,7 @@ export function startGame(opts: GameOptions): void {
         // v1.5: ofertas de subvención y fiestas: llevan a su sección del Ayuntamiento.
         // Si hay que decidir algo con plazo, el juego baja a x1 para que dé tiempo (ronda 11).
         const decide = /Responde antes|puedes organizarlas/.test(e.text);
-        if (decide && speed >= 3) setSpeed(1);
+        if (decide) slowDown();
         toast(e.text, { kind: 'info', sticky: decide, onClick: () => openTownHall(social, /fiestas/i.test(e.text) ? 'festival' : 'grants') });
       } else if (e.kind === 'info' && /^(Nieva|Ola de calor|Tormenta sobre|El río crece)/.test(e.text)) {
         // v1.7: el tiempo que cambia algo (no el sol ni las nubes).
@@ -603,7 +636,7 @@ export function startGame(opts: GameOptions): void {
         toast(e.text, { kind: urgent ? 'warn' : 'info', sticky: urgent || e.text.startsWith('Nace'), onClick: () => openTownHall(social, 'associations') });
       } else if (e.kind === 'politics' && /presupuesto/i.test(e.text)) {
         const decide = e.text.startsWith('Toca presentar');
-        if (decide && speed >= 3) setSpeed(1);
+        if (decide) slowDown();
         toast(e.text, { kind: e.text.includes('rechaza') ? 'warn' : 'info', sticky: decide, onClick: () => openTownHall(social, 'budget') });
       } else if (e.kind === 'politics') {
         // Lo que responde a una acción tuya (moción, campaña) se avisa siempre.
@@ -1361,6 +1394,39 @@ export function startGame(opts: GameOptions): void {
     revealTile(tile);
   }
 
+  /** Nivel del servicio, lo que da y qué pide subirlo (con «Mejorar»). */
+  function levelBox(b: Building): HTMLElement {
+    const lv = levelOf(b);
+    const served = serviceCounts(state).get(b.id);
+    const box = h('section', { class: 'level-box' }, h('h3', {}, pixelIcon('upgrade'), ` Nivel ${lv} de ${SERVICE_LEVELS.maxLevel}`));
+    const gives: string[] = [];
+    if (radiusOf(b)) gives.push(`llega a ${radiusOf(b)} casillas`);
+    if (serviceCapacityOf(b)) gives.push(`atiende a ${serviceCapacityOf(b)} vecinos${served !== undefined ? ` (ahora ${served})` : ''}`);
+    if (plantCapacityOf(b)) gives.push(`da ${b.kind === 'water' ? 'agua' : 'luz'} a ${plantCapacityOf(b)} edificios`);
+    if (b.kind === 'police') gives.push(`${cellsOf(b)} calabozos`);
+    if (b.kind === 'jail') gives.push(`${jailPlacesOf(b)} plazas`);
+    if (gives.length) box.append(h('p', { class: 'muted small' }, `Ahora ${gives.join(', ')}.`));
+    if (b.upgradeUntil !== undefined) {
+      box.append(h('p', {}, `Mejorando a nivel ${lv + 1}: termina el ${formatDate(tickToDate(b.upgradeUntil))}. Sigue abierto mientras tanto.`));
+      return box;
+    }
+    if (lv >= SERVICE_LEVELS.maxLevel) {
+      box.append(h('p', { class: 'muted small' }, 'Está en su nivel más alto.'));
+      return box;
+    }
+    const reqs = upgradeReqs(state, b, served);
+    box.append(
+      h('p', {}, `Para el nivel ${lv + 1} (más alcance y más capacidad; cuesta más mantenerlo):`),
+      h('ul', { class: 'reqs' }, ...reqs.map((r) => h('li', { class: r.ok ? 'ok' : 'no' }, h('span', { 'aria-hidden': 'true' }, r.ok ? '✓ ' : '✗ '), r.label, h('span', { class: 'visually-hidden' }, r.ok ? ' (cumplido)' : ' (falta)')))),
+    );
+    const ok = canUpgradeBuilding(state, b, served).ok;
+    const btn = h('button', { class: 'btn primary wide' }, `Mejorar · ${money(upgradeCost(b))}`) as HTMLButtonElement;
+    btn.disabled = !ok;
+    btn.addEventListener('click', () => void command({ type: 'UpgradeBuilding', buildingId: b.id }));
+    box.append(btn);
+    return box;
+  }
+
   /** Que la casilla quede a la vista, por encima (o al lado) de la hoja abierta (v1.6). */
   function revealTile(t: { x: number; y: number }) {
     const el = currentSheet();
@@ -1462,10 +1528,12 @@ export function startGame(opts: GameOptions): void {
       // v1.8: comisaría (calabozos) y cárcel (presos).
       if (b.kind === 'police') {
         const used = cellsUsed(state, b.id);
-        content.push(h('p', {}, `Calabozos: ${used} de ${CRIME.cellsPerStation} ocupados.`));
-        if (used >= CRIME.cellsPerStation) content.push(h('p', { class: 'pol-tag' }, jailCapacity(state) ? 'Llenos: esperan sitio en la cárcel.' : 'Llenos: hace falta una cárcel para poder detener a más.'));
+        content.push(h('p', {}, `Calabozos: ${used} de ${cellsOf(b)} ocupados.`));
+        if (used >= cellsOf(b)) content.push(h('p', { class: 'pol-tag' }, jailCapacity(state) ? 'Llenos: esperan sitio en la cárcel.' : 'Llenos: hace falta una cárcel para poder detener a más.'));
       }
       if (b.kind === 'jail') content.push(h('p', {}, `Presos: ${state.justice?.jail.length ?? 0} de ${jailCapacity(state)} plazas.`));
+      // v1.8 (petición del creador): los servicios suben de nivel.
+      if (UPGRADABLE.includes(b.kind)) content.push(levelBox(b));
       const res = occupants(state, b);
       const workers = state.citizens.filter((c) => c.jobId === b.id);
       if (home && res.length) {

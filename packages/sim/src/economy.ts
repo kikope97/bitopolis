@@ -32,10 +32,10 @@ import {
   TAX_SPLIT_POP,
   TRANSACTION_COST,
   BUY_CHANCE,
-  SERVICE,
   SERVICE_CAPACITY,
 } from './balance.ts';
 import { hash32 } from './hash.ts';
+import { radiusOf, serviceCapacityOf } from './levels.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance } from './prng.ts';
 import { addMemory, onBusinessFounded } from './social.ts';
@@ -389,7 +389,7 @@ export function monthlyMarket(state: GameState): void {
  * que un colegio en una esquina vacía no alivia al del barrio lleno.
  * 1 = da abasto; menos de 1 = saturado. Se calcula una vez por hora de juego.
  */
-const loadCache = new WeakMap<GameState, { key: string; loads: Map<number, number> }>();
+const loadCache = new WeakMap<GameState, { key: string; loads: Map<number, number>; count: Map<number, number> }>();
 export function serviceLoads(state: GameState): Map<number, number> {
   const key = `${state.tick}:${state.citizens.length}:${state.buildings.length}`;
   const hit = loadCache.get(state);
@@ -403,7 +403,7 @@ export function serviceLoads(state: GameState): Map<number, number> {
     const nearest = new Map<BuildingKind, { id: number; d: number }>();
     for (const b of served) {
       const d = Math.abs(b.x - home.x) + Math.abs(b.y - home.y);
-      if (d > SERVICE[b.kind]!.radius) continue;
+      if (d > radiusOf(b)) continue;
       const best = nearest.get(b.kind);
       if (!best || d < best.d || (d === best.d && b.id < best.id)) nearest.set(b.kind, { id: b.id, d });
     }
@@ -411,9 +411,15 @@ export function serviceLoads(state: GameState): Map<number, number> {
     for (const [kind, { id }] of nearest) count.set(id, count.get(id)! + (kind === 'school' ? 1 + (c.kids?.length ?? 0) : 1));
   }
   const loads = new Map<number, number>();
-  for (const b of served) loads.set(b.id, Math.min(1, SERVICE_CAPACITY[b.kind]! / Math.max(1, count.get(b.id)!)));
-  loadCache.set(state, { key, loads });
+  for (const b of served) loads.set(b.id, Math.min(1, serviceCapacityOf(b) / Math.max(1, count.get(b.id)!)));
+  loadCache.set(state, { key, loads, count });
   return loads;
+}
+
+/** v1.8: vecinos que usa cada colegio, centro de salud o comisaría (para su nivel). */
+export function serviceCounts(state: GameState): Map<number, number> {
+  serviceLoads(state);
+  return loadCache.get(state)!.count;
 }
 
 /** Cobertura de un edificio de servicio, o del peor de ese tipo si no se dice cuál. */

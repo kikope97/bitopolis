@@ -1,5 +1,6 @@
 import { TICKS_PER_DAY } from '@bitopolis/shared';
-import { CRIME, SERVICE } from './balance.ts';
+import { CRIME } from './balance.ts';
+import { cellsOf, jailPlacesOf, radiusOf } from './levels.ts';
 import { OUTSIDE, transfer } from './money.ts';
 import { chance } from './prng.ts';
 import { addMemory } from './social.ts';
@@ -33,8 +34,7 @@ const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.
 
 /** Comisarías que cubren un sitio (las más cercanas primero). */
 export function stationsFor(state: GameState, x: number, y: number): Building[] {
-  const r = SERVICE.police?.radius ?? 10;
-  return state.buildings.filter((b) => b.kind === 'police' && b.built && dist(b, { x, y }) <= r).sort((a, b) => dist(a, { x, y }) - dist(b, { x, y }));
+  return state.buildings.filter((b) => b.kind === 'police' && b.built && dist(b, { x, y }) <= radiusOf(b)).sort((a, b) => dist(a, { x, y }) - dist(b, { x, y }));
 }
 
 export function cellsUsed(state: GameState, stationId: number): number {
@@ -42,7 +42,7 @@ export function cellsUsed(state: GameState, stationId: number): number {
 }
 
 export function jailCapacity(state: GameState): number {
-  return state.buildings.filter((b) => b.kind === 'jail' && b.built).length * CRIME.jailCapacity;
+  return state.buildings.filter((b) => b.kind === 'jail' && b.built).reduce((a, b) => a + jailPlacesOf(b), 0);
 }
 
 /**
@@ -55,7 +55,7 @@ export function tryArrest(state: GameState, x: number, y: number, n: number): nu
   const stations = stationsFor(state, x, y);
   let done = 0;
   for (const s of stations) {
-    while (done < n && cellsUsed(state, s.id) < CRIME.cellsPerStation) {
+    while (done < n && cellsUsed(state, s.id) < cellsOf(s)) {
       // Con cárcel y sitio, a los pocos días se les traslada; sin cárcel, cumplen en el calabozo.
       const toJail = j.jail.length + j.cells.filter((c) => c.toJail).length < jailCapacity(state);
       j.cells.push({ stationId: s.id, until: state.tick + (toJail ? CRIME.transferDays : CRIME.cellDays) * TICKS_PER_DAY, toJail });
