@@ -146,7 +146,13 @@ export function missingMarks(state: GameState): { x: number; y: number; needs: N
   const key = `${Math.floor(state.tick / 24)}:${state.buildings.length}:${state.buildings.filter((b) => b.built).length}`;
   if (marksCache?.key === key) return marksCache.marks;
   const ctx = coverageCtx(state);
-  const marks = homeSites(state).map((s) => ({ ...s, needs: missingServices(state, s.x, s.y, ctx) }));
+  const raw = homeSites(state).map((s) => ({ ...s, needs: missingServices(state, s.x, s.y, ctx) }));
+  // Ronda 13: primero lo que falta (no lo lleno) y, entre eso, lo que falta en más casas del pueblo:
+  // así el icono de cada casa señala la misma prioridad que la leyenda.
+  const count = new Map<string, number>();
+  for (const m of raw) for (const n of m.needs) if (n.status === 'falta') count.set(n.key, (count.get(n.key) ?? 0) + 1);
+  const rank = (n: Need) => (n.key === 'agua' || n.key === 'luz' ? -1e6 : 0) + (n.status === 'falta' ? -1000 - (count.get(n.key) ?? 0) : 0);
+  const marks = raw.map((m) => ({ ...m, needs: [...m.needs].sort((a, b) => rank(a) - rank(b)) }));
   marksCache = { key, marks };
   return marks;
 }

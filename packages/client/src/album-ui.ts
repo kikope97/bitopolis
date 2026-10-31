@@ -119,7 +119,9 @@ export function openAlbum(ctx: SocialCtx): void {
   const list = h('div', { class: 'album' });
   for (const m of album) {
     const { el, live } = photo(ctx.token, state, m);
-    const save = h('button', { class: 'btn small' }, 'Guardar postal');
+    const save = h('button', { class: 'btn small', 'aria-label': `Guardar postal del ${formatDate(tickToDate(m.tick))}` }, 'Guardar postal');
+    el.setAttribute('role', 'img');
+    el.setAttribute('aria-label', `Foto: ${m.text}`);
     save.addEventListener('click', () => void postcard(ctx.token, state, m));
     list.append(
       h(

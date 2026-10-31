@@ -523,24 +523,50 @@ export function render(
   }
 
   if (layer === 'missing') {
-    // Sobre cada vivienda (o solar R), los iconos de lo que falta: rojo debajo si falta, amarillo si está lleno.
+    // Ronda 13: sobre cada vivienda (o solar R), UN icono: lo que más falta, con marco rojo
+    // (falta) o amarillo a trazos (llega, pero lleno), y «+N» si hay más. Muy alejado, solo un punto.
+    const cssTile = ts / Math.max(1, typeof devicePixelRatio === 'number' ? devicePixelRatio : 1);
     for (const m of missingMarks(state)) {
       if (!m.needs.length) continue;
-      const shown = m.needs.slice(0, 4);
-      const cols = Math.min(2, shown.length);
-      const rows = Math.ceil(shown.length / 2);
+      const top = m.needs[0]!;
       const built = state.buildings.some((b) => b.x === m.x && b.y === m.y);
-      const px = m.x * ts - cam.x + (T - cols * 14) / 2 * z;
+      const falta = top.status === 'falta';
+      if (cssTile < 22) {
+        // Punto de 10×10 con borde claro: rojo lleno si falta, amarillo con hueco si está lleno.
+        const cx = m.x * ts - cam.x + 11 * z;
+        const cy = (m.y * T - (built ? BH - T : 0) + 6) * z - cam.y;
+        ctx.fillStyle = P(12);
+        ctx.fillRect(cx - z, cy - z, 12 * z, 12 * z);
+        ctx.fillStyle = P(falta ? 2 : 4);
+        ctx.fillRect(cx, cy, 10 * z, 10 * z);
+        if (!falta) {
+          ctx.fillStyle = P(0);
+          ctx.fillRect(cx + 3 * z, cy + 3 * z, 4 * z, 4 * z);
+        }
+        continue;
+      }
+      const px = m.x * ts - cam.x + 8 * z;
       const py = (m.y * T - (built ? BH - T : 0)) * z - cam.y + 2 * z;
+      // Marco de 2 px: rojo continuo o amarillo a trazos (no solo el color distingue).
+      ctx.fillStyle = P(falta ? 2 : 4);
+      ctx.fillRect(px - 2 * z, py - 2 * z, 18 * z, 18 * z);
+      if (!falta) {
+        ctx.fillStyle = P(0);
+        for (let k = 0; k < 18; k += 4) {
+          ctx.fillRect(px - 2 * z + k * z, py - 2 * z, 2 * z, 2 * z);
+          ctx.fillRect(px - 2 * z + k * z, py + 14 * z, 2 * z, 2 * z);
+        }
+      }
       ctx.fillStyle = P(0);
-      ctx.fillRect(px - z, py - z, (cols * 14 + 1) * z, (rows * 15 + 1) * z);
-      shown.forEach((need, k) => {
-        const ix = px + (k % 2) * 14 * z;
-        const iy = py + Math.floor(k / 2) * 15 * z;
-        ctx.drawImage(icon(NEED_ICON[need.key]), ix + z, iy, 12 * z, 12 * z);
-        ctx.fillStyle = P(need.status === 'falta' ? 2 : 4);
-        ctx.fillRect(ix + z, iy + 12 * z, 12 * z, 2 * z);
-      });
+      ctx.fillRect(px, py, 14 * z, 14 * z);
+      ctx.drawImage(icon(NEED_ICON[top.key]), px + z, py + z, 12 * z, 12 * z);
+      if (m.needs.length > 1) {
+        // «+N»: cuadradito con tantos puntos como necesidades más (hasta 3).
+        ctx.fillStyle = P(0);
+        ctx.fillRect(px + 16 * z, py, 6 * z, 9 * z);
+        ctx.fillStyle = P(12);
+        for (let k = 0; k < Math.min(3, m.needs.length - 1); k++) ctx.fillRect(px + 18 * z, py + (1 + k * 3) * z, 2 * z, 2 * z);
+      }
     }
   }
 

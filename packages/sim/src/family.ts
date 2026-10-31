@@ -69,7 +69,11 @@ export function familyOf(state: GameState, id: number): Family | null {
   const self = kin(state, id);
   if (!self) return null;
   const c = state.citizens.find((x) => x.id === id);
-  const partnerId = c?.relations.find((r) => r.kind === 'pareja')?.id ?? state.departed?.find((x) => x.id === id)?.partnerId;
+  // La pareja viva; si no, la que falleció o se fue (para que el viudo no se quede solo en el árbol).
+  const partnerId =
+    c?.relations.find((r) => r.kind === 'pareja')?.id ??
+    state.departed?.find((x) => x.id === id)?.partnerId ??
+    [...(state.departed ?? [])].reverse().find((x) => x.partnerId === id)?.id;
   const parents = parentsOf(state, id);
   const children = childrenOf(state, id);
   const siblings = parents.length

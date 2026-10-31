@@ -96,16 +96,22 @@ export function lifeYear(state: GameState): void {
     if (!grown.length) continue;
     c.kids = kids.filter((t) => !grown.includes(t));
     for (let i = 0; i < grown.length; i++) {
+      // Ronda 13: dos apellidos, el primero de cada progenitor; y padres en el árbol.
+      const partnerId = c.relations.find((r) => r.kind === 'pareja')?.id;
+      const partner = state.citizens.find((x) => x.id === partnerId);
+      const surnames = partner ? `${surname(c)} ${surname(partner)}` : surname(c);
+      const parents = partnerId !== undefined ? [c.id, partnerId] : [c.id];
       if (freeHomes(state) > 0) {
-        const kid = newResident(state, { age: ADULT_AGE, surname: surname(c) });
-        // v1.7: árbol genealógico: los padres son quien lo crió y su pareja.
-        const partner = c.relations.find((r) => r.kind === 'pareja')?.id;
-        kid.parents = partner !== undefined ? [c.id, partner] : [c.id];
+        const kid = newResident(state, { age: ADULT_AGE, surname: surnames });
+        kid.parents = parents;
         state.citizens.push(kid);
         transfer(state, c.id, kid.id, Math.min(c.money, 500));
         pushEvent(state, 'arrival', `${first(kid)}, de casa de ${first(c)}, cumple 18, se independiza y se queda en el pueblo`, { ref: kid.id });
       } else {
-        pushEvent(state, 'info', `En casa de ${first(c)}, alguien cumple 18 y se va a estudiar fuera: no hay casa libre en el pueblo`, { ref: c.id });
+        // Se va, pero sigue en el árbol familiar con su nombre.
+        const kid = newResident(state, { age: ADULT_AGE, surname: surnames });
+        state.departed?.push({ id: kid.id, name: kid.name, age: ADULT_AGE, parents, tick: state.tick, reason: 'se_fue' });
+        pushEvent(state, 'info', `${first(kid)}, de casa de ${first(c)}, cumple 18 y se va a estudiar fuera: no hay casa libre en el pueblo`, { ref: c.id });
       }
     }
   }

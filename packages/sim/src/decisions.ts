@@ -230,7 +230,10 @@ export function applyDecision(state: GameState, citizenId: number, action: strin
   const entry: DecisionLogEntry = { tick: state.tick, citizenId, trigger: p.trigger, action, motivo: text, source };
   state.decisionLog.push(entry);
   if (state.decisionLog.length > LOG_LIMIT) state.decisionLog.splice(0, state.decisionLog.length - LOG_LIMIT);
-  pushEvent(state, 'decision', `${c.name} ${effect}: «${text}»`, { ref: citizenId });
+  // Ronda 13: lo rutinario (ahorrar, darse un capricho, seguir igual) queda en la ficha del
+  // vecino, no en el diario ni en burbujas (en 12 años eran miles de «decide ahorrar»).
+  const routine = ['ahorrar', 'gastar_ocio', 'seguir_alquilando', 'seguir_fuera'].includes(verb) || (verb === 'quedarse' && p.trigger === 'opinion');
+  if (!routine) pushEvent(state, 'decision', `${c.name} ${effect}: «${text}»`, { ref: citizenId });
   return true;
 }
 
@@ -343,7 +346,9 @@ export function ruleDecide(state: GameState, p: Pending): { action: string; moti
   const options = TEMPLATES[verb!] ?? TEMPLATES.quedarse!;
   const base = options[hash32(state.seed, c.id, state.tick) % options.length]!.replace('{x}', NEED_TEXT[arg ?? ''] ?? 'más cosas');
   const top = (Object.entries(c.traits) as [keyof Citizen['traits'], number][]).sort((a, b) => b[1] - a[1])[0]!;
-  const flavors = FLAVOR[top[0]];
+  // «Ya lo comentaré en el bar» solo si hay bar en el pueblo.
+  const hasBar = state.buildings.some((b) => b.kind === 'bar' && b.built);
+  const flavors = FLAVOR[top[0]].filter((f) => hasBar || !f.includes('bar'));
   const motivo = top[1] >= 60 ? `${base} ${flavors[hash32(c.id, state.tick, 7) % flavors.length]}` : base;
   return { action: best, motivo: cleanMotivo(motivo) };
 }

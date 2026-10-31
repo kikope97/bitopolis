@@ -282,6 +282,8 @@ export function startGame(opts: GameOptions): void {
       wEl.replaceChildren(...(wk === 'nubes' ? [] : [pixelIcon(icon)]), h('span', { class: 'weather-name' }, WEATHER_TEXT[wk]));
       wEl.setAttribute('aria-label', `${SEASON_TEXT[seasonOf(d.month)]}: ${WEATHER_TEXT[wk].toLowerCase()}`);
     }
+    // El botón de la franja lleva su propio nombre: incluye la fecha y el tiempo (ronda 13).
+    $('#strip-info').setAttribute('aria-label', `${formatDate(d)}, ${WEATHER_TEXT[wk].toLowerCase()}. Ver qué pide el pueblo`);
     if (d.hour === 0 || dayAgoTreasury.length === 0) {
       dayAgoTreasury.push(state.treasury);
       if (dayAgoTreasury.length > 2) dayAgoTreasury.shift();
@@ -901,8 +903,9 @@ export function startGame(opts: GameOptions): void {
     const v = validateCommand(state, cmd);
     const hill = tool.build && tool.shape === 'tap' && terrainAt(state, a.x, a.y) === Terrain.Hill;
     const cost = tool.build && tool.shape === 'tap' ? `${shortCost(tool)}${hill ? ' (colina: materiales +50 %)' : ''}` : lineText(a, b);
-    const msg = demolishText && v.ok ? demolishText : v.ok ? `${tool.label} aquí${cost ? ` · ${cost}` : ''}` : `${tool.label}: no se puede (${v.error})`;
-    $('#confirm-text').textContent = msg;
+    // Ronda 13: el precio va en su propia línea y siempre se ve (también si no se puede: «no hay dinero»).
+    const what = demolishText && v.ok ? demolishText : v.ok ? `${tool.label} aquí` : `${tool.label}: no se puede (${v.error})`;
+    $('#confirm-text').replaceChildren(h('span', { class: 'cc-what' }, what), demolishText || !cost ? '' : h('span', { class: 'cc-cost' }, v.ok ? cost : `Cuesta ${cost}`));
     const yes = $('#confirm-yes') as HTMLButtonElement;
     yes.textContent = demolishText ? 'Derribar' : tool.zone ? (tool.zone === 'none' ? 'Quitar zona' : 'Marcar zona') : 'Construir';
     yes.className = demolishText ? 'btn danger' : 'btn primary';
@@ -924,6 +927,8 @@ export function startGame(opts: GameOptions): void {
     if (!p) return;
     const cmd = commandFor(tool, p.a, p.b);
     if (cmd) await command(cmd);
+    // Tras una carretera o zona, la franja vuelve a la ayuda de la herramienta (no a «toca dónde termina»).
+    if (tool.shape !== 'tap') selectTool(tool.id);
   }
 
   function cancelAnchor() {
@@ -1500,16 +1505,29 @@ export function startGame(opts: GameOptions): void {
   }
   /** Leyenda de «Qué falta»: cuántas viviendas (y solares R) carecen de cada servicio. */
   let legendDay = -1;
+  let legendFolded = false;
   function missingLegend() {
     legendDay = Math.floor(state.tick / 24);
-    const sum = coverageSummary(state);
-    const rows = sum.map((r) =>
-      h('span', { class: 'legend-need' }, pixelIcon(NEED_ICON[r.key]), `${NEED_LABEL[r.key][0]!.toUpperCase()}${NEED_LABEL[r.key].slice(1)}: ${r.falta ? `falta en ${r.falta}` : ''}${r.falta && r.lleno ? ', ' : ''}${r.lleno ? `lleno en ${r.lleno}` : ''}`),
-    );
+    // Ronda 13: ordenada por lo que más falta, con «Construir» al lado; plegable para ver el mapa.
+    const sum = coverageSummary(state).sort((a, b) => b.falta - a.falta || b.lleno - a.lleno);
+    const TOOL_FOR: Record<string, ToolId> = { agua: 'water', luz: 'power', colegio: 'school', salud: 'clinic', policia: 'police', ocio: 'park' };
+    const rows = sum.map((r) => {
+      const name = `${NEED_LABEL[r.key][0]!.toUpperCase()}${NEED_LABEL[r.key].slice(1)}`;
+      const count = r.falta ? `falta en ${plural(r.falta, 'casa', 'casas')}` : `lleno en ${plural(r.lleno, 'casa', 'casas')}`;
+      const go = h('button', { class: 'legend-go', 'aria-label': `Construir: ${NEED_LABEL[r.key]}` }, 'Construir');
+      go.addEventListener('click', () => selectTool(TOOL_FOR[r.key]!));
+      return h('span', { class: 'legend-need' }, pixelIcon(NEED_ICON[r.key]), h('span', { class: 'legend-text' }, `${name}: ${count}`), go);
+    });
+    const head = h('button', { class: 'legend-head', 'aria-expanded': String(!legendFolded) }, h('strong', {}, 'Qué falta'), h('span', { 'aria-hidden': 'true' }, legendFolded ? ' ▸' : ' ▾'));
+    head.addEventListener('click', () => {
+      legendFolded = !legendFolded;
+      missingLegend();
+    });
+    $('#legend').classList.toggle('folded', legendFolded);
     $('#legend').replaceChildren(
-      h('strong', {}, 'Qué falta'),
-      ...(rows.length ? rows : [h('span', {}, 'A ninguna vivienda le falta nada.')]),
-      h('span', { class: 'legend-note' }, 'Raya roja: falta. Amarilla: llega, pero está lleno.'),
+      head,
+      ...(legendFolded ? [] : rows.length ? rows : [h('span', {}, 'A ninguna vivienda le falta nada.')]),
+      ...(legendFolded ? [] : [h('span', { class: 'legend-note' }, 'Marco rojo: falta. Amarillo a trazos: llega, pero está lleno. Un icono por casa: lo que más falta.')]),
     );
   }
   function openLayers() {
