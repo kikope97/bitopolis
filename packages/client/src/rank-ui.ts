@@ -14,7 +14,7 @@ export function nextRankText(state: GameState): string {
   const n = nextRank(state);
   if (!n) return 'Ya es lo más alto: capital comarcal.';
   const parts: string[] = [];
-  if (n.missingPop) parts.push(`faltan ${plural(n.missingPop, 'vecino', 'vecinos')}`);
+  if (n.missingPop) parts.push(`${n.missingPop === 1 ? 'falta' : 'faltan'} ${plural(n.missingPop, 'vecino', 'vecinos')}`);
   if (n.missingHall) parts.push(`${parts.length ? 'y ' : 'falta '}el ayuntamiento a nivel ${n.townhall}`);
   return parts.length ? `Para ${n.name}: ${parts.join(' ')}.` : `${n.name}: mañana se celebra.`;
 }

@@ -161,9 +161,12 @@ export function openAway(token: string, state: GameState, since: AwaySince, act:
   const next = h('button', { class: 'btn away-next', 'aria-label': 'Momento siguiente' }, 'Siguiente ›');
   const dots = h('div', { class: 'away-dots' }, ...slides.map((_, i) => h('button', { class: 'away-dot', 'aria-label': `Ir al momento ${i + 1} de ${n}` }, '')));
   let at = 0;
+  // Mientras se desliza por un botón, el contador no sigue al scroll (iría por los intermedios).
+  let auto = 0;
   const show = (i: number, scroll = true) => {
     at = Math.max(0, Math.min(n - 1, i));
-    if (scroll) track.scrollTo({ left: slides[at]!.offsetLeft - track.offsetLeft, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    if (scroll) auto = performance.now();
+    if (scroll) track.scrollTo({ left: at * track.clientWidth, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     status.textContent = `${at + 1} de ${n}`;
     (prev as HTMLButtonElement).disabled = at === 0;
     next.textContent = at === n - 1 ? 'A jugar' : 'Siguiente ›';
@@ -181,9 +184,16 @@ export function openAway(token: string, state: GameState, since: AwaySince, act:
   track.addEventListener('scroll', () => {
     cancelAnimationFrame(raf);
     raf = requestAnimationFrame(() => {
+      if (performance.now() - auto < 800) return;
       const i = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
       if (i !== at) show(i, false);
     });
+  });
+  // Al acabar cualquier desplazamiento (dedo o botón), el contador queda en el que se ve.
+  track.addEventListener('scrollend', () => {
+    auto = 0;
+    const i = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+    if (i !== at) show(i, false);
   });
   track.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowRight') {
