@@ -42,7 +42,13 @@ export function updateFields(state: GameState): void {
   const police = new Float64Array(n);
   const good = new Float64Array(n);
   const residents = new Map<number, number>();
-  for (const c of state.citizens) if (c.homeId !== null) residents.set(c.homeId, (residents.get(c.homeId) ?? 0) + 1);
+  // v1.9: la pobreza también cuenta: cada vecino endeudado suma delincuencia en su casa.
+  const indebted = new Map<number, number>();
+  for (const c of state.citizens) {
+    if (c.homeId === null) continue;
+    residents.set(c.homeId, (residents.get(c.homeId) ?? 0) + 1);
+    if (c.debt && c.debt.town + c.debt.bank > 0) indebted.set(c.homeId, (indebted.get(c.homeId) ?? 0) + 1);
+  }
 
   for (const b of state.buildings) {
     if (!b.built) continue;
@@ -89,7 +95,7 @@ export function updateFields(state: GameState): void {
         break;
     }
     const people = residents.get(b.id) ?? 0;
-    if (people > 0) stamp(crime, w, h, b.x, b.y, 4, people * 2.2);
+    if (people > 0) stamp(crime, w, h, b.x, b.y, 4, people * 2.2 + (indebted.get(b.id) ?? 0) * CRIME.debtCrime);
   }
   // v1.8: los robos sin resolver suben la inseguridad alrededor durante un tiempo.
   for (const hs of state.justice?.hot ?? []) stamp(crime, w, h, hs.x, hs.y, 3, CRIME.hotCrime);

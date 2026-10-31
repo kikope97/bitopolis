@@ -385,6 +385,15 @@ export const CRIME = {
   finePerDay: 10,
   /** Días de calabozo de un vecino detenido en unos disturbios (no pasa a la cárcel). */
   riotDays: 10,
+  /** v1.9: robos en casas (por casa y día, como en las tiendas) y lo que se llevan como mucho. */
+  homeRobBase: 0.0015,
+  homeLoss: 400,
+  /** v1.9: ladrones del pueblo: deuda mínima, probabilidad diaria base y antecedentes con los que se van. */
+  localDebt: 300,
+  localBase: 0.003,
+  recordLeave: 3,
+  /** v1.9: delincuencia de más por cada vecino endeudado en una casa. */
+  debtCrime: 4,
 } as const;
 
 /**

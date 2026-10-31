@@ -130,6 +130,7 @@ export const MIGRATIONS: Record<number, Migration> = {
     formatVersion: 12,
     minWage: s.minWage ?? 'none',
     debtLedger: s.debtLedger ?? { created: 0, repaid: 0, written: 0, forgiven: 0 },
+    justice: s.justice ? { ...s.justice, jail: (s.justice.jail ?? []).map((p: number | { until: number }) => (typeof p === 'number' ? { until: p } : p)) } : s.justice,
   }),
 };
 
