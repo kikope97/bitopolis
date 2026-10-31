@@ -279,10 +279,11 @@ El alcance está congelado hasta la v1.0. Todo lo de la sección 15 solo entra s
 
 - **v1.5 — Ayuntamiento y ciclo vital** (ronda 11): presupuesto anual votado, fiestas del pueblo, subvenciones con plazo y cofinanciación, y ciclo vital (nacimientos, herencias y fallecimientos). Pedido por el creador, del backlog §15.
 - **v1.6 — Rediseño de la interfaz** (ronda 12): revisión crítica en cinco tamaños (iPhone mini, 17, 17 Pro Max, Android 360 px con horizontal, iPad). Barra de datos arriba, franja de contexto, cinco pestañas con bandeja «Construir» por categorías, panel «Pueblo», avisos en una línea con campana, fichas a media pantalla y panel lateral en tableta y horizontal.
+- **v1.7 — Geografía y vida** (ronda 13): río, costa, colinas y puentes; estaciones y tiempo (nieve, calor, tormentas y riadas); bar, ermita, cementerio, biblioteca y polideportivo; asociaciones vecinales y manifestaciones; álbum del pueblo y árbol genealógico; capa «Qué falta» por vivienda (propuesta del creador).
 
 ## 15. Después de la v1.0 (backlog, no implementar antes)
 
-Deuda municipal con límites reales y calificación crediticia; presupuesto anual votado; subvenciones con plazo y cofinanciación; funcionarios y externalización; PGOU y licitaciones; dificultad "Interventor" con toda la burocracia; sindicatos, asociaciones y huelgas; ciclo vital (nacimientos, herencias, muertes); cultura y fiestas inventadas por los vecinos; ciudades vecinas con alcalde IA y migración entre ellas; presidencia de varias ciudades; contenido nuevo propuesto por los agentes (como JSON validado y probado con `pnpm sim`); tarjetas compartibles y álbum del pueblo; visitar pueblos de amigos en solo lectura; árbol genealógico; mapas con terreno; modo acuario (el alcalde también es una IA); apps nativas de iOS y Android.
+Deuda municipal con límites reales y calificación crediticia; presupuesto anual votado; subvenciones con plazo y cofinanciación; funcionarios y externalización; PGOU y licitaciones; dificultad "Interventor" con toda la burocracia; sindicatos, asociaciones (hechas en la v1.7) y huelgas; ciclo vital (nacimientos, herencias, muertes); cultura y fiestas inventadas por los vecinos; ciudades vecinas con alcalde IA y migración entre ellas; presidencia de varias ciudades; contenido nuevo propuesto por los agentes (como JSON validado y probado con `pnpm sim`); tarjetas compartibles y álbum del pueblo; visitar pueblos de amigos en solo lectura; árbol genealógico; mapas con terreno; modo acuario (el alcalde también es una IA); apps nativas de iOS y Android.
 
 ## 16. Nombre
 
