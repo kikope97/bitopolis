@@ -55,7 +55,7 @@ Monorepo pnpm + TypeScript:
 - Cliente: farolas en `render.ts`, `skyline.ts` animado, `icons.ts` (iconos de píxeles), avisos agrupados, atajos de una tecla desactivables (`prefs.shortcuts`).
 
 ## Móvil y táctil (v1.4) — la norma principal: se juega bien en el móvil
-- `game.ts`: `ResizeObserver` en el canvas; en táctil toda obra pasa por `proposePlace` y la barra `#confirm-bar` («Construir / ✕», ignora sus primeros 350 ms; el canvas cancela `touchend` para evitar el clic fantasma). Con carretera o zona, un dedo mueve el mapa (se traza con dos toques o arrastrando desde el inicio). `pickTile` (tejados), inercia, `minZoom` de 24 px CSS.
+- `game.ts`: `ResizeObserver` en el canvas; en táctil toda obra pasa por `proposePlace` y la barra `#confirm-bar` («Construir / ✕», ignora sus primeros 350 ms; el canvas cancela `touchend` para evitar el clic fantasma). Con carretera o zona, un dedo mueve el mapa (se traza con dos toques o arrastrando desde el inicio). `pickTile` (tejados), inercia. Zoom: se aleja hasta `minZoom` (≈11 px por casilla en iPhone, v1.6.1); para obras con el dedo hace falta `touchZoom` (24 px CSS): por debajo, el primer toque acerca.
 - `#play-pause` y `#speed` (x1→x3→x10) están en la barra de arriba (v1.6). En los e2e, usa `setSpeed(page, n)` de `e2e/helpers.ts`.
 - Hojas (`ui.ts`): solo se refresca la que está abierta (`currentSheet()`); atrás cierra la hoja (`history`).
 - A x10 no hay burbujas ni avisos menores. Los toques reales se prueban por CDP en `e2e/tactil.spec.ts`.
