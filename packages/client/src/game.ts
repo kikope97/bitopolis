@@ -15,6 +15,7 @@ import {
   NEED_LABEL,
   occupants,
   roadCost,
+  zoneChanges,
   Terrain,
   terrainAt,
   Tile,
@@ -838,11 +839,9 @@ export function startGame(opts: GameOptions): void {
       if (!pendingEnd || pendingEnd.x !== tile.x || pendingEnd.y !== tile.y) {
         pendingEnd = tile;
         preview = previewFor(anchor, tile);
-        const n = tilesOf(line).length;
-        const cost = tool.zone ? n * ZONE_COST_PER_TILE : lineCost(anchor, tile);
         const v = validateCommand(state, line);
         const msg = v.ok
-          ? `${tool.label}: ${plural(n, 'casilla', 'casillas')}, ${money(cost)}. Toca otra vez el final para confirmar.`
+          ? `${tool.label}: ${lineText(anchor, tile)}. Toca otra vez el final para confirmar.`
           : `${tool.label}: no se puede (${v.error}). Elige otro final o pulsa Esc.`;
         $('#tool-info').textContent = msg;
         refreshStrip();
@@ -865,6 +864,24 @@ export function startGame(opts: GameOptions): void {
     if (cmd) await command(cmd);
   }
 
+  /**
+   * Lo que cuesta un trazo, en palabras. Zonas: solo las casillas que cambian
+   * (lo mismo que cobra el motor; las ocupadas se saltan y se dice cuántas).
+   * Carretera: las casillas nuevas, con los puentes aparte.
+   */
+  function lineText(a: { x: number; y: number }, b: { x: number; y: number }): string {
+    const cmd = commandFor(tool, a, b);
+    if (!cmd) return '';
+    if (cmd.type === 'Zone') {
+      const { changed, skipped } = zoneChanges(state, cmd);
+      if (cmd.zone === 'none') return `${plural(changed, 'casilla', 'casillas')}, gratis`;
+      return `${plural(changed, 'casilla', 'casillas')}, ${money(changed * ZONE_COST_PER_TILE)}${skipped ? ` (no se cobran ${skipped} ocupadas o ya marcadas; los árboles sí, se talan al construir)` : ''}`;
+    }
+    const n = tilesOf(cmd).filter((t) => state.map.tiles[t.y * state.map.w + t.x] !== Tile.Road && !state.buildings.some((q) => q.x === t.x && q.y === t.y)).length;
+    const bridges = bridgeTiles(a, b);
+    return `${plural(n, 'casilla nueva', 'casillas nuevas')}, ${money(lineCost(a, b))}${bridges ? ` (con puente de ${plural(bridges, 'casilla', 'casillas')})` : ''}`;
+  }
+
   /** Coste de un tramo de carretera (los puentes, más caros) y cuántas casillas son puente (v1.7). */
   const lineCost = (a: { x: number; y: number }, b: { x: number; y: number }) => roadCost(state, a.x, a.y, b.x, b.y);
   function bridgeTiles(a: { x: number; y: number }, b: { x: number; y: number }) {
@@ -882,12 +899,8 @@ export function startGame(opts: GameOptions): void {
     pendingEnd = null;
     preview = previewFor(a, b);
     const v = validateCommand(state, cmd);
-    const n = tilesOf(cmd).length;
     const hill = tool.build && tool.shape === 'tap' && terrainAt(state, a.x, a.y) === Terrain.Hill;
-    const cost =
-      tool.build && tool.shape === 'tap'
-        ? `${shortCost(tool)}${hill ? ' (colina: materiales +50 %)' : ''}`
-        : `${plural(n, 'casilla', 'casillas')}, ${money(tool.zone ? n * ZONE_COST_PER_TILE : lineCost(a, b))}${!tool.zone && bridgeTiles(a, b) ? ` (con puente de ${plural(bridgeTiles(a, b), 'casilla', 'casillas')})` : ''}`;
+    const cost = tool.build && tool.shape === 'tap' ? `${shortCost(tool)}${hill ? ' (colina: materiales +50 %)' : ''}` : lineText(a, b);
     const msg = demolishText && v.ok ? demolishText : v.ok ? `${tool.label} aquí${cost ? ` · ${cost}` : ''}` : `${tool.label}: no se puede (${v.error})`;
     $('#confirm-text').textContent = msg;
     const yes = $('#confirm-yes') as HTMLButtonElement;
@@ -1000,7 +1013,7 @@ export function startGame(opts: GameOptions): void {
     else if (k.toLowerCase() === 'o') openSettings();
     else if (k === ' ' && target.tagName !== 'BUTTON') {
       e.preventDefault();
-      setSpeed(speed === 0 ? 1 : 0);
+      userSpeed(speed === 0 ? lastSpeed : 0);
     } else if (k === 'Escape') {
       if (!tray.hidden) closeTray();
       else if (isSheetOpen()) closeSheet();
@@ -1535,6 +1548,29 @@ export function startGame(opts: GameOptions): void {
   }
 
   /* ---------- velocidad y ciclo de vida ---------- */
+  /**
+   * v1.7.0: la velocidad que dejó el jugador se recuerda (por partida, en este
+   * navegador). Solo cuentan sus decisiones (▶/❚❚, la velocidad, la barra
+   * espaciadora), no las pausas automáticas al cambiar de pestaña o salir.
+   */
+  const speedKey = `bitopolis.speed.${token}`;
+  function savedSpeed(): number {
+    try {
+      const v = Number(localStorage.getItem(speedKey) ?? '0');
+      return [0, 1, 3, 10].includes(v) ? v : 0;
+    } catch {
+      return 0;
+    }
+  }
+  function userSpeed(s: number) {
+    setSpeed(s);
+    try {
+      localStorage.setItem(speedKey, String(speed));
+    } catch {
+      /* sin almacenamiento: empezará en pausa */
+    }
+  }
+
   function setSpeed(s: number) {
     if (lost && s > 0) return;
     // Modo tranquilo: como mucho x1.
@@ -1574,6 +1610,9 @@ export function startGame(opts: GameOptions): void {
     if (document.hidden) {
       setSpeed(0);
       send({ type: 'flush' });
+    } else if (speed === 0 && !lost && !isSheetOpen() && savedSpeed() > 0) {
+      // Al volver a la pestaña, sigue como lo dejó el jugador.
+      setSpeed(savedSpeed());
     }
   };
   const onPageHide = () => {
@@ -1624,11 +1663,11 @@ export function startGame(opts: GameOptions): void {
     }, 150);
   }
 
-  $('#play-pause').onclick = () => setSpeed(speed === 0 ? lastSpeed : 0);
+  $('#play-pause').onclick = () => userSpeed(speed === 0 ? lastSpeed : 0);
   $('#speed').onclick = () => {
-    if (prefs().calm) return setSpeed(1);
+    if (prefs().calm) return userSpeed(1);
     const next = ({ 1: 3, 3: 10, 10: 1 } as Record<number, number>)[lastSpeed] ?? 1;
-    setSpeed(next);
+    userSpeed(next);
   };
   paintSpeed();
   $('#layers').onclick = openLayers;
@@ -1680,14 +1719,17 @@ export function startGame(opts: GameOptions): void {
   resize();
   frameTown();
   selectTool('inspect');
-  setSpeed(0);
+  // Si lo dejó en marcha, sigue en marcha (con la misma velocidad).
+  const resume = savedSpeed();
+  if (resume > 0) lastSpeed = resume;
+  setSpeed(resume);
   onState();
   refreshStrip();
   const away = resumeSummary(token, state);
   if (away && away.length) toast(`Desde tu última visita: ${away.join(' · ')}`, { sticky: true });
   tutorial.start(state);
   tutorial.update(state, tool.id);
-  if (!tutorial.active) toast(`En pausa. Pulsa ▶ (${matchMedia('(orientation: landscape) and (max-height: 500px)').matches ? 'arriba' : 'arriba a la izquierda'}) para que pase el tiempo.`);
+  if (!tutorial.active && resume === 0) toast(`En pausa. Pulsa ▶ (${matchMedia('(orientation: landscape) and (max-height: 500px)').matches ? 'arriba' : 'arriba a la izquierda'}) para que pase el tiempo.`);
   // Sonido: se desbloquea con el primer gesto; el ambiente sigue la hora del juego.
   const unlock = () => unlockAudio();
   window.addEventListener('pointerdown', unlock, { once: true });

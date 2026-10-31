@@ -97,3 +97,21 @@ test('v1.7: el tiempo se ve junto a la fecha (nieve)', async ({ page, request },
   await page.screenshot({ path: `test-results/capturas/${info.project.name}-v17-nieve.png` });
   expect(errors).toEqual([]);
 });
+
+test('v1.7.0: al volver a la partida sigue a la velocidad en que la dejaste', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Jugar' }).click();
+  await skipTutorial(page);
+  await page.locator('#speed').click(); // x3 (y en marcha)
+  await expect(page.locator('#play-pause')).toHaveAttribute('data-paused', 'false');
+  await page.waitForTimeout(500);
+  await page.reload();
+  await page.getByRole('button', { name: 'Continuar' }).click();
+  await expect(page.locator('#play-pause')).toHaveAttribute('data-paused', 'false');
+  await expect(page.locator('#speed')).toHaveText('x3');
+  // Y si lo dejas en pausa, vuelve en pausa.
+  await page.locator('#play-pause').click();
+  await page.reload();
+  await page.getByRole('button', { name: 'Continuar' }).click();
+  await expect(page.locator('#play-pause')).toHaveAttribute('data-paused', 'true');
+});

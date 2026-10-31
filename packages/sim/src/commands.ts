@@ -83,6 +83,26 @@ export function roadCost(state: GameState, x: number, y: number, x2: number, y2:
   );
 }
 
+/**
+ * Casillas que de verdad cambian al pintar una zona (v1.7.0): no cuentan las
+ * carreteras, los edificios, el agua ni lo que ya tenía esa zona. Los árboles
+ * sí: se talan cuando los vecinos construyen. El jugador paga solo estas.
+ */
+export function zoneChanges(state: GameState, cmd: { x: number; y: number; w: number; h: number; zone: ZoneKind }): { changed: number; skipped: number } {
+  const value = ZONE_VALUE[cmd.zone];
+  let changed = 0;
+  let skipped = 0;
+  for (let y = cmd.y; y < cmd.y + cmd.h; y++) {
+    for (let x = cmd.x; x < cmd.x + cmd.w; x++) {
+      if (!inBounds(state, x, y)) continue;
+      const i = tileIndex(state, x, y);
+      if (state.map.tiles[i] === Tile.Road || buildingAt(state, x, y) || isWater(state.map.terrain?.[i]) || state.map.zones[i] === value) skipped++;
+      else changed++;
+    }
+  }
+  return { changed, skipped };
+}
+
 /** Coste total previsto en un sitio concreto (en la colina, más materiales). */
 export function buildCostAt(state: GameState, kind: BuildKind, x: number, y: number): number {
   const extra = terrainAt(state, x, y) === Terrain.Hill ? Math.round(BUILD[kind].materials * (TERRAIN.hillFactor - 1)) : 0;
@@ -156,7 +176,7 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
         return { ok: false, error: 'Fuera del mapa' };
       }
       // Pintar zonas es la salida de una crisis: se permite con deuda hasta el límite.
-      if (cmd.zone !== 'none' && state.treasury - cmd.w * cmd.h * ZONE_COST_PER_TILE < -DEBT_LIMIT) return { ok: false, error: 'No hay dinero suficiente' };
+      if (cmd.zone !== 'none' && state.treasury - zoneChanges(state, cmd).changed * ZONE_COST_PER_TILE < -DEBT_LIMIT) return { ok: false, error: 'No hay dinero suficiente' };
       return { ok: true };
     }
     case 'Demolish': {

@@ -155,3 +155,21 @@ describe('migración 9 → 10', () => {
     expect(m.weather.kind).toBe('sol');
   });
 });
+
+describe('precio de las zonas (v1.7.0)', () => {
+  it('solo se cobran las casillas que cambian (no carreteras, edificios, agua ni lo ya marcado)', async () => {
+    const { zoneChanges, ZONE_COST_PER_TILE } = await import('../src/index.ts');
+    const { state: s } = runSimulation({ seed: 3, days: 200, profile: 'constructor' });
+    transfer(s, OUTSIDE, TREASURY, 50_000, 'subvencion');
+    const hall = s.buildings.find((b) => b.kind === 'townhall')!;
+    // Rectángulo que incluye el ayuntamiento y la calle.
+    const cmd = { type: 'Zone' as const, zone: 'R' as const, x: hall.x - 3, y: hall.y - 1, w: 7, h: 4 };
+    const { changed, skipped } = zoneChanges(s, cmd);
+    expect(skipped).toBeGreaterThan(0);
+    const before = s.treasury;
+    expect(applyCommand(s, cmd).ok).toBe(true);
+    expect(before - s.treasury).toBe(changed * ZONE_COST_PER_TILE);
+    // Repetirlo no cobra nada: ya está marcado.
+    expect(zoneChanges(s, cmd).changed).toBe(0);
+  });
+});
