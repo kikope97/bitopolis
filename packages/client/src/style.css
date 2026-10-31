@@ -952,3 +952,17 @@ body.cal-on.in-game #toasts { left: calc(max(8px, env(safe-area-inset-left)) + 6
 body.cal-on .legend { top: 86px; }
 /* Ronda 14: un botón principal desactivado se ve apagado (parecía pulsable). */
 .btn.primary:disabled { background: var(--panel-2); color: var(--muted); border-color: var(--line); border-style: dashed; box-shadow: none; cursor: not-allowed; }
+
+/* v1.9: el bolsillo de cada vecino. */
+.pocket { padding: 8px 12px; border: 2px solid var(--line); background: var(--bg); }
+.pocket .pos { color: var(--good); }
+.pocket .neg, .neg { color: var(--bad); }
+.pocket-tag { display: inline-block; padding: 0 6px; border: 1px solid var(--line); font-weight: 600; }
+.pocket-tag.endeudado, .pocket-tag.no_llega { color: var(--bad); border-color: var(--bad); }
+.pocket-tag.holgado { color: var(--good); border-color: var(--good); }
+.pocket-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.pocket-warn { color: var(--bad); }
+/* Ronda 15: cifras que no se parten y tarjetas que no se salen a 360 px con texto grande. */
+.mg-card { min-width: 0; }
+.mg-row strong, .accounts .num { white-space: nowrap; }
+.legend { max-width: min(60%, calc(100% - 180px)); }

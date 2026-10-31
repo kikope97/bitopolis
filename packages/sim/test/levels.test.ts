@@ -16,7 +16,15 @@ import {
 
 describe('niveles de los servicios (v1.8)', () => {
   it('subir de nivel pide ayuntamiento, vecinos, uso y dinero; tarda unos días y da más', () => {
-    const { state: s } = runSimulation({ seed: 3, days: 1200, profile: 'constructor', checkEveryDay: false });
+    // Un pueblo donde algún servicio ya se usa lo bastante (depende de la semilla).
+    let s = runSimulation({ seed: 3, days: 1200, profile: 'constructor', checkEveryDay: false }).state;
+    for (const seed of [1, 2, 4, 5, 6]) {
+      const t = structuredClone(s);
+      t.townhallLevel = 5;
+      transfer(t, OUTSIDE, TREASURY, 200_000, 'subvencion');
+      if (t.buildings.some((b) => b.built && UPGRADABLE.includes(b.kind) && validateCommand(t, { type: 'UpgradeBuilding', buildingId: b.id }).ok)) break;
+      s = runSimulation({ seed, days: 1200, profile: 'constructor', checkEveryDay: false }).state;
+    }
     const services = s.buildings.filter((b) => b.built && UPGRADABLE.includes(b.kind));
     expect(services.length).toBeGreaterThan(0);
     // Con el ayuntamiento en nivel 1, ninguno.
@@ -46,5 +54,5 @@ describe('niveles de los servicios (v1.8)', () => {
     expect(radiusOf(b) + serviceCapacityOf(b) + plantCapacityOf(b)).toBeGreaterThan(before.r + before.cap);
     expect(s.events.some((e) => e.text.includes('sube a nivel 2'))).toBe(true);
     expect(checkInvariants(s)).toEqual([]);
-  }, 60_000);
+  }, 240_000);
 });

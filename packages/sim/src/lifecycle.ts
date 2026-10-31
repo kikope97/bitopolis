@@ -1,4 +1,5 @@
 import { DAYS_PER_YEAR, TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
+import { leaveTown } from './household.ts';
 import { hash32 } from './hash.ts';
 import { SOCIAL_PLACES } from './balance.ts';
 import { rememberDeparted } from './family.ts';
@@ -60,6 +61,8 @@ export function dies(state: GameState, c: Citizen): void {
   } else {
     sellOnDeparture(state, c);
   }
+  // v1.9: herencia a beneficio de inventario: primero se pagan sus deudas con lo que deja.
+  leaveTown(state, c);
   if (heir) {
     transfer(state, c.id, heir.id, c.money);
     addMemory(state, heir, 'heredo', 3, 2, [c.id]);

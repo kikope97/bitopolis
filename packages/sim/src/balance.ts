@@ -139,10 +139,17 @@ export const PUBLIC_SALARY = 900;
 export const SERVICE_SALARY = 700;
 export const PRIVATE_SALARY = 900;
 /** Lo que gana al día quien trabaja fuera del pueblo. */
-export const COMMUTER_DAILY = 22;
+/** v1.9 (economía de cada vecino): 22 → 25; con 22, trabajar fuera y vivir de alquiler era perder dinero cada mes. */
+export const COMMUTER_DAILY = 25;
+/** Gasto de vida total de referencia (básico + ocio). */
 export const LIVING_COST = 450;
+/** v1.9: gasto básico obligatorio (comida, ropa, transporte). */
+export const LIVING_BASIC = 300;
+/** v1.9: ocio, solo si después de pagarlo todo le queda un colchón. */
+export const LIVING_EXTRA = 150;
+export const LIVING_CUSHION = 300;
 /** Parte del gasto que va a tiendas del pueblo si las hay. */
-export const LOCAL_SPEND_SHARE = 0.45;
+export const LOCAL_SPEND_SHARE = 0.6;
 export const FACTORY_REVENUE_PER_WORKER = 1_250;
 export const MUNICIPAL_RENT = 180;
 export const PRIVATE_RENT = 280;
@@ -378,6 +385,15 @@ export const CRIME = {
   finePerDay: 10,
   /** Días de calabozo de un vecino detenido en unos disturbios (no pasa a la cárcel). */
   riotDays: 10,
+  /** v1.9: robos en casas (por casa y día, como en las tiendas) y lo que se llevan como mucho. */
+  homeRobBase: 0.0015,
+  homeLoss: 400,
+  /** v1.9: ladrones del pueblo: deuda mínima, probabilidad diaria base y antecedentes con los que se van. */
+  localDebt: 300,
+  localBase: 0.003,
+  recordLeave: 3,
+  /** v1.9: delincuencia de más por cada vecino endeudado en una casa. */
+  debtCrime: 4,
 } as const;
 
 /**
@@ -406,4 +422,78 @@ export const SERVICE_LEVELS = {
   usage: 0.75,
   /** En parques, biblioteca y polideportivo: vecinos que viven en su radio, por nivel. */
   residents: [0, 0, 20, 50],
+} as const;
+
+/**
+ * v1.9 (petición del creador): cada vecino tiene su balance y puede endeudarse.
+ * La deuda no es dinero: es lo que debe. Se apunta lo que no puede pagar y se
+ * devuelve poco a poco. Ver docs/propuestas/v1.9-economia-personal.md.
+ */
+export const DEBT = {
+  /** Recargo único del ayuntamiento si no se paga al mes siguiente (como el recargo de apremio). */
+  townSurcharge: 0.1,
+  /** Interés mensual de lo que se debe al banco o al casero. */
+  bankInterest: 0.01,
+  /** Lo que se devuelve al mes como mucho: el 30 % de lo que ingresó (mínimo 50 €). */
+  repayShare: 0.3,
+  repayMin: 50,
+  /** Meses de alquiler privado impagado hasta el desahucio. */
+  evictMonths: 4,
+  /** Meses sin que nadie le alquile tras un desahucio (si no tiene dinero, se acaba yendo). */
+  evictedMonths: 6,
+  /** Cuotas de hipoteca impagadas hasta que el banco ejecuta y vende la vivienda. */
+  foreclosureMonths: 3,
+  /** Deuda a partir de la que «debe dinero» se nota y salta la decisión (vecinos con nombre). */
+  noticeable: 300,
+  /** Irse con deudas: deuda mayor que estos meses de ingresos y 0 €; probabilidad diaria. */
+  leaveMonths: 3,
+  leaveChance: 0.05,
+  /** Felicidad: −(base + deuda/por), como mucho −max. */
+  moodBase: 3,
+  moodPer: 300,
+  moodMax: 10,
+  /** «Llega justo»: menos de esto sin deuda. */
+  tightBelow: 300,
+  tightMood: 2,
+  /** Aplazamiento que concede el alcalde: meses de cuota fija, sin recargo. */
+  planMonths: 12,
+} as const;
+
+/** v1.9 (petición del creador): sueldo mínimo que el ayuntamiento obliga a pagar a las empresas del pueblo. */
+export type MinWageLevel = 'none' | 'low' | 'medium' | 'high';
+// Ronda 15: el alto, 1.250 → 1.150 (con 1.250 las fábricas pagaban lo que ingresaban y cerraba un 15–20 % de empresas al año).
+export const MIN_WAGE: Record<MinWageLevel, number> = { none: 900, low: 1_000, medium: 1_100, high: 1_150 };
+export const MIN_WAGE_STEP: Record<MinWageLevel, number> = { none: 0, low: 1, medium: 2, high: 3 };
+export const MIN_WAGE_FX = {
+  /** Felicidad de quien trabaja en una empresa del pueblo, por escalón. */
+  workerMood: 1,
+  /** Felicidad de quien tiene una empresa con empleados, por escalón (negativo). */
+  ownerMood: 2,
+  /** Rencor fiscal del empresario al subirlo, por escalón. */
+  ownerGrudge: 8,
+  /** Demanda comercial que se pierde por escalón (las empresas suben precios). */
+  demandC: 5,
+  /** Ganas de emprender que se pierden por escalón (margen menor). */
+  foundPenalty: 0.2,
+} as const;
+
+/** v1.9: paro real. Quien no trabaja en el pueblo puede trabajar fuera… o no encontrar nada. */
+export const JOBS_OUTSIDE = {
+  /** Probabilidad mensual de perder el trabajo de fuera. */
+  loseChance: 0.03,
+  /** Probabilidad mensual de encontrar trabajo fuera estando en paro. */
+  findChance: 0.3,
+  /** Prestación por desempleo (la paga el Estado), al mes, durante unos meses. */
+  benefit: 350,
+  benefitMonths: 6,
+  /** Felicidad de estar en paro. */
+  mood: 6,
+} as const;
+
+/** v1.9: microcrédito municipal (petición del creador: «no dejes nada para más adelante»). */
+export const MICROCREDIT = {
+  amount: 1_500,
+  months: 12,
+  /** Ayuntamiento de nivel mínimo para ofrecerlos. */
+  townhallLevel: 2,
 } as const;

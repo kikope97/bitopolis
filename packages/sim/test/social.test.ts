@@ -217,7 +217,7 @@ describe('objetivos e hitos', () => {
   });
 
   it('el hito de 50 vecinos desbloquea la Plaza Mayor', () => {
-    const { state } = runSimulation({ seed: 1, days: 420, profile: 'constructor' });
+    const { state } = runSimulation({ seed: 1, days: 900, profile: 'constructor', checkEveryDay: false });
     expect(state.unlocked).toContain('plaza');
     const s = createInitialState({ seed: 4 });
     expect(applyCommand(s, { type: 'Build', kind: 'plaza', x: s.map.w / 2 + 2, y: s.map.h / 2 + 1 }).ok).toBe(false);

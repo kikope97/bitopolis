@@ -1,6 +1,7 @@
 import type { Command, TaxLevel } from '@bitopolis/shared';
-import { BUILD_NAMES, type Citizen, type GameState, IBI_RATE, PLUSVALIA_RATE, TASA_BASURAS, TASA_TERRAZAS, TAX_SPLIT_POP, unitValue } from '@bitopolis/sim';
+import { BUILD_NAMES, totalDebt, type Citizen, type GameState, IBI_RATE, MIN_WAGE, type MinWageLevel, PLUSVALIA_RATE, TASA_BASURAS, TASA_TERRAZAS, TAX_SPLIT_POP, unitValue } from '@bitopolis/sim';
 import { money, MONTHS } from './i18n.ts';
+import { economyLines } from './money-ui.ts';
 import { h, sheet } from './ui.ts';
 
 type Cmd = (c: Command) => Promise<boolean>;
@@ -76,6 +77,31 @@ export function openTaxes(getState: () => GameState, command: Cmd): void {
     return box;
   };
   const gloss = (k: keyof typeof GLOSSARY) => h('details', { class: 'gloss' }, h('summary', {}, `¿Qué es ${GLOSSARY[k]!.name}?`), h('p', {}, GLOSSARY[k]!.text));
+  // v1.9 (petición del creador): sueldo mínimo obligatorio en las empresas del pueblo.
+  const wageBox = h('div', { class: 'radio-list compact', role: 'radiogroup', 'aria-label': 'Sueldo mínimo' });
+  const cur = state.minWage ?? 'none';
+  const shops = state.buildings.filter((b) => (b.kind === 'shop' || b.kind === 'factory') && b.built);
+  const workers = state.citizens.filter((c) => shops.some((b) => b.id === c.jobId)).length;
+  const owners = new Set(shops.map((b) => b.owner).filter((o) => state.citizens.some((c) => c.id === o))).size;
+  for (const lv of ['none', 'low', 'medium', 'high'] as const) {
+    const extra = (MIN_WAGE[lv] - MIN_WAGE.none) * workers;
+    const b = h(
+      'button',
+      { class: 'btn choice', role: 'radio', 'aria-checked': String(cur === lv) },
+      h('strong', {}, `${cur === lv ? '✓ ' : ''}${MIN_WAGE_NAME[lv]}${cur === lv ? ' (actual)' : ''}`),
+      h('span', {}, `${lv === 'none' ? `pagan lo de siempre (${money(MIN_WAGE[lv])} al mes)` : `${money(MIN_WAGE[lv])} al mes`}${extra > 0 ? ` · las empresas pagan ${money(extra)} más al mes en nóminas` : ''}`),
+    );
+    b.addEventListener('click', async () => {
+      await command({ type: 'SetMinimumWage', level: lv });
+      openTaxes(getState, command);
+    });
+    wageBox.append(b);
+  }
+  const wageSection = [
+    h('h3', {}, 'Sueldo mínimo'),
+    wageBox,
+    h('p', { class: 'affects' }, `A quién afecta: ${workers} ${workers === 1 ? 'vecino trabaja' : 'vecinos trabajan'} en empresas del pueblo (cobran más y están más contentos); ${owners} ${owners === 1 ? 'vecino tiene' : 'vecinos tienen'} empresa (pagan más, ganan menos y se enfadan; si no llegan a las nóminas, cierran). Con el sueldo alto, las empresas suben precios y se abren menos.`),
+  ];
 
   if (!state.taxesSplit) {
     sheet(
@@ -92,6 +118,7 @@ export function openTaxes(getState: () => GameState, command: Cmd): void {
       gloss('tasas'),
       gloss('plusvalia'),
       gloss('pie'),
+      ...wageSection,
       h('p', { class: 'muted' }, `Con ${TAX_SPLIT_POP} vecinos podrás ajustar cada tributo por separado.`),
     );
     return;
@@ -112,10 +139,15 @@ export function openTaxes(getState: () => GameState, command: Cmd): void {
     h('p', { class: 'affects' }, affected(state, 'plusvalia')),
     gloss('plusvalia'),
     gloss('pie'),
+    ...wageSection,
   );
 }
 
+const MIN_WAGE_NAME: Record<MinWageLevel, string> = { none: 'Sin mínimo', low: 'Bajo', medium: 'Medio', high: 'Alto' };
+
 const CONCEPT: Record<string, string> = {
+  'deudas cobradas': 'Deudas cobradas a vecinos',
+  microcréditos: 'Microcréditos concedidos',
   sueldos: 'Sueldos municipales',
   mantenimiento: 'Mantenimiento',
   obras: 'Obras',
@@ -161,6 +193,9 @@ export function openReport(state: GameState): void {
     rows(income, prev?.breakdown),
     h('h3', {}, `Sale: ${money(last.expenses)}`),
     rows(spend, prev?.breakdown),
+    // v1.9: los vecinos que no llegan y la salud de las empresas.
+    h('h3', {}, 'Vecinos y empresas'),
+    h('ul', { class: 'accounts' }, ...economyLines(state).map((l) => h('li', { class: l.bad ? 'neg' : '' }, h('span', {}, l.label), h('span', { class: 'num' }, l.bad ? `⚠ ${l.value}` : l.value)))),
     live ? h('details', { class: 'advanced' }, h('summary', {}, 'Este mes (en curso)'), rows(state.month.breakdown, undefined)) : '',
   );
 }
@@ -188,8 +223,9 @@ function rows(bd: Record<string, number>, prev: Record<string, number> | undefin
 }
 
 /** Lista de vecinos con nombre; el resto es población estadística. */
-export function openNeighbours(state: GameState, onPick: (c: Citizen) => void): void {
-  const named = state.citizens.filter((c) => c.named);
+export function openNeighbours(state: GameState, onPick: (c: Citizen) => void, onlyDebts = false): void {
+  // v1.9: filtro «Con deudas» (también para los vecinos sin nombre, en un resumen).
+  const named = state.citizens.filter((c) => c.named && (!onlyDebts || totalDebt(c) > 0));
   const ul = h('ul', { class: 'people' });
   for (const c of named) {
     const job = state.buildings.find((b) => b.id === c.jobId);
@@ -200,15 +236,22 @@ export function openNeighbours(state: GameState, onPick: (c: Citizen) => void): 
       h('span', { 'aria-hidden': 'true' }, `${mood[0]} `),
       h('strong', {}, c.name),
       h('span', {}, ` (${mood[1]})`),
-      h('span', { class: 'muted' }, ` · ${c.age} años · ${job ? (job.name ?? BUILD_NAMES[job.kind]) : 'trabaja fuera'}${c.owns ? ' · propietario' : ''}`),
+      // Ronda 15: todo el detalle en una línea propia (la rejilla tiene 3 columnas).
+      h('span', { class: 'p-sub muted' }, `${c.age} años · ${job ? (job.name ?? BUILD_NAMES[job.kind]) : c.unemployedSince !== undefined ? 'en paro' : 'trabaja fuera'}${c.owns ? ' · propietario' : ''}`, totalDebt(c) > 0 ? h('span', { class: 'pocket-warn' }, ` · debe ${money(totalDebt(c))}`) : ''),
     );
     btn.addEventListener('click', () => onPick(c));
     ul.append(h('li', {}, btn));
   }
-  const rest = state.citizens.length - named.length;
+  const debtors = state.citizens.filter((c) => totalDebt(c) > 0);
+  const filter = h('button', { class: 'btn small', 'aria-pressed': String(onlyDebts) }, onlyDebts ? 'Ver a todos' : `Con deudas (${debtors.length})`);
+  filter.addEventListener('click', () => openNeighbours(state, onPick, !onlyDebts));
+  const rest = (onlyDebts ? debtors.length : state.citizens.length) - named.length;
   sheet(
     'Vecinos',
-    h('p', {}, `${named.length} vecinos con nombre${rest > 0 ? ` y ${rest} vecinos más (población estadística, siguen la media de su barrio)` : ''}.`),
+    h('div', { class: 'mg-actions' }, filter),
+    onlyDebts
+      ? h('p', {}, `${debtors.length} vecinos deben dinero: ${money(debtors.reduce((a, c) => a + (c.debt?.town ?? 0), 0))} al ayuntamiento y ${money(debtors.reduce((a, c) => a + (c.debt?.bank ?? 0), 0))} a bancos y caseros.${rest > 0 ? ` ${rest} de ellos son vecinos sin nombre.` : ''} ${named.length ? ' Toca a uno con nombre para aplazar, perdonar o darle un microcrédito.' : ''}`)
+      : h('p', {}, `${named.length} vecinos con nombre${rest > 0 ? ` y ${rest} vecinos más (población estadística, siguen la media de su barrio)` : ''}.`),
     ul,
   );
 }

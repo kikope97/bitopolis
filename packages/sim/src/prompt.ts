@@ -1,4 +1,5 @@
 import { COMMON_NAMES, FIRST_NAMES, SURNAMES } from './names.ts';
+import { debtBand } from './household.ts';
 import { CAUSE_ASK, protestFor } from './associations.ts';
 import { tickToDate } from '@bitopolis/shared';
 import { z } from 'zod';
@@ -16,7 +17,7 @@ import { daysToElection, FACTION_TEXT, factionOf, politicsActive } from './polit
  * - Salida estructurada con enum de acciones válidas; se valida con zod.
  */
 
-export const PROMPT_VERSION = 4;
+export const PROMPT_VERSION = 5;
 
 export const SYSTEM_PROMPT = `Eres el narrador de Bitópolis, un pueblo español pequeño. Interpretas a vecinos con nombre que toman UNA decisión cada uno.
 
@@ -52,7 +53,8 @@ const TRIGGER_TEXT: Record<string, string> = {
   comprar_casa: 'podría comprar la vivienda en la que vive de alquiler',
   emprender: 'tiene ahorros y hay un local comercial libre',
   elecciones: 'hay elecciones municipales en unos días y decide su voto (secreto)',
-  protesta: 'su asociación de vecinos convoca una manifestación ante el ayuntamiento y decide si va'
+  protesta: 'su asociación de vecinos convoca una manifestación ante el ayuntamiento y decide si va',
+  deudas: 'debe dinero (no le llegó para pagarlo todo) y decide qué hacer'
 };
 
 const band = (n: number, cuts: number[], names: string[]) => names[cuts.findIndex((c) => n < c) === -1 ? names.length - 1 : cuts.findIndex((c) => n < c)]!;
@@ -134,9 +136,11 @@ function citizenView(state: GameState, c: Citizen, p: Pending) {
     miedo: c.fear,
     felicidad: Math.round(c.happiness),
     dinero: band(c.money, [300, 1_500, 4_000], ['casi nada', 'poco', 'algo', 'bastante']),
+    // v1.9: la deuda va por tramos, nunca la cifra.
+    deuda: debtBand(c),
     casa: home ? (c.owns ? 'vivienda en propiedad' : home.kind === 'house' ? 'casa municipal de alquiler' : 'piso de alquiler') : 'sin casa',
     hipoteca: c.mortgage > 0,
-    trabajo: job ? BUILD_NAMES[job.kind]!.toLowerCase() : 'fuera del pueblo',
+    trabajo: job ? BUILD_NAMES[job.kind]!.toLowerCase() : c.unemployedSince !== undefined ? 'en paro' : 'fuera del pueblo',
     profesion: c.profession,
     meta: GOAL_TEXT[c.goal],
     // Capa 1 (hechos) y capa 2 (recuerdos): solo datos y plantillas del motor.

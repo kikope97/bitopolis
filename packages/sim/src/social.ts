@@ -5,6 +5,7 @@ import { BUILD_NAMES } from './commands.ts';
 import { canFound, freeShopLot, saturated, taxLevels } from './economy.ts';
 import { hash32 } from './hash.ts';
 import { radiusOf } from './levels.ts';
+import { leaveTown } from './household.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance, pick } from './prng.ts';
 import type { Building, Citizen, GameState } from './state.ts';
@@ -64,6 +65,14 @@ export const MEMORY_KINDS = [
   // v1.8: delincuencia.
   'le_robaron',
   'detenido',
+  // v1.9: economía de cada vecino.
+  'desahuciado',
+  'embargado',
+  'robo_en_casa',
+  'antecedentes',
+  'en_paro',
+  'deuda_perdonada',
+  'cerro_negocio',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -229,6 +238,20 @@ export function memoryText(state: GameState, m: Memory): string {
       return 'Le robaron en su negocio';
     case 'detenido':
       return 'Le detuvieron en unos disturbios';
+    case 'desahuciado':
+      return 'Le echaron de casa por no pagar el alquiler';
+    case 'embargado':
+      return 'El banco se quedó su casa por la hipoteca';
+    case 'robo_en_casa':
+      return 'Le entraron a robar en casa';
+    case 'antecedentes':
+      return 'Le detuvieron por robar';
+    case 'en_paro':
+      return 'Se quedó sin trabajo';
+    case 'deuda_perdonada':
+      return 'El alcalde le perdonó lo que debía';
+    case 'cerro_negocio':
+      return 'Tuvo que cerrar su negocio';
   }
 }
 
@@ -243,7 +266,7 @@ export function narrativeSummary(state: GameState, c: Citizen): string {
   const parts: string[] = [];
   const job = state.buildings.find((b) => b.id === c.jobId);
   parts.push(`${c.name.split(' ')[0]}, ${c.profession}, ${c.age} años.`);
-  parts.push(job ? `Trabaja en ${(job.name ?? BUILD_NAMES[job.kind] ?? '').toLowerCase()}.` : 'Trabaja fuera del pueblo.');
+  parts.push(job ? `Trabaja en ${(job.name ?? BUILD_NAMES[job.kind] ?? '').toLowerCase()}.` : c.unemployedSince !== undefined ? 'Está en paro.' : 'Trabaja fuera del pueblo.');
   if (c.owns) parts.push(c.mortgage > 0 ? 'Paga la hipoteca de su casa.' : 'Su casa ya es suya.');
   const friends = c.relations.filter((r) => r.kind === 'amistad').map((r) => nameOf(state, r.id));
   if (friends.length) parts.push(`Se lleva bien con ${friends.slice(0, 2).join(' y ')}.`);
@@ -411,6 +434,8 @@ function updateRelations(state: GameState): void {
 
 /** Cuando un vecino se va, sus amistades lo recuerdan. */
 export function onCitizenLeaves(state: GameState, leaving: Citizen): void {
+  // v1.9: salda lo que pueda; lo que deba y no pague se da por perdido.
+  leaveTown(state, leaving);
   rememberDeparted(state, leaving, 'se_fue');
   for (const c of state.citizens) {
     const r = relation(c, leaving.id);
@@ -806,6 +831,13 @@ const MEMORY_LINE: Partial<Record<MemoryKind, (who: string) => string>> = {
   compro_casa: () => 'Con la casa ya en mis manos, duermo con más calma.',
   abrio_negocio: () => 'Con mi negocio en marcha, ganas no me faltan.',
   subida_impuestos: () => 'Y la última subida de impuestos no ayuda.',
+  // v1.9 (ronda 15).
+  desahuciado: () => 'Desde que me echaron de casa, duermo donde puedo.',
+  embargado: () => 'El banco se quedó mi casa; ahora pago alquiler en ella.',
+  robo_en_casa: () => 'Me entraron a robar en casa; ya no estoy tranquilo.',
+  en_paro: () => 'Sigo buscando trabajo.',
+  deuda_perdonada: () => 'El alcalde me perdonó lo que debía. No lo olvido.',
+  cerro_negocio: () => 'Tuve que cerrar mi negocio; las nóminas me comían.',
 };
 
 /** Frase de un recuerdo; las pérdidas, distintas para la pareja y para una amistad (ronda 11). */

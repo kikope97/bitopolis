@@ -31,6 +31,18 @@ export function checkInvariants(state: GameState): string[] {
     ids.add(x.id);
     if (x.id >= state.nextId) errors.push(`id ${x.id} >= nextId`);
   }
+  // v1.9: la deuda de los vecinos se conserva y siempre es entera y no negativa.
+  let liveDebt = 0;
+  for (const c of state.citizens) {
+    if (!c.debt) continue;
+    for (const k of ['town', 'bank'] as const) {
+      const v = c.debt[k];
+      if (v < 0 || !Number.isInteger(v)) errors.push(`vecino ${c.id} con deuda inválida (${k})`);
+      liveDebt += v;
+    }
+  }
+  const dl = state.debtLedger;
+  if (dl && liveDebt !== dl.created - dl.repaid - dl.written - dl.forgiven) errors.push(`deuda descuadrada: ${liveDebt - (dl.created - dl.repaid - dl.written - dl.forgiven)}`);
   const buildingIds = new Set(state.buildings.map((b) => b.id));
   for (const c of state.citizens) {
     if (c.homeId !== null && !buildingIds.has(c.homeId)) errors.push(`casa inexistente en ${c.id}`);

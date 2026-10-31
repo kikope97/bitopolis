@@ -1,4 +1,5 @@
 import type { Command } from '@bitopolis/shared';
+import { pocketBox } from './money-ui.ts';
 import {
   activeObjectives,
   BUILD_NAMES,
@@ -102,7 +103,10 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
     face,
     h('p', {}, `${c.profession || 'Sin oficio conocido'}, ${c.age} años · ${moodWord(c.happiness)} (${Math.round(c.happiness)}) · ${money(c.money)}`),
     c.kids?.length ? h('p', { class: 'muted small' }, c.kids.length === 1 ? 'Tiene un hijo en casa.' : `Tiene ${c.kids.length} hijos en casa.`) : '',
-    h('p', {}, `${c.owns ? (c.mortgage > 0 ? `Propietario (le quedan ${money(c.mortgage)} de hipoteca)` : 'Propietario') : 'De alquiler'} · ${job ? `trabaja en ${(job.name ?? BUILD_NAMES[job.kind] ?? '').toLowerCase()}` : 'trabaja fuera'}`),
+    h('p', {}, `${c.owns ? (c.mortgage > 0 ? `Propietario (le quedan ${money(c.mortgage)} de hipoteca)` : 'Propietario') : c.homeId === null ? 'Sin casa' : 'De alquiler'} · ${job ? `trabaja en ${(job.name ?? BUILD_NAMES[job.kind] ?? '').toLowerCase()}` : c.unemployedSince !== undefined ? 'en paro' : 'trabaja fuera'}`),
+    // v1.9: su balance y sus deudas.
+    h('h3', {}, 'Su bolsillo'),
+    pocketBox(ctx, c, () => openCitizen(ctx, citizenId)),
     h('p', {}, `Quiere ${DESIRE_TEXT[c.desire]}; teme ${FEAR_TEXT[c.fear]}. Meta: ${GOAL_TEXT[c.goal]} ${goalDone(state, c) ? '✓' : ''}`),
     hook ? h('p', { class: 'hook' }, h('strong', {}, 'Ahora mismo: '), `${HOOK_TEXT[hook.kind]}.`) : '',
     politicsActive(state)
