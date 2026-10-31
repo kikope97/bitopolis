@@ -49,7 +49,8 @@ export function snapMoments(token: string, state: GameState, seen: { n: number }
   seen.n = album.length;
 }
 
-function photo(token: string, state: GameState, m: Moment): { el: HTMLElement; live: boolean } {
+/** Foto guardada de un momento (o cómo está hoy ese rincón). También la usa «Mientras no estabas». */
+export function photo(token: string, state: GameState, m: Moment): { el: HTMLElement; live: boolean } {
   let url: string | null;
   try {
     url = localStorage.getItem(key(token, m));

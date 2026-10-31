@@ -36,8 +36,8 @@ function add(state: GameState, kind: string, text: string, at: { x: number; y: n
   if (unique && state.album.some((m) => m.kind === kind)) return;
   state.album.push({ tick: state.tick, kind, text, x: at.x, y: at.y });
   if (state.album.length > ALBUM_MAX) {
-    // Se quitan antes los repetibles (riadas, despedidas) que los «primeros».
-    const i = state.album.findIndex((m) => !m.kind.startsWith('primer'));
+    // Se quitan antes los repetibles (riadas, despedidas) que los «primeros» y los rangos.
+    const i = state.album.findIndex((m) => !m.kind.startsWith('primer') && !m.kind.startsWith('rango_'));
     state.album.splice(i >= 0 ? i : 0, 1);
   }
 }

@@ -186,6 +186,17 @@ export const sfx = {
   arrival: () => play([{ wave: 'triangle', from: 660, to: 880, dur: 0.12, vol: 0.3 }], 'sfx', 'arrival'),
   milestone: () =>
     play([523, 659, 784, 1047].map((f, i) => ({ wave: 'square' as const, from: f, dur: 0.14, vol: 0.3, at: i * 0.09 }))),
+  /** 2.1: fanfarria al subir de rango (trompetas en cuadrada y un timbal). */
+  fanfare: () =>
+    play(
+      [
+        ...[392, 392, 523, 659, 523, 659, 784].map((f, i) => ({ wave: 'square' as const, from: f, dur: i === 6 ? 0.5 : 0.12, vol: 0.3, at: [0, 0.12, 0.24, 0.42, 0.6, 0.72, 0.86][i] })),
+        ...[262, 330].map((f) => ({ wave: 'triangle' as const, from: f, dur: 0.5, vol: 0.25, at: 0.86 })),
+        { wave: 'noise' as const, from: 300, to: 60, dur: 0.3, vol: 0.4, at: 0.86 },
+      ],
+      'sfx',
+      'fanfare',
+    ),
   warn: () =>
     play([
       { wave: 'square', from: 440, dur: 0.1, vol: 0.25 },

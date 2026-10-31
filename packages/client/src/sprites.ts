@@ -289,9 +289,24 @@ const WALLS: [Mat, Texture][] = [
   [MAT.stone, 'stone'],
 ];
 const ROOFS: Mat[] = [MAT.terracotta, MAT.slate, MAT.plum, MAT.moss, MAT.terracotta];
+/** 2.1: tejados por rango del pueblo (solo índices de la paleta). La villa (2) es el aspecto de siempre. */
+const THATCH: Mat = [45, 46, 47, 36];
+const RED_TILE: Mat = [3, 2, 17, 16];
+const DARK_SLATE: Mat = [54, 52, 53, 55];
+const PATINA: Mat = [63, 7, 25, 26];
+const BLUE_SLATE: Mat = [10, 9, 8, 56];
+export const VILLA_RANK = 2;
+const RANK_ROOFS: Mat[][] = [
+  [THATCH, MAT.terracotta, THATCH, MAT.moss, THATCH],
+  [MAT.terracotta, THATCH, MAT.moss, MAT.terracotta, MAT.slate],
+  ROOFS,
+  [MAT.slate, RED_TILE, MAT.plum, MAT.terracotta, DARK_SLATE],
+  [DARK_SLATE, RED_TILE, PATINA, BLUE_SLATE, MAT.terracotta],
+];
+const roofsFor = (rank: number) => RANK_ROOFS[Math.max(0, Math.min(RANK_ROOFS.length - 1, rank))]!;
 const SHUTTERS: Mat[] = [MAT.moss, MAT.teal, MAT.red, MAT.blue];
 
-function cottage(seed: number): Pix {
+function cottage(seed: number, rank = VILLA_RANK): Pix {
   const p = new Pix(T, BH);
   castShadow(p, 3, 26, 25, 20);
   // Jardín con valla.
@@ -301,7 +316,7 @@ function cottage(seed: number): Pix {
   }
   p.hline(1, 43, 30, MAT.wood[2]);
   facade(p, 4, 26, 24, 18, MAT.cream, 'plaster', seed);
-  gableRoof(p, 2, 13, 28, 6, 8, MAT.terracotta);
+  gableRoof(p, 2, 13, 28, 6, 8, rank === VILLA_RANK ? MAT.terracotta : roofsFor(rank)[seed % 5]!);
   chimney(p, 21, 8, 7, true, seed);
   windowAt(p, 8, 30, 5, 6, { shutters: MAT.moss, flowers: true });
   windowAt(p, 21, 30, 4, 6, { shutters: MAT.moss });
@@ -311,10 +326,11 @@ function cottage(seed: number): Pix {
   return p;
 }
 
-function apartment(seed: number): Pix {
+function apartment(seed: number, rank = VILLA_RANK): Pix {
   const p = new Pix(T, BH);
   const [wall, tex] = WALLS[seed % WALLS.length]!;
-  const roof = ROOFS[(seed >> 3) % ROOFS.length]!;
+  const roofs = roofsFor(rank);
+  const roof = roofs[(seed >> 3) % roofs.length]!;
   const floors = 2 + ((seed >> 5) % 2);
   const fh = 10;
   const top = 46 - floors * fh - 2;
@@ -2784,7 +2800,9 @@ export function sprite(key: string, make: () => Pix, tod: TimeOfDay = 'day'): HT
 }
 
 /** Clave de caché y generador de cada edificio (null: no es un edificio conocido). */
-function buildingSpec(kind: string, id: number): [string, () => Pix] | null {
+function buildingSpec(kind: string, id: number, rank = VILLA_RANK): [string, () => Pix] | null {
+  // 2.1: las viviendas cambian de tejado con el rango del pueblo (otra entrada de la caché).
+  const r = rank === VILLA_RANK ? '' : `r${rank}`;
   switch (kind) {
     case 'townhall':
       return ['townhall', townhall];
@@ -2821,17 +2839,17 @@ function buildingSpec(kind: string, id: number): [string, () => Pix] | null {
     case 'shop':
       return [`shop${id % 16}`, () => shop(id % 16)];
     case 'house':
-      return [`house${id % 4}`, () => cottage(id % 4)];
+      return [`house${id % 4}${r}`, () => cottage(id % 4, rank)];
     case 'res':
-      return [`res${id % 256}`, () => apartment(Math.floor(hash(id, 77) * 256))];
+      return [`res${id % 256}${r}`, () => apartment(Math.floor(hash(id, 77) * 256), rank)];
     default:
       return null;
   }
 }
 
 /** Sprite de 32×48 de un edificio. Las viviendas y tiendas varían con su id. */
-export function buildingSprite(kind: string, id: number, tod: TimeOfDay = 'day', snow = false): HTMLCanvasElement {
-  const spec = buildingSpec(kind, id);
+export function buildingSprite(kind: string, id: number, tod: TimeOfDay = 'day', snow = false, rank = VILLA_RANK): HTMLCanvasElement {
+  const spec = buildingSpec(kind, id, rank);
   if (!spec) return constructionSprite(0, id, tod);
   const [key, make] = spec;
   // v1.7: en invierno con nieve, tejados nevados (otra entrada de la caché).
