@@ -48,7 +48,7 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
       const e = await api.estimate(provider, m, meta.maxCitizens);
       estimate.textContent = `≈ ${eur(e.eurPerHour.x1! * 30)} al mes jugando 1 hora al día a x1 (${eur(e.eurPerHour.x10! * 30)} a x10), con ${meta.maxCitizens} vecinos con nombre.${
         e.known ? '' : ' (Modelo sin precio en la tabla: se estima con uno caro.)'
-      }`;
+      } Incluye reintentos y la crónica del mes.`;
     } catch {
       estimate.textContent = '';
     }

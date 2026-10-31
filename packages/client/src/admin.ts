@@ -34,6 +34,7 @@ interface View {
     playerKeys: boolean;
   };
   backups: { keep: number };
+  estimate: { citizens: number; provider: string; eurPerGameMonth: number; eurPerHourX1: number; known: boolean };
   defaults: { prices: Record<string, Price>; models: Record<string, { cheap: string; premium: string; models: string[] }> };
 }
 interface GameRow {
@@ -306,6 +307,13 @@ async function renderPanel(focus?: string): Promise<void> {
   prices.value = a.prices ? JSON.stringify(a.prices, null, 2) : '';
   prices.placeholder = '{ "mi-modelo": { "in": 0.15, "out": 0.6 } }';
   const pricesErr = h('p', { class: 'error small', role: 'alert' });
+  // Coste orientativo con lo guardado (v1.3): ayuda a elegir los topes.
+  const costLine = h('p', { class: 'estimate', 'aria-live': 'polite' });
+  const showCost = (e: View['estimate']) => {
+    costLine.textContent = `Con ${e.citizens} vecinos con IA, un mes de juego cuesta unos ${eur(e.eurPerGameMonth)} (unos ${eur(e.eurPerHourX1)} por hora jugando a x1). Incluye reintentos y la crónica mensual.${e.known ? '' : ' Modelo sin precio en la tabla: se estima con uno caro.'}`;
+  };
+  if (a.hasKey || a.baseUrl) showCost(v.estimate);
+  else costLine.textContent = 'Con una API key de Anthropic y Claude Haiku, un mes de juego con 20 vecinos cuesta céntimos. Pon la key para ver la estimación exacta.';
   const advanced = () => prices.closest('details')!;
   /** Guarda el formulario de la IA tal como está escrito. */
   const saveAi = async (): Promise<void> => {
@@ -335,6 +343,7 @@ async function renderPanel(focus?: string): Promise<void> {
       },
     });
     key.value = '';
+    showCost(r.estimate);
     if (r.ai.hasKey !== a.hasKey || r.ai.keyMask !== a.keyMask || r.ai.baseUrl !== a.baseUrl) await renderPanel('IA');
   };
   const aiCard = card(
@@ -370,6 +379,7 @@ async function renderPanel(focus?: string): Promise<void> {
     h('h3', {}, 'Topes de gasto (€)'),
     h('div', { class: 'row wrap' }, field('Servidor al mes', capServer), field('Cada partida al mes', capGameMonth), field('Cada partida al día', capGameDay)),
     h('p', { class: 'help' }, 'Al llegar a un tope, la IA se pausa y deciden las reglas. Pon también un límite en el panel de tu proveedor.'),
+    costLine,
     playerRow,
     h(
       'details',

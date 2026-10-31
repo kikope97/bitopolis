@@ -8,6 +8,7 @@ import { migrate } from '@bitopolis/sim';
 import { DEFAULT_PRICES, PROVIDER_INFO, providerFromKey } from './ai/catalog.ts';
 import { encryptSecret, maskKey } from './ai/crypto.ts';
 import { makeProvider } from './ai/providers.ts';
+import { estimatePerGameDay } from './ai/routes.ts';
 import type { AiService } from './ai/service.ts';
 import { lockout, safeEqual, setCookie, signedCookie } from './auth.ts';
 import type { Config } from './config.ts';
@@ -94,6 +95,13 @@ export async function registerAdminRoutes(
   const bad = (reply: FastifyReply, error: string, code = 400) => reply.code(code).send({ error });
   const zodError = (e: z.ZodError) => e.issues[0]?.message ?? 'datos no válidos';
   const view = () => adminView(store.get(), config.version);
+  /** Coste orientativo con lo guardado: un mes de juego (30 días) y una hora real a x1. */
+  const estimate = async () => {
+    const s = await ai.settings(null);
+    const n = store.get().ai.maxCitizens;
+    const day = estimatePerGameDay(ai, s.provider, s.model, s.modelPremium, n);
+    return { citizens: n, provider: s.provider, eurPerGameMonth: day * 30, eurPerHourX1: day * 180, known: s.model in ai.prices || s.provider === 'openai-compatible' };
+  };
 
   // Todo /api/admin pide sesión, salvo entrar; con admin/admin solo se puede cambiar la cuenta.
   const OPEN = new Set(['/api/admin/login', '/api/admin/logout']);
@@ -151,6 +159,7 @@ export async function registerAdminRoutes(
 
   app.get('/api/admin/settings', async () => ({
     ...view(),
+    estimate: await estimate(),
     defaults: {
       prices: DEFAULT_PRICES,
       models: Object.fromEntries((['anthropic', 'openai', 'openai-compatible'] as const).map((p) => [p, { cheap: PROVIDER_INFO[p].cheap, premium: PROVIDER_INFO[p].premium, models: PROVIDER_INFO[p].models ?? [] }])),
@@ -189,7 +198,7 @@ export async function registerAdminRoutes(
       }
       return s;
     });
-    return view();
+    return { ...view(), estimate: await estimate() };
   });
 
   /** Prueba la IA del servidor con una petición mínima (cuenta en el gasto). */

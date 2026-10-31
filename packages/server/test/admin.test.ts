@@ -294,3 +294,19 @@ describe('ronda 08: seguridad', () => {
     expect((await app.inject({ method: 'GET', url: '/api/admin/settings', ...as(c) })).statusCode).toBe(401);
   });
 });
+
+describe('estimación de coste (v1.3)', () => {
+  it('el panel da el coste de un mes de juego con reintentos y crónica; más vecinos, más caro', async () => {
+    const c = (await login('admin', 'otra-clave-larga')).cookie;
+    await put({ ai: { key: 'sk-ant-api03-estimacion-1234', maxCitizens: 5 } }, c);
+    const five = (await app.inject({ method: 'GET', url: '/api/admin/settings', ...as(c) })).json().estimate;
+    expect(five).toMatchObject({ citizens: 5, provider: 'anthropic', known: true });
+    expect(five.eurPerGameMonth).toBeGreaterThan(0);
+    const twenty = (await put({ ai: { maxCitizens: 20 } }, c)).json().estimate;
+    expect(twenty.eurPerGameMonth).toBeGreaterThan(five.eurPerGameMonth);
+    // Un mes de juego son 30 días = 10 minutos a x1: la hora vale 6 meses.
+    expect(twenty.eurPerHourX1).toBeCloseTo(twenty.eurPerGameMonth * 6, 6);
+    const est = (await app.inject({ method: 'GET', url: '/api/ai/estimate?provider=anthropic&citizens=20' })).json();
+    expect(est.eurPerGameMonth).toBeCloseTo(twenty.eurPerGameMonth, 6);
+  });
+});

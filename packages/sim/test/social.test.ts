@@ -4,6 +4,7 @@ import {
   addMemory,
   applyCommand,
   buildDecisionRequest,
+  buildTalkRequest,
   checkInvariants,
   createInitialState,
   type GameState,
@@ -14,7 +15,10 @@ import {
   OBJECTIVES,
   onCitizenLeaves,
   parseText,
+  inventedName,
   meetingPlace,
+  parseDecisions,
+  toneOf,
   memoryLine,
   newBuilding,
   ruleAnswer,
@@ -336,5 +340,46 @@ describe('respuestas que recuerdan (v1.3)', () => {
     // Los recuerdos de hace más de 60 días ya no salen.
     s.tick += 24 * 61;
     expect(memoryLine(s, c!)).toBeNull();
+  });
+});
+
+describe('IA: tono y nombres inventados (v1.3)', () => {
+  it('cada vecino lleva un tono en el prompt, y no todos el mismo', () => {
+    const s = town();
+    const named = s.citizens.filter((c) => c.named);
+    const tones = new Set(named.map(toneOf));
+    expect(tones.size).toBeGreaterThan(2);
+    const c = named[0]!;
+    const pend = { citizenId: c.id, trigger: 'infeliz' as const, actions: validActions(s, c, 'infeliz'), createdTick: s.tick, dueTick: s.tick + 12 };
+    const req = buildDecisionRequest(s, [pend]);
+    expect(JSON.parse(req.user).vecinos[0].tono).toBe(toneOf(c));
+  });
+
+  it('detecta nombres que no están en los datos, pero no el inicio de frase ni los conocidos', () => {
+    const sent = '{"nombre":"Lucía Pérez","relaciones":[{"con":"Gonzalo"}]}';
+    expect(inventedName('Me quedo por Lucía y por Gonzalo.', sent)).toBeNull();
+    expect(inventedName('Pues me quedo. Aquí estoy bien.', sent)).toBeNull();
+    expect(inventedName('Lo hago por el Ayuntamiento y por Bitópolis.', sent)).toBeNull();
+    expect(inventedName('Me lo dijo Marisa en la panadería.', sent)).toBe('Marisa');
+  });
+
+  it('un motivo con un nombre inventado no vale; uno normal, sí', () => {
+    const s = town();
+    const c = s.citizens.find((x) => x.named)!;
+    const actions = validActions(s, c, 'infeliz');
+    const pend = [{ citizenId: c.id, trigger: 'infeliz' as const, actions, createdTick: s.tick, dueTick: s.tick + 12 }];
+    const req = buildDecisionRequest(s, pend);
+    const known = req.system + '\n' + req.user;
+    const raw = (motivo: string) => JSON.stringify({ decisiones: [{ vecino: c.id, accion: actions[0], motivo }] });
+    expect(parseDecisions(raw('Me lo ha aconsejado Wenceslao y le hago caso.'), pend, {}, false, known).reasons).toEqual({ nombre_inventado: 1 });
+    expect(parseDecisions(raw('Me lo he pensado mucho y lo tengo claro.'), pend, {}, false, known).decisions).toHaveLength(1);
+  });
+
+  it('un texto premium con un nombre inventado se descarta', () => {
+    const s = town();
+    const c = s.citizens.find((x) => x.named)!;
+    const req = buildTalkRequest(s, c, 'como_estas');
+    expect(parseText(JSON.stringify({ texto: 'Aquí andamos, con ganas de que el pueblo crezca.' }), req)).not.toBeNull();
+    expect(parseText(JSON.stringify({ texto: 'Mi primo Anacleto dice que esto va bien.' }), req)).toBeNull();
   });
 });
