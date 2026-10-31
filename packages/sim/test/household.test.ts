@@ -2,6 +2,10 @@ import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { describe, expect, it } from 'vitest';
 import {
   addDebt,
+  applyDecision,
+  GRUDGE_MAX,
+  settleDebt,
+  unansweredDeferrals,
   applyCommand,
   charge,
   checkInvariants,
@@ -135,5 +139,51 @@ describe('economía de cada vecino (v1.9)', () => {
     expect(m.minWage).toBe('none');
     expect(m.debtLedger.created).toBe(0);
     expect(m.justice.jail[0]).toEqual({ until: 123 });
+  });
+});
+
+describe('aplazamiento sin respuesta (v1.9.1)', () => {
+  function asking() {
+    const s = town();
+    const c = s.citizens.find((x) => x.named)!;
+    addDebt(s, c, 'town', 640);
+    c.grudge = 0;
+    s.pending = s.pending.filter((p) => p.citizenId !== c.id);
+    s.pending.push({ citizenId: c.id, trigger: 'deudas', actions: ['apretarse', 'pedir_aplazamiento'], createdTick: s.tick, dueTick: s.tick + TICKS_PER_DAY });
+    expect(applyDecision(s, c.id, 'pedir_aplazamiento', 'Necesito tiempo.', 'rule')).toBe(true);
+    expect(c.debt!.askedAt).toBe(s.tick);
+    return { s, c };
+  }
+
+  it('si en 30 días no se aplaza ni se perdona, recuerdo «sin_respuesta» (−3) y +5 de rencor', () => {
+    const { s, c } = asking();
+    const memories = c.memories.length;
+    s.tick += (DEBT.answerDays - 1) * TICKS_PER_DAY;
+    unansweredDeferrals(s);
+    expect(c.memories.some((m) => m.kind === 'sin_respuesta')).toBe(false);
+    s.tick += TICKS_PER_DAY;
+    unansweredDeferrals(s);
+    const m = c.memories.find((x) => x.kind === 'sin_respuesta');
+    expect(m?.valence).toBe(-3);
+    expect(c.memories.length).toBeLessThanOrEqual(memories + 1);
+    expect(c.grudge).toBe(Math.min(GRUDGE_MAX, 5));
+    expect(c.debt!.askedAt).toBeUndefined();
+    // Solo una vez.
+    s.tick += 40 * TICKS_PER_DAY;
+    unansweredDeferrals(s);
+    expect(c.memories.filter((x) => x.kind === 'sin_respuesta')).toHaveLength(1);
+    expect(checkInvariants(s)).toEqual([]);
+  });
+
+  it('si el alcalde aplaza (o perdona) a tiempo, no hay rencor', () => {
+    for (const mode of ['aplazar', 'perdonar'] as const) {
+      const { s, c } = asking();
+      s.tick += 10 * TICKS_PER_DAY;
+      settleDebt(s, c, mode);
+      s.tick += DEBT.answerDays * TICKS_PER_DAY;
+      unansweredDeferrals(s);
+      expect(c.memories.some((m) => m.kind === 'sin_respuesta')).toBe(false);
+      expect(c.grudge).toBe(0);
+    }
   });
 });

@@ -15,7 +15,10 @@ test('Modo IA: configurar, jugar y ver un motivo de la IA', async ({ page }, inf
   // En el test se usa un LLM falso local (endpoint propio, compatible con OpenAI).
   await page.locator('details.advanced summary').first().click();
   await page.locator('#ai-base').fill('http://localhost:8099/v1');
-  await page.locator('#ai-model').fill('falso');
+  // «Cargar modelos» prueba el endpoint sin guardarlo y llena los desplegables (con «Otro…»).
+  await page.getByRole('button', { name: 'Cargar modelos' }).click();
+  await expect(page.locator('#ai-model-list option')).toHaveText([/^Automático/, 'falso-mini', 'falso-grande', 'falso-viejo', 'Otro…']);
+  await page.getByLabel('Modelo de los vecinos (lotes)').selectOption('falso-mini');
   await page.screenshot({ path: `test-results/capturas/${info.project.name}-ia-config.png` });
   await page.getByRole('button', { name: 'Guardar y usar el Modo IA' }).click();
   await expect(page.locator('.toast').last()).toContainText('casilla');
@@ -33,13 +36,13 @@ test('Modo IA: configurar, jugar y ver un motivo de la IA', async ({ page }, inf
   await pickTool(page, 'house');
   await tap(page, cx + 2, cy + 1);
   await setSpeed(page, 3);
-  // La primera decisión (opinión o llegada) debe venir de la IA.
-  await expect(page.locator('.bubble .ai-badge').first()).toBeVisible({ timeout: 60_000 });
-  await expect(page.locator('.bubble').first()).toContainText('promete');
+  // 2.0: el primer turno del pueblo lo decide la IA y sus motivos salen en burbujas.
+  await expect(page.locator('.bubble .ai-badge').first()).toBeVisible({ timeout: 90_000 });
+  await expect(page.locator('.bubble .bubble-text').first()).toContainText('«');
   await page.screenshot({ path: `test-results/capturas/${info.project.name}-ia-burbuja.png` });
-  await expect(page.locator('#ai-chip')).toHaveText('IA ●');
+  await expect(page.locator('#ai-chip')).toHaveText('IA ✦');
   const s1 = await state(page);
-  expect(s1.decisionLog.some((d: { source: string }) => d.source === 'ai')).toBe(true);
+  expect(s1.ai.log.some((l: { source: string }) => l.source === 'ia')).toBe(true);
 
   await setSpeed(page, 0);
   // Consejero con IA (modelo premium) en Modo IA.

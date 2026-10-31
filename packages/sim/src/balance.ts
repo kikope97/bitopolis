@@ -457,6 +457,10 @@ export const DEBT = {
   tightMood: 2,
   /** Aplazamiento que concede el alcalde: meses de cuota fija, sin recargo. */
   planMonths: 12,
+  /** v1.9.1: días que espera respuesta quien pide un aplazamiento; sin ella, se lo guarda (rencor). */
+  answerDays: 30,
+  unansweredGrudge: 5,
+  unansweredMood: -3,
 } as const;
 
 /** v1.9 (petición del creador): sueldo mínimo que el ayuntamiento obliga a pagar a las empresas del pueblo. */
@@ -496,4 +500,70 @@ export const MICROCREDIT = {
   months: 12,
   /** Ayuntamiento de nivel mínimo para ofrecerlos. */
   townhallLevel: 2,
+} as const;
+
+/**
+ * 2.0 (petición del creador): turnos del pueblo con IA. Ver turns.ts y
+ * docs/propuestas/v2.0-superia.md.
+ */
+export const TURN = {
+  /** % de vecinos con IA por defecto. */
+  defaultShare: 50,
+  /** Días de juego entre turnos a x1 (el cliente lo alarga a x3/x10). */
+  days: 7,
+  /** Horas de juego que espera un turno a la IA antes de que decidan las reglas. */
+  dueHours: 12,
+  /** Vecinos con IA como mucho en un turno semanal y en una reacción rápida. */
+  maxCitizens: 150,
+  quickCitizens: 12,
+  /** Vecinos con nombre como mucho (rendimiento: relaciones entre todos los pares). */
+  maxNamed: 150,
+  /** Lo que se guarda: acciones del alcalde, turnos y líneas por turno. */
+  mayorLog: 20,
+  logTurns: 12,
+  logLines: 40,
+  /** Cuánto mueve la actitud hacia el alcalde la intención de voto (por punto, de −2 a +2). */
+  attitudeVote: 0.05,
+  /** Ronda 16: ultimátums con plazo mínimo y, para irse, solo si su felicidad está por debajo de esto. */
+  planMinMonths: 3,
+  leaveBelow: 55,
+  /** Notas de su semana que guarda cada vecino con IA. */
+  notes: 4,
+  /** Modo mixto: los vecinos por reglas copian esta parte de la actitud de sus amigos con IA (o de su barrio). */
+  contagion: 0.6,
+  /** Lado (en casillas) de cada barrio para el contagio. */
+  barrioSize: 12,
+} as const;
+
+/** 2.0: el director del pueblo (sucesos que elige la IA entre los que propone el motor). */
+export const DIRECTOR = {
+  /** Delincuencia mínima en la calle para que un robo sea candidato. */
+  robCrime: 25,
+  /** Sucesos como mucho por turno, y buenos como mucho por turno. */
+  maxEvents: 3,
+  maxGood: 2,
+  /** Sucesos malos según el descontento (100 − felicidad): desde 35, uno por turno; desde 55, dos. */
+  badFrom: 35,
+  twoBadFrom: 55,
+  /** Sucesos malos como mucho al mes (ronda 16: cupo gradual, de 0 con descontento 30 a 4 con 70). */
+  maxBadPerMonth: 4,
+  badFromDiscontent: 30,
+  badFullDiscontent: 70,
+  /** Lo que justifican los datos (delincuencia alta sin policía, asociación ignorada) pasa aunque el pueblo esté contento: uno al mes. */
+  owedCrime: 40,
+  /** Con el pueblo contento (felicidad ≥ esta), al menos un suceso bueno por cada dos malos. */
+  fairHappiness: 60,
+  /** Avisos («Se está cociendo») a la vez, y turnos que dura un aviso. */
+  maxBrewing: 5,
+  brewingTurns: 4,
+  /** Ronda 16: los avisos duran días de juego (no turnos: igual a cualquier velocidad). */
+  brewingDays: 28,
+  /** Una tienda o casa robada no vuelve al menú en estos días. */
+  robbedCooldownDays: 30,
+  /** Candidatos de cada tipo en el menú. */
+  perKind: 2,
+  /** Lo que da un vecino a un amigo en apuros (€, como mucho). */
+  helpAmount: 120,
+  /** Vecinos a los que llega un rumor. */
+  rumorReach: 6,
 } as const;

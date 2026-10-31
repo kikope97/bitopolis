@@ -1,5 +1,6 @@
 import type { MinWageLevel } from './balance.ts';
-import type { TaxLevel } from '@bitopolis/shared';
+import type { TownAi } from './turns.ts';
+import { TICKS_PER_DAY, type TaxLevel } from '@bitopolis/shared';
 import { emptyFields, type Fields } from './fields.ts';
 import { chance, nextInt, type RngState, seedRng } from './prng.ts';
 import type { Goal, Hook, Memory, Pleno, PromiseRecord, Relation } from './social.ts';
@@ -13,7 +14,7 @@ import type { Departed } from './family.ts';
 import type { Justice } from './crime.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
-export const FORMAT_VERSION = 12;
+export const FORMAT_VERSION = 13;
 
 export const MAP_W = 48;
 export const MAP_H = 48;
@@ -175,6 +176,13 @@ export interface Citizen {
   seizedUntil?: number;
   /** v1.9 (ronda 15): tras cerrar su negocio, no abre otro hasta este tick. */
   closedUntil?: number;
+  /** 2.0: lo que decide la IA en cada turno (actitud hacia el alcalde −2…2, dónde gasta, su plan y lo que piensa). */
+  attitude?: number;
+  spending?: { where: 'pueblo' | 'fuera' | 'ahorrar'; shop?: number; leisure: boolean };
+  plan?: { kind: 'irse_si_no' | 'protestar_si_no' | 'votar_en_contra_si_no'; need: string; until: number; since: number };
+  thought?: string;
+  /** 2.0: lo que el propio vecino (la IA) apunta de cada semana; lo lee la semana siguiente. */
+  notes?: { tick: number; text: string }[];
 }
 
 export interface CitizenDebt {
@@ -189,6 +197,8 @@ export interface CitizenDebt {
   aged: number;
   /** Aplazamiento concedido por el alcalde: cuota fija sin recargo hasta `until`. */
   plan?: { perMonth: number; until: number; kind?: 'aplazamiento' | 'microcredito' };
+  /** v1.9.1: cuándo pidió al alcalde un aplazamiento (tick) que aún no tiene respuesta. */
+  askedAt?: number;
 }
 
 export type TaxKey = 'ibi' | 'tasas' | 'plusvalia';
@@ -354,6 +364,8 @@ export interface GameState {
   departed: Departed[];
   /** v1.8: nivel del ayuntamiento (1–5): desbloquea edificios y partes del juego. */
   townhallLevel: number;
+  /** 2.0: turnos del pueblo con IA (solo en Modo IA). */
+  ai?: TownAi;
   /** v1.9: sueldo mínimo obligatorio para las empresas del pueblo. */
   minWage: MinWageLevel;
   /** v1.9: contabilidad de la deuda de los vecinos (conservación: deuda viva = altas − pagos − incobrables − perdonadas). */
@@ -400,11 +412,13 @@ export interface NewGameOptions {
   seed: number;
   aiMode?: boolean;
   namedLimit?: number;
+  /** 2.0: % de vecinos con IA (Modo IA). */
+  aiShare?: number;
 }
 
 export const INITIAL_SUBSIDY = 30_000;
 
-export function createInitialState({ seed, aiMode = false, namedLimit = 20 }: NewGameOptions): GameState {
+export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiShare = 50 }: NewGameOptions): GameState {
   const rng = seedRng(seed);
   const tiles = new Array<number>(MAP_W * MAP_H).fill(Tile.Grass);
   const zones = new Array<number>(MAP_W * MAP_H).fill(Zone.None);
@@ -454,6 +468,10 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20 }: Ne
     departed: [],
     justice: { cells: [], jail: [], hot: [], robberies: 0, arrests: 0, fullWarned: -1 },
     townhallLevel: 1,
+    // 2.0: turnos del pueblo con IA (en línea: turns.ts importa este módulo).
+    ...(aiMode
+      ? { ai: { share: Math.max(0, Math.min(100, Math.round(aiShare))), paceDays: 7, turn: null, lastN: 0, next: 7 * TICKS_PER_DAY, mayor: [], quick: null, lastQuick: -1e9, log: [] } }
+      : {}),
     minWage: 'none',
     debtLedger: { created: 0, repaid: 0, written: 0, forgiven: 0 },
   };

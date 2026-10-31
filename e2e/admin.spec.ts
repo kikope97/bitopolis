@@ -5,7 +5,7 @@ import { expect, test } from '@playwright/test';
  * playwright.config.ts) porque cambia ajustes globales: contraseña para jugar,
  * partidas nuevas, IA del servidor.
  */
-const ADMIN = 'http://localhost:8091';
+const ADMIN = `http://localhost:${process.env.PW_ADMIN_PORT ?? 8091}`;
 // Sin reintentos: el primer intento ya cambia la cuenta y un reintento no puede repetirlo.
 test.describe.configure({ mode: 'serial', retries: 0 });
 
@@ -91,10 +91,39 @@ test('admin: primer acceso, ajustes que valen al momento y vista móvil', async 
   const ia = page.getByRole('region', { name: 'IA' });
   await ia.getByText('Avanzado: endpoint propio y precios').click();
   await ia.getByLabel('Endpoint propio (Ollama, LM Studio…)').fill('http://localhost:8099/v1');
-  await ia.getByLabel('Vecinos con IA por partida (1–20)').fill('6');
+  await ia.getByLabel('Vecinos con nombre en Modo normal (1–20)').fill('6');
   await ia.getByLabel('Servidor al mes').fill('5');
+  // 2.0: % de vecinos que piensan con IA y modo de los turnos.
+  await ia.getByLabel('Vecinos que piensan con IA (%)').fill('70');
+  await ia.getByLabel('Turnos del pueblo').selectOption('ahorro');
   await saved(ia.getByRole('button', { name: 'Guardar la IA' }));
   await expect(page.locator('.server-ai')).toContainText('Endpoint propio');
+  await expect(ia.getByLabel('Vecinos que piensan con IA (%)')).toHaveValue('70');
+  await expect(ia.getByLabel('Turnos del pueblo')).toHaveValue('ahorro');
+
+  // Modelos (petición del creador): desplegables con los que da la key/endpoint y «Recargar modelos».
+  const vecinos = ia.getByLabel('Modelo de los vecinos (lotes)');
+  const director = ia.getByLabel('Modelo del director (y consejero)');
+  await expect(vecinos).toHaveJSProperty('tagName', 'SELECT');
+  await expect(vecinos.locator('option')).toHaveText(['Por defecto (llama3.2)', 'falso-mini', 'falso-grande', 'falso-viejo', 'Otro…']);
+  await expect(director.locator('option')).toHaveCount(5);
+  await expect(ia.locator('.models-status')).toHaveText('3 modelos disponibles.');
+  await vecinos.selectOption('falso-mini');
+  await director.selectOption({ label: 'Otro…' });
+  await ia.getByLabel('Otro modelo (escríbelo)').fill('falso-a-mano');
+  await saved(ia.getByRole('button', { name: 'Guardar la IA' }));
+  await page.reload();
+  await expect(vecinos).toHaveValue('falso-mini');
+  await expect(director.locator('option:checked')).toHaveText('Otro…');
+  await expect(ia.getByLabel('Otro modelo (escríbelo)')).toHaveValue('falso-a-mano');
+  const listed = page.waitForResponse((r) => r.url().endsWith('/api/admin/ai/models') && r.request().method() === 'GET' && r.ok());
+  await ia.getByRole('button', { name: 'Recargar modelos' }).click();
+  await listed;
+  await expect(page.locator('.toast').last()).toContainText('Modelos cargados');
+  await expect(vecinos).toHaveValue('falso-mini');
+  // La respuesta no trae nunca la key.
+  expect(JSON.stringify(await (await page.request.get(`${ADMIN}/api/admin/ai/models`)).json())).not.toMatch(/sk-/);
+  await shot('3-modelos');
   await page.getByRole('button', { name: 'Guardar y probar' }).click();
   await expect(page.locator('.toast').last()).toContainText('Funciona');
   await visitor.goto(`${ADMIN}/`);
@@ -107,6 +136,12 @@ test('admin: primer acceso, ajustes que valen al momento y vista móvil', async 
   expect(await visitor.evaluate(() => (window as unknown as { __bitopolis: { state: { aiMode: boolean } } }).__bitopolis.state.aiMode)).toBe(true);
   await shot('3-ia');
   await page.getByRole('region', { name: 'IA' }).getByText('Avanzado: endpoint propio y precios').click();
+  // Si la lista falla (este endpoint no da /models), aviso claro y vuelta al campo de texto.
+  await ia.getByLabel('Endpoint propio (Ollama, LM Studio…)').fill('http://localhost:8099/nada');
+  await ia.getByLabel('Endpoint propio (Ollama, LM Studio…)').press('Tab');
+  await expect(ia.locator('.models-status')).toContainText('No se pudo cargar la lista de modelos');
+  await expect(vecinos).toHaveJSProperty('tagName', 'INPUT');
+  await expect(vecinos).toHaveValue('falso-mini');
   await page.getByRole('region', { name: 'IA' }).getByLabel('Endpoint propio (Ollama, LM Studio…)').fill('');
   await page.getByRole('region', { name: 'IA' }).getByRole('button', { name: 'Guardar la IA' }).click();
   await expect(page.locator('.server-ai')).toContainText('Sin IA del servidor');

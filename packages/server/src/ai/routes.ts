@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { GameToken } from '@bitopolis/shared';
 import {
@@ -10,7 +10,6 @@ import {
   FORMAT_VERSION,
   type GameState,
   migrate,
-  SYSTEM_PROMPT,
   townFacts,
   validActions,
 } from '@bitopolis/sim';
@@ -18,39 +17,44 @@ import type { Config } from '../config.ts';
 import type { Db } from '../db/index.ts';
 import type { SettingsStore } from '../settings.ts';
 import { newSeed } from '../tokens.ts';
-import { costEur, PROVIDER_INFO, PROVIDERS, type ProviderId } from './catalog.ts';
+import { costEur, PROVIDER_INFO, PROVIDERS, providerFromKey, type ProviderId } from './catalog.ts';
 import { encryptSecret, maskKey } from './crypto.ts';
-import type { AiService, AiSettings } from './service.ts';
+import { type AiService, type AiSettings, ModelsError } from './service.ts';
 
-/** Medido con `pnpm sim` (ver docs/rondas): decisiones por vecino con nombre y día. */
-export const DECISIONS_PER_CITIZEN_DAY = 0.085;
-/** Las «opiniones» salen con cualquier número de vecinos: nunca menos de media decisión al día. */
-const MIN_DECISIONS_PER_DAY = 0.5;
-// Ronda 09: la base es el prompt de sistema real (≈3,2 caracteres por token) más el resumen del pueblo.
-const TOKENS_IN_BASE = Math.ceil(SYSTEM_PROMPT.length / 3.2) + 120;
-const TOKENS_IN_PER_CITIZEN = 230;
-const TOKENS_OUT_PER_CITIZEN = 40;
-
-/** Margen para los reintentos de respuestas no válidas (v1.3; medido: casi siempre valen a la primera). */
+/**
+ * 2.0: coste de los turnos del pueblo, medido en vivo con `pnpm ai-eval --live`
+ * (ronda 16): por turno, ≈2500 tokens de entrada fijos más ≈900 por vecino con IA
+ * (una cuarta parte en caché) y ≈220 de salida por vecino.
+ */
+export const TURN_COST = { inBase: 2500, inPerCitizen: 900, cachedShare: 0.25, outPerCitizen: 220 };
+/** Pueblo de referencia para la estimación: vecinos con nombre en una partida mediana. */
+export const REFERENCE_TOWN = 60;
+/** Días de juego entre turnos según la velocidad (`SetTurnPace`). */
+const PACE: Record<number, number> = { 1: 7, 3: 14, 10: 28 };
+/** Margen para segundas preguntas, reacciones rápidas y conversaciones. */
 export const RETRY_RATE = 0.15;
 /** Crónica del diario: una al mes con el modelo premium. */
 const CHRONICLE = { in: 800, out: 260 };
 
-/** Coste en € de un día de juego: decisiones (con reintentos) y la parte de la crónica del mes. */
-export function estimatePerGameDay(ai: AiService, provider: ProviderId, model: string, premium: string, citizens: number): number {
-  const decisionsPerDay = Math.max(MIN_DECISIONS_PER_DAY, citizens * DECISIONS_PER_CITIZEN_DAY);
-  // Las decisiones del mismo día van en un lote.
-  const batchesPerDay = Math.min(1, decisionsPerDay);
-  const tokensIn = batchesPerDay * TOKENS_IN_BASE + decisionsPerDay * TOKENS_IN_PER_CITIZEN;
-  const tokensOut = decisionsPerDay * TOKENS_OUT_PER_CITIZEN;
-  const decisions = costEur(ai.prices, model, provider, { in: tokensIn, cachedIn: 0, out: tokensOut }) * (1 + RETRY_RATE);
-  const chronicle = costEur(ai.prices, premium, provider, { in: CHRONICLE.in, cachedIn: 0, out: CHRONICLE.out }) / 30;
-  return decisions + chronicle;
+/** Vecinos con IA para un % dado en el pueblo de referencia. */
+export const aiCitizensFor = (share: number) => Math.max(1, Math.round((REFERENCE_TOWN * share) / 100));
+
+/** Coste en € de un turno del pueblo con `citizens` vecinos con IA. */
+export function turnCost(ai: AiService, provider: ProviderId, model: string, citizens: number): number {
+  const tin = TURN_COST.inBase + citizens * TURN_COST.inPerCitizen;
+  return costEur(ai.prices, model, provider, { in: tin, cachedIn: tin * TURN_COST.cachedShare, out: citizens * TURN_COST.outPerCitizen });
 }
 
-/** Estimación de coste en €/hora real según modelo, vecinos y velocidad (1 día = 20 s a x1). */
+/** Coste en € de un día de juego (turnos al ritmo de la velocidad, con margen, y la parte de la crónica del mes). */
+export function estimatePerGameDay(ai: AiService, provider: ProviderId, model: string, premium: string, citizens: number, speed = 1): number {
+  const turns = (turnCost(ai, provider, model, citizens) * (1 + RETRY_RATE)) / (PACE[speed] ?? 7);
+  const chronicle = costEur(ai.prices, premium, provider, { in: CHRONICLE.in, cachedIn: 0, out: CHRONICLE.out }) / 30;
+  return turns + chronicle;
+}
+
+/** Estimación de coste en €/hora real según modelo, vecinos con IA y velocidad (1 día = 20 s a x1). */
 export function estimatePerHour(ai: AiService, provider: ProviderId, model: string, citizens: number, speed: number, premium = PROVIDER_INFO[provider].premium): number {
-  return estimatePerGameDay(ai, provider, model, premium, citizens) * (3600 / 20) * speed;
+  return estimatePerGameDay(ai, provider, model, premium, citizens, speed) * (3600 / 20) * speed;
 }
 
 function publicSettings(s: AiSettings) {
@@ -70,7 +74,14 @@ const ConfigBody = z.object({
   key: z.string().trim().min(8).max(400).optional(),
   capDay: z.number().min(0).max(1000).optional(),
   capMonth: z.number().min(0).max(10000).optional(),
+  /** 2.0: % de vecinos con IA (solo con key propia; con la del servidor manda /admin). */
+  aiShare: z.number().int().min(0).max(100).optional(),
   accepted: z.boolean(),
+});
+
+const ModelsBody = z.object({
+  key: z.string().trim().min(8, 'La API key es demasiado corta').max(400).optional(),
+  baseUrl: z.string().trim().url('El endpoint no es una URL válida').max(512).optional().or(z.literal('')),
 });
 
 export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Config, ai: AiService, store: SettingsStore): Promise<void> {
@@ -85,6 +96,8 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
       providers: PROVIDERS.map((id) => ({ id, ...PROVIDER_INFO[id] })),
       serverKey: !!s.ai.keyEnc || !!s.ai.baseUrl,
       maxCitizens: s.ai.maxCitizens,
+      aiShare: s.ai.aiShare ?? 50,
+      turnQuality: s.ai.turnQuality ?? 'calidad',
       playerKeys: s.ai.playerKeys,
       prices: ai.prices,
       newGames: s.newGames,
@@ -95,12 +108,14 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
   app.get('/api/ai/estimate', async (req) => {
     const q = req.query as Record<string, string>;
     const provider = (PROVIDERS as readonly string[]).includes(q.provider ?? '') ? (q.provider as ProviderId) : 'openai';
-    const model = q.model || PROVIDER_INFO[provider].cheap;
+    const quality = (store.get().ai.turnQuality ?? 'calidad') === 'calidad';
+    const model = q.model || PROVIDER_INFO[provider][quality ? 'premium' : 'cheap'];
     const premium = q.premium || PROVIDER_INFO[provider].premium;
-    const citizens = Math.max(1, Math.min(20, Number(q.citizens) || store.get().ai.maxCitizens));
+    const share = q.share !== undefined && q.share !== '' ? Number(q.share) : (store.get().ai.aiShare ?? 50);
+    const citizens = aiCitizensFor(Math.max(0, Math.min(100, Number.isFinite(share) ? share : 50)));
     const out: Record<string, number> = {};
     for (const sp of [1, 3, 10]) out[`x${sp}`] = estimatePerHour(ai, provider, model, citizens, sp, premium);
-    return { eurPerHour: out, eurPerGameMonth: estimatePerGameDay(ai, provider, model, premium, citizens) * 30, known: model in ai.prices || provider === 'openai-compatible' };
+    return { eurPerHour: out, citizens, eurPerGameMonth: estimatePerGameDay(ai, provider, model, premium, citizens) * 30, known: model in ai.prices || provider === 'openai-compatible' };
   });
 
   app.get('/api/games/:token/ai-config', async (req, reply) => {
@@ -124,7 +139,8 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
     if (!row) {
       if (!store.get().newGames) return bad(reply, 'Este servidor no admite partidas nuevas', 403);
       const seed = newSeed();
-      const state = createInitialState({ seed, aiMode: true, namedLimit: store.get().ai.maxCitizens });
+      const share = srv.configured ? (store.get().ai.aiShare ?? 50) : (d.aiShare ?? store.get().ai.aiShare ?? 50);
+      const state = createInitialState({ seed, aiMode: true, namedLimit: store.get().ai.maxCitizens, aiShare: share });
       const ts = new Date().toISOString();
       await db
         .insertInto('games')
@@ -161,6 +177,47 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
     return publicSettings(await ai.settings(row.id));
   });
 
+  /**
+   * Modelos para el desplegable de Configurar. Con la key del servidor, su
+   * lista solo si la partida puede elegir modelo (403 si lo fija el servidor);
+   * con la del jugador, la guardada (GET) o una escrita y aún sin guardar (POST).
+   * La key nunca vuelve al cliente.
+   */
+  const gameModels = async (req: FastifyRequest, reply: FastifyReply, draft?: z.infer<typeof ModelsBody>) => {
+    const t = tokenOf(req.params);
+    if (!t.success) return bad(reply, 'enlace no válido');
+    const row = await load(t.data);
+    if (row && row.mode !== 'ai') return bad(reply, 'Esta partida es de Modo normal', 409);
+    const s = await ai.settings(row?.id ?? null);
+    const srv = store.get().ai;
+    let key = s.key;
+    let baseUrl = s.baseUrl;
+    if (srv.keyEnc || srv.baseUrl) {
+      // La key del servidor no se manda a otro endpoint ni se cambia desde aquí.
+      if (s.locked.includes('model') && s.locked.includes('modelPremium')) return bad(reply, 'El modelo lo fija el servidor', 403);
+    } else {
+      if (!srv.playerKeys) return bad(reply, 'Este servidor no permite poner una API key propia', 403);
+      const nextBase = draft?.baseUrl !== undefined ? draft.baseUrl || undefined : baseUrl;
+      // Ronda 16: la key guardada nunca va a un endpoint distinto del guardado (fuga y SSRF).
+      if (draft?.key) key = draft.key;
+      else if (nextBase !== baseUrl) key = undefined;
+      baseUrl = nextBase;
+    }
+    if (!key && !baseUrl) return bad(reply, 'Escribe tu API key y pulsa «Cargar modelos»');
+    try {
+      return await ai.models(providerFromKey(key, baseUrl), key, baseUrl);
+    } catch (e) {
+      if (e instanceof ModelsError) return bad(reply, e.message, 502);
+      throw e;
+    }
+  };
+  app.get('/api/games/:token/ai/models', (req, reply) => gameModels(req, reply));
+  app.post('/api/games/:token/ai/models', async (req, reply) => {
+    const b = ModelsBody.safeParse(req.body ?? {});
+    if (!b.success) return bad(reply, b.error.issues[0]?.message ?? 'datos no válidos');
+    return gameModels(req, reply, b.data);
+  });
+
   app.get('/api/games/:token/decisions', async (req, reply) => {
     const t = tokenOf(req.params);
     if (!t.success) return bad(reply, 'enlace no válido');
@@ -175,6 +232,22 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
       s.serverMonthly ? spent.serverMonth / s.serverMonthly : 0,
     ];
     return { ...ai.take(row.id), budgetFraction: Math.max(...fractions) };
+  });
+
+  /** 2.0: resultado del turno del pueblo `n` (pendiente, listo o fallido). */
+  app.get('/api/games/:token/turn/:n', async (req, reply) => {
+    const t = tokenOf(req.params);
+    const n = Number((req.params as { n?: string }).n);
+    if (!t.success || !Number.isInteger(n) || n < 1) return bad(reply, 'petición no válida');
+    const row = await load(t.data);
+    if (!row) return bad(reply, 'no existe', 404);
+    // Ronda 16: si el servidor no conoce ese turno (se reinició, o el guardado no era «live»),
+    // lo pide ahora con el estado guardado, si ese turno sigue abierto.
+    if (!ai.turn(row.id, n) && row.mode === 'ai') {
+      const st = migrate(JSON.parse(row.state)) as GameState;
+      if (st.ai?.turn?.n === n) void ai.onSaved(row.id, st);
+    }
+    return { turn: ai.turn(row.id, n), ...ai.status(row.id) };
   });
 
   app.get('/api/games/:token/ai-usage', async (req, reply) => {

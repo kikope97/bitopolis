@@ -1,10 +1,12 @@
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { rememberDeparted } from './family.ts';
 import { CAMPAIGN_MONTHS } from './balance.ts';
+import { directorOwns } from './director-core.ts';
 import { BUILD_NAMES } from './commands.ts';
 import { canFound, freeShopLot, saturated, taxLevels } from './economy.ts';
 import { hash32 } from './hash.ts';
 import { radiusOf } from './levels.ts';
+import { isFemaleName } from './names.ts';
 import { leaveTown } from './household.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance, pick } from './prng.ts';
@@ -73,6 +75,15 @@ export const MEMORY_KINDS = [
   'en_paro',
   'deuda_perdonada',
   'cerro_negocio',
+  // v1.9.1: el alcalde no contestó a su petición de aplazamiento.
+  'sin_respuesta',
+  // 2.0: sucesos del director del pueblo.
+  'discusion',
+  'agradecio',
+  'rumor',
+  'mitin',
+  'le_ayudaron',
+  'se_conocieron',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -91,6 +102,42 @@ export interface Memory {
 export const PROFESSIONS = [
   'panadera', 'maestro', 'fontanera', 'enfermero', 'informática', 'camarero', 'agricultora', 'electricista', 'estudiante', 'jubilado',
 ] as const;
+
+/** Oficios en masculino y femenino (v1.9.1: «Rosa, enfermero»). Se guarda una forma; se dice la que toca. */
+const PROFESSION_FORMS: [string, string][] = [
+  ['panadero', 'panadera'], ['maestro', 'maestra'], ['fontanero', 'fontanera'], ['enfermero', 'enfermera'],
+  ['informático', 'informática'], ['camarero', 'camarera'], ['agricultor', 'agricultora'], ['jubilado', 'jubilada'],
+  ['vecino', 'vecina'], ['administrativo', 'administrativa'], ['electricista', 'electricista'], ['estudiante', 'estudiante'],
+];
+
+/** El oficio de un vecino concordando con su nombre. */
+export function professionOf(c: { name: string; profession: string }): string {
+  const forms = PROFESSION_FORMS.find((f) => f.includes(c.profession));
+  return forms ? forms[isFemaleName(c.name) ? 1 : 0] : c.profession;
+}
+
+/**
+ * Une nombres con «y» sin repetir (v1.9.1: «Se lleva bien con Marcos y Marcos»):
+ * si dos se llaman igual, se dice el nombre completo; si ni así, «dos Marcos».
+ */
+export function joinNames(first: string[], full: (string | undefined)[] = []): string {
+  const out: string[] = [];
+  const done = new Set<string>();
+  for (const n of first) {
+    const group = first.flatMap((x, j) => (x === n ? [j] : []));
+    if (group.length < 2) {
+      out.push(n);
+      continue;
+    }
+    if (done.has(n)) continue;
+    done.add(n);
+    const fulls = group.map((j) => full[j]);
+    const words = ['', '', 'dos', 'tres', 'cuatro', 'cinco'];
+    if (fulls.every(Boolean) && new Set(fulls).size === fulls.length) out.push(...(fulls as string[]));
+    else out.push(n.startsWith('alguien') ? `${words[group.length] ?? group.length} vecinos que ya no viven aquí` : `${words[group.length] ?? group.length} ${n}`);
+  }
+  return out.length > 1 ? `${out.slice(0, -1).join(', ')} y ${out.at(-1)}` : (out[0] ?? '');
+}
 
 export const GOALS = ['comprar_casa', 'trabajo_en_el_pueblo', 'parque_cerca', 'tienda_cerca', 'ahorrar', 'vivir_tranquilo'] as const;
 export type Goal = (typeof GOALS)[number];
@@ -165,11 +212,15 @@ export function addMemory(state: GameState, c: Citizen, kind: MemoryKind, import
   }
 }
 
+/** Minúscula solo la primera letra: los nombres propios que vengan detrás se quedan como están. */
+export const lowerFirst = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
+
 const nameOf = (state: GameState, id: number) => state.citizens.find((c) => c.id === id)?.name.split(' ')[0] ?? 'alguien que ya no vive aquí';
 
 /** Nombres de un recuerdo: los actuales o, si ya no vive aquí, los que se guardaron. */
 function memoryWho(state: GameState, m: Memory): string {
-  return m.about.map((id, k) => (state.citizens.some((c) => c.id === id) ? nameOf(state, id) : m.names?.[k] || nameOf(state, id))).join(' y ');
+  const first = m.about.map((id, k) => (state.citizens.some((c) => c.id === id) ? nameOf(state, id) : m.names?.[k] || nameOf(state, id)));
+  return joinNames(first, m.about.map((id) => state.citizens.find((c) => c.id === id)?.name));
 }
 
 /** Texto de un recuerdo con plantillas del motor. */
@@ -252,6 +303,20 @@ export function memoryText(state: GameState, m: Memory): string {
       return 'El alcalde le perdonó lo que debía';
     case 'cerro_negocio':
       return 'Tuvo que cerrar su negocio';
+    case 'sin_respuesta':
+      return 'Pidió tiempo al alcalde y no le contestó';
+    case 'discusion':
+      return `Discutió con ${who}`;
+    case 'agradecio':
+      return 'Dio las gracias al alcalde en público';
+    case 'rumor':
+      return 'Oyó un rumor sobre el ayuntamiento';
+    case 'mitin':
+      return 'Fue a un mitin de la oposición';
+    case 'le_ayudaron':
+      return `Le echó una mano ${who}`;
+    case 'se_conocieron':
+      return `Conoció a ${who}`;
   }
 }
 
@@ -261,19 +326,25 @@ export function memoryMood(state: GameState, c: Citizen): number {
   return Math.max(-10, Math.min(10, recent.reduce((a, m) => a + m.valence, 0)));
 }
 
+/** Dónde trabaja, para una frase: el nombre de un negocio tal cual («el Bar de Lucía», no «bar de lucía»; v1.9.1). */
+export function workplaceText(b: Pick<Building, 'kind' | 'name'>): string {
+  if (b.name) return `${b.name.startsWith('Bar') ? 'el' : 'la'} ${b.name}`;
+  return (BUILD_NAMES[b.kind] ?? '').toLowerCase();
+}
+
 /** Resumen narrativo (capa 3): plantilla del motor, máx. ~60 palabras. */
 export function narrativeSummary(state: GameState, c: Citizen): string {
   const parts: string[] = [];
   const job = state.buildings.find((b) => b.id === c.jobId);
-  parts.push(`${c.name.split(' ')[0]}, ${c.profession}, ${c.age} años.`);
-  parts.push(job ? `Trabaja en ${(job.name ?? BUILD_NAMES[job.kind] ?? '').toLowerCase()}.` : c.unemployedSince !== undefined ? 'Está en paro.' : 'Trabaja fuera del pueblo.');
+  parts.push(`${c.name.split(' ')[0]}, ${professionOf(c)}, ${c.age} años.`);
+  parts.push(job ? `Trabaja en ${workplaceText(job)}.` : c.unemployedSince !== undefined ? 'Está en paro.' : 'Trabaja fuera del pueblo.');
   if (c.owns) parts.push(c.mortgage > 0 ? 'Paga la hipoteca de su casa.' : 'Su casa ya es suya.');
-  const friends = c.relations.filter((r) => r.kind === 'amistad').map((r) => nameOf(state, r.id));
-  if (friends.length) parts.push(`Se lleva bien con ${friends.slice(0, 2).join(' y ')}.`);
+  const friends = c.relations.filter((r) => r.kind === 'amistad').slice(0, 2).map((r) => r.id);
+  if (friends.length) parts.push(`Se lleva bien con ${joinNames(friends.map((id) => nameOf(state, id)), friends.map((id) => state.citizens.find((x) => x.id === id)?.name))}.`);
   const partner = c.relations.find((r) => r.kind === 'pareja');
   if (partner) parts.push(`Sale con ${nameOf(state, partner.id)}.`);
   const top = [...c.memories].sort((a, b) => b.importance - a.importance)[0];
-  if (top) parts.push(`No olvida que ${memoryText(state, top).toLowerCase()}.`);
+  if (top) parts.push(`No olvida que ${lowerFirst(memoryText(state, top))}.`);
   parts.push(goalDone(state, c) ? 'Ha cumplido su meta.' : `Su meta: ${GOAL_TEXT[c.goal]}.`);
   return parts.join(' ');
 }
@@ -318,11 +389,11 @@ export function goalDone(state: GameState, c: Citizen): boolean {
 
 /* ---------------- relaciones ---------------- */
 
-function relation(c: Citizen, id: number): Relation | undefined {
+export function relation(c: Citizen, id: number): Relation | undefined {
   return c.relations.find((r) => r.id === id);
 }
 
-function setRelation(state: GameState, a: Citizen, b: Citizen, kind: RelationKind, strength: number): void {
+export function setRelation(state: GameState, a: Citizen, b: Citizen, kind: RelationKind, strength: number): void {
   for (const [x, y] of [
     [a, b],
     [b, a],
@@ -529,7 +600,8 @@ function directStories(state: GameState): void {
   const named = state.citizens.filter((c) => c.named);
   // Dos vecinos quieren el mismo (y único) local.
   const founders = named.filter((c) => canFound(state, c));
-  if (founders.length >= 2 && freeShopLot(state) !== null && chance(state.rng, 0.3)) {
+  // 2.0: en Modo IA con director, esta historia la abre el director.
+  if (!directorOwns(state) && founders.length >= 2 && freeShopLot(state) !== null && chance(state.rng, 0.3)) {
     const a = pick(state.rng, founders);
     const b = pick(state.rng, founders.filter((x) => x !== a));
     // La rivalidad solo si la historia arranca, y nunca entre pareja ni tras hacer las paces.
@@ -838,6 +910,7 @@ const MEMORY_LINE: Partial<Record<MemoryKind, (who: string) => string>> = {
   en_paro: () => 'Sigo buscando trabajo.',
   deuda_perdonada: () => 'El alcalde me perdonó lo que debía. No lo olvido.',
   cerro_negocio: () => 'Tuve que cerrar mi negocio; las nóminas me comían.',
+  sin_respuesta: () => 'Pedí tiempo al alcalde para pagar y ni me contestó.',
 };
 
 /** Frase de un recuerdo; las pérdidas, distintas para la pareja y para una amistad (ronda 11). */
@@ -885,7 +958,7 @@ function baseAnswer(state: GameState, c: Citizen, q: Question, worst: string | u
   switch (q) {
     case 'como_estas':
       if (c.happiness >= 70) return ['Muy bien, alcalde. Este pueblo me sienta de maravilla.', 'No me puedo quejar, de verdad.', 'Aquí estoy a gusto, de verdad.'][v]!;
-      if (c.happiness >= 45) return worst ? `Tirando. Lo que más me pesa es esto: ${worst.toLowerCase()}.` : 'Tirando, como todos.';
+      if (c.happiness >= 45) return worst ? `Tirando. Lo que más me pesa es esto: ${lowerFirst(worst)}.` : 'Tirando, como todos.';
       return worst ? `Mal, alcalde. ${worst}. Así no se puede.` : 'Mal. Estoy pensando en irme.';
     case 'que_necesitas':
       if (pending) return `Que cumpla lo que prometió: ${NEED_TEXT[pending.need]}.`;

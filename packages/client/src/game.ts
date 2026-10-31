@@ -33,6 +33,8 @@ import {
   NEED_LABEL,
   occupants,
   roadCost,
+  commandOutlay,
+  pendingWorksCost,
   zoneChanges,
   Terrain,
   terrainAt,
@@ -43,6 +45,8 @@ import {
   TOWNHALL_LEVELS,
   townLevel,
   zonesUnlocked,
+  isFemaleName,
+  lowerFirst,
 } from '@bitopolis/sim';
 import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
 import { openNeighbours, openReport, openTaxes as openTaxesSheet } from './economy-ui.ts';
@@ -53,6 +57,7 @@ import { objectivesNode, openAdvisor, openCitizen, openDiary, openPleno, portrai
 import { api, ApiError } from './api.ts';
 import { nextHint } from './hints.ts';
 import { openManagement } from './manage-ui.ts';
+import { openWhatsHappening, turnHeadline } from './ai-town-ui.ts';
 import { pocketMark } from './money-ui.ts';
 import { formatDate, money, MONTHS, plural, shortDate, t } from './i18n.ts';
 import { type Camera, type Preview, render, restartAnimations } from './render.ts';
@@ -199,15 +204,20 @@ export function startGame(opts: GameOptions): void {
     } else if (m.type === 'save') {
       queue.push({ ...m.batch, live: !m.flush && speed > 0 && !document.hidden });
       void flushQueue();
+    } else if (m.type === 'thinking') {
+      // 2.0: el reloj espera al turno del pueblo.
+      thinkingN = m.n;
+      thinkingSince = performance.now();
+      paintThinking();
     }
   };
   send({ type: 'init', state });
 
-  function command(cmd: Command): Promise<boolean> {
+  function command(cmd: Command, quiet = false): Promise<boolean> {
     const id = ++cmdId;
     return new Promise((resolve) => {
       pendingResults.set(id, (ok, error) => {
-        if (!ok && error) {
+        if (!ok && error && !quiet) {
           toast(error, { kind: 'warn' });
           sfx.error();
         }
@@ -224,6 +234,8 @@ export function startGame(opts: GameOptions): void {
     if (cmd.type === 'Build') {
       sfx.build();
       say(`Obra empezada: ${BUILD_NAMES[cmd.kind] ?? cmd.kind}.`);
+      // v1.9.1: en el tutorial, tras la primera casa se vuelve a «Mirar» (si no, cada toque proponía otra casa y se acababa en deuda).
+      if (cmd.kind === 'house' && tutorial.active && tool.id === 'house' && state.buildings.filter((b) => b.kind === 'house').length <= 1) selectTool('inspect');
     } else if (cmd.type === 'BuildRoad') {
       sfx.road();
       say(`Carretera construida: ${plural(tilesOf(cmd).length, 'casilla', 'casillas')}.`);
@@ -378,6 +390,24 @@ export function startGame(opts: GameOptions): void {
     lastAttention = performance.now();
   }
   const hallSpot = () => state.buildings.find((b) => b.kind === 'townhall');
+  // v1.9.1: en el paso del tutorial «Toca el ayuntamiento…», el ayuntamiento destella y la cámara va a él.
+  tutorial.onFocus = () => {
+    const hall = hallSpot();
+    if (!hall) return;
+    highlight = { x: hall.x, y: hall.y, since: performance.now() };
+    if (reducedMotion()) return centerOn(hall.x, hall.y);
+    glide({ x: cam.x, y: cam.y }, () => {
+      centerOn(hall.x, hall.y);
+      return { x: cam.x, y: cam.y };
+    }, () => undefined);
+  };
+  /** Mientras dure ese paso, el destello se repite (sin mover la cámara). */
+  function tutorialGlow() {
+    if (tutorial.focus !== 'townhall' || isSheetOpen()) return;
+    const hall = hallSpot();
+    const now = performance.now();
+    if (hall && (!highlight || now - highlight.since > 5_000)) highlight = { x: hall.x, y: hall.y, since: now };
+  }
   const refSpot = (ref?: number) => (ref !== undefined ? state.buildings.find((b) => b.id === ref) : undefined);
 
   /** Modo tranquilo: un evento importante pausa el juego. */
@@ -421,6 +451,13 @@ export function startGame(opts: GameOptions): void {
       setTimeout(() => tabBuild.classList.remove('pulse'), 8000);
     }
     lastLevel = lv;
+    // 2.0: una tarjeta por turno del pueblo (en vez de muchos avisos sueltos).
+    const lastTurn = state.ai?.log.at(-1);
+    if (lastTurn && lastTurn.n > turnLogSeen) {
+      turnLogSeen = lastTurn.n;
+      const head = turnHeadline(state);
+      if (head && speed < 10) toast(head, { kind: 'info', onClick: openHappening });
+    }
     if (state.stats.length !== lastStats) {
       lastStats = state.stats.length;
       const m = state.stats.at(-1);
@@ -752,12 +789,82 @@ export function startGame(opts: GameOptions): void {
     }
   }
   const decisionTimer = setInterval(() => void pollDecisions(), 1500);
-  function setAiChip(mode: 'on' | 'paused') {
+
+  /* ---------- 2.0: turnos del pueblo con IA ---------- */
+  let thinkingN: number | null = null;
+  let thinkingSince = 0;
+  let turnBusy = false;
+  let turnLogSeen = state.ai?.log.at(-1)?.n ?? 0;
+  /** Lo que el reloj espera a la IA como mucho (luego deciden las reglas: «por costumbre»). */
+  const TURN_WAIT_MS = 45_000;
+  function paintThinking() {
+    const on = thinkingN !== null;
+    document.body.classList.toggle('ai-thinking', on);
+    setAiChip(on ? 'thinking' : 'on');
+    const strip = document.getElementById('thinking');
+    if (strip) strip.hidden = !on;
+    // Ronda 16: el botón de velocidad dice que el reloj espera a la IA (no que se haya colgado).
+    const sp = $('#speed');
+    sp.dataset.waiting = String(on);
+    if (on) {
+      sp.textContent = '✦';
+      sp.setAttribute('aria-label', `El reloj espera a que el pueblo decida la semana (como mucho 45 s). Velocidad x${lastSpeed}`);
+    } else paintSpeed();
+  }
+  function releaseTurn(n: number, why: string) {
+    send({ type: 'release', n });
+    if (why) toast(why, { kind: 'info' });
+  }
+  async function pollTurn() {
+    const t = state.ai?.turn;
+    if (!state.aiMode || !t || lost || turnBusy || document.hidden) return;
+    turnBusy = true;
+    try {
+      const r = await api.turn(token, t.n);
+      $('#ai-banner').hidden = !r.capped;
+      if (r.notice && !notices.has(r.notice)) {
+        notices.add(r.notice);
+        toast(r.notice, { kind: 'warn' });
+      }
+      const res = r.turn;
+      if (res && res.status === 'ready' && state.ai?.turn?.n === t.n) {
+        await command(
+          {
+            type: 'TownTurn',
+            n: t.n,
+            acts: res.acts,
+            ...(res.director ? { director: res.director } : {}),
+            ...(res.focus ? { focus: res.focus } : {}),
+            ...(res.chronicle ? { chronicle: res.chronicle } : {}),
+          },
+          true,
+        );
+      } else if (res && res.status === 'failed') {
+        releaseTurn(t.n, '');
+      }
+    } catch {
+      /* sin conexión: si tarda demasiado, deciden las reglas */
+    } finally {
+      turnBusy = false;
+    }
+    if (thinkingN !== null && state.ai?.turn?.n === thinkingN && performance.now() - thinkingSince > TURN_WAIT_MS) {
+      releaseTurn(thinkingN, 'La IA tarda: esta semana el pueblo decide por costumbre.');
+    }
+  }
+  const turnTimer = setInterval(() => void pollTurn(), 1500);
+  /** Ritmo de los turnos según la velocidad: a x3 y x10, turnos más espaciados (menos esperas y menos gasto). */
+  function syncTurnPace(s: number) {
+    if (!state.aiMode || !state.ai || s <= 0) return;
+    const days = s >= 10 ? 28 : s >= 3 ? 14 : 7;
+    if (days !== state.ai.paceDays) void command({ type: 'SetTurnPace', days }, true);
+  }
+  function setAiChip(mode: 'on' | 'paused' | 'thinking') {
     const chip = $('#ai-chip');
     chip.hidden = !state.aiMode;
-    chip.textContent = mode === 'on' ? 'IA ●' : 'IA en pausa';
+    chip.textContent = mode === 'on' ? 'IA ✦' : mode === 'thinking' ? 'IA …' : 'IA en pausa';
     chip.classList.toggle('paused', mode === 'paused');
-    chip.setAttribute('aria-label', mode === 'on' ? 'IA activa: ver gasto' : 'IA en pausa por el tope de gasto: deciden las reglas. Ver gasto');
+    chip.classList.toggle('is-thinking', mode === 'thinking');
+    chip.setAttribute('aria-label', mode === 'on' ? 'IA activa: ver gasto' : mode === 'thinking' ? 'El pueblo está pensando (la IA decide la semana). Ver gasto' : 'IA en pausa por el tope de gasto: deciden las reglas. Ver gasto');
   }
   setAiChip('on');
   $('#ai-chip').onclick = () => void openUsage(token);
@@ -1112,7 +1219,11 @@ export function startGame(opts: GameOptions): void {
     const cost = tool.build && tool.shape === 'tap' ? `${shortCost(tool)}${hill ? ' (colina: materiales +50 %)' : ''}` : lineText(a, b);
     // Ronda 13: el precio va en su propia línea y siempre se ve (también si no se puede: «no hay dinero»).
     const what = demolishText && v.ok ? demolishText : v.ok ? `${tool.label} aquí` : `${tool.label}: no se puede (${v.error})`;
-    $('#confirm-text').replaceChildren(h('span', { class: 'cc-what' }, what), demolishText || !cost ? '' : h('span', { class: 'cc-cost' }, v.ok ? cost : `Cuesta ${cost}`));
+    // v1.9.1: si con lo que falta por pagar de las obras en marcha la caja quedaría en negativo, se avisa (no se bloquea).
+    const after = v.ok && !demolishText ? state.treasury - commandOutlay(state, cmd) - pendingWorksCost(state) : 0;
+    const warn = after < 0 ? h('span', { class: 'cc-warn' }, `⚠ Quedarías en −${money(-after)} con las obras en marcha`) : '';
+    $('#confirm-text').replaceChildren(h('span', { class: 'cc-what' }, what), demolishText || !cost ? '' : h('span', { class: 'cc-cost' }, v.ok ? cost : `Cuesta ${cost}`), warn);
+    $('#confirm-bar').classList.toggle('warn', after < 0);
     const yes = $('#confirm-yes') as HTMLButtonElement;
     yes.textContent = demolishText ? 'Derribar' : tool.zone ? (tool.zone === 'none' ? 'Quitar zona' : 'Marcar zona') : 'Construir';
     yes.className = demolishText ? 'btn danger' : 'btn primary';
@@ -1222,7 +1333,7 @@ export function startGame(opts: GameOptions): void {
     else if (k === '-') setZoom(cam.zoom - 1);
     else if (k === 'l') setLayer(LAYERS[(LAYERS.findIndex((l) => l.id === layer) + 1) % LAYERS.length]!.id);
     // Atajo de Ajustes: solo la tecla sola (Ctrl+O abre archivos en el navegador), con o sin mayúsculas.
-    else if (k.toLowerCase() === 'o') openSettings();
+    else if (k.toLowerCase() === 'o') openSettingsGame();
     else if (k === ' ' && target.tagName !== 'BUTTON') {
       e.preventDefault();
       userSpeed(speed === 0 ? lastSpeed : 0);
@@ -1616,7 +1727,8 @@ export function startGame(opts: GameOptions): void {
   function servicesTable(b: Building): HTMLElement {
     const needs = new Map(missingServices(state, b.x, b.y).map((n) => [n.key, n.status] as const));
     const row = (icon: string, label: string, ok: boolean | 'warn', text: string) =>
-      h('div', { class: `svc ${ok === true ? 'ok' : ok === 'warn' ? 'warn' : 'bad'}` }, pixelIcon(icon), h('span', { class: 'svc-label' }, label), h('span', { class: 'svc-state' }, text));
+      // Ronda 14 (aplazado): lista de definición para los lectores de pantalla («Agua: Sí»), mismo aspecto.
+      h('div', { class: `svc ${ok === true ? 'ok' : ok === 'warn' ? 'warn' : 'bad'}` }, pixelIcon(icon), h('dt', { class: 'svc-label' }, label), h('dd', { class: 'svc-state' }, text));
     const svc = (key: NeedKey, icon: string, label: string) => {
       const st = needs.get(key);
       return row(icon, label, st === undefined ? true : st === 'lleno' ? 'warn' : false, st === undefined ? 'Cubierto' : st === 'lleno' ? 'Lleno' : 'No llega');
@@ -1633,7 +1745,7 @@ export function startGame(opts: GameOptions): void {
       ...(pop >= 10 ? [svc('ocio', 'leaf', 'Parque o plaza')] : []),
       row('bar', 'Tienda', state.buildings.some((s) => s.kind === 'shop' && s.built && !s.damaged && Math.abs(s.x - b.x) + Math.abs(s.y - b.y) <= 6), state.buildings.some((s) => s.kind === 'shop' && s.built && !s.damaged && Math.abs(s.x - b.x) + Math.abs(s.y - b.y) <= 6) ? 'Cerca' : 'Lejos'),
     ];
-    return h('div', { class: 'svc-table' }, ...rows, h('p', { class: 'muted small' }, `Valor: ${money(unitValue(state, b))} por vivienda`));
+    return h('div', {}, h('dl', { class: 'svc-table', 'aria-label': 'Servicios de la vivienda' }, ...rows), h('p', { class: 'muted small' }, `Valor: ${money(unitValue(state, b))} por vivienda`));
   }
 
   /** Vecinos de un edificio: una fila por persona con retrato y lo esencial (v1.6). */
@@ -1653,7 +1765,7 @@ export function startGame(opts: GameOptions): void {
           'span',
           {},
           h('span', { class: 'p-name' }, c.name),
-          h('span', { class: 'p-sub' }, `${c.age} años · ${c.owns ? 'propietario' : 'quiere ' + DESIRE_TEXT[c.desire]}${worry ? ` · le preocupa ${worry.label.toLowerCase()}` : ''}`),
+          h('span', { class: 'p-sub' }, `${c.age} años · ${c.owns ? (isFemaleName(c.name) ? 'propietaria' : 'propietario') : 'quiere ' + DESIRE_TEXT[c.desire]}${worry ? ` · le preocupa ${lowerFirst(worry.label)}` : ''}`),
           // v1.9: quien no llega o debe dinero, marcado.
           pocketMark(c) ? h('span', { class: 'p-sub pocket-warn' }, pocketMark(c) === '€!' ? `€ Debe ${money(totalDebt(c))}` : '€ No llega a fin de mes') : '',
           last ? h('em', { class: 'p-sub quote' }, `«${last.motivo}»`) : '',
@@ -1674,12 +1786,23 @@ export function startGame(opts: GameOptions): void {
   /* ---------- menú, impuestos y cuentas ---------- */
   const social: SocialCtx = { token, state: () => state, command };
   const openTaxes = () => openTaxesSheet(() => state, command);
+  // 2.0: el % de vecinos con IA se cambia en Ajustes (con key del servidor, lo fija /admin).
+  let aiShareLocked = true;
+  if (state.aiMode) void api.aiMeta().then((m) => (aiShareLocked = m.serverKey)).catch(() => undefined);
+  const openSettingsGame = () =>
+    openSettings(state.aiMode && state.ai ? { share: state.ai.share, locked: aiShareLocked, set: (share) => command({ type: 'SetAiShare', share }) } : undefined);
+  const openHappening = () => openWhatsHappening(social, (id) => withBack('Qué está pasando', openHappening, () => openCitizen(social, id)));
   const openAccounts = () => openReport(state);
 
   /**
    * v1.6: el panel «Pueblo» sustituye al menú plano. Cada sección resume cómo va
    * y lleva a sus hojas, que tienen «‹» para volver aquí.
    */
+  /** «Gestión del pueblo», como al tocar el ayuntamiento en el mapa. */
+  function openHall() {
+    const hall = state.buildings.find((b) => b.kind === 'townhall' && b.built);
+    if (hall) focusBuilding(hall.id);
+  }
   function openHub() {
     closeTray();
     const go = (fn: () => void) => () => withBack('Pueblo', openHub, fn);
@@ -1714,6 +1837,8 @@ export function startGame(opts: GameOptions): void {
         'build',
         'Ayuntamiento',
         [townSum.join(' · ')],
+        // v1.9.1: el ayuntamiento cuesta de encontrar en el mapa; desde aquí se llega a «Gestión del pueblo».
+        item(`Nivel ${townLevel(state)} · ${townLevel(state) >= TOWNHALL_LEVELS.length ? 'Gestión' : 'Ampliar'}`, go(openHall), canUpgradeTownhall(state).ok),
         item('Presupuesto y fiestas', go(() => openTownHall(social)), budgetOpen || offers > 0 || protest),
         item('Pleno municipal', go(() => openPleno(social))),
         item('Política y elecciones', go(() => openPolitics(social))),
@@ -1724,6 +1849,7 @@ export function startGame(opts: GameOptions): void {
         'Gente',
         [h('strong', {}, plural(state.citizens.length, 'vecino', 'vecinos')), ` · felicidad ${happy}`],
         item('Vecinos', go(openPeople)),
+        ...(state.aiMode ? [item('✦ Qué está pasando', go(openHappening), !!state.ai?.log.length)] : []),
         item('Felicidad', go(openHappiness)),
         item('Diario del pueblo', go(() => openDiary(social))),
         item('Álbum del pueblo', go(() => openAlbum(social))),
@@ -1735,7 +1861,7 @@ export function startGame(opts: GameOptions): void {
       h(
         'div',
         { class: 'menu-foot' },
-        item('Ajustes', go(openSettings)),
+        item('Ajustes', go(openSettingsGame)),
         item('Repetir tutorial', () => {
           closeSheet();
           tutorial.start(state, true);
@@ -1810,8 +1936,11 @@ export function startGame(opts: GameOptions): void {
     const def = LAYERS.find((l) => l.id === layer)!;
     const legend = $('#legend');
     legend.hidden = layer === 'none';
-    if (layer === 'missing') missingLegend();
-    else legend.replaceChildren(h('strong', {}, def.label), ...def.legend.map((x) => h('span', { class: `legend-item ${x.cls}` }, x.text)));
+    if (layer === 'missing') {
+      // v1.9.1: con poca altura (móvil en horizontal) empieza plegada: si no, tapa medio mapa.
+      if (matchMedia('(max-height: 500px)').matches) legendFolded = true;
+      missingLegend();
+    } else legend.replaceChildren(h('strong', {}, def.label), ...def.legend.map((x) => h('span', { class: `legend-item ${x.cls}` }, x.text)));
     const chip = $('#layers');
     chip.querySelector('.chip-text')!.textContent = layer === 'none' ? 'Capas' : def.label;
     chip.setAttribute('aria-label', `Capas de datos: ${def.label}. Cambiar`);
@@ -1920,6 +2049,7 @@ export function startGame(opts: GameOptions): void {
       );
     }
     speed = s;
+    syncTurnPace(s);
     if (s > 0) lastSpeed = s;
     send({ type: 'speed', speed: s });
     $('#sr-live').textContent = s === 0 ? 'Juego en pausa' : `Velocidad x${s}`;
@@ -1936,8 +2066,10 @@ export function startGame(opts: GameOptions): void {
     play.setAttribute('aria-label', speed === 0 ? `Poner en marcha a x${lastSpeed}` : 'Pausar');
     play.dataset.paused = String(speed === 0);
     const sp = $('#speed');
-    sp.textContent = `x${lastSpeed}`;
     sp.dataset.speed = String(lastSpeed);
+    // Mientras el reloj espera a la IA, el botón lo dice (paintThinking).
+    if (sp.dataset.waiting === 'true') return;
+    sp.textContent = `x${lastSpeed}`;
     sp.setAttribute('aria-label', `Velocidad x${lastSpeed}. Toca para cambiarla`);
   }
 
@@ -1985,6 +2117,7 @@ export function startGame(opts: GameOptions): void {
         worker.terminate();
         clearInterval(heartbeat);
         clearInterval(decisionTimer);
+        clearInterval(turnTimer);
         document.removeEventListener('visibilitychange', onVisibility);
         window.removeEventListener('pagehide', onPageHide);
         window.removeEventListener('popstate', onBack);
@@ -2029,6 +2162,10 @@ export function startGame(opts: GameOptions): void {
       return state;
     },
     sprite: (kind: string, id: number) => buildingSprite(kind, id),
+    /** Casilla que destella ahora (o null). */
+    get highlight() {
+      return highlight ? { x: highlight.x, y: highlight.y } : null;
+    },
     /** Para las pruebas: centra la cámara en una casilla (no toca el estado). */
     centerOn(tx: number, ty: number) {
       centerOn(tx, ty);
@@ -2042,6 +2179,7 @@ export function startGame(opts: GameOptions): void {
   /* ---------- bucle de pintado ---------- */
   function frame(time: number) {
     if ($('#game').hidden) return;
+    tutorialGlow();
     // La sacudida se aplica a una copia de la cámara: no cambia dónde mira el jugador.
     const [sx, sy] = shakeOffset(time);
     const view = sx || sy ? { ...cam, x: cam.x + sx * dpr(), y: cam.y + sy * dpr() } : cam;

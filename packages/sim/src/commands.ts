@@ -1,5 +1,6 @@
 import { canMeetAssociation, meetAssociation } from './associations.ts';
 import { canUpgradeBuilding, startUpgrade } from './levels.ts';
+import { applyTownTurn, canApplyTurn, mayorText, noteMayor, setAiShare } from './turns.ts';
 import { canMicrocredit, canSettleDebt, grantMicrocredit, settleDebt } from './household.ts';
 import { serviceCounts } from './economy.ts';
 import { BUILD_LEVEL, canUpgradeTownhall, plenoUnlocked, townLevel, upgradeTownhall, zonesUnlocked } from './townhall.ts';
@@ -114,6 +115,33 @@ export function buildCostAt(state: GameState, kind: BuildKind, x: number, y: num
   return buildCost(kind) + extra;
 }
 
+/**
+ * Lo que falta por pagar, como mucho, de las obras del ayuntamiento en marcha
+ * (v1.9.1): los días que quedan con toda la cuadrilla al precio de fuera.
+ * Con obreros del pueblo sale más barato; con nieve, algo más caro.
+ */
+export function pendingWorksCost(state: GameState): number {
+  let sum = 0;
+  for (const p of state.projects) {
+    if (p.payer !== TREASURY || p.workersNeeded <= 0) continue;
+    const days = Math.max(0, Math.ceil((p.workerDaysNeeded - p.workerDaysDone) / p.workersNeeded - 1e-9));
+    sum += days * p.workersNeeded * WAGE_OUTSIDE;
+  }
+  return sum;
+}
+
+/** Lo que costará al ayuntamiento, como mucho, una obra nueva (edificio, carretera o zona). */
+export function commandOutlay(state: GameState, cmd: Command): number {
+  if (cmd.type === 'Build') {
+    if (cmd.kind === 'road') return roadCost(state, cmd.x, cmd.y, cmd.x, cmd.y);
+    const s = BUILD[cmd.kind];
+    return materialsCost(state, cmd.kind, cmd.x, cmd.y) + s.workers * s.days * WAGE_OUTSIDE;
+  }
+  if (cmd.type === 'BuildRoad') return roadCost(state, cmd.x, cmd.y, cmd.x2, cmd.y2);
+  if (cmd.type === 'Zone') return cmd.zone === 'none' ? 0 : zoneChanges(state, cmd).changed * ZONE_COST_PER_TILE;
+  return 0;
+}
+
 /** Valida sin aplicar. El motor es quien decide si un comando es legal. */
 /** Mientras gobierna el alcalde rival, sus órdenes pasan por aquí (no las del jugador). */
 let governing = false;
@@ -207,6 +235,14 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
     }
     case 'UpgradeTownhall':
       return canUpgradeTownhall(state);
+    case 'TownTurn':
+      return canApplyTurn(state, cmd.n);
+    case 'SetAiShare':
+      if (!state.aiMode || !state.ai) return { ok: false, error: 'Solo en Modo IA' };
+      return cmd.share === state.ai.share ? { ok: false, error: 'Ya está en ese %' } : { ok: true };
+    case 'SetTurnPace':
+      if (!state.aiMode || !state.ai) return { ok: false, error: 'Solo en Modo IA' };
+      return cmd.days === state.ai.paceDays ? { ok: false, error: 'Ya está a ese ritmo' } : { ok: true };
     case 'UpgradeBuilding': {
       const b = state.buildings.find((x) => x.id === cmd.buildingId);
       return canUpgradeBuilding(state, b, b ? serviceCounts(state).get(b.id) : undefined);
@@ -271,7 +307,18 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
   const v = validateCommand(state, raw);
   if (!v.ok) return v;
   const cmd = Command.parse(raw);
+  // 2.0: lo que hace el alcalde se cuenta a la IA del pueblo (texto del motor).
+  const mayor = mayorText(state, cmd);
   switch (cmd.type) {
+    case 'TownTurn':
+      applyTownTurn(state, cmd.n, cmd.acts, { focus: cmd.focus, chronicle: cmd.chronicle, director: cmd.director });
+      break;
+    case 'SetAiShare':
+      setAiShare(state, cmd.share);
+      break;
+    case 'SetTurnPace':
+      state.ai!.paceDays = cmd.days;
+      break;
     case 'SetTax':
       if (state.taxLevel !== cmd.level) {
         state.taxLevel = cmd.level;
@@ -435,5 +482,6 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       talkTo(state, state.citizens.find((c) => c.id === cmd.citizenId)!);
       break;
   }
+  if (mayor) noteMayor(state, mayor.text, mayor.big);
   return { ok: true };
 }

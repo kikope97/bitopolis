@@ -167,14 +167,14 @@ describe('ajustes', () => {
     const g = await app.inject({ method: 'POST', url: `/api/games/${t}`, payload: { mode: 'ai', sessionId: SID } });
     expect(g.json().state.aiMode).toBe(true);
     const cfg = (await app.inject({ method: 'GET', url: `/api/games/${t}/ai-config` })).json();
-    expect(cfg).toMatchObject({ provider: 'anthropic', model: 'claude-haiku-5-5', capDay: 0.5, serverMonthly: 10 });
+    expect(cfg).toMatchObject({ provider: 'anthropic', model: 'claude-sonnet-5-5', capDay: 0.5, serverMonthly: 10 });
     expect(cfg.locked).toEqual(expect.arrayContaining(['key', 'provider', 'capDay']));
     expect(JSON.stringify(cfg)).not.toContain('SECRETA');
   });
 
   it('probar la IA del servidor', async () => {
     const ok = (await app.inject({ method: 'POST', url: '/api/admin/ai/test', ...as() })).json();
-    expect(ok).toMatchObject({ ok: true, provider: 'anthropic', model: 'claude-haiku-5-5' });
+    expect(ok).toMatchObject({ ok: true, provider: 'anthropic', model: 'claude-sonnet-5-5' });
     await put({ ai: { key: 'sk-ant-falla-12345678' } });
     const ko = (await app.inject({ method: 'POST', url: '/api/admin/ai/test', ...as() })).json();
     expect(ko.ok).toBe(false);
@@ -186,7 +186,11 @@ describe('ajustes', () => {
     expect([s.model, s.modelPremium]).toEqual(['claude-sonnet-5-5', 'claude-opus-5-5']);
     expect((await app.inject({ method: 'GET', url: '/api/ai/meta' })).json().prices['mi-modelo']).toEqual({ in: 1, out: 2 });
     await put({ ai: { model: '', modelPremium: '', prices: null } });
+    // 2.0: en «Calidad» (por defecto) los vecinos van con el modelo bueno; en «Ahorro», con el barato.
+    expect((await ai.settings(null)).model).toBe('claude-sonnet-5-5');
+    await put({ ai: { turnQuality: 'ahorro' } });
     expect((await ai.settings(null)).model).toBe('claude-haiku-5-5');
+    await put({ ai: { turnQuality: 'calidad' } });
   });
 
   it('borrar la key; sin keys de jugadores, las partidas no pueden poner la suya', async () => {
@@ -298,18 +302,25 @@ describe('ronda 08: seguridad', () => {
   });
 });
 
-describe('estimación de coste (v1.3)', () => {
-  it('el panel da el coste de un mes de juego con reintentos y crónica; más vecinos, más caro', async () => {
+describe('estimación de coste (2.0, por turnos)', () => {
+  it('el panel da el coste de un mes de juego; más % de vecinos con IA, más caro; ahorro, más barato', async () => {
     const c = (await login('admin', 'otra-clave-larga')).cookie;
-    await put({ ai: { key: 'sk-ant-api03-estimacion-1234', maxCitizens: 5 } }, c);
-    const five = (await app.inject({ method: 'GET', url: '/api/admin/settings', ...as(c) })).json().estimate;
-    expect(five).toMatchObject({ citizens: 5, provider: 'anthropic', known: true });
-    expect(five.eurPerGameMonth).toBeGreaterThan(0);
-    const twenty = (await put({ ai: { maxCitizens: 20 } }, c)).json().estimate;
-    expect(twenty.eurPerGameMonth).toBeGreaterThan(five.eurPerGameMonth);
+    await put({ ai: { key: 'sk-ant-api03-estimacion-1234', aiShare: 10 } }, c);
+    const few = (await app.inject({ method: 'GET', url: '/api/admin/settings', ...as(c) })).json().estimate;
+    expect(few).toMatchObject({ citizens: 6, provider: 'anthropic', known: true });
+    expect(few.eurPerGameMonth).toBeGreaterThan(0);
+    const many = (await put({ ai: { aiShare: 80 } }, c)).json().estimate;
+    expect(many.citizens).toBe(48);
+    expect(many.eurPerGameMonth).toBeGreaterThan(few.eurPerGameMonth);
     // Un mes de juego son 30 días = 10 minutos a x1: la hora vale 6 meses.
-    expect(twenty.eurPerHourX1).toBeCloseTo(twenty.eurPerGameMonth * 6, 6);
-    const est = (await app.inject({ method: 'GET', url: '/api/ai/estimate?provider=anthropic&citizens=20' })).json();
-    expect(est.eurPerGameMonth).toBeCloseTo(twenty.eurPerGameMonth, 6);
+    expect(many.eurPerHourX1).toBeCloseTo(many.eurPerGameMonth * 6, 6);
+    const est = (await app.inject({ method: 'GET', url: '/api/ai/estimate?provider=anthropic&share=80' })).json();
+    expect(est.citizens).toBe(48);
+    expect(est.eurPerGameMonth).toBeCloseTo(many.eurPerGameMonth, 6);
+    // A x10 los turnos son más espaciados (28 días), pero pasan más días por hora.
+    expect(est.eurPerHour.x10).toBeGreaterThan(est.eurPerHour.x1);
+    const cheap = (await put({ ai: { turnQuality: 'ahorro' } }, c)).json().estimate;
+    expect(cheap.eurPerGameMonth).toBeLessThan(many.eurPerGameMonth / 3);
+    await put({ ai: { turnQuality: 'calidad' } }, c);
   });
 });

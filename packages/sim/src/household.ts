@@ -1,6 +1,7 @@
-import { TICKS_PER_MONTH } from '@bitopolis/shared';
+import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import {
   DEBT,
+  GRUDGE_MAX,
   JOBS_OUTSIDE,
   LIVING_BASIC,
   LIVING_CUSHION,
@@ -105,8 +106,29 @@ export function settleDebt(state: GameState, c: Citizen, mode: 'aplazar' | 'perd
     return;
   }
   d.plan = { perMonth: Math.ceil(d.town / DEBT.planMonths), until: state.tick + DEBT.planMonths * TICKS_PER_MONTH, kind: 'aplazamiento' };
+  delete d.askedAt;
   d.fresh = 0;
   d.aged = 0;
+}
+
+/**
+ * v1.9.1: quien pidió un aplazamiento y en DEBT.answerDays no lo tiene (ni se le
+ * perdonó ni ha saldado lo que debe al ayuntamiento) se lo guarda: un recuerdo
+ * «sin_respuesta» y algo de rencor. Una vez al día, sin azar.
+ */
+export function unansweredDeferrals(state: GameState): void {
+  for (const c of state.citizens) {
+    const d = c.debt;
+    if (d?.askedAt === undefined) continue;
+    if (d.plan || d.town <= 0) {
+      delete d.askedAt;
+      continue;
+    }
+    if (state.tick - d.askedAt < DEBT.answerDays * TICKS_PER_DAY) continue;
+    delete d.askedAt;
+    addMemory(state, c, 'sin_respuesta', 3, DEBT.unansweredMood);
+    c.grudge = Math.min(GRUDGE_MAX, c.grudge + DEBT.unansweredGrudge);
+  }
 }
 
 export function canSettleDebt(state: GameState, c: Citizen | undefined, mode: 'aplazar' | 'perdonar'): { ok: true } | { ok: false; error: string } {
@@ -146,9 +168,13 @@ export function grantMicrocredit(state: GameState, c: Citizen): void {
 function spend(state: GameState, c: Citizen, amount: number, shops: Building[]): number {
   const total = Math.min(c.money, Math.floor(amount));
   if (total <= 0) return 0;
-  const local = shops.length > 0 ? Math.floor(total * LOCAL_SPEND_SHARE) : 0;
+  // 2.0: dónde compra lo decide la IA (en el pueblo, fuera, y en qué tienda); comer, se come siempre.
+  const pref = c.spending?.where;
+  const share = pref === 'fuera' ? LOCAL_SPEND_SHARE / 2 : pref === 'pueblo' ? Math.min(0.85, LOCAL_SPEND_SHARE + 0.2) : LOCAL_SPEND_SHARE;
+  const local = shops.length > 0 ? Math.floor(total * share) : 0;
   if (local > 0) {
-    const shop = shops[c.id % shops.length]!;
+    const chosen = c.spending?.shop !== undefined ? shops.find((b) => b.id === c.spending!.shop) : undefined;
+    const shop = chosen ?? shops[c.id % shops.length]!;
     const got = transfer(state, c.id, shop.id, local);
     shop.sales = (shop.sales ?? 0) + got;
   }
@@ -177,7 +203,9 @@ export function settleMonth(state: GameState, shops: Building[]): void {
       }
       if (c.debt) repaid += payDebt(state, c, Math.max(DEBT.repayMin, Math.round(income * DEBT.repayShare)) - repaid);
     }
-    if (!c.debt && c.money - LIVING_EXTRA >= LIVING_CUSHION) spend(state, c, LIVING_EXTRA, shops);
+    // Ocio: con colchón y sin deudas; con IA, solo si quiere darse ese gusto (o no ahorra).
+    const wantsLeisure = c.spending ? c.spending.leisure && c.spending.where !== 'ahorrar' : true;
+    if (!c.debt && wantsLeisure && c.money - LIVING_EXTRA >= LIVING_CUSHION) spend(state, c, LIVING_EXTRA, shops);
     // Intereses del banco y recargo único del ayuntamiento sobre lo que lleva un mes sin pagar.
     const dd = c.debt;
     if (dd) {

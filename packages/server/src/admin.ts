@@ -8,8 +8,8 @@ import { migrate } from '@bitopolis/sim';
 import { DEFAULT_PRICES, PROVIDER_INFO, providerFromKey } from './ai/catalog.ts';
 import { encryptSecret, maskKey } from './ai/crypto.ts';
 import { makeProvider } from './ai/providers.ts';
-import { estimatePerGameDay } from './ai/routes.ts';
-import type { AiService } from './ai/service.ts';
+import { aiCitizensFor, estimatePerGameDay } from './ai/routes.ts';
+import { type AiService, ModelsError } from './ai/service.ts';
 import { lockout, safeEqual, setCookie, signedCookie } from './auth.ts';
 import type { Config } from './config.ts';
 import { backupNow, BACKUP_RE } from './db/backup.ts';
@@ -44,6 +44,8 @@ const Patch = z.object({
       model: z.string().trim().max(128).optional(),
       modelPremium: z.string().trim().max(128).optional(),
       maxCitizens: z.number().int().min(1).max(20).optional(),
+      aiShare: z.number().int().min(0).max(100).optional(),
+      turnQuality: z.enum(['calidad', 'ahorro']).optional(),
       serverMonthly: Money.optional(),
       gameMonthly: Money.optional(),
       gameDaily: Money.optional(),
@@ -54,6 +56,11 @@ const Patch = z.object({
   backups: z.object({ keep: z.number().int().min(1).max(60) }).optional(),
 });
 export type AdminPatch = z.infer<typeof Patch>;
+/** Probar una key (o un endpoint) aún sin guardar; lo que falte, lo guardado. */
+const ModelsBody = z.object({
+  key: z.string().trim().min(8, 'La API key es demasiado corta').max(400).optional(),
+  baseUrl: z.string().trim().url('El endpoint no es una URL válida').max(512).or(z.literal('')).optional(),
+});
 
 /** Lo que ve el panel: nada de hashes ni la key. */
 export function adminView(s: ServerSettings, version: string) {
@@ -73,6 +80,8 @@ export function adminView(s: ServerSettings, version: string) {
       model: s.ai.model ?? '',
       modelPremium: s.ai.modelPremium ?? '',
       maxCitizens: s.ai.maxCitizens,
+      aiShare: s.ai.aiShare ?? 50,
+      turnQuality: s.ai.turnQuality ?? 'calidad',
       serverMonthly: s.ai.serverMonthly ?? null,
       gameMonthly: s.ai.gameMonthly ?? null,
       gameDaily: s.ai.gameDaily ?? null,
@@ -98,7 +107,7 @@ export async function registerAdminRoutes(
   /** Coste orientativo con lo guardado: un mes de juego (30 días) y una hora real a x1. */
   const estimate = async () => {
     const s = await ai.settings(null);
-    const n = store.get().ai.maxCitizens;
+    const n = aiCitizensFor(store.get().ai.aiShare ?? 50);
     const day = estimatePerGameDay(ai, s.provider, s.model, s.modelPremium, n);
     return { citizens: n, provider: s.provider, eurPerGameMonth: day * 30, eurPerHourX1: day * 180, known: s.model in ai.prices || s.provider === 'openai-compatible' };
   };
@@ -190,6 +199,8 @@ export async function registerAdminRoutes(
         if (a.model !== undefined) s.ai.model = opt(a.model);
         if (a.modelPremium !== undefined) s.ai.modelPremium = opt(a.modelPremium);
         if (a.maxCitizens !== undefined) s.ai.maxCitizens = a.maxCitizens;
+        if (a.aiShare !== undefined) s.ai.aiShare = a.aiShare;
+        if (a.turnQuality !== undefined) s.ai.turnQuality = a.turnQuality;
         if (a.serverMonthly !== undefined) s.ai.serverMonthly = opt(a.serverMonthly);
         if (a.gameMonthly !== undefined) s.ai.gameMonthly = opt(a.gameMonthly);
         if (a.gameDaily !== undefined) s.ai.gameDaily = opt(a.gameDaily);
@@ -224,6 +235,29 @@ export async function registerAdminRoutes(
       // El mensaje del proveedor no incluye la key; se recorta por si acaso.
       return { ok: false, provider: s.provider, model: s.model, ms: Date.now() - t0, error: String((e as Error).message).slice(0, 300) };
     }
+  });
+
+  /** Modelos que ofrece la key del servidor (GET) o una por guardar (POST). La key nunca vuelve. */
+  const listFor = async (reply: FastifyReply, key: string | undefined, baseUrl: string | undefined) => {
+    if (!key && !baseUrl) return bad(reply, 'No hay API key ni endpoint propio: pon la key primero');
+    try {
+      return await ai.models(providerFromKey(key, baseUrl), key, baseUrl);
+    } catch (e) {
+      if (e instanceof ModelsError) return bad(reply, e.message, 502);
+      throw e;
+    }
+  };
+  app.get('/api/admin/ai/models', async (_req, reply) => {
+    const s = await ai.settings(null);
+    return listFor(reply, s.key, s.baseUrl);
+  });
+  app.post('/api/admin/ai/models', async (req, reply) => {
+    const b = ModelsBody.safeParse(req.body ?? {});
+    if (!b.success) return bad(reply, zodError(b.error));
+    const s = await ai.settings(null);
+    const baseUrl = b.data.baseUrl === undefined ? s.baseUrl : opt(b.data.baseUrl);
+    // La key guardada solo va a su endpoint: con otro, hay que escribirla otra vez.
+    return listFor(reply, b.data.key ?? (baseUrl === s.baseUrl ? s.key : undefined), baseUrl);
   });
 
   app.get('/api/admin/stats', async () => {

@@ -4,6 +4,7 @@ import { coverageCtx, missingServices, type NeedKey } from './coverage.ts';
 import { felt } from './economy.ts';
 import { addMemory } from './social.ts';
 import { barrioOf } from './barrio.ts';
+import { directorOwns } from './director-core.ts';
 import { stationsFor, tryArrest, cellsUsed } from './crime.ts';
 import { chance } from './prng.ts';
 import { type Building, type Citizen, type GameState, pushEvent } from './state.ts';
@@ -140,6 +141,8 @@ export function associationsMonth(state: GameState): void {
       for (const c of still) addMemory(state, c, 'promesa_rota', 4, -4);
       callProtest(state, a, true);
     } else if (
+      // 2.0: en Modo IA con director, la manifestación por impaciencia la convoca el director.
+      !directorOwns(state) &&
       a.protestDay < 0 &&
       a.promiseUntil < 0 &&
       // Tras una manifestación, esperan un mes más antes de la siguiente.
@@ -149,36 +152,54 @@ export function associationsMonth(state: GameState): void {
     }
   }
   // Nuevas: una al mes como mucho, la de la queja más compartida.
-  const fresh = [...byCause.entries()]
-    .filter(([cause, cs]) => cs.length >= ASSOCIATIONS.minMembers && !state.associations.some((a) => a.cause === cause))
-    .sort((a, b) => b[1].length - a[1].length)[0];
-  if (fresh && state.associations.length < ASSOCIATIONS.max) {
-    const [cause, cs] = fresh;
-    const leader = leaderOf(cs);
-    // v1.8: nombre del barrio («Asociación Vecinal del Río»); si ya hay una allí, con su causa.
-    // El barrio es el de la casa del líder (la media de todas las casas caía siempre en el centro).
-    const at = centerOf(state, [leader.id]);
-    let name = `Asociación Vecinal ${barrioOf(state, at.x, at.y)}`;
-    if (state.associations.some((x) => x.name === name)) name = `${name} por ${CAUSE_TEXT[cause]}`;
-    const a: Association = {
-      id: state.nextId++,
-      name,
-      x: at.x,
-      y: at.y,
-      protests: 0,
-      cause,
-      members: cs.map((c) => c.id),
-      leaderId: leader.id,
-      founded: state.tick,
-      lastProtest: -1,
-      protestDay: -1,
-      promiseUntil: -1,
-      lastMeeting: -1,
-    };
-    state.associations.push(a);
-    for (const c of cs) addMemory(state, c, 'asociacion', 3, 1);
-    pushEvent(state, 'politics', `Nace la ${a.name}: ${cs.length} socios, con ${leader.name} al frente. Piden ${CAUSE_ASK[cause]} (Pueblo › Ayuntamiento)`, { ref: leader.id });
+  // 2.0: en Modo IA con director, la decide el director (este es el respaldo).
+  if (directorOwns(state)) return;
+  const fresh = freshCauses(state, byCause)[0];
+  if (fresh) foundAssociation(state, fresh[0], fresh[1]);
+}
+
+/** Quejas compartidas por bastantes vecinos con nombre que aún no tienen asociación (la más compartida primero). */
+export function freshCauses(state: GameState, byCause?: Map<Cause, Citizen[]>): [Cause, Citizen[]][] {
+  if (!state.associations || state.citizens.length < ASSOCIATIONS.minPop || state.associations.length >= ASSOCIATIONS.max) return [];
+  if (!byCause) {
+    const ctx = coverageCtx(state);
+    byCause = new Map();
+    for (const c of state.citizens) {
+      if (!c.named) continue;
+      const g = grievanceOf(state, c, ctx);
+      if (g) byCause.set(g, [...(byCause.get(g) ?? []), c]);
+    }
   }
+  return [...byCause.entries()].filter(([cause, cs]) => cs.length >= ASSOCIATIONS.minMembers && !state.associations.some((a) => a.cause === cause)).sort((a, b) => b[1].length - a[1].length);
+}
+
+/** Funda la asociación de una queja con estos socios. */
+export function foundAssociation(state: GameState, cause: Cause, cs: Citizen[]): Association {
+  const leader = leaderOf(cs);
+  // v1.8: nombre del barrio («Asociación Vecinal del Río»); si ya hay una allí, con su causa.
+  // El barrio es el de la casa del líder (la media de todas las casas caía siempre en el centro).
+  const at = centerOf(state, [leader.id]);
+  let name = `Asociación Vecinal ${barrioOf(state, at.x, at.y)}`;
+  if (state.associations.some((x) => x.name === name)) name = `${name} por ${CAUSE_TEXT[cause]}`;
+  const a: Association = {
+    id: state.nextId++,
+    name,
+    x: at.x,
+    y: at.y,
+    protests: 0,
+    cause,
+    members: cs.map((c) => c.id),
+    leaderId: leader.id,
+    founded: state.tick,
+    lastProtest: -1,
+    protestDay: -1,
+    promiseUntil: -1,
+    lastMeeting: -1,
+  };
+  state.associations.push(a);
+  for (const c of cs) addMemory(state, c, 'asociacion', 3, 1);
+  pushEvent(state, 'politics', `Nace la ${a.name}: ${cs.length} socios, con ${leader.name} al frente. Piden ${CAUSE_ASK[cause]} (Pueblo › Ayuntamiento)`, { ref: leader.id });
+  return a;
 }
 
 function leaderOf(cs: Citizen[]): Citizen {
@@ -186,7 +207,7 @@ function leaderOf(cs: Citizen[]): Citizen {
 }
 
 /** Convoca una manifestación para dentro de unos días: cada socio decide si va (IA o reglas). */
-function callProtest(state: GameState, a: Association, broken: boolean): void {
+export function callProtest(state: GameState, a: Association, broken: boolean): void {
   a.protestDay = state.tick + ASSOCIATIONS.protestNoticeDays * TICKS_PER_DAY;
   pushEvent(
     state,

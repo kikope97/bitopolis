@@ -1,5 +1,6 @@
 import { TICKS_PER_DAY } from '@bitopolis/shared';
 import { CRIME } from './balance.ts';
+import { directorOwns } from './director-core.ts';
 import { cellsOf, jailPlacesOf, radiusOf } from './levels.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance, nextInt } from './prng.ts';
@@ -138,7 +139,10 @@ export function crimeDay(state: GameState): void {
   j.hot = j.hot.filter((h) => h.until > state.tick);
   if (state.citizens.length < CRIME.minPop) return;
   const crimeAt = (x: number, y: number) => state.fields.crime[y * state.map.w + x] ?? 0;
+  // 2.0: en Modo IA con director, los robos de fuera los elige el director entre los posibles.
+  const directed = directorOwns(state);
   for (const b of state.buildings) {
+    if (directed) break;
     if (b.kind !== 'shop' || !b.built || b.damaged) continue;
     const p = CRIME.robBase * Math.max(0, crimeAt(b.x, b.y) - CRIME.robThreshold) / 50;
     if (!chance(state.rng, p)) continue;
@@ -146,6 +150,7 @@ export function crimeDay(state: GameState): void {
   }
   // v1.9: robos en las casas (ladrones de fuera).
   for (const b of state.buildings) {
+    if (directed) break;
     if ((b.kind !== 'house' && b.kind !== 'res') || !b.built) continue;
     const p = CRIME.homeRobBase * Math.max(0, crimeAt(b.x, b.y) - CRIME.robThreshold) / 50;
     if (!chance(state.rng, p)) continue;
@@ -167,7 +172,7 @@ export function crimeDay(state: GameState): void {
   }
 }
 
-function robbery(state: GameState, b: Building): void {
+export function robbery(state: GameState, b: Building): void {
   const j = state.justice;
   const name = b.name ?? 'una tienda';
   // v1.9: con la caja vacía no hay nada que llevarse: un intento, sin más.
@@ -196,7 +201,7 @@ function robbery(state: GameState, b: Building): void {
  * cerca y calabozo libre, detienen al ladrón y no se pierde nada. Si no, la
  * víctima se queda sin ese dinero y puede no llegar a fin de mes (y endeudarse).
  */
-function homeRobbery(state: GameState, b: Building, thief: Citizen | undefined): void {
+export function homeRobbery(state: GameState, b: Building, thief: Citizen | undefined): void {
   const j = state.justice;
   const living = state.citizens.filter((c) => c.homeId === b.id && c !== thief);
   const victim = living.filter((c) => c.money > 0).sort((a, c) => c.money - a.money)[0];

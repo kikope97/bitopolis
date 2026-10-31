@@ -13,6 +13,9 @@ import {
   MEMORY_MAX,
   migrate,
   narrativeSummary,
+  joinNames,
+  professionOf,
+  workplaceText,
   OBJECTIVES,
   OUTSIDE,
   TREASURY,
@@ -459,5 +462,38 @@ describe('ronda 09: arreglos de la vida social y el pleno', () => {
     s.tick += 24;
     socialDay(s);
     if (promise.status === 'broken') expect(s.politics.campaign.jovenes).toBe(1);
+  });
+});
+
+describe('frases bien construidas (v1.9.1)', () => {
+  it('no repite nombres al listar: nombre completo o «dos Marcos»', () => {
+    expect(joinNames(['Marcos', 'Ana'])).toBe('Marcos y Ana');
+    expect(joinNames(['Marcos', 'Marcos'], ['Marcos Gil', 'Marcos Ruiz'])).toBe('Marcos Gil y Marcos Ruiz');
+    expect(joinNames(['Marcos', 'Marcos'])).toBe('dos Marcos');
+    expect(joinNames(['Ana', 'Marcos', 'Marcos'], ['Ana Gil', 'Marcos Gil', 'Marcos Gil'])).toBe('Ana y dos Marcos');
+  });
+
+  it('el oficio concuerda con el nombre', () => {
+    expect(professionOf({ name: 'Rosa Gil', profession: 'enfermero' })).toBe('enfermera');
+    expect(professionOf({ name: 'Marcos Gil', profession: 'panadera' })).toBe('panadero');
+    expect(professionOf({ name: 'Lucía', profession: 'administrativa' })).toBe('administrativa');
+    expect(professionOf({ name: 'Hugo Ruiz', profession: 'electricista' })).toBe('electricista');
+  });
+
+  it('el resumen dice el negocio tal cual y no repite amigos', () => {
+    const s = createInitialState({ seed: 4 });
+    const me = s.citizens[0]!;
+    s.citizens.push({ ...me, id: 901, name: 'Marcos Gil', relations: [], memories: [] }, { ...me, id: 902, name: 'Marcos Ruiz', relations: [], memories: [] });
+    me.relations = [
+      { id: 901, kind: 'amistad', strength: 50, since: 0 },
+      { id: 902, kind: 'amistad', strength: 50, since: 0 },
+    ];
+    expect(workplaceText({ kind: 'shop', name: 'Bar de Lucía' })).toBe('el Bar de Lucía');
+    expect(workplaceText({ kind: 'shop', name: 'Panadería de Rosa' })).toBe('la Panadería de Rosa');
+    s.buildings.find((x) => x.id === me.jobId)!.name = 'Bar de Lucía';
+    const text = narrativeSummary(s, me);
+    expect(text).toContain('Trabaja en el Bar de Lucía.');
+    expect(text).toContain('Se lleva bien con Marcos Gil y Marcos Ruiz.');
+    expect(text).toContain('Lucía, administrativa,');
   });
 });

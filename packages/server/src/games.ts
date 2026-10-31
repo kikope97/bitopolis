@@ -94,7 +94,7 @@ export async function registerGameRoutes(app: FastifyInstance, db: Db, store: Se
     const mode = b.data.mode;
     if (mode === 'ai' && !(await ai.settings(null)).configured) return bad(reply, 'Configura la IA antes de jugar en Modo IA');
     const seed = newSeed();
-    const state = createInitialState({ seed, aiMode: mode === 'ai', namedLimit: store.get().ai.maxCitizens });
+    const state = createInitialState({ seed, aiMode: mode === 'ai', namedLimit: store.get().ai.maxCitizens, aiShare: store.get().ai.aiShare ?? 50 });
     const ts = new Date().toISOString();
     await db
       .insertInto('games')
@@ -160,7 +160,21 @@ export async function registerGameRoutes(app: FastifyInstance, db: Db, store: Se
     }
     const state = migrate(JSON.parse(row.state));
     if (state.tick !== fromTick) return reply.code(409).send({ error: 'desincronizado', state });
-    replayOnto(state, commands, toTick);
+    // 2.0: con la IA del servidor, el % de vecinos con IA lo fija /admin (la partida no lo cambia).
+    // 409 (no 403): el cliente recarga el estado bueno y sigue guardando (ronda 16).
+    if (commands.some((c) => c.cmd.type === 'SetAiShare') && (await ai.settings(row.id)).locked.includes('key')) {
+      return reply.code(409).send({ error: 'El % de vecinos con IA lo fija el servidor', state: migrate(JSON.parse(row.state)) });
+    }
+    // Ronda 16: un turno del pueblo solo vale si es el que respondió la IA del servidor (el cliente
+    // no puede inventarse actitudes, sucesos ni textos que luego irían al LLM). Si no coincide, el
+    // hash no cuadra y el cliente recibe el estado bueno.
+    const trusted = commands.flatMap((c) => {
+      if (c.cmd.type !== 'TownTurn') return [c];
+      const r = ai.turn(row.id, c.cmd.n);
+      if (!r || r.status !== 'ready') return [];
+      return [{ tick: c.tick, cmd: { type: 'TownTurn' as const, n: r.n, acts: r.acts, ...(r.director ? { director: r.director } : {}), ...(r.focus ? { focus: r.focus } : {}), ...(r.chronicle ? { chronicle: r.chronicle } : {}) } }];
+    });
+    replayOnto(state, trusted, toTick);
     if (hashState(state) !== hash) {
       req.log.warn({ token: '…', fromTick, toTick }, 'hash distinto en el guardado');
       const fresh = migrate(JSON.parse(row.state));

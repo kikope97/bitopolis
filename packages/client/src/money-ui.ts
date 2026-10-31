@@ -1,5 +1,5 @@
-import { tickToDate } from '@bitopolis/shared';
-import { type Citizen, canMicrocredit, canSettleDebt, type GameState, MICROCREDIT, type Pocket, pocketOf, totalDebt } from '@bitopolis/sim';
+import { TICKS_PER_DAY, tickToDate } from '@bitopolis/shared';
+import { type Citizen, canMicrocredit, DEBT, canSettleDebt, type GameState, MICROCREDIT, type Pocket, pocketOf, totalDebt } from '@bitopolis/sim';
 import { formatDate, money } from './i18n.ts';
 import type { SocialCtx } from './social-ui.ts';
 import { confirmDialog, h, toast } from './ui.ts';
@@ -61,6 +61,10 @@ export function pocketBox(ctx: SocialCtx, c: Citizen, reopen: () => void): HTMLE
       );
     }
     else if (d.town > 0) box.append(h('p', { class: 'muted small' }, 'Lo que debe al ayuntamiento lleva un recargo del 10 % si pasa un mes sin pagarlo.'));
+    // v1.9.1: pidió tiempo; si no se le contesta (aplazar o perdonar) a tiempo, se lo guarda.
+    if (d.askedAt !== undefined && !d.plan && d.town > 0) {
+      box.append(h('p', { class: 'neg' }, `⚠ Te pidió un aplazamiento el ${formatDate(tickToDate(d.askedAt))}. Si no le contestas antes del ${formatDate(tickToDate(d.askedAt + DEBT.answerDays * TICKS_PER_DAY))}, se sentirá ignorado.`));
+    }
   }
   const actions = h('div', { class: 'pocket-actions' });
   const add = (label: string, ok: { ok: boolean; error?: string }, run: () => Promise<void>) => {

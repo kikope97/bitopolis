@@ -1,4 +1,6 @@
+import type { TurnAct } from '@bitopolis/sim';
 import type { GameState } from '@bitopolis/sim';
+import type { ListedModel } from './model-picker.ts';
 import type { SaveBatch } from './sim.worker.ts';
 
 export interface Summary {
@@ -47,8 +49,13 @@ export const api = {
   aiMeta: () => call<AiMeta>('GET', '/api/ai/meta'),
   aiConfig: (token: string) => call<AiSettings>('GET', `/api/games/${token}/ai-config`),
   saveAiConfig: (token: string, body: Record<string, unknown>) => call<AiSettings>('PUT', `/api/games/${token}/ai-config`, body),
-  estimate: (provider: string, model: string, citizens: number) =>
-    call<{ eurPerHour: Record<string, number>; known: boolean }>('GET', `/api/ai/estimate?provider=${encodeURIComponent(provider)}&model=${encodeURIComponent(model)}&citizens=${citizens}`),
+  /** Modelos de la key guardada (sin borrador) o de una escrita y aún sin guardar. La key no vuelve. */
+  aiModels: (token: string, draft?: { key?: string; baseUrl?: string }) =>
+    draft
+      ? call<{ provider: string; models: ListedModel[] }>('POST', `/api/games/${token}/ai/models`, draft)
+      : call<{ provider: string; models: ListedModel[] }>('GET', `/api/games/${token}/ai/models`),
+  estimate: (provider: string, model: string, share: number) =>
+    call<{ eurPerHour: Record<string, number>; citizens: number; known: boolean }>('GET', `/api/ai/estimate?provider=${encodeURIComponent(provider)}&model=${encodeURIComponent(model)}&share=${share}`),
   decisions: (token: string) =>
     call<{ decisions: { citizenId: number; createdTick: number; action: string; motivo: string }[]; capped: boolean; notice?: string; budgetFraction: number }>(
       'GET',
@@ -57,6 +64,8 @@ export const api = {
   aiUsage: (token: string) => call<AiUsage>('GET', `/api/games/${token}/ai-usage`),
   aiPreview: (token: string) => call<{ system: string; user: string }>('GET', `/api/games/${token}/ai-preview`),
   talk: (token: string, citizenId: number, question: string) => call<{ text: string | null; reason?: string }>('POST', `/api/games/${token}/talk`, { citizenId, question }),
+  /** 2.0: resultado del turno del pueblo `n`. */
+  turn: (token: string, n: number) => call<{ turn: TurnResult | null; capped: boolean; notice?: string }>('GET', `/api/games/${token}/turn/${n}`),
   advisor: (token: string, question: string) => call<{ text: string | null; reason?: string }>('POST', `/api/games/${token}/advisor`, { question }),
   chronicle: (token: string) => call<{ text: string | null; reason?: string }>('POST', `/api/games/${token}/chronicle`),
   regenerate: (token: string, sessionId: string) => call<{ token: string }>('POST', `/api/games/${token}/regenerate`, { sessionId }),
@@ -68,11 +77,29 @@ export const api = {
   },
 };
 
+/** 2.0: resultado de un turno del pueblo (lo que decidió la IA). */
+export interface TurnResult {
+  n: number;
+  status: 'pending' | 'ready' | 'failed';
+  acts: TurnAct[];
+  requested: number;
+  answered: number;
+  reason?: string;
+  rung?: 'calidad' | 'ahorro' | 'cerca del tope';
+  director?: { sucesos: { id: string; motivo: string }[]; avisos: { id: string; motivo: string }[] };
+  focus?: string;
+  chronicle?: string;
+}
+
 export interface AiMeta {
   providers: { id: string; label: string; cheap: string; premium: string; baseUrl: string; needsKey: boolean; models?: string[] }[];
   /** La IA la pone el servidor (/admin): todas las partidas son de Modo IA. */
   serverKey: boolean;
   maxCitizens: number;
+  /** 2.0: % de vecinos con IA por defecto (o fijo, con key del servidor). */
+  aiShare: number;
+  /** 2.0: modelo de los vecinos por defecto: el bueno (calidad) o el barato (ahorro). */
+  turnQuality?: 'calidad' | 'ahorro';
   /** Sin IA del servidor, ¿puede cada partida poner su propia key? */
   playerKeys: boolean;
   newGames: boolean;

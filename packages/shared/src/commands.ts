@@ -57,6 +57,42 @@ export const Command = z.discriminatedUnion('type', [
     motivo: z.string().max(400),
     source: z.enum(['ai', 'rule']),
   }),
+  /**
+   * 2.0: lo que decidió la IA en un turno del pueblo (todos los vecinos del turno
+   * a la vez). El motor valida cada parte con su menú; lo que no vale se descarta.
+   */
+  z.object({
+    type: z.literal('TownTurn'),
+    n: z.number().int().min(1),
+    acts: z
+      .array(
+        z.object({
+          vecino: z.number().int(),
+          accion: z.string().regex(/^[a-z_]+(:[a-z0-9_]+)?$/).max(40),
+          gesto: z.object({ con: z.number().int(), tipo: z.string().max(20) }),
+          actitud: z.number().int().min(-2).max(2),
+          gasto: z.object({ donde: z.string().max(10), tienda: z.number().int(), ocio: z.boolean() }),
+          plan: z.object({ tipo: z.string().max(30), necesidad: z.string().max(20), meses: z.number().int().min(0).max(12) }),
+          pensamiento: z.string().max(300),
+          motivo: z.string().max(400),
+          recuerdo: z.string().max(300).optional(),
+        }),
+      )
+      .max(300),
+    focus: z.string().max(300).optional(),
+    chronicle: z.string().max(1200).optional(),
+    /** Director del pueblo: sucesos que pasan esta semana y avisos de lo que se cuece. */
+    director: z
+      .object({
+        sucesos: z.array(z.object({ id: z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(40), motivo: z.string().max(400) })).max(6),
+        avisos: z.array(z.object({ id: z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(40), motivo: z.string().max(400) })).max(6),
+      })
+      .optional(),
+  }),
+  /** 2.0: % de vecinos con IA (solo sube: nadie deja de pensar con IA). */
+  z.object({ type: z.literal('SetAiShare'), share: z.number().int().min(0).max(100) }),
+  /** 2.0: días de juego entre turnos de la IA (el cliente los alarga a x3/x10). */
+  z.object({ type: z.literal('SetTurnPace'), days: z.number().int().min(3).max(60) }),
 ]);
 export type Command = z.infer<typeof Command>;
 

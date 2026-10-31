@@ -1,4 +1,7 @@
 import { api, type AiMeta, type AiSettings } from './api.ts';
+import { loadModels, modelPicker } from './model-picker.ts';
+
+const KIND_LABEL: Record<string, string> = { decision: 'Decisiones', turno: 'Turnos del pueblo', director: 'Director del pueblo', consejero: 'Consejero', diario: 'Diario', conversacion: 'Conversaciones' };
 import { $, closeSheet, h, sheet, toast } from './ui.ts';
 
 /** Un único formato de euros: «0,42 €» o «menos de 1 céntimo». */
@@ -20,11 +23,16 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
 
   // El proveedor no se elige: se deduce de la key («sk-ant-…» es Anthropic; el resto, OpenAI).
   const providerOf = (k: string, base: string) => (base ? 'openai-compatible' : k.startsWith('sk-ant-') ? 'anthropic' : k ? 'openai' : cur.provider);
-  // Modelos en blanco = automáticos según la key; se puede escribir otro.
-  const models = h('datalist', { id: 'ai-models' }, ...[...new Set(meta.providers.flatMap((p) => p.models ?? []))].map((m) => h('option', { value: m })));
-  const explicit = (m: string, kind: 'cheap' | 'premium') => (meta.providers.some((p) => p[kind] === m) ? '' : m);
-  const model = h('input', { id: 'ai-model', value: explicit(cur.model, 'cheap'), placeholder: `Automático (${cur.model})`, autocomplete: 'off', list: 'ai-models', ...ro('model') }) as HTMLInputElement;
-  const premium = h('input', { id: 'ai-premium', value: explicit(cur.modelPremium, 'premium'), placeholder: `Automático (${cur.modelPremium})`, autocomplete: 'off', list: 'ai-models', ...ro('modelPremium') }) as HTMLInputElement;
+  // Modelos en blanco = automáticos según la key. Con «Cargar modelos», un desplegable con los
+  // que da la key y «Otro…» para escribir uno a mano (petición del creador).
+  const explicit = (m: string, kind: 'cheap' | 'premium') => (meta.providers.some((p) => p[kind] === m || (kind === 'cheap' && p.premium === m)) ? '' : m);
+  const model = modelPicker({ id: 'ai-model', value: explicit(cur.model, 'cheap'), placeholder: `Automático (${cur.model})`, auto: `Automático (${cur.model})`, disabled: locked.has('model') });
+  const premium = modelPicker({ id: 'ai-premium', value: explicit(cur.modelPremium, 'premium'), placeholder: `Automático (${cur.modelPremium})`, auto: `Automático (${cur.modelPremium})`, disabled: locked.has('modelPremium') });
+  const pickers = [model, premium].filter((_, i) => !locked.has(i ? 'modelPremium' : 'model'));
+  const modelsStatus = h('span', { class: 'help', 'aria-live': 'polite' });
+  const loadBtn = h('button', { class: 'btn', type: 'button' }, 'Cargar modelos');
+  // Con key propia, el botón va junto a la key (se pulsa tras escribirla); si no, junto a los modelos.
+  const loadRow = h('div', { class: 'row wrap models-row' }, loadBtn, modelsStatus);
   const baseUrl = h('input', { id: 'ai-base', type: 'url', value: cur.baseUrl ?? '', placeholder: 'http://ollama:11434/v1', ...ro('baseUrl') }) as HTMLInputElement;
   const key = h('input', {
     id: 'ai-key',
@@ -35,6 +43,14 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
   }) as HTMLInputElement;
   const capDay = h('input', { id: 'ai-cap-day', type: 'number', min: '0', step: '0.1', value: String(cur.capDay ?? 0.5), ...ro('capDay') }) as HTMLInputElement;
   const capMonth = h('input', { id: 'ai-cap-month', type: 'number', min: '0', step: '0.5', value: String(cur.capMonth ?? 5), ...ro('capMonth') }) as HTMLInputElement;
+  // 2.0: % de vecinos con IA (con la key del servidor lo fija /admin).
+  const shareLocked = locked.has('key');
+  const share = h('input', { id: 'ai-share', type: 'range', min: '0', max: '100', step: '5', value: String(meta.aiShare ?? 50), ...(shareLocked ? { disabled: true } : {}) }) as HTMLInputElement;
+  const shareOut = h('output', { for: 'ai-share' }, `${share.value} %`);
+  share.addEventListener('input', () => {
+    shareOut.textContent = `${share.value} %`;
+  });
+  share.addEventListener('change', () => void refresh());
   const accept = h('input', { type: 'checkbox', id: 'ai-accept' }) as HTMLInputElement;
   const estimate = h('p', { class: 'estimate', 'aria-live': 'polite' });
   const detected = h('span', { class: 'help', 'aria-live': 'polite' });
@@ -43,18 +59,34 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
     const provider = providerOf(key.value.trim(), baseUrl.value.trim());
     const info = meta.providers.find((p) => p.id === provider)!;
     detected.textContent = key.value.trim() ? `Detectada: ${info.label}.` : '';
-    const m = model.value.trim() || info.cheap;
+    const m = model.value() || (provider === cur.provider ? cur.model : meta.turnQuality === 'ahorro' ? info.cheap : info.premium);
     try {
-      const e = await api.estimate(provider, m, meta.maxCitizens);
-      estimate.textContent = `≈ ${eur(e.eurPerHour.x1! * 30)} al mes jugando 1 hora al día a x1 (${eur(e.eurPerHour.x10! * 30)} a x10), con ${meta.maxCitizens} vecinos con nombre.${
+      const e = await api.estimate(provider, m, Number(share.value));
+      estimate.textContent = `≈ ${eur(e.eurPerHour.x1! * 30)} al mes jugando 1 hora al día a x1 (${eur(e.eurPerHour.x10! * 30)} a x10), en un pueblo de 60 vecinos con ${e.citizens} que piensan con IA.${
         e.known ? '' : ' (Modelo sin precio en la tabla: se estima con uno caro.)'
-      } Incluye reintentos y la crónica del mes.`;
+      } Incluye segundas preguntas y la crónica del mes.`;
     } catch {
       estimate.textContent = '';
     }
   };
   key.addEventListener('input', refresh);
-  model.addEventListener('change', refresh);
+  model.onChange(() => void refresh());
+  /** Con la key escrita, la prueba sin guardarla; si no, la guardada (o la del servidor). */
+  const fetchModels = () => {
+    const k = locked.has('key') ? '' : key.value.trim();
+    const b = locked.has('baseUrl') ? undefined : baseUrl.value.trim();
+    return api.aiModels(token, k || (b !== undefined && b !== (cur.baseUrl ?? '')) ? { ...(k ? { key: k } : {}), ...(b !== undefined ? { baseUrl: b } : {}) } : undefined);
+  };
+  loadBtn.addEventListener('click', async () => {
+    loadBtn.disabled = true;
+    try {
+      // Abre las opciones avanzadas, donde están los selectores.
+      model.root.closest('details')?.setAttribute('open', '');
+      await loadModels(pickers, modelsStatus, fetchModels);
+    } finally {
+      loadBtn.disabled = false;
+    }
+  });
   baseUrl.addEventListener('change', refresh);
 
   const save = h('button', { class: 'btn primary wide' }, 'Guardar y usar el Modo IA');
@@ -67,12 +99,13 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
     save.disabled = true;
     try {
       const body: Record<string, unknown> = { sessionId, accepted: true };
-      if (!locked.has('model') && model.value.trim()) body.model = model.value.trim();
-      if (!locked.has('modelPremium') && premium.value.trim()) body.modelPremium = premium.value.trim();
+      if (!locked.has('model') && model.value()) body.model = model.value();
+      if (!locked.has('modelPremium') && premium.value()) body.modelPremium = premium.value();
       if (!locked.has('baseUrl')) body.baseUrl = baseUrl.value.trim();
       if (!locked.has('capDay')) body.capDay = Number(capDay.value);
       if (!locked.has('capMonth')) body.capMonth = Number(capMonth.value);
       if (key.value.trim() && !locked.has('key')) body.key = key.value.trim();
+      if (!shareLocked) body.aiShare = Number(share.value);
       const s = await api.saveAiConfig(token, body);
       key.value = '';
       if (!s.configured) {
@@ -96,9 +129,9 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
     'details',
     { class: 'advanced' },
     h('summary', {}, 'Opciones avanzadas (modelos, tope diario, endpoint propio)'),
-    h('label', { class: 'field' }, 'Modelo para decisiones diarias', serverNote('model'), model, h('span', { class: 'help' }, 'En blanco: Claude Haiku con key de Anthropic, GPT nano con key de OpenAI.')),
-    h('label', { class: 'field' }, 'Modelo para plenos, consejero y diario', serverNote('modelPremium'), premium),
-    models,
+    h('div', { class: 'field' }, h('label', { for: 'ai-model' }, 'Modelo de los vecinos (lotes)', serverNote('model')), model.root, h('span', { class: 'help' }, meta.turnQuality === 'ahorro' ? 'Automático: Claude Haiku con key de Anthropic, GPT nano con key de OpenAI.' : 'Automático: Claude Sonnet con key de Anthropic, GPT mini con key de OpenAI. Decide qué hace cada vecino cada semana.')),
+    h('div', { class: 'field' }, h('label', { for: 'ai-premium' }, 'Modelo del director (y consejero)', serverNote('modelPremium')), premium.root),
+    pickers.length && locked.has('key') ? loadRow : '',
     h('label', { class: 'field' }, 'Tope diario (€)', serverNote('capDay'), capDay),
     h('label', { class: 'field' }, 'Endpoint propio (Ollama, LM Studio…)', serverNote('baseUrl'), baseUrl, h('span', { class: 'help' }, 'Solo si usas un modelo local compatible con OpenAI. Normalmente, en blanco.')),
   );
@@ -109,13 +142,25 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
     fromServer
       ? h('p', { class: 'server-ai' }, 'La API key ya la pone el servidor. Solo tienes que aceptar el aviso.')
       : h('label', { class: 'field' }, 'API key', key, h('span', { class: 'help' }, 'Se acepta API key de Anthropic (sk-ant-…) o de OpenAI (sk-…).'), detected),
+    !fromServer && pickers.length ? loadRow : '',
     h('label', { class: 'field' }, 'Gasto máximo al mes (€)', serverNote('capMonth'), capMonth),
+    h(
+      'label',
+      { class: 'field' },
+      'Vecinos que piensan con IA ',
+      shareOut,
+      shareLocked ? h('span', { class: 'muted small' }, ' · definido por el servidor') : '',
+      share,
+      h('span', { class: 'help' }, 'Cada semana de juego deciden con la IA qué hacen (trabajo, compras, pareja, negocio, protestas…). El resto, por costumbre. Más vecinos con IA, más gasto.'),
+    ),
     estimate,
     advanced,
     h('label', { class: 'check warning' }, accept, h('span', {}, 'Pon un límite de gasto en el panel de tu proveedor. Bitópolis es un proyecto personal y no se hace responsable si la key se filtra o se usa de más.')),
     h('div', { class: 'sticky-actions' }, save, previewBtn),
   );
   void refresh();
+  // Con una key ya guardada (la del jugador o la del servidor), su lista al abrir.
+  if (pickers.length && (cur.keyMask || (locked.has('key') && cur.configured))) void loadModels(pickers, modelsStatus, () => api.aiModels(token));
 }
 
 /** «Qué se envía»: un ejemplo real del prompt (sin key, sin telemetría). */
@@ -154,7 +199,7 @@ export async function openUsage(token: string): Promise<void> {
         'details',
         { class: 'advanced' },
         h('summary', {}, 'Detalle técnico'),
-        h('ul', { class: 'accounts' }, ...(kinds.length ? kinds.map(([k, v]) => h('li', {}, h('span', {}, k === 'decision' ? 'Decisiones' : k), h('span', {}, eur(v)))) : [h('li', {}, 'Sin llamadas todavía.')])),
+        h('ul', { class: 'accounts' }, ...(kinds.length ? kinds.map(([k, v]) => h('li', {}, h('span', {}, KIND_LABEL[k] ?? k), h('span', {}, eur(v)))) : [h('li', {}, 'Sin llamadas todavía.')])),
         h('p', {}, `${plural(u.calls, 'llamada', 'llamadas')}, ${plural(u.requested, 'decisión pedida', 'decisiones pedidas')} (${u.retried} tras reintento).`),
         h('p', {}, `Tokens: ${u.tokensIn} de entrada y ${u.tokensOut} de salida.`),
         u.caps.server ? h('p', {}, `Servidor (todas las partidas) este mes: ${eur(u.spend.serverMonth)} de ${eur(u.caps.server)}.`) : '',
@@ -170,7 +215,7 @@ export function makeBubble(name: string, motivo: string, ai: boolean): HTMLEleme
   const layer = $('#bubbles');
   const el = h(
     'button',
-    { class: 'bubble', type: 'button', 'aria-label': `${name}${ai ? ' (decidido por la IA)' : ''}: ${motivo}. Abrir su ficha.` },
+    { class: 'bubble', type: 'button', 'aria-label': `${name}${ai ? ' (decidido por la IA)' : ''}: ${motivo.replace(/[.!?…]+$/, '')}. Abrir su ficha.` },
     h('strong', {}, name, ai ? h('span', { class: 'ai-badge' }, 'IA', h('span', { class: 'visually-hidden' }, ' (decidido por la IA)')) : ''),
     h('span', { class: 'bubble-text' }, `«${motivo}»`),
   );

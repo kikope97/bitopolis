@@ -108,6 +108,20 @@ export function toneOf(c: Citizen): string {
  */
 const fold = (w: string) => w.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 const PERSON_NAMES = new Set([...FIRST_NAMES, ...SURNAMES, ...COMMON_NAMES].map(fold));
+/** Ronda 16: ¿hay en el texto alguna cifra que no esté en los datos enviados? */
+export function inventedNumber(text: string, sent: string): boolean {
+  const allowed = new Set<string>();
+  for (const m of sent.match(/\d+(?:\.\d+)?/g) ?? []) {
+    const v = Number(m);
+    allowed.add(String(v)).add(String(Math.round(v))).add(String(Math.trunc(v)));
+  }
+  for (const n of text.match(/\d[\d.,]*/g) ?? []) {
+    const v = Number(n.replace(/[.,]$/, '').replace(/\.(?=\d{3}\b)/g, '').replace(',', '.'));
+    if (!allowed.has(String(v))) return true;
+  }
+  return false;
+}
+
 export function inventedName(text: string, sent: string): string | null {
   const known = new Set((sent.match(/\p{L}+/gu) ?? []).map(fold));
   for (const m of text.matchAll(/\p{Lu}\p{Ll}+/gu)) {

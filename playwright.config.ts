@@ -1,7 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = 8090;
-const ADMIN_PORT = 8091;
+// Puerto configurable (varias pruebas a la vez en la misma máquina).
+const PORT = Number(process.env.PW_PORT ?? 8090);
+const ADMIN_PORT = Number(process.env.PW_ADMIN_PORT ?? 8091);
 
 export default defineConfig({
   testDir: 'e2e',

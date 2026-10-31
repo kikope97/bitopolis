@@ -235,6 +235,8 @@ export function openNeighbours(state: GameState, onPick: (c: Citizen) => void, o
       { class: 'person-row' },
       h('span', { 'aria-hidden': 'true' }, `${mood[0]} `),
       h('strong', {}, c.name),
+      // 2.0: en Modo IA, los vecinos con nombre piensan con IA.
+      state.aiMode && state.ai ? h('span', { class: 'ai-mark', title: 'Piensa con IA' }, ' ✦') : '',
       h('span', {}, ` (${mood[1]})`),
       // Ronda 15: todo el detalle en una línea propia (la rejilla tiene 3 columnas).
       h('span', { class: 'p-sub muted' }, `${c.age} años · ${job ? (job.name ?? BUILD_NAMES[job.kind]) : c.unemployedSince !== undefined ? 'en paro' : 'trabaja fuera'}${c.owns ? ' · propietario' : ''}`, totalDebt(c) > 0 ? h('span', { class: 'pocket-warn' }, ` · debe ${money(totalDebt(c))}`) : ''),
@@ -251,7 +253,7 @@ export function openNeighbours(state: GameState, onPick: (c: Citizen) => void, o
     h('div', { class: 'mg-actions' }, filter),
     onlyDebts
       ? h('p', {}, `${debtors.length} vecinos deben dinero: ${money(debtors.reduce((a, c) => a + (c.debt?.town ?? 0), 0))} al ayuntamiento y ${money(debtors.reduce((a, c) => a + (c.debt?.bank ?? 0), 0))} a bancos y caseros.${rest > 0 ? ` ${rest} de ellos son vecinos sin nombre.` : ''} ${named.length ? ' Toca a uno con nombre para aplazar, perdonar o darle un microcrédito.' : ''}`)
-      : h('p', {}, `${named.length} vecinos con nombre${rest > 0 ? ` y ${rest} vecinos más (población estadística, siguen la media de su barrio)` : ''}.`),
+      : h('p', {}, `${named.length} vecinos con nombre${state.aiMode && state.ai ? ' (✦ piensan con IA)' : ''}${rest > 0 ? ` y ${rest} vecinos más (población estadística, siguen la media de su barrio)` : ''}.`),
     ul,
   );
 }

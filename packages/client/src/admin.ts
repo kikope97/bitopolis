@@ -1,5 +1,6 @@
 import './style.css';
 import { formatDate } from './i18n.ts';
+import { type ListedModel, loadModels, modelPicker } from './model-picker.ts';
 import { apply as applyPrefs } from './prefs.ts';
 import { $, confirmDialog, h, toast } from './ui.ts';
 
@@ -27,6 +28,8 @@ interface View {
     model: string;
     modelPremium: string;
     maxCitizens: number;
+    aiShare: number;
+    turnQuality: 'calidad' | 'ahorro';
     serverMonthly: number | null;
     gameMonthly: number | null;
     gameDaily: number | null;
@@ -328,12 +331,31 @@ async function renderPanel(focus?: string): Promise<void> {
   const key = input({ type: 'password', autocomplete: 'off', spellcheck: 'false', placeholder: a.hasKey ? `guardada: ${a.keyMask}` : 'sk-ant-… o sk-…' });
   const status = h('p', { class: 'server-ai' }, a.hasKey ? `API key del servidor: ${a.keyMask} (${PROVIDER_LABEL[a.provider ?? ''] ?? a.provider}). Quien empiece una partida puede elegir Modo IA sin poner nada, o Modo normal.` : a.baseUrl ? `Endpoint propio: ${a.baseUrl}. Quien empiece una partida puede elegir Modo IA sin poner nada, o Modo normal.` : 'Sin IA del servidor: cada partida elige Modo normal o pone su propia key.');
   const prov = a.provider ?? 'anthropic';
-  const listId = 'admin-models';
-  const datalist = h('datalist', { id: listId }, ...Object.values(v.defaults.models).flatMap((m) => m.models.map((x) => h('option', { value: x }))));
-  const model = input({ value: a.model, list: listId, placeholder: `por defecto: ${v.defaults.models[prov]?.cheap ?? ''}`, autocomplete: 'off' });
-  const premium = input({ value: a.modelPremium, list: listId, placeholder: `por defecto: ${v.defaults.models[prov]?.premium ?? ''}`, autocomplete: 'off' });
+  // Modelos: desplegable con los que da la API key, «Otro…» para escribir uno (petición del creador).
+  const defaults = v.defaults.models[prov];
+  // 2.0: «Calidad» pone por defecto el modelo bueno para los vecinos; «Ahorro», el barato.
+  const neighboursDefault = a.turnQuality === 'ahorro' ? defaults?.cheap : defaults?.premium;
+  const model = modelPicker({ id: 'admin-model', value: a.model, placeholder: `por defecto: ${neighboursDefault ?? ''}`, auto: `Por defecto (${neighboursDefault ?? 'según la key'})` });
+  const premium = modelPicker({ id: 'admin-premium', value: a.modelPremium, placeholder: `por defecto: ${defaults?.premium ?? ''}`, auto: `Por defecto (${defaults?.premium ?? 'según la key'})` });
+  const modelsStatus = h('p', { class: 'help models-status', 'aria-live': 'polite' });
+  /** Sin borrador, la key y el endpoint guardados; con borrador, los escritos (sin guardarlos). */
+  const reloadModels = (draft?: { key?: string; baseUrl: string }) =>
+    loadModels([model, premium], modelsStatus, () => (draft ? req<{ models: ListedModel[] }>('POST', '/api/admin/ai/models', draft) : req<{ models: ListedModel[] }>('GET', '/api/admin/ai/models')));
+  const draft = () => {
+    const k = key.value.trim();
+    const b = baseUrl.value.trim();
+    return k || b !== a.baseUrl ? { ...(k ? { key: k } : {}), baseUrl: b } : undefined;
+  };
+  const reload = action('Recargar modelos', async () => ((await reloadModels(draft())) ? 'Modelos cargados' : undefined));
   const baseUrl = input({ type: 'url', value: a.baseUrl, placeholder: 'http://ollama:11434/v1', inputmode: 'url', autocomplete: 'off' });
-  const citizens = input({ type: 'number', min: '1', max: '20', step: '1', value: String(a.maxCitizens), inputmode: 'numeric' });
+  const citizens = input({ id: 'admin-named', type: 'number', min: '1', max: '20', step: '1', value: String(a.maxCitizens), inputmode: 'numeric' });
+  const share = input({ id: 'admin-share', type: 'number', min: '0', max: '100', step: '5', value: String(a.aiShare), inputmode: 'numeric' });
+  const quality = h(
+    'select',
+    { id: 'admin-quality' },
+    h('option', { value: 'calidad', ...(a.turnQuality !== 'ahorro' ? { selected: true } : {}) }, 'Calidad (Claude Sonnet o GPT mini)'),
+    h('option', { value: 'ahorro', ...(a.turnQuality === 'ahorro' ? { selected: true } : {}) }, 'Ahorro (Claude Haiku o GPT nano)'),
+  ) as HTMLSelectElement;
   const capServer = moneyInput(a.serverMonthly);
   const capGameMonth = moneyInput(a.gameMonthly);
   const capGameDay = moneyInput(a.gameDaily);
@@ -345,11 +367,20 @@ async function renderPanel(focus?: string): Promise<void> {
   // Coste orientativo con lo guardado (v1.3): ayuda a elegir los topes.
   const costLine = h('p', { class: 'estimate', 'aria-live': 'polite' });
   const showCost = (e: View['estimate']) => {
-    costLine.textContent = `Con ${e.citizens} vecinos con IA, un mes de juego cuesta unos ${eur(e.eurPerGameMonth)} (unos ${eur(e.eurPerHourX1)} por hora jugando a x1). Incluye reintentos y la crónica mensual.${e.known ? '' : ' Modelo sin precio en la tabla: se estima con uno caro.'}`;
+    costLine.textContent = `En un pueblo de 60 vecinos (${e.citizens} con IA), un mes de juego cuesta unos ${eur(e.eurPerGameMonth)} (unos ${eur(e.eurPerHourX1)} por hora jugando a x1). Incluye segundas preguntas y la crónica mensual.${e.known ? '' : ' Modelo sin precio en la tabla: se estima con uno caro.'}`;
   };
   if (a.hasKey || a.baseUrl) showCost(v.estimate);
-  else costLine.textContent = 'Con una API key de Anthropic y Claude Haiku, un mes de juego con 20 vecinos cuesta céntimos. Pon la key para ver la estimación exacta.';
+  else costLine.textContent = 'Pon la API key para ver cuánto cuesta un mes de juego con estos ajustes.';
   const advanced = () => prices.closest('details')!;
+  // Al pegar otra key (o cambiar el endpoint), su lista; al abrir, la de lo guardado.
+  key.addEventListener('change', () => {
+    if (key.value.trim().length >= 8) void reloadModels(draft());
+  });
+  baseUrl.addEventListener('change', () => {
+    if (key.value.trim() || baseUrl.value.trim() || a.hasKey) void reloadModels(draft());
+  });
+  if (a.hasKey || a.baseUrl) void reloadModels();
+  else modelsStatus.textContent = 'Pon la API key para elegir el modelo en una lista.';
   /** Guarda el formulario de la IA tal como está escrito. */
   const saveAi = async (): Promise<void> => {
     let customPrices: Record<string, Price> | null = null;
@@ -366,10 +397,12 @@ async function renderPanel(focus?: string): Promise<void> {
     const r = await save({
       ai: {
         ...(key.value.trim() ? { key: key.value.trim() } : {}),
-        model: model.value.trim(),
-        modelPremium: premium.value.trim(),
+        model: model.value(),
+        modelPremium: premium.value(),
         baseUrl: baseUrl.value.trim(),
         maxCitizens: Number(citizens.value),
+        aiShare: Math.max(0, Math.min(100, Math.round(Number(share.value) || 0))),
+        turnQuality: quality.value === 'ahorro' ? 'ahorro' : 'calidad',
         serverMonthly: money(capServer),
         gameMonthly: money(capGameMonth),
         gameDaily: money(capGameDay),
@@ -407,10 +440,12 @@ async function renderPanel(focus?: string): Promise<void> {
           )
         : '',
     ),
-    field('Modelo para las decisiones diarias', model, 'En blanco: Claude Haiku con key de Anthropic, GPT nano con key de OpenAI.'),
-    field('Modelo para plenos, consejero y diario', premium, 'En blanco: Claude Sonnet o GPT mini.'),
-    datalist,
-    field('Vecinos con IA por partida (1–20)', citizens),
+    field('Turnos del pueblo', quality, 'Cada semana de juego la IA decide qué hace cada vecino. «Calidad» usa por defecto el modelo bueno; «Ahorro», el barato. Al pasar del 70 % de un tope, los turnos bajan solos al barato.'),
+    field('Modelo de los vecinos (lotes)', model.root, 'Los turnos del pueblo: qué hace, piensa y gasta cada vecino.'),
+    field('Modelo del director (y consejero)', premium.root, 'Director del pueblo, consejero y diario. Por defecto: Claude Sonnet o GPT mini.'),
+    h('div', { class: 'row wrap models-row' }, reload, modelsStatus),
+    field('Vecinos que piensan con IA (%)', share, 'En las partidas nuevas con la IA del servidor. Con una key propia, lo elige quien juega.'),
+    field('Vecinos con nombre en Modo normal (1–20)', citizens),
     h('h3', {}, 'Topes de gasto (€)'),
     h('div', { class: 'row wrap' }, field('Servidor al mes', capServer), field('Cada partida al mes', capGameMonth), field('Cada partida al día', capGameDay)),
     h('p', { class: 'help' }, 'Al llegar a un tope, la IA se pausa y deciden las reglas. Pon también un límite en el panel de tu proveedor.'),

@@ -4,6 +4,8 @@ import { PROVIDER_INFO, type ProviderId } from './catalog.ts';
 
 export interface LLMRequest {
   system: string;
+  /** 2.0: bloque común a varias peticiones (el estado del pueblo del turno): se cachea aparte. */
+  shared?: string;
   user: string;
   schema: Record<string, unknown>;
   model: string;
@@ -13,6 +15,8 @@ export interface LLMRequest {
 export interface LLMResult {
   text: string;
   usage: { in: number; cachedIn: number; out: number };
+  /** Ronda 16: la respuesta se cortó por el tope de tokens (el JSON llega incompleto). */
+  truncated?: boolean;
 }
 
 export interface LLMProvider {
@@ -55,7 +59,7 @@ export class OpenAICompatProvider implements LLMProvider {
       model: req.model,
       messages: [
         { role: 'system', content: info.jsonSchema ? req.system : `${req.system}\n\nEsquema JSON de la respuesta:\n${JSON.stringify(req.schema)}` },
-        { role: 'user', content: req.user },
+        { role: 'user', content: req.shared ? `${req.shared}\n\n${req.user}` : req.user },
       ],
       response_format: info.jsonSchema
         ? { type: 'json_schema', json_schema: { name: 'decisiones', strict: true, schema: req.schema } }
@@ -75,6 +79,7 @@ export class OpenAICompatProvider implements LLMProvider {
     if (typeof text !== 'string') throw new ProviderError('respuesta sin contenido');
     const u = data.usage ?? {};
     return {
+      ...(data?.choices?.[0]?.finish_reason === 'length' ? { truncated: true } : {}),
       text,
       usage: { in: u.prompt_tokens ?? 0, cachedIn: u.prompt_tokens_details?.cached_tokens ?? u.prompt_cache_hit_tokens ?? 0, out: u.completion_tokens ?? 0 },
     };
@@ -104,7 +109,18 @@ export class AnthropicProvider implements LLMProvider {
           // Margen para el razonamiento (cuenta como salida).
           max_tokens: req.maxTokens + 1024,
           system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
-          messages: [{ role: 'user', content: req.user }],
+          messages: [
+            {
+              role: 'user',
+              // 2.0: el estado del pueblo del turno, igual en todos los lotes, va en su propio bloque cacheado.
+              content: req.shared
+                ? [
+                    { type: 'text', text: req.shared, cache_control: { type: 'ephemeral' } },
+                    { type: 'text', text: req.user },
+                  ]
+                : req.user,
+            },
+          ],
           output_config: { effort: 'low', format: { type: 'json_schema', schema: req.schema } },
         },
         { signal },
@@ -120,6 +136,7 @@ export class AnthropicProvider implements LLMProvider {
     const u = msg.usage;
     const cached = u.cache_read_input_tokens ?? 0;
     return {
+      ...(msg.stop_reason === 'max_tokens' ? { truncated: true } : {}),
       text,
       usage: { in: u.input_tokens + cached + (u.cache_creation_input_tokens ?? 0), cachedIn: cached, out: u.output_tokens },
     };
@@ -136,8 +153,10 @@ export class ReplayProvider implements LLMProvider {
     private fallback?: (req: LLMRequest) => LLMResult,
   ) {}
 
-  static key(req: Pick<LLMRequest, 'system' | 'user'>): string {
-    return createHash('sha256').update(req.system).update('\u0000').update(req.user).digest('hex').slice(0, 32);
+  static key(req: Pick<LLMRequest, 'system' | 'user' | 'shared'>): string {
+    const h = createHash('sha256').update(req.system).update('\u0000');
+    if (req.shared) h.update(req.shared).update('\u0000');
+    return h.update(req.user).digest('hex').slice(0, 32);
   }
 
   async complete(req: LLMRequest): Promise<LLMResult> {
@@ -155,4 +174,87 @@ export function makeProvider(provider: ProviderId, key: string | undefined, base
   }
   if (PROVIDER_INFO[provider].needsKey && !key) throw new ProviderError('falta la API key');
   return new OpenAICompatProvider(provider, baseUrl || PROVIDER_INFO[provider].baseUrl, key);
+}
+
+/** Un modelo que ofrece la API key (desplegables de /admin y de Configurar). */
+export interface ListedModel {
+  id: string;
+  name?: string;
+  /** Fecha de publicación (ms), si la API la da. Sirve para ordenar. */
+  created?: number;
+  /** Anthropic: aún funciona, pero se va a retirar. */
+  deprecated?: boolean;
+}
+
+export const LIST_TIMEOUT_MS = 10_000;
+/** Tope de modelos (OpenRouter lista cientos; más no caben en un desplegable). */
+const LIST_MAX = 500;
+/** De la lista de OpenAI solo interesan los modelos de texto que valen para chat. */
+const NOT_CHAT = /embed|tts|whisper|dall-e|davinci|babbage|moderation|transcribe|image|audio|realtime|search|sora|computer-use/i;
+
+/** Más nuevos primero; sin fecha, por nombre. Sin repetidos. */
+export function sortModels(list: ListedModel[]): ListedModel[] {
+  const seen = new Set<string>();
+  return list
+    .filter((m) => !!m.id && !seen.has(m.id) && !!seen.add(m.id))
+    .sort((a, b) => (b.created ?? 0) - (a.created ?? 0) || a.id.localeCompare(b.id))
+    .slice(0, LIST_MAX);
+}
+
+/**
+ * Modelos que ofrece una key. Anthropic, con el SDK oficial (`models.list`, que
+ * pagina solo; la API ya los da de más nuevo a más antiguo); OpenAI y
+ * compatibles, `GET {baseUrl}/models`. Como mucho 10 s. Los errores solo llevan
+ * el código de estado: nunca la key ni la respuesta del proveedor.
+ */
+export async function listModels(
+  provider: ProviderId,
+  key: string | undefined,
+  baseUrl: string | undefined,
+  opts: { fetch?: typeof fetch; signal?: AbortSignal } = {},
+): Promise<ListedModel[]> {
+  const signal = opts.signal ?? AbortSignal.timeout(LIST_TIMEOUT_MS);
+  const lost = () => new ProviderError(signal.aborted ? 'el proveedor no respondió a tiempo' : 'no se pudo conectar con el proveedor');
+  if (provider === 'anthropic') {
+    if (!key) throw new ProviderError('falta la API key');
+    const client = new Anthropic({ apiKey: key, baseURL: baseUrl || undefined, maxRetries: 0, timeout: LIST_TIMEOUT_MS, ...(opts.fetch ? { fetch: opts.fetch } : {}) });
+    const out: ListedModel[] = [];
+    try {
+      for await (const m of client.models.list({ limit: 1000 }, { signal })) {
+        const created = Date.parse(m.created_at);
+        out.push({ id: m.id, ...(m.display_name ? { name: m.display_name } : {}), ...(created > 0 ? { created } : {}), ...(m.lifecycle === 'deprecated' ? { deprecated: true } : {}) });
+        if (out.length >= LIST_MAX) break;
+      }
+    } catch (e) {
+      if (e instanceof Anthropic.APIError && e.status) throw new ProviderError(`el proveedor respondió ${e.status}`, e.status);
+      throw lost();
+    }
+    return sortModels(out);
+  }
+  if (PROVIDER_INFO[provider].needsKey && !key) throw new ProviderError('falta la API key');
+  const base = (baseUrl || PROVIDER_INFO[provider].baseUrl).replace(/\/$/, '');
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (key) headers.Authorization = `Bearer ${key}`;
+  let data: unknown;
+  try {
+    const r = await (opts.fetch ?? fetch)(`${base}/models`, { headers, signal });
+    if (!r.ok) throw new ProviderError(`el proveedor respondió ${r.status}`, r.status);
+    data = JSON.parse(await r.text());
+  } catch (e) {
+    if (e instanceof ProviderError) throw e;
+    if (e instanceof SyntaxError) throw new ProviderError('respuesta del proveedor no es JSON');
+    throw lost();
+  }
+  const rows = (data as { data?: unknown } | null)?.data;
+  if (!Array.isArray(rows)) throw new ProviderError('la respuesta no trae la lista de modelos');
+  const out: ListedModel[] = [];
+  for (const m of rows as Record<string, unknown>[]) {
+    if (!m || typeof m.id !== 'string' || !m.id || m.id.length > 128) continue;
+    if (provider === 'openai' && NOT_CHAT.test(m.id)) continue;
+    const name = typeof m.name === 'string' && m.name && m.name !== m.id ? m.name.slice(0, 128) : undefined;
+    // OpenAI da segundos Unix.
+    const created = typeof m.created === 'number' && m.created > 0 ? m.created * 1000 : undefined;
+    out.push({ id: m.id, ...(name ? { name } : {}), ...(created ? { created } : {}) });
+  }
+  return sortModels(out);
 }

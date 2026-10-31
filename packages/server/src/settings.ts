@@ -34,6 +34,10 @@ export interface ServerAi {
   model?: string;
   modelPremium?: string;
   maxCitizens: number;
+  /** 2.0: % de vecinos con IA en las partidas nuevas (con key del servidor, fijo; con key propia, lo elige el jugador). */
+  aiShare?: number;
+  /** 2.0: turnos del pueblo con el modelo de calidad (por defecto) o el de ahorro. */
+  turnQuality?: 'calidad' | 'ahorro';
   serverMonthly?: number;
   gameMonthly?: number;
   gameDaily?: number;

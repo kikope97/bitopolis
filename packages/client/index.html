@@ -42,7 +42,7 @@
         <button id="hud-pop" class="tb-btn tb-stat"></button>
         <button id="hud-happy" class="tb-btn tb-stat" aria-label="Felicidad media: ver por qué"></button>
         <button id="hud-poll" class="tb-btn" hidden></button>
-        <button id="ai-chip" class="ai-chip" hidden>IA ●</button>
+        <button id="ai-chip" class="ai-chip" hidden>IA ✦</button>
         <button id="bell" class="tb-btn tb-bell" aria-label="Avisos"><span class="bell-n" hidden></span></button>
       </header>
       <div class="map-wrap">
@@ -62,6 +62,8 @@
       </div>
       <!-- Franja de contexto (una sola): fecha y demanda, ayuda de la herramienta o «Construir / ✕». -->
       <div id="strip" class="strip">
+        <!-- 2.0: mientras la IA decide la semana, el reloj espera (como mucho 45 s). -->
+        <p id="thinking" class="turn-wait" role="status" hidden><span>✦ El pueblo decide la semana…</span><span class="wait-bar" aria-hidden="true"><span class="wait-fill"></span></span></p>
         <button id="strip-info" class="strip-info" aria-label="Fecha y demanda: ver qué significa">
           <span id="hud-date"></span>
           <span id="hud-weather" class="hud-weather"></span>
