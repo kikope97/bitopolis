@@ -15,7 +15,10 @@ test('Modo IA: configurar, jugar y ver un motivo de la IA', async ({ page }, inf
   // En el test se usa un LLM falso local (endpoint propio, compatible con OpenAI).
   await page.locator('details.advanced summary').first().click();
   await page.locator('#ai-base').fill('http://localhost:8099/v1');
-  await page.locator('#ai-model').fill('falso');
+  // «Cargar modelos» prueba el endpoint sin guardarlo y llena los desplegables (con «Otro…»).
+  await page.getByRole('button', { name: 'Cargar modelos' }).click();
+  await expect(page.locator('#ai-model-list option')).toHaveText([/^Automático/, 'falso-mini', 'falso-grande', 'falso-viejo', 'Otro…']);
+  await page.getByLabel('Modelo de los vecinos (lotes)').selectOption('falso-mini');
   await page.screenshot({ path: `test-results/capturas/${info.project.name}-ia-config.png` });
   await page.getByRole('button', { name: 'Guardar y usar el Modo IA' }).click();
   await expect(page.locator('.toast').last()).toContainText('casilla');

@@ -4,6 +4,21 @@ import { createServer } from 'node:http';
 
 const port = Number(process.env.FAKE_LLM_PORT ?? 8099);
 createServer((req, res) => {
+  // Lista de modelos (desplegables de /admin y Configurar), como la de OpenAI.
+  if (req.method === 'GET' && req.url?.startsWith('/v1/models')) {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(
+      JSON.stringify({
+        object: 'list',
+        data: [
+          { id: 'falso-mini', object: 'model', created: 1_790_000_000, owned_by: 'bitopolis' },
+          { id: 'falso-grande', object: 'model', created: 1_780_000_000, owned_by: 'bitopolis' },
+          { id: 'falso-viejo', object: 'model', created: 1_700_000_000, owned_by: 'bitopolis' },
+        ],
+      }),
+    );
+    return;
+  }
   if (req.method === 'GET') {
     res.writeHead(200).end('ok');
     return;
