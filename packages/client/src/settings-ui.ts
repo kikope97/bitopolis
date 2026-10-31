@@ -35,7 +35,7 @@ export function radioGroup<T extends string | number>(label: string, options: [T
   return h('div', { class: 'field' }, h('span', { class: 'field-label' }, label), box);
 }
 
-function toggle(label: string, key: 'sfx' | 'music' | 'ambience' | 'vibrate' | 'calm', help?: string): HTMLElement {
+function toggle(label: string, key: 'sfx' | 'music' | 'ambience' | 'vibrate' | 'calm' | 'shortcuts', help?: string): HTMLElement {
   const input = h('input', { type: 'checkbox', ...(prefs()[key] ? { checked: true } : {}) }) as HTMLInputElement;
   input.addEventListener('change', () => {
     unlockAudio();
@@ -132,6 +132,8 @@ export function openSettings(): void {
       p.motion,
       (v) => setPrefs({ motion: v }),
     ),
+    h('h3', {}, 'Teclado'),
+    toggle('Atajos de una tecla', 'shortcuts', '(W A S D, L, O y las herramientas; con lector de pantalla puede ir mejor sin ellos)'),
     h('p', { class: 'muted small' }, 'Se guardan en este dispositivo.'),
   );
 }

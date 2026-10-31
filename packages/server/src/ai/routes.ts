@@ -10,6 +10,7 @@ import {
   FORMAT_VERSION,
   type GameState,
   migrate,
+  SYSTEM_PROMPT,
   townFacts,
   validActions,
 } from '@bitopolis/sim';
@@ -22,19 +23,22 @@ import { encryptSecret, maskKey } from './crypto.ts';
 import type { AiService, AiSettings } from './service.ts';
 
 /** Medido con `pnpm sim` (ver docs/rondas): decisiones por vecino con nombre y día. */
-export const DECISIONS_PER_CITIZEN_DAY = 0.1;
-const TOKENS_IN_BASE = 330;
-const TOKENS_IN_PER_CITIZEN = 200;
+export const DECISIONS_PER_CITIZEN_DAY = 0.085;
+/** Las «opiniones» salen con cualquier número de vecinos: nunca menos de media decisión al día. */
+const MIN_DECISIONS_PER_DAY = 0.5;
+// Ronda 09: la base es el prompt de sistema real (≈3,2 caracteres por token) más el resumen del pueblo.
+const TOKENS_IN_BASE = Math.ceil(SYSTEM_PROMPT.length / 3.2) + 120;
+const TOKENS_IN_PER_CITIZEN = 230;
 const TOKENS_OUT_PER_CITIZEN = 40;
 
 /** Margen para los reintentos de respuestas no válidas (v1.3; medido: casi siempre valen a la primera). */
 export const RETRY_RATE = 0.15;
 /** Crónica del diario: una al mes con el modelo premium. */
-const CHRONICLE = { in: 1_800, out: 260 };
+const CHRONICLE = { in: 800, out: 260 };
 
 /** Coste en € de un día de juego: decisiones (con reintentos) y la parte de la crónica del mes. */
 export function estimatePerGameDay(ai: AiService, provider: ProviderId, model: string, premium: string, citizens: number): number {
-  const decisionsPerDay = citizens * DECISIONS_PER_CITIZEN_DAY;
+  const decisionsPerDay = Math.max(MIN_DECISIONS_PER_DAY, citizens * DECISIONS_PER_CITIZEN_DAY);
   // Las decisiones del mismo día van en un lote.
   const batchesPerDay = Math.min(1, decisionsPerDay);
   const tokensIn = batchesPerDay * TOKENS_IN_BASE + decisionsPerDay * TOKENS_IN_PER_CITIZEN;
@@ -234,13 +238,16 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
     const key = `${g.row.id}:${monthIdx}`;
     const cached = chronicles.get(key);
     if (cached) return { text: cached };
+    // Si la IA ya falló este mes, no se repite la llamada (premium) cada vez que se abre el diario.
+    if (cached === '') return { text: null, reason: 'no disponible este mes' };
     // Sucesos del motor; los motivos del LLM no se reinyectan.
     const events = g.state.events
       .filter((e) => e.kind !== 'decision' && e.kind !== 'tax')
       .map((e) => e.text)
       .slice(-25);
     const r = await ai.text(g.row.id, 'diario', buildChronicleRequest(g.state, townFacts(g.state), events), true);
-    if (r.text) chronicles.set(key, r.text);
+    // Un texto no válido se recuerda como fallo; si fue por tope o por red, se puede reintentar luego.
+    if (r.text || r.reason === 'invalid') chronicles.set(key, r.text ?? '');
     return r;
   });
 

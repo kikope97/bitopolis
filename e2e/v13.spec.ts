@@ -29,6 +29,12 @@ test('v1.3: skyline que se mueve, llave de píxeles, tecla O y nota del enlace',
   await page.locator('#map').focus();
   await page.keyboard.press('o');
   await expect(page.locator('.sheet h2')).toHaveText('Ajustes');
+  // Ronda 09: los atajos de una tecla se pueden quitar (WCAG 2.1.4); Ctrl+O nunca abre Ajustes.
+  await page.getByRole('checkbox', { name: /Atajos de una tecla/ }).uncheck();
+  await page.locator('.sheet-close').click();
+  await page.locator('#map').focus();
+  await page.keyboard.press('o');
+  await expect(page.locator('.sheet')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

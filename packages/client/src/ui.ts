@@ -30,8 +30,16 @@ export function toast(text: string, opts: { sticky?: boolean; kind?: 'info' | 'w
     const n = Number(same.dataset.count ?? '1') + 1;
     same.dataset.count = String(n);
     let badge = same.querySelector('.toast-count');
-    if (!badge) same.querySelector('.toast-text')!.after((badge = h('span', { class: 'toast-count' })));
+    // El contador es visual; al lector se le dice el aviso entero (ronda 09).
+    if (!badge) same.querySelector('.toast-text')!.after((badge = h('span', { class: 'toast-count', 'aria-hidden': 'true' })));
     badge.textContent = `×${n}`;
+    const live = document.querySelector('#sr-live');
+    if (live) live.textContent = `${text} (${n} veces)`;
+    // Se repitió: vuelve a contar el tiempo para que no desaparezca justo ahora.
+    if (same.dataset.timer) {
+      clearTimeout(Number(same.dataset.timer));
+      same.dataset.timer = String(setTimeout(() => same.remove(), 6000));
+    }
     return;
   }
   const icon = { info: 'ℹ', warn: '⚠', good: '✔' }[opts.kind ?? 'info'];
@@ -65,7 +73,7 @@ export function toast(text: string, opts: { sticky?: boolean; kind?: 'info' | 'w
     });
     el.append(x);
   } else {
-    setTimeout(() => el.remove(), 6000);
+    el.dataset.timer = String(setTimeout(() => el.remove(), 6000));
   }
   box.append(el);
   // Como mucho 2 avisos a la vista; los fijos (con ✕) se conservan antes.

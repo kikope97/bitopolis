@@ -1,4 +1,5 @@
 import { openSettings } from './settings-ui.ts';
+import { drawSkyline } from './skyline.ts';
 import { openAiConfig } from './ai-ui.ts';
 import { type AiMeta, api, ApiError, type Summary } from './api.ts';
 import { startGame } from './game.ts';
@@ -11,6 +12,7 @@ export async function showStart(token: string): Promise<void> {
   const sid = sessionId();
   const root = $('#start');
   root.hidden = false;
+  drawSkyline();
   $('#game').hidden = true;
   let info: Awaited<ReturnType<typeof api.get>>;
   let meta: AiMeta;
@@ -76,6 +78,7 @@ export async function showStart(token: string): Promise<void> {
   // La URL pública (de /admin) puede no ser la de la barra del navegador: es la misma partida.
   const other = !!meta.publicUrl && new URL(meta.publicUrl).origin !== location.origin;
   $('#link-note').hidden = !other;
+  if (other) $('#copy-link').setAttribute('aria-describedby', 'link-note');
   ($('#copy-link') as HTMLButtonElement).onclick = () => copy(url);
   ($('#configure') as HTMLButtonElement).onclick = () => openConfig(info.exists);
 

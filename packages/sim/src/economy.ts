@@ -391,6 +391,11 @@ export function serviceSaturation(state: GameState, kind: BuildingKind): number 
   return Math.min(1, (n * cap) / Math.max(1, state.citizens.length));
 }
 
+/**
+ * Saturado de verdad: por debajo del 90 % (con 61 vecinos y un colegio no
+ * hace falta otro) y sin otro de ese tipo ya en obras (ronda 09).
+ */
 export function saturated(state: GameState, kind: BuildingKind): boolean {
-  return serviceSaturation(state, kind) < 1;
+  if (state.buildings.some((b) => b.kind === kind && !b.built)) return false;
+  return serviceSaturation(state, kind) < 0.9;
 }

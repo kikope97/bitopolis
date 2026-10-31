@@ -10,6 +10,7 @@ import {
   hashState,
   migrate,
   playerApproval,
+  saturated,
   serviceSaturation,
   runSimulation,
   step,
@@ -253,5 +254,16 @@ describe('servicios que escalan con la población (v1.3)', () => {
     step(s);
     const all = Object.values(s.politics.factions).flatMap((f) => f.unmet);
     expect(all).toContain('otro colegio');
+  });
+
+  it('un colegio en obras cuenta: no se pide otro mientras se construye (ronda 09)', () => {
+    const s = town(900);
+    const school = s.buildings.find((b) => b.kind === 'school' && b.built);
+    if (!school) return;
+    s.buildings = s.buildings.filter((b) => b.kind !== 'school' || b === school);
+    for (let i = s.citizens.length; i < 100; i++) s.citizens.push({ ...s.citizens[0]!, id: 900_000 + i, named: false, relations: [], memories: [] });
+    expect(saturated(s, 'school')).toBe(true);
+    s.buildings.push({ ...school, id: 999_999, built: false });
+    expect(saturated(s, 'school')).toBe(false);
   });
 });

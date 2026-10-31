@@ -658,7 +658,7 @@ export function startGame(opts: GameOptions): void {
   window.addEventListener('keydown', (e) => {
     if (document.querySelector('.modal-backdrop')) return;
     const target = e.target as HTMLElement;
-    if (target.tagName === 'INPUT' || target.tagName === 'SELECT') return;
+    if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
     const step = Math.round(64 * dpr());
     const k = e.key;
     // Con una hoja abierta el teclado es de la hoja: el mapa no se mueve por detrás.
@@ -686,6 +686,8 @@ export function startGame(opts: GameOptions): void {
       $('#sr-live').textContent = describeTile(cursor);
       return;
     }
+    // Atajos de una tecla (letras y signos): se pueden quitar en Ajustes (WCAG 2.1.4) y nunca con Ctrl/Alt/Cmd.
+    if (k.length === 1 && k !== ' ' && (!prefs().shortcuts || e.ctrlKey || e.metaKey || e.altKey)) return;
     if (k === 'ArrowLeft' || k === 'a') cam.x -= step;
     else if (k === 'ArrowRight' || k === 'd') cam.x += step;
     else if (k === 'ArrowUp' || k === 'w') cam.y -= step;
@@ -693,7 +695,8 @@ export function startGame(opts: GameOptions): void {
     else if (k === '+' || k === '=') setZoom(cam.zoom + 1);
     else if (k === '-') setZoom(cam.zoom - 1);
     else if (k === 'l') $('#layers').click();
-    else if (k === 'o') openSettings();
+    // Atajo de Ajustes: solo la tecla sola (Ctrl+O abre archivos en el navegador), con o sin mayúsculas.
+    else if (k.toLowerCase() === 'o') openSettings();
     else if (k === ' ' && target.tagName !== 'BUTTON') {
       e.preventDefault();
       setSpeed(speed === 0 ? 1 : 0);

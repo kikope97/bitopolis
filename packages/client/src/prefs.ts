@@ -24,10 +24,12 @@ export interface Prefs {
   calm: boolean;
   /** Movimiento: según el sistema o siempre reducido. */
   motion: 'sistema' | 'reducido';
+  /** Atajos de una tecla (W A S D, L, O, herramientas). Se pueden quitar (WCAG 2.1.4). */
+  shortcuts: boolean;
 }
 
 const KEY = 'bitopolis.prefs';
-const DEFAULTS: Prefs = { sfx: true, music: false, ambience: false, sfxDb: -9, musicDb: -22, ambDb: -28, vibrate: true, font: 'legible', text: 100, contrast: 'normal', colorblind: 'no', calm: false, motion: 'sistema' };
+const DEFAULTS: Prefs = { sfx: true, music: false, ambience: false, sfxDb: -9, musicDb: -22, ambDb: -28, vibrate: true, font: 'legible', text: 100, contrast: 'normal', colorblind: 'no', calm: false, motion: 'sistema', shortcuts: true };
 
 let current: Prefs = load();
 const listeners = new Set<(p: Prefs) => void>();

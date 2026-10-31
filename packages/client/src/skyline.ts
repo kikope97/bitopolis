@@ -1,5 +1,5 @@
 import { PALETTE } from './palette.ts';
-import { lowMotion } from './prefs.ts';
+import { lowMotion, onPrefs } from './prefs.ts';
 import { grassTile, putPix, walkerSprite, buildingSprite, treeSprite } from './sprites.ts';
 
 /**
@@ -65,7 +65,13 @@ function frame(g: CanvasRenderingContext2D, t: number, still: boolean): void {
 }
 
 let raf = 0;
+let watching = false;
 export function drawSkyline(): void {
+  // Al cambiar «Animaciones» o el modo tranquilo, se vuelve a decidir si se mueve.
+  if (!watching) {
+    watching = true;
+    onPrefs(() => drawSkyline());
+  }
   const c = document.querySelector<HTMLCanvasElement>('#skyline');
   const g = c?.getContext('2d');
   if (!c || !g) return;
@@ -73,12 +79,11 @@ export function drawSkyline(): void {
   cancelAnimationFrame(raf);
   let last = 0;
   const loop = (t: number) => {
-    if (!c.isConnected) return;
-    // Solo mientras se ve la pantalla de inicio (si no, se mira cada medio segundo);
-    // a unos 12 fotogramas por segundo basta.
-    if (c.offsetParent === null || lowMotion()) {
-      if (lowMotion()) frame(g, 0, true);
-      setTimeout(() => (raf = requestAnimationFrame(loop)), 500);
+    // Solo mientras se ve la pantalla de inicio: al jugar se para del todo y
+    // showStart() lo vuelve a lanzar (ronda 09: antes consultaba cada 500 ms).
+    if (!c.isConnected || c.offsetParent === null) return;
+    if (lowMotion()) {
+      frame(g, 0, true);
       return;
     }
     if (t - last > 80) {

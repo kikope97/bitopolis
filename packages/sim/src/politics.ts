@@ -273,17 +273,22 @@ function rivalGovern(state: GameState): void {
   // Impuestos según la facción; con déficit y la caja baja, como cualquier gobierno, los sube.
   const last = state.stats.at(-1);
   const deficit = !!last && last.income < last.expenses && state.treasury < 10_000;
+  // Margen (ronda 09): tras subir por déficit, solo baja con superávit claro y caja holgada.
+  // Sin margen, subía y bajaba cada mes y el registro se llenaba de cambios de impuestos.
+  const calm = !last || (last.income > last.expenses * 1.1 && state.treasury > 15_000);
   const want = deficit ? 'high' : f === 'empresarios' || f === 'jubilados' ? 'low' : 'medium';
   if (deficit && state.taxesSplit) governmentCommand(state, { type: 'SetTaxes', ibi: 'high', tasas: 'high' });
-  else if (state.taxesSplit) {
+  else if (!deficit && !calm) {
+    /* entre el déficit y la calma: se deja como está */
+  } else if (state.taxesSplit) {
     if (f === 'jubilados') governmentCommand(state, { type: 'SetTaxes', ibi: 'low', tasas: 'medium' });
     else if (f === 'empresarios') governmentCommand(state, { type: 'SetTaxes', ibi: 'medium', tasas: 'low' });
     else governmentCommand(state, { type: 'SetTaxes', ibi: 'medium', tasas: 'medium' });
   } else if (state.taxLevel !== want) governmentCommand(state, { type: 'SetTax', level: want });
   // Promesas fiscales: si no hay déficit, las cumple bajando ese impuesto.
   const owesTax = (need: string) => p.party!.promises.some((x) => x.status === 'pending' && x.need === need);
-  if (!deficit && owesTax('bajar el IBI')) governmentCommand(state, state.taxesSplit ? { type: 'SetTaxes', ibi: 'low' } : { type: 'SetTax', level: 'low' });
-  if (!deficit && owesTax('bajar los impuestos')) governmentCommand(state, state.taxesSplit ? { type: 'SetTaxes', tasas: 'low', ibi: 'low' } : { type: 'SetTax', level: 'low' });
+  if (calm && owesTax('bajar el IBI')) governmentCommand(state, state.taxesSplit ? { type: 'SetTaxes', ibi: 'low' } : { type: 'SetTax', level: 'low' });
+  if (calm && owesTax('bajar los impuestos')) governmentCommand(state, state.taxesSplit ? { type: 'SetTaxes', tasas: 'low', ibi: 'low' } : { type: 'SetTax', level: 'low' });
   if (JSON.stringify(taxLevels(state)) !== taxesBefore) {
     const t = taxLevels(state);
     const what = state.taxesSplit ? `IBI ${LEVEL_TEXT[t.ibi]}, tasas ${LEVEL_TEXT[t.tasas]}` : `impuestos en ${LEVEL_TEXT[t.ibi]}`;

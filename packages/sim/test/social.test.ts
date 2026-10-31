@@ -1,3 +1,4 @@
+import { TICKS_PER_MONTH } from '@bitopolis/shared';
 import { describe, expect, it } from 'vitest';
 import {
   activeObjectives,
@@ -13,6 +14,9 @@ import {
   migrate,
   narrativeSummary,
   OBJECTIVES,
+  OUTSIDE,
+  TREASURY,
+  transfer,
   onCitizenLeaves,
   parseText,
   inventedName,
@@ -30,6 +34,8 @@ import {
 
 function town(): GameState {
   const { state } = runSimulation({ seed: 1, days: 200, profile: 'constructor' });
+  // Caja holgada para poder convocar plenos (entra desde fuera: el dinero se conserva).
+  transfer(state, OUTSIDE, TREASURY, 20_000, 'subvencion');
   return state;
 }
 
@@ -361,6 +367,10 @@ describe('IA: tono y nombres inventados (v1.3)', () => {
     expect(inventedName('Pues me quedo. Aquí estoy bien.', sent)).toBeNull();
     expect(inventedName('Lo hago por el Ayuntamiento y por Bitópolis.', sent)).toBeNull();
     expect(inventedName('Me lo dijo Marisa en la panadería.', sent)).toBe('Marisa');
+    // Ronda 09: ni días, ni tratamientos, ni edificios, ni lugares; sí nombres al empezar la frase.
+    for (const ok of ['El Lunes lo pienso.', 'Señor alcalde, así no.', 'Como Médica, lo veo claro.', 'Que pongan la Comisaría.', 'Vengo de Ávila.', 'Ni un McDonald.', 'Por Lucia lo hago.']) expect(inventedName(ok, sent)).toBeNull();
+    expect(inventedName('Paco me dijo que me quede.', sent)).toBe('Paco');
+    expect(inventedName('Me quedo: Fernando lo dice.', sent)).toBe('Fernando');
   });
 
   it('un motivo con un nombre inventado no vale; uno normal, sí', () => {
@@ -381,5 +391,73 @@ describe('IA: tono y nombres inventados (v1.3)', () => {
     const req = buildTalkRequest(s, c, 'como_estas');
     expect(parseText(JSON.stringify({ texto: 'Aquí andamos, con ganas de que el pueblo crezca.' }), req)).not.toBeNull();
     expect(parseText(JSON.stringify({ texto: 'Mi primo Anacleto dice que esto va bien.' }), req)).toBeNull();
+  });
+});
+
+describe('ronda 09: arreglos de la vida social y el pleno', () => {
+  it('nadie pasa de 5 relaciones y las amistades no se rehacen en bucle', () => {
+    const { state } = runSimulation({ seed: 3, days: 600, profile: 'constructor' });
+    for (const c of state.citizens) expect(c.relations.length).toBeLessThanOrEqual(5);
+    let barrio = 0;
+    for (let d = 0; d < 120; d++) {
+      state.tick += 24;
+      const before = state.events.length;
+      socialDay(state);
+      barrio += state.events.slice(before).filter((e) => e.text.includes('han hecho amistad')).length;
+    }
+    // Como mucho uno al día, y en la práctica muy pocos.
+    expect(barrio).toBeLessThan(30);
+    expect(state.events.some((e) => / amigos /.test(e.text))).toBe(false);
+  });
+
+  it('un recuerdo conserva el nombre aunque esa persona se vaya', () => {
+    const s = town();
+    const [c, friend] = s.citizens.filter((x) => x.named);
+    c!.memories = [];
+    addMemory(s, c!, 'se_fue_amigo', 3, -3, [friend!.id]);
+    const first = friend!.name.split(' ')[0]!;
+    s.citizens = s.citizens.filter((x) => x !== friend);
+    expect(memoryLine(s, c!)).toContain(first);
+  });
+
+  it('«¿Cómo estás?» enlaza el recuerdo con el ánimo', () => {
+    const s = town();
+    const [c, friend] = s.citizens.filter((x) => x.named);
+    c!.memories = [];
+    addMemory(s, c!, 'se_fue_amigo', 3, -3, [friend!.id]);
+    c!.happiness = 90;
+    expect(ruleAnswer(s, c!, 'como_estas', undefined)).toContain('Eso sí, echo de menos');
+    c!.memories = [];
+    addMemory(s, c!, 'abrio_negocio', 3, 3);
+    c!.happiness = 20;
+    expect(ruleAnswer(s, c!, 'como_estas', undefined)).toContain('Al menos, con mi negocio');
+  });
+
+  it('pleno: la oposición no da campaña fuera del último año ni por encima de 3; incumplirle resta', () => {
+    const s = town();
+    const leader = s.citizens.find((x) => x.named)!;
+    s.politics.party = { leaderId: leader.id, leaderName: leader.name, name: 'Bitópolis Joven', faction: 'jovenes', founded: s.tick, promises: [] };
+    s.politics.nextElection = s.tick + 30 * TICKS_PER_MONTH;
+    s.politics.campaign.jovenes = 0;
+    applyCommand(s, { type: 'ConvenePleno' });
+    const q = s.pleno!.petitions.find((p) => p.opposition)!;
+    applyCommand(s, { type: 'AnswerPetition', petitionId: q.id, answer: 'promise' });
+    // Faltan 30 meses: no cuenta como campaña.
+    expect(s.politics.campaign.jovenes).toBe(0);
+    const promise = s.promises.at(-1)!;
+    expect(promise.oppositionFaction).toBe('jovenes');
+    // Lo ya prometido no se vuelve a pedir.
+    applyCommand(s, { type: 'ClosePleno' });
+    s.lastPlenoTick = -1e9;
+    applyCommand(s, { type: 'ConvenePleno' });
+    expect(s.pleno!.petitions.some((p) => p.need === promise.need)).toBe(false);
+    applyCommand(s, { type: 'ClosePleno' });
+    // Incumplida: la facción de la oposición lo castiga.
+    s.politics.campaign.jovenes = 3;
+    promise.deadline = s.tick;
+    promise.baseline = 1e9;
+    s.tick += 24;
+    socialDay(s);
+    if (promise.status === 'broken') expect(s.politics.campaign.jovenes).toBe(1);
   });
 });

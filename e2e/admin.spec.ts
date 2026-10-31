@@ -110,7 +110,8 @@ test('admin: primer acceso, ajustes que valen al momento y vista móvil', async 
   await page.reload();
   // Partidas, copias y cuenta empiezan plegadas (v1.3).
   await page.getByRole('button', { name: 'Partidas', exact: true }).click();
-  await page.getByRole('button', { name: 'Copias de seguridad' }).click();
+  // Sin copias recientes, «Copias de seguridad» ya viene abierta (ronda 09).
+  if ((await page.getByRole('button', { name: 'Copias de seguridad' }).getAttribute('aria-expanded')) !== 'true') await page.getByRole('button', { name: 'Copias de seguridad' }).click();
   const partidas = page.getByRole('region', { name: 'Partidas', exact: true });
   await expect(partidas.locator('li')).not.toHaveCount(0);
   const before = await partidas.locator('li').count();

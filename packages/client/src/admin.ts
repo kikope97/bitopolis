@@ -117,7 +117,8 @@ function foldCard(title: string, openByDefault: boolean, ...content: (Node | str
   const key = `bitopolis.admin.open.${title}`;
   let open = openByDefault;
   try {
-    const saved = localStorage.getItem(key);
+    // Si hay algo que mirar (abierta por defecto), manda eso; si no, lo que eligió la última vez.
+    const saved = openByDefault ? null : localStorage.getItem(key);
     if (saved !== null) open = saved === '1';
   } catch {
     /* sin almacenamiento: por defecto */
@@ -471,9 +472,12 @@ action('Guardar la IA', async () => (await saveAi(), 'IA guardada'), 'btn primar
         : [h('li', { class: 'muted' }, 'Sin copias todavía.')]),
     );
   fillBackups(backups);
+  // Sin copias, o la última de hace más de 2 días: la tarjeta se abre sola (ronda 09).
+  const lastBackup = backups[0]?.name.match(/\d{4}-\d{2}-\d{2}/)?.[0];
+  const staleBackups = !lastBackup || Date.now() - Date.parse(lastBackup) > 2 * 86_400_000;
   const backupCard = foldCard(
     'Copias de seguridad',
-    false,
+    staleBackups,
     h('p', { class: 'help' }, 'Una al día en /data/backups. Para mover el servidor, copia la carpeta /data entera (incluye la clave que cifra las API keys).'),
     field('Copias que se guardan', keep),
     h(
