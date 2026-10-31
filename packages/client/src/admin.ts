@@ -108,10 +108,42 @@ function check(label: string, on: boolean, help?: string): [HTMLElement, HTMLInp
 function card(title: string, ...content: (Node | string)[]): HTMLElement {
   const id = `c${++uid}`;
   // El título se puede enfocar: tras redibujar, el foco vuelve a la tarjeta en la que se estaba.
-  return h('section', { class: 'admin-card', 'aria-labelledby': id }, h('h2', { id, tabindex: '-1' }, title), ...content);
+  return h('section', { class: 'admin-card', 'aria-labelledby': id }, h('h2', { id, tabindex: '-1', 'data-title': title }, title), ...content);
+}
+
+/** Tarjeta plegable (v1.3): el panel en móvil son muchas pantallas. Recuerda si estaba abierta. */
+function foldCard(title: string, openByDefault: boolean, ...content: (Node | string)[]): HTMLElement {
+  const id = `c${++uid}`;
+  const key = `bitopolis.admin.open.${title}`;
+  let open = openByDefault;
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved !== null) open = saved === '1';
+  } catch {
+    /* sin almacenamiento: por defecto */
+  }
+  const body = h('div', { id: `${id}-body`, class: 'admin-card-body' }, ...content);
+  // La flecha va aparte y oculta al lector: el nombre del botón es solo el título.
+  const arrow = h('span', { class: 'fold-arrow', 'aria-hidden': 'true' });
+  const toggle = h('button', { class: 'admin-fold', type: 'button', 'aria-expanded': String(open), 'aria-controls': `${id}-body` }, arrow, title);
+  const set = (v: boolean) => {
+    open = v;
+    body.hidden = !v;
+    toggle.setAttribute('aria-expanded', String(v));
+    arrow.textContent = v ? '▾' : '▸';
+    try {
+      localStorage.setItem(key, v ? '1' : '0');
+    } catch {
+      /* da igual */
+    }
+  };
+  toggle.addEventListener('click', () => set(!open));
+  body.hidden = !open;
+  arrow.textContent = open ? '▾' : '▸';
+  return h('section', { class: 'admin-card', 'aria-labelledby': id }, h('h2', { id, tabindex: '-1', 'data-title': title }, toggle), body);
 }
 function focusCard(title: string): void {
-  [...document.querySelectorAll<HTMLElement>('.admin-card h2')].find((x) => x.textContent === title)?.focus();
+  [...document.querySelectorAll<HTMLElement>('.admin-card h2')].find((x) => x.dataset.title === title)?.focus();
 }
 /** Botón que se desactiva mientras trabaja y avisa del resultado. */
 function action(text: string, run: () => Promise<string | void>, cls = 'btn'): HTMLButtonElement {
@@ -427,7 +459,7 @@ action('Guardar la IA', async () => (await saveAi(), 'IA guardada'), 'btn primar
         : [h('li', { class: 'muted' }, 'Todavía no hay partidas.')]),
     );
   fillGames(games);
-  const gamesCard = card('Partidas', h('p', { class: 'help' }, 'El enlace de cada partida es su contraseña: no lo compartas.'), gameList);
+  const gamesCard = foldCard('Partidas', false, h('p', { class: 'help' }, 'El enlace de cada partida es su contraseña: no lo compartas.'), gameList);
 
   /* --- copias --- */
   const keep = input({ type: 'number', min: '1', max: '60', step: '1', value: String(v.backups.keep), inputmode: 'numeric' });
@@ -439,8 +471,9 @@ action('Guardar la IA', async () => (await saveAi(), 'IA guardada'), 'btn primar
         : [h('li', { class: 'muted' }, 'Sin copias todavía.')]),
     );
   fillBackups(backups);
-  const backupCard = card(
+  const backupCard = foldCard(
     'Copias de seguridad',
+    false,
     h('p', { class: 'help' }, 'Una al día en /data/backups. Para mover el servidor, copia la carpeta /data entera (incluye la clave que cifra las API keys).'),
     field('Copias que se guardan', keep),
     h(
@@ -463,8 +496,9 @@ action('Guardar la IA', async () => (await saveAi(), 'IA guardada'), 'btn primar
   const user = input({ value: v.admin.user, autocomplete: 'username' });
   const cur = input({ type: 'password', autocomplete: 'current-password' });
   const npw = input({ type: 'password', autocomplete: 'new-password', minlength: '8', placeholder: 'en blanco: la misma' });
-  const account = card(
+  const account = foldCard(
     'Cuenta del administrador',
+    false,
     field('Usuario', user),
     field('Contraseña nueva', npw),
     field('Contraseña actual (para confirmar)', cur),

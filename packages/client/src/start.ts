@@ -73,6 +73,9 @@ export async function showStart(token: string): Promise<void> {
   }
 
   $('#link-text').textContent = url;
+  // La URL pública (de /admin) puede no ser la de la barra del navegador: es la misma partida.
+  const other = !!meta.publicUrl && new URL(meta.publicUrl).origin !== location.origin;
+  $('#link-note').hidden = !other;
   ($('#copy-link') as HTMLButtonElement).onclick = () => copy(url);
   ($('#configure') as HTMLButtonElement).onclick = () => openConfig(info.exists);
 

@@ -693,6 +693,7 @@ export function startGame(opts: GameOptions): void {
     else if (k === '+' || k === '=') setZoom(cam.zoom + 1);
     else if (k === '-') setZoom(cam.zoom - 1);
     else if (k === 'l') $('#layers').click();
+    else if (k === 'o') openSettings();
     else if (k === ' ' && target.tagName !== 'BUTTON') {
       e.preventDefault();
       setSpeed(speed === 0 ? 1 : 0);
@@ -925,7 +926,7 @@ export function startGame(opts: GameOptions): void {
             item('Qué se envía a la IA', () => void openPreview(token)),
           ]
         : []),
-      item('Ajustes (sonido y accesibilidad)', openSettings),
+      item('Ajustes (sonido y accesibilidad) · tecla O', openSettings),
       item('Repetir tutorial', () => {
         closeSheet();
         tutorial.start(state, true);

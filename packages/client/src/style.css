@@ -425,7 +425,7 @@ html[data-text='200'] .fab-label small { font-size: 0.4rem; }
 .sheet { border-top: 4px solid var(--accent); box-shadow: 0 -4px 0 #1a1c2c; }
 .sheet-head { background: var(--panel-2); }
 .sheet-head h2, .sheet h3, .stats-card dt { font-family: ui-monospace, 'Cascadia Mono', Menlo, monospace; letter-spacing: 0.5px; }
-.sheet h3::before { content: '▸ '; color: var(--accent); }
+.sheet h3::before { content: '▸ ' / ''; color: var(--accent); }
 .toast { box-shadow: inset 2px 2px 0 #566c86, inset -3px -3px 0 #1a1c2c, 0 3px 0 #1a1c2c; }
 .petition { border-left: 4px solid var(--accent); }
 .tool { border-radius: 0; }
@@ -518,3 +518,11 @@ html[data-font='pixel'] .sheet-head h2, html[data-font='pixel'] .sheet h3, html[
 .pol-log { list-style: none; margin: 4px 0 8px; padding: 0; }
 .pol-log li { padding: 4px 0; border-bottom: 1px solid var(--line); }
 #hud-poll.soon { border-color: var(--accent); }
+/* Iconos de píxeles (v1.3): se escalan sin suavizar. */
+.px-icon { width: 20px; height: 10px; image-rendering: pixelated; vertical-align: middle; margin-right: 4px; }
+/* Avisos compactos (v1.3). */
+.toast { padding: 6px 10px; font-size: 0.95rem; }
+.toast-count { margin-left: auto; padding: 0 6px; border: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.admin-fold { all: unset; cursor: pointer; display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; }
+.fold-arrow { color: var(--accent); }
+.admin-fold:focus-visible { outline: 3px solid var(--accent); }

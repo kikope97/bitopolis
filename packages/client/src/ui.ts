@@ -24,10 +24,21 @@ export function h<K extends keyof HTMLElementTagNameMap>(
 
 export function toast(text: string, opts: { sticky?: boolean; kind?: 'info' | 'warn' | 'good'; onClick?: () => void } = {}) {
   const box = $('#toasts');
+  // Compactos (v1.3): el mismo aviso otra vez no se apila; sube su contador «×2».
+  const same = [...box.querySelectorAll<HTMLElement>('.toast')].find((t) => t.dataset.text === text && !t.classList.contains('clickable'));
+  if (same) {
+    const n = Number(same.dataset.count ?? '1') + 1;
+    same.dataset.count = String(n);
+    let badge = same.querySelector('.toast-count');
+    if (!badge) same.querySelector('.toast-text')!.after((badge = h('span', { class: 'toast-count' })));
+    badge.textContent = `×${n}`;
+    return;
+  }
   const icon = { info: 'ℹ', warn: '⚠', good: '✔' }[opts.kind ?? 'info'];
   // Sin role propio: el contenedor #toasts ya es aria-live (evita anuncios dobles).
   const body = opts.onClick ? h('button', { class: 'toast-text toast-action' }, text) : h('span', { class: 'toast-text' }, text);
   const el = h('div', { class: `toast ${opts.kind ?? 'info'}` }, h('span', { class: 'toast-icon', 'aria-hidden': 'true' }, icon), body);
+  el.dataset.text = text;
   if (opts.onClick) {
     el.classList.add('clickable');
     // Un botón de verdad: funciona con teclado (Enter/Espacio) y con lector de pantalla.

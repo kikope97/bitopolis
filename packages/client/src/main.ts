@@ -1,11 +1,13 @@
 import { randomBase62 } from './session.ts';
 import { apply as applyPrefs } from './prefs.ts';
+import { drawPixelIcons } from './icons.ts';
 import { drawSkyline } from './skyline.ts';
 import { showStart } from './start.ts';
 import './style.css';
 
 applyPrefs();
 drawSkyline();
+drawPixelIcons();
 window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener?.('change', applyPrefs);
 
 // PWA: instalable y con carga rápida (solo en HTTPS o localhost).
