@@ -3,9 +3,11 @@ import { emptyFields, type Fields } from './fields.ts';
 import { chance, nextInt, type RngState, seedRng } from './prng.ts';
 import type { Goal, Hook, Memory, Pleno, PromiseRecord, Relation } from './social.ts';
 import { emptyPolitics, type Politics } from './politics-core.ts';
+import { generateTerrain, isWater, Terrain } from './terrain.ts';
+import type { Weather } from './weather.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
-export const FORMAT_VERSION = 9;
+export const FORMAT_VERSION = 10;
 
 export const MAP_W = 48;
 export const MAP_H = 48;
@@ -28,6 +30,12 @@ export type BuildingKind =
   | 'police'
   | 'plaza'
   | 'market'
+  /** v1.7: lugares de vida social. */
+  | 'bar'
+  | 'chapel'
+  | 'cemetery'
+  | 'library'
+  | 'sports'
   | 'house'
   /** Crecen solos sobre zonas. */
   | 'res'
@@ -201,7 +209,8 @@ export interface GameState {
   rng: RngState;
   /** Horas de juego transcurridas. */
   tick: number;
-  map: { w: number; h: number; tiles: number[]; zones: number[] };
+  /** terrain (v1.7): 0 llano, 1 río, 2 mar, 3 colina (ver terrain.ts). */
+  map: { w: number; h: number; tiles: number[]; zones: number[]; terrain: number[] };
   /** Caja del ayuntamiento. Negativa = deuda municipal. */
   treasury: number;
   taxLevel: TaxLevel;
@@ -255,6 +264,8 @@ export interface GameState {
   budget: Budget;
   festival: Festival;
   grants: Grant[];
+  /** v1.7: tiempo de hoy y hasta cuándo dura. */
+  weather: Weather;
   /** Última despedida (como mucho una por semana). */
   lastDeathTick?: number;
 }
@@ -303,12 +314,14 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20 }: Ne
   const rng = seedRng(seed);
   const tiles = new Array<number>(MAP_W * MAP_H).fill(Tile.Grass);
   const zones = new Array<number>(MAP_W * MAP_H).fill(Zone.None);
+  // v1.7: río, costa y colinas (el centro queda en llano).
+  const terrain = generateTerrain(rng, MAP_W, MAP_H);
   const state: GameState = {
     formatVersion: FORMAT_VERSION,
     seed,
     rng,
     tick: 0,
-    map: { w: MAP_W, h: MAP_H, tiles, zones },
+    map: { w: MAP_W, h: MAP_H, tiles, zones, terrain },
     treasury: 0,
     taxLevel: 'medium',
     citizens: [],
@@ -341,10 +354,12 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20 }: Ne
     budget: { year: 1, plan: 'equilibrado', status: 'approved', votesFor: 0, votesAgainst: 0 },
     festival: { name: null, year: 0, size: 'none', until: 0 },
     grants: [],
+    weather: { kind: 'sol', until: 2 * 24 },
   };
   // Árboles dispersos (se talan gratis al construir encima).
   for (let i = 0; i < tiles.length; i++) {
-    if (chance(rng, 0.07)) tiles[i] = Tile.Tree;
+    if (isWater(terrain[i])) continue;
+    if (chance(rng, terrain[i] === Terrain.Hill ? 0.22 : 0.07)) tiles[i] = Tile.Tree;
   }
   const cx = Math.floor(MAP_W / 2);
   const cy = Math.floor(MAP_H / 2);
@@ -448,3 +463,8 @@ export function randomTraits(rng: RngState): Traits {
 }
 
 export const NO_PROPERTY = { owns: false, boughtPrice: 0, mortgage: 0, mortgageTo: -1, subsidized: false, boughtTick: 0, grudge: 0 } as const;
+
+/** Terreno de una casilla (v1.7). */
+export function terrainAt(state: GameState, x: number, y: number): number {
+  return state.map.terrain?.[y * state.map.w + x] ?? 0;
+}

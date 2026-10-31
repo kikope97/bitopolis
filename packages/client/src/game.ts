@@ -12,6 +12,9 @@ import {
   missingServices,
   NEED_TEXT,
   occupants,
+  roadCost,
+  Terrain,
+  terrainAt,
   Tile,
   validateCommand,
   ZONE_COST_PER_TILE,
@@ -768,7 +771,8 @@ export function startGame(opts: GameOptions): void {
     if (tool.id === 'demolish') {
       // v1.6: se confirma en la franja de abajo, en rojo (antes, una ventana que tapaba el mapa).
       const b = state.buildings.find((x) => x.x === tile.x && x.y === tile.y);
-      const what = b ? (b.name ?? BUILD_NAMES[b.kind]) : state.map.tiles[tile.y * state.map.w + tile.x] === Tile.Road ? 'Carretera' : null;
+      const onRiver = terrainAt(state, tile.x, tile.y) === Terrain.River;
+      const what = b ? (b.name ?? BUILD_NAMES[b.kind]) : state.map.tiles[tile.y * state.map.w + tile.x] === Tile.Road ? (onRiver ? 'Puente' : 'Carretera') : null;
       if (!what) {
         $('#tool-info').replaceChildren(h('b', {}, 'Derribar'), ': ahí no hay nada que derribar. Toca un edificio o una carretera.');
         return refreshStrip();
@@ -802,7 +806,7 @@ export function startGame(opts: GameOptions): void {
         pendingEnd = tile;
         preview = previewFor(anchor, tile);
         const n = tilesOf(line).length;
-        const cost = n * (tool.zone ? ZONE_COST_PER_TILE : BUILD.road.materials);
+        const cost = tool.zone ? n * ZONE_COST_PER_TILE : lineCost(anchor, tile);
         const v = validateCommand(state, line);
         const msg = v.ok
           ? `${tool.label}: ${plural(n, 'casilla', 'casillas')}, ${money(cost)}. Toca otra vez el final para confirmar.`
@@ -828,6 +832,13 @@ export function startGame(opts: GameOptions): void {
     if (cmd) await command(cmd);
   }
 
+  /** Coste de un tramo de carretera (los puentes, más caros) y cuántas casillas son puente (v1.7). */
+  const lineCost = (a: { x: number; y: number }, b: { x: number; y: number }) => roadCost(state, a.x, a.y, b.x, b.y);
+  function bridgeTiles(a: { x: number; y: number }, b: { x: number; y: number }) {
+    const cmd = commandFor(tool, a, b);
+    return cmd ? tilesOf(cmd).filter((t) => terrainAt(state, t.x, t.y) === Terrain.River && state.map.tiles[t.y * state.map.w + t.x] !== Tile.Road).length : 0;
+  }
+
   /** Enseña la obra (fantasma) y la barra «Construir / ✕». Nada se gasta hasta confirmar. */
   function proposePlace(a: { x: number; y: number }, b: { x: number; y: number }, demolishText?: string) {
     const cmd = commandFor(tool, a, b);
@@ -839,7 +850,11 @@ export function startGame(opts: GameOptions): void {
     preview = previewFor(a, b);
     const v = validateCommand(state, cmd);
     const n = tilesOf(cmd).length;
-    const cost = tool.build && tool.shape === 'tap' ? shortCost(tool) : `${plural(n, 'casilla', 'casillas')}, ${money(n * (tool.zone ? ZONE_COST_PER_TILE : BUILD.road.materials))}`;
+    const hill = tool.build && tool.shape === 'tap' && terrainAt(state, a.x, a.y) === Terrain.Hill;
+    const cost =
+      tool.build && tool.shape === 'tap'
+        ? `${shortCost(tool)}${hill ? ' (colina: materiales +50 %)' : ''}`
+        : `${plural(n, 'casilla', 'casillas')}, ${money(tool.zone ? n * ZONE_COST_PER_TILE : lineCost(a, b))}${!tool.zone && bridgeTiles(a, b) ? ` (con puente de ${plural(bridgeTiles(a, b), 'casilla', 'casillas')})` : ''}`;
     const msg = demolishText && v.ok ? demolishText : v.ok ? `${tool.label} aquí${cost ? ` · ${cost}` : ''}` : `${tool.label}: no se puede (${v.error})`;
     $('#confirm-text').textContent = msg;
     const yes = $('#confirm-yes') as HTMLButtonElement;
@@ -891,7 +906,13 @@ export function startGame(opts: GameOptions): void {
   function describeTile(t: { x: number; y: number }): string {
     const b = state.buildings.find((x) => x.x === t.x && x.y === t.y);
     const i = t.y * state.map.w + t.x;
-    const what = b ? (b.name ?? BUILD_NAMES[b.kind] ?? b.kind) : state.map.tiles[i] === Tile.Road ? 'carretera' : state.map.tiles[i] === Tile.Tree ? 'árboles' : 'solar libre';
+    const ter = state.map.terrain?.[i] ?? 0;
+    const road = state.map.tiles[i] === Tile.Road;
+    const what = b
+      ? (b.name ?? BUILD_NAMES[b.kind] ?? b.kind)
+      : road
+        ? ter === Terrain.River ? 'puente' : 'carretera'
+        : ter === Terrain.River ? 'río' : ter === Terrain.Sea ? 'mar' : state.map.tiles[i] === Tile.Tree ? 'árboles' : ter === Terrain.Hill ? 'colina' : 'solar libre';
     const zone = ['', ', zona residencial', ', zona comercial', ', zona industrial'][state.map.zones[i] ?? 0] ?? '';
     let can = '';
     if (tool.id !== 'inspect') {
@@ -1173,7 +1194,11 @@ export function startGame(opts: GameOptions): void {
     if (!b) {
       const z = state.map.zones[tile.y * state.map.w + tile.x];
       const tt = state.map.tiles[tile.y * state.map.w + tile.x];
-      const name = tt === Tile.Road ? 'Carretera' : tt === Tile.Tree ? 'Árboles' : 'Solar';
+      const ter = state.map.terrain?.[tile.y * state.map.w + tile.x] ?? 0;
+      const name =
+        tt === Tile.Road
+          ? ter === Terrain.River ? 'Puente' : 'Carretera'
+          : ter === Terrain.River ? 'Río' : ter === Terrain.Sea ? 'Mar' : tt === Tile.Tree ? 'Árboles' : ter === Terrain.Hill ? 'Colina' : 'Solar';
       const zone = z ? `Zona ${['', 'residencial (R)', 'comercial (C)', 'industrial (I)'][z]}` : 'Sin zona';
       sheet(name, h('p', {}, zone), h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`)).classList.add('half');
       openInspect = null;

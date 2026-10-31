@@ -64,7 +64,7 @@ function townSummary(state: GameState) {
     impuestos: state.taxesSplit ? Object.fromEntries(Object.entries(state.taxes).map(([k, v]) => [k, { low: 'bajo', medium: 'medio', high: 'alto' }[v]])) : { low: 'bajos', medium: 'medios', high: 'altos' }[state.taxLevel],
     felicidad_media: Math.round(averageHappiness(state)),
     caja_ayuntamiento: band(state.treasury, [0, 5_000, 30_000], ['en deuda', 'justa', 'normal', 'holgada']),
-    servicios: ['water', 'power', 'park', 'school', 'clinic', 'shop', 'factory'].filter((k) => kinds.has(k as never)).map((k) => BUILD_NAMES[k]!.toLowerCase()),
+    servicios: ['water', 'power', 'park', 'school', 'clinic', 'police', 'bar', 'chapel', 'cemetery', 'library', 'sports', 'shop', 'factory'].filter((k) => kinds.has(k as never)).map((k) => BUILD_NAMES[k]!.toLowerCase()),
     ...(politicsActive(state) ? { politica: politicsView(state) } : {}),
   };
 }

@@ -1,5 +1,7 @@
 import type { GameState } from './state.ts';
 import { Tile } from './state.ts';
+import { TERRAIN } from './balance.ts';
+import { isWater, Terrain } from './terrain.ts';
 
 /**
  * Externalidades por casilla (0–100): contaminación (persistente), ruido,
@@ -64,6 +66,16 @@ export function updateFields(state: GameState): void {
       case 'clinic':
         stamp(good, w, h, b.x, b.y, 8, 12);
         break;
+      case 'bar':
+        // El bar alegra, pero hace ruido por la noche.
+        stamp(good, w, h, b.x, b.y, 4, 6);
+        stamp(noise, w, h, b.x, b.y, 3, 14);
+        break;
+      case 'library':
+      case 'sports':
+      case 'chapel':
+        stamp(good, w, h, b.x, b.y, 7, 8);
+        break;
       case 'police':
         stamp(police, w, h, b.x, b.y, 10, 1);
         stamp(good, w, h, b.x, b.y, 6, 5);
@@ -80,6 +92,27 @@ export function updateFields(state: GameState): void {
 
   const cx = w / 2;
   const cy = h / 2;
+  // v1.7: vistas al agua (a 2 casillas o menos) y en alto suben el valor del suelo.
+  const ter = state.map.terrain ?? [];
+  const view = new Array<number>(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    if (ter[i] === Terrain.Hill) view[i] = TERRAIN.hillLand;
+    if (isWater(ter[i])) continue;
+    const x = i % w;
+    const y = Math.floor(i / w);
+    let near = false;
+    for (let dy = -2; dy <= 2 && !near; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx >= 0 && ny >= 0 && nx < w && ny < h && isWater(ter[ny * w + nx])) {
+          near = true;
+          break;
+        }
+      }
+    }
+    if (near) view[i]! += TERRAIN.waterfrontLand;
+  }
   for (let i = 0; i < n; i++) {
     // La contaminación industrial persiste: se disipa muy despacio.
     f.pollution[i] = clamp(f.pollution[i]! * 0.985 + emit[i]!);
@@ -88,7 +121,7 @@ export function updateFields(state: GameState): void {
     const x = i % w;
     const y = Math.floor(i / w);
     const centre = Math.max(0, 15 - (Math.abs(x - cx) + Math.abs(y - cy)) * 0.6);
-    f.land[i] = clamp(40 + centre + good[i]! - f.pollution[i]! * 0.6 - f.noise[i]! * 0.25 - f.crime[i]! * 0.4);
+    f.land[i] = clamp(40 + centre + view[i]! + good[i]! - f.pollution[i]! * 0.6 - f.noise[i]! * 0.25 - f.crime[i]! * 0.4);
   }
 }
 

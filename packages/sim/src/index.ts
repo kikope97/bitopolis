@@ -20,3 +20,5 @@ export * from './civic.ts';
 export * from './lifecycle.ts';
 export * from './names.ts';
 export * from './coverage.ts';
+export * from './terrain.ts';
+export * from './weather.ts';

@@ -217,7 +217,7 @@ describe('migración 8 → 9', () => {
     delete v8.festival;
     delete v8.grants;
     const m = migrate(v8);
-    expect(m.formatVersion).toBe(9);
+    expect(m.formatVersion).toBeGreaterThanOrEqual(9);
     expect(m.budget.plan).toBe('equilibrado');
     expect(m.festival.name).toBeNull();
     expect(m.grants).toEqual([]);

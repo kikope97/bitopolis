@@ -54,6 +54,8 @@ export const MEMORY_KINDS = [
   'nacio_hijo',
   'perdio_a',
   'heredo',
+  // v1.7: tiempo, asociaciones y protestas.
+  'inundacion',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -207,6 +209,8 @@ export function memoryText(state: GameState, m: Memory): string {
       return `Perdió a ${who}`;
     case 'heredo':
       return `Heredó de ${who}`;
+    case 'inundacion':
+      return 'El río le anegó la casa o el trabajo';
   }
 }
 
@@ -316,14 +320,25 @@ export function meetingPlace(state: GameState, a: Citizen, b: Citizen): Building
   const ha = home(a);
   const hb = home(b);
   if (!ha || !hb || ha === hb) return undefined;
-  return state.buildings.find((p) => {
+  // El primero que encaje por orden de preferencia (el bar antes que el parque).
+  const places = state.buildings.filter((p) => p.built && MEETING_KINDS.includes(p.kind)).sort((x, y) => MEETING_KINDS.indexOf(x.kind) - MEETING_KINDS.indexOf(y.kind));
+  return places.find((p) => {
     if (!p.built || !MEETING_KINDS.includes(p.kind)) return false;
     const r = SERVICE[p.kind]!.radius;
     return Math.abs(p.x - ha.x) + Math.abs(p.y - ha.y) <= r && Math.abs(p.x - hb.x) + Math.abs(p.y - hb.y) <= r;
   });
 }
-const MEETING_KINDS: Building['kind'][] = ['plaza', 'market', 'park'];
-const MEETING_TEXT: Partial<Record<Building['kind'], string>> = { plaza: 'en la plaza', market: 'en el mercado', park: 'paseando por el parque' };
+// v1.7: el bar va primero: es donde más amistades nacen.
+const MEETING_KINDS: Building['kind'][] = ['bar', 'plaza', 'market', 'park', 'sports', 'library', 'chapel'];
+const MEETING_TEXT: Partial<Record<Building['kind'], string>> = {
+  bar: 'tomando algo en el bar',
+  plaza: 'en la plaza',
+  market: 'en el mercado',
+  park: 'paseando por el parque',
+  sports: 'en el polideportivo',
+  library: 'en la biblioteca',
+  chapel: 'en la ermita',
+};
 
 /**
  * Las relaciones nacen de compartir casa o trabajo y, más despacio, de
