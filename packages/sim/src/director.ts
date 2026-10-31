@@ -10,8 +10,10 @@
  */
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { type Association, callProtest, CAUSE_ASK, CAUSE_TEXT, foundAssociation, freshCauses } from './associations.ts';
-import { DIRECTOR } from './balance.ts';
-import { robbery, homeRobbery } from './crime.ts';
+import { ASSOCIATIONS, CRIME, DIRECTOR } from './balance.ts';
+
+const CRIME_HOT_DAYS = CRIME.hotDays;
+import { homeRobbery, robbery, stationsFor } from './crime.ts';
 import type { Brewing } from './director-core.ts';
 import { canFound, freeShopLot } from './economy.ts';
 import { hash32 } from './hash.ts';
@@ -35,6 +37,8 @@ export interface DirectorCandidate {
   text: string;
   /** El dato del juego que lo justifica. */
   why: string;
+  /** Ronda 16: los datos lo justifican tanto que cabe aunque el pueblo esté contento. */
+  owed?: boolean;
 }
 
 /** Lo que elige la IA (ya validado por forma; el motor lo vuelve a validar al aplicarlo). */
@@ -57,17 +61,28 @@ export function directorMenu(state: GameState): DirectorCandidate[] {
   const out: DirectorCandidate[] = [];
   const add = (list: DirectorCandidate[]) => out.push(...list.slice(0, DIRECTOR.perKind));
   const named = state.citizens.filter((c) => c.named);
+  // Ronda 16: lo robado hace poco no vuelve al menú (antes siempre caían las mismas tiendas).
+  const cool = DIRECTOR.robbedCooldownDays * TICKS_PER_DAY;
+  const robbed = (b: { x: number; y: number }) => state.justice.hot.some((h) => h.x === b.x && h.y === b.y && h.until - state.tick > (CRIME_HOT_DAYS * TICKS_PER_DAY - cool));
+  const unpoliced = (b: { x: number; y: number }) => stationsFor(state, b.x, b.y).length === 0;
 
   // Robos (solo donde la delincuencia lo justifica).
   add(
     state.buildings
-      .filter((b) => b.kind === 'shop' && b.built && !b.damaged && b.cash > 0 && crimeAt(state, b.x, b.y) >= DIRECTOR.robCrime)
+      .filter((b) => b.kind === 'shop' && b.built && !b.damaged && b.cash > 0 && crimeAt(state, b.x, b.y) >= DIRECTOR.robCrime && !robbed(b))
       .sort((a, b) => crimeAt(state, b.x, b.y) - crimeAt(state, a.x, a.y) || a.id - b.id)
-      .map((b) => ({ id: `robo_tienda:${b.id}`, kind: 'robo_tienda', bad: true, text: `Roban en ${b.name ?? 'una tienda'}`, why: `delincuencia ${Math.round(crimeAt(state, b.x, b.y))} en su calle` })),
+      .map((b) => ({
+        id: `robo_tienda:${b.id}`,
+        kind: 'robo_tienda',
+        bad: true,
+        text: `Roban en ${b.name ?? 'una tienda'}`,
+        why: `delincuencia ${Math.round(crimeAt(state, b.x, b.y))} en su calle${unpoliced(b) ? ' y sin policía cerca' : ''}`,
+        owed: unpoliced(b) && crimeAt(state, b.x, b.y) >= DIRECTOR.owedCrime,
+      })),
   );
   add(
     state.buildings
-      .filter((b) => (b.kind === 'house' || b.kind === 'res') && b.built && crimeAt(state, b.x, b.y) >= DIRECTOR.robCrime && state.citizens.some((c) => c.homeId === b.id && c.money > 0))
+      .filter((b) => (b.kind === 'house' || b.kind === 'res') && b.built && crimeAt(state, b.x, b.y) >= DIRECTOR.robCrime && !robbed(b) && state.citizens.some((c) => c.homeId === b.id && c.money > 0))
       .sort((a, b) => crimeAt(state, b.x, b.y) - crimeAt(state, a.x, a.y) || a.id - b.id)
       .map((b) => {
         const who = state.citizens.filter((c) => c.homeId === b.id).sort((x, y) => y.money - x.money)[0]!;
@@ -82,7 +97,17 @@ export function directorMenu(state: GameState): DirectorCandidate[] {
   add(
     (state.associations ?? [])
       .filter((a) => a.protestDay < 0 && a.promiseUntil < 0 && state.tick - Math.max(a.founded, a.lastProtest, a.lastMeeting) >= TICKS_PER_MONTH)
-      .map((a) => ({ id: `manifestacion:${a.id}`, kind: 'manifestacion', bad: true, text: `La ${a.name} convoca una manifestación`, why: `${a.members.length} socios; piden ${CAUSE_ASK[a.cause]} y nadie les ha recibido en un mes` })),
+      .map((a) => {
+        const months = Math.floor((state.tick - Math.max(a.founded, a.lastProtest, a.lastMeeting)) / TICKS_PER_MONTH);
+        return {
+          id: `manifestacion:${a.id}`,
+          kind: 'manifestacion',
+          bad: true,
+          text: `La ${a.name} convoca una manifestación`,
+          why: `${a.members.length} socios; piden ${CAUSE_ASK[a.cause]} y nadie les ha recibido en ${months === 1 ? 'un mes' : `${months} meses`}`,
+          owed: months > ASSOCIATIONS.patienceMonths,
+        };
+      }),
   );
 
   // Relaciones: peleas por la política, reconciliaciones, encuentros.
@@ -158,19 +183,27 @@ export function directorMenu(state: GameState): DirectorCandidate[] {
 const monthOf = (tick: number) => Math.floor(tick / TICKS_PER_MONTH);
 
 /** Sucesos malos que caben este turno, y por qué. */
-export function dramaBudget(state: GameState): { bad: number; why: string } {
-  const discontent = 100 - townHappiness(state);
+export function dramaBudget(state: GameState, menu?: DirectorCandidate[]): { bad: number; why: string } {
+  const happy = townHappiness(state);
+  const discontent = 100 - happy;
   const d = state.ai?.drama && state.ai.drama.month === monthOf(state.tick) ? state.ai.drama : { bad: 0, good: 0 };
-  let bad = discontent >= DIRECTOR.twoBadFrom ? 2 : discontent >= DIRECTOR.badFrom ? 1 : 0;
-  let why = bad ? `descontento ${Math.round(discontent)}: caben ${bad} malos` : `el pueblo está contento (felicidad ${Math.round(townHappiness(state))}): nada malo`;
-  const left = DIRECTOR.maxBadPerMonth - d.bad;
-  if (left < bad) {
-    bad = Math.max(0, left);
-    why = `ya van ${d.bad} sucesos malos este mes`;
-  }
-  if (bad && townHappiness(state) >= DIRECTOR.fairHappiness && d.bad >= 2 * (d.good + 1)) {
+  // Ronda 16: cupo del mes gradual con el descontento (sin escalón), igual a cualquier velocidad.
+  const span = DIRECTOR.badFullDiscontent - DIRECTOR.badFromDiscontent;
+  const monthCap = Math.max(0, Math.min(DIRECTOR.maxBadPerMonth, Math.round((DIRECTOR.maxBadPerMonth * (discontent - DIRECTOR.badFromDiscontent)) / span)));
+  let bad = Math.max(0, Math.min(2, monthCap - d.bad));
+  let why = bad ? `descontento ${Math.round(discontent)}: caben ${bad} malos (${d.bad} de ${monthCap} este mes)` : monthCap ? `ya van ${d.bad} sucesos malos este mes` : `el pueblo está contento (felicidad ${Math.round(happy)})`;
+  if (bad && happy >= DIRECTOR.fairHappiness && d.bad >= 2 * (d.good + 1)) {
     bad = 0;
     why = 'el alcalde lo hace bien: antes toca algo bueno';
+  }
+  // Lo que justifican los datos pasa aunque el pueblo esté contento (uno al mes): la seguridad no sale gratis.
+  if (!bad && d.bad === 0) {
+    const m = menu ?? directorMenu(state);
+    const owed = m.find((c) => c.owed);
+    if (owed) {
+      bad = 1;
+      why = `aunque el pueblo esté contento, ${owed.why}`;
+    }
   }
   return { bad, why };
 }
@@ -181,7 +214,7 @@ export function dramaBudget(state: GameState): { bad: number; why: string } {
 function liveBrewing(state: GameState, menu: DirectorCandidate[]): Brewing[] {
   const ai = state.ai;
   if (!ai) return [];
-  const ttl = DIRECTOR.brewingTurns * ai.paceDays * TICKS_PER_DAY;
+  const ttl = DIRECTOR.brewingDays * TICKS_PER_DAY;
   return (ai.brewing ?? []).filter((b) => state.tick - b.since <= ttl && menu.some((m) => m.id === b.id));
 }
 
@@ -193,7 +226,7 @@ export function applyDirector(state: GameState, choice: DirectorChoice): TurnLog
   const opened = ai.turn?.opened ?? state.tick;
   const month = monthOf(state.tick);
   if (!ai.drama || ai.drama.month !== month) ai.drama = { month, bad: 0, good: 0 };
-  const budget = dramaBudget(state);
+  const budget = dramaBudget(state, menu);
   let bad = budget.bad;
   let good = DIRECTOR.maxGood;
   let total = DIRECTOR.maxEvents;

@@ -524,6 +524,9 @@ export const TURN = {
   logLines: 40,
   /** Cuánto mueve la actitud hacia el alcalde la intención de voto (por punto, de −2 a +2). */
   attitudeVote: 0.05,
+  /** Ronda 16: ultimátums con plazo mínimo y, para irse, solo si su felicidad está por debajo de esto. */
+  planMinMonths: 3,
+  leaveBelow: 55,
   /** Notas de su semana que guarda cada vecino con IA. */
   notes: 4,
   /** Modo mixto: los vecinos por reglas copian esta parte de la actitud de sus amigos con IA (o de su barrio). */
@@ -542,13 +545,21 @@ export const DIRECTOR = {
   /** Sucesos malos según el descontento (100 − felicidad): desde 35, uno por turno; desde 55, dos. */
   badFrom: 35,
   twoBadFrom: 55,
-  /** Sucesos malos como mucho al mes. */
+  /** Sucesos malos como mucho al mes (ronda 16: cupo gradual, de 0 con descontento 30 a 4 con 70). */
   maxBadPerMonth: 4,
+  badFromDiscontent: 30,
+  badFullDiscontent: 70,
+  /** Lo que justifican los datos (delincuencia alta sin policía, asociación ignorada) pasa aunque el pueblo esté contento: uno al mes. */
+  owedCrime: 40,
   /** Con el pueblo contento (felicidad ≥ esta), al menos un suceso bueno por cada dos malos. */
   fairHappiness: 60,
   /** Avisos («Se está cociendo») a la vez, y turnos que dura un aviso. */
   maxBrewing: 5,
   brewingTurns: 4,
+  /** Ronda 16: los avisos duran días de juego (no turnos: igual a cualquier velocidad). */
+  brewingDays: 28,
+  /** Una tienda o casa robada no vuelve al menú en estos días. */
+  robbedCooldownDays: 30,
   /** Candidatos de cada tipo en el menú. */
   perKind: 2,
   /** Lo que da un vecino a un amigo en apuros (€, como mucho). */

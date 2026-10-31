@@ -276,4 +276,29 @@ describe('turnos del pueblo con IA (2.0)', () => {
     expect(state.ai!.turn).toBeNull();
     expect(checkInvariants(state)).toEqual([]);
   });
+
+  it('director justo (ronda 16): la delincuencia alta sin policía no sale gratis, lo robado no se repite y los ultimátums son justos', () => {
+    const { state } = runSimulation({ seed: 3, days: 260, profile: 'constructor', aiMode: true, aiShare: 100 });
+    while (!state.ai!.turn || state.ai!.turn.kind !== 'semana') step(state);
+    const shop = state.buildings.find((b) => b.kind === 'shop' && b.built && b.cash > 0)!;
+    state.buildings = state.buildings.filter((b) => b.kind !== 'police');
+    for (const x of state.citizens) if (x.jobId !== null && !state.buildings.some((b) => b.id === x.jobId)) x.jobId = null;
+    state.fields.crime[shop.y * state.map.w + shop.x] = 80;
+    for (const c of state.citizens) c.happiness = 90;
+    state.ai!.drama = undefined;
+    const menu = directorMenu(state);
+    expect(menu.find((m) => m.id === `robo_tienda:${shop.id}`)?.owed).toBe(true);
+    // Pueblo contento, pero los datos lo justifican: cabe uno.
+    expect(dramaBudget(state, menu).bad).toBe(1);
+    // Robada hace poco: no vuelve al menú.
+    state.justice.hot.push({ x: shop.x, y: shop.y, until: state.tick + 24 * 30 });
+    expect(directorMenu(state).some((m) => m.id === `robo_tienda:${shop.id}`)).toBe(false);
+    // Ultimátum de irse con el vecino feliz o por algo que no es lo suyo: no vale.
+    const t = state.ai!.turn!;
+    const c = state.citizens.find((x) => t.ids.includes(x.id) && !x.plan)!;
+    const act = { vecino: c.id, accion: 'seguir', gesto: { con: 0, tipo: 'ninguno' }, actitud: 0, gasto: { donde: 'pueblo', tienda: 0, ocio: false }, plan: { tipo: 'irse_si_no', necesidad: 'colegio', meses: 1 }, pensamiento: '', motivo: '' };
+    expect(applyCommand(state, { type: 'TownTurn', n: t.n, acts: [act] }).ok).toBe(true);
+    expect(c.plan).toBeUndefined();
+    expect(checkInvariants(state)).toEqual([]);
+  });
 });

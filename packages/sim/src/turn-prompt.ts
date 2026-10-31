@@ -350,7 +350,7 @@ export interface DirectorRequest {
 export function buildDirectorRequest(state: GameState, shared = turnShared(state)): DirectorRequest {
   const menu = directorMenu(state);
   const brewing = brewingNow(state, menu);
-  const budget = dramaBudget(state);
+  const budget = dramaBudget(state, menu);
   const paceTicks = Math.max(1, (state.ai?.paceDays ?? 7) * 24);
   const data = {
     presupuesto_drama: { sucesos_malos_que_caben: budget.bad, por_que: budget.why },

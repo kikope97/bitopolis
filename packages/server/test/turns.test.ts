@@ -161,6 +161,8 @@ describe('turnos del pueblo en el servidor (2.0)', () => {
     expect(lots.every((c) => c.model === 'claude-haiku-5-5')).toBe(true);
     // Cerca del tope, el director solo un turno sí y otro no (los pares).
     expect(calls.some((c) => c.user.startsWith('Director'))).toBe(t.n % 2 === 0);
+    // Sin director a propósito, va vacío (no vuelven los dados de las reglas).
+    expect(result.turn.director).toBeTruthy();
 
     // Con el tope pasado, no se llama: el cliente suelta el reloj y deciden las reglas.
     calls = [];

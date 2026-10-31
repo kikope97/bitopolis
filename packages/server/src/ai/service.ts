@@ -348,7 +348,12 @@ export class AiService {
     };
     /** El director del pueblo: una petición con el modelo del director (cerca del tope, un turno sí y otro no). */
     const director = async (): Promise<void> => {
-      if (state.ai?.turn?.kind !== 'semana' || (rung === 'cerca del tope' && result.n % 2 === 1)) return;
+      if (state.ai?.turn?.kind !== 'semana') return;
+      // Ronda 16: si se salta el director a propósito (ahorro), va vacío: no se reabren los dados.
+      if (rung === 'cerca del tope' && result.n % 2 === 1) {
+        result.director = { sucesos: [], avisos: [] };
+        return;
+      }
       const req = buildDirectorRequest(state, shared);
       // Ronda 16: el director va siempre con su modelo (también en Ahorro); cerca del tope, con el barato.
       const dModel = rung === 'cerca del tope' ? model : s.modelPremium;

@@ -9,7 +9,7 @@ import type { DirectorChoice } from './director.ts';
 import { hash32 } from './hash.ts';
 import { totalDebt } from './household.ts';
 import { jobsOf } from './levels.ts';
-import { addMemory, goalFor, NEED_TEXT, needsOf, PROFESSIONS, relation, setRelation } from './social.ts';
+import { addMemory, goalFor, NEED_TEXT, needOf, needsOf, PROFESSIONS, relation, setRelation } from './social.ts';
 import { transfer } from './money.ts';
 import { type Building, type Citizen, DESIRES, FEARS, type GameState, pushEvent, type Trigger } from './state.ts';
 
@@ -55,6 +55,8 @@ export interface TownAi {
   directed?: boolean;
   /** «Se está cociendo»: avisos previos del director. */
   brewing?: Brewing[];
+  /** Última marcha por ultimátum (como mucho una a la semana). */
+  lastUltimatum?: number;
   /** Presupuesto de drama del mes (sucesos malos y buenos). */
   drama?: { month: number; bad: number; good: number };
 }
@@ -408,9 +410,9 @@ export function applyTownTurn(state: GameState, n: number, acts: TurnAct[], extr
     const shop = state.buildings.find((b) => b.id === a.gasto?.tienda && b.kind === 'shop' && b.built);
     c.spending = { where: donde, shop: shop?.id, leisure: !!a.gasto?.ocio && donde !== 'ahorrar' };
     const tipo = (PLANS as readonly string[]).includes(a.plan?.tipo) ? (a.plan.tipo as PlanKind) : 'ninguno';
-    const need = needsOf(state, c).includes(a.plan?.necesidad as never) ? (a.plan.necesidad as string) : null;
+    const need = planAllowed(state, c, tipo, a.plan?.necesidad) ? (a.plan.necesidad as string) : null;
     if (tipo !== 'ninguno' && need && !c.plan) {
-      c.plan = { kind: tipo, need, until: state.tick + clamp(a.plan.meses ?? 3, 1, 6) * TICKS_PER_MONTH, since: state.tick };
+      c.plan = { kind: tipo, need, until: state.tick + clamp(a.plan.meses ?? 3, TURN.planMinMonths, 6) * TICKS_PER_MONTH, since: state.tick };
       parts.push(`avisa: ${planText(c.plan)}`);
     }
     c.thought = cleanText(a.pensamiento, 160) || c.thought;
@@ -547,6 +549,17 @@ export function turnsTick(state: GameState, ruleFallback: (state: GameState, ids
   }
 }
 
+/**
+ * Ronda 16: un ultimátum solo vale si es justo y se puede cumplir: su necesidad
+ * principal de verdad («empleo» solo en paro) y, para irse, que lo esté pasando mal.
+ */
+function planAllowed(state: GameState, c: Citizen, tipo: string, need: unknown): boolean {
+  if (tipo === 'ninguno' || typeof need !== 'string' || need !== needOf(state, c)) return false;
+  if (need === 'empleo' && c.jobId !== null) return false;
+  if (tipo === 'irse_si_no' && c.happiness >= TURN.leaveBelow) return false;
+  return true;
+}
+
 /** Una vez al día: planes y ultimátums que vencen (el motor comprueba si se cumplió lo que pedían). */
 export function plansDay(state: GameState, leave: (c: Citizen) => void): void {
   for (const c of [...state.citizens]) {
@@ -556,11 +569,18 @@ export function plansDay(state: GameState, leave: (c: Citizen) => void): void {
     const met = !needsOf(state, c).slice(0, 3).includes(p.need as never);
     if (met) {
       addMemory(state, c, 'promesa_cumplida', 3, 3);
-      pushEvent(state, 'info', `${c.name} está más tranquilo: ya hay ${NEED_TEXT[p.need as keyof typeof NEED_TEXT] ?? p.need}`, { ref: c.id });
+      pushEvent(state, 'info', `${c.name} respira: ya hay ${NEED_TEXT[p.need as keyof typeof NEED_TEXT] ?? p.need}`, { ref: c.id });
       continue;
     }
-    addMemory(state, c, 'promesa_rota', 4, -4);
+    if (p.kind !== 'irse_si_no' || !state.ai || state.tick - (state.ai.lastUltimatum ?? -1e9) >= 7 * TICKS_PER_DAY) addMemory(state, c, 'promesa_rota', 4, -4);
     if (p.kind === 'irse_si_no') {
+      // Como mucho una marcha por ultimátum a la semana: a los demás les da una semana más.
+      const ai = state.ai;
+      if (ai && state.tick - (ai.lastUltimatum ?? -1e9) < 7 * TICKS_PER_DAY) {
+        c.plan = { ...p, until: state.tick + 7 * TICKS_PER_DAY };
+        continue;
+      }
+      if (ai) ai.lastUltimatum = state.tick;
       pushEvent(state, 'departure', `${c.name} cumple su palabra y se va del pueblo: no hubo ${NEED_TEXT[p.need as keyof typeof NEED_TEXT] ?? p.need}`, { ref: c.id });
       leave(c);
     } else {
