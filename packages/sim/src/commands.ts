@@ -115,6 +115,33 @@ export function buildCostAt(state: GameState, kind: BuildKind, x: number, y: num
   return buildCost(kind) + extra;
 }
 
+/**
+ * Lo que falta por pagar, como mucho, de las obras del ayuntamiento en marcha
+ * (v1.9.1): los días que quedan con toda la cuadrilla al precio de fuera.
+ * Con obreros del pueblo sale más barato; con nieve, algo más caro.
+ */
+export function pendingWorksCost(state: GameState): number {
+  let sum = 0;
+  for (const p of state.projects) {
+    if (p.payer !== TREASURY || p.workersNeeded <= 0) continue;
+    const days = Math.max(0, Math.ceil((p.workerDaysNeeded - p.workerDaysDone) / p.workersNeeded - 1e-9));
+    sum += days * p.workersNeeded * WAGE_OUTSIDE;
+  }
+  return sum;
+}
+
+/** Lo que costará al ayuntamiento, como mucho, una obra nueva (edificio, carretera o zona). */
+export function commandOutlay(state: GameState, cmd: Command): number {
+  if (cmd.type === 'Build') {
+    if (cmd.kind === 'road') return roadCost(state, cmd.x, cmd.y, cmd.x, cmd.y);
+    const s = BUILD[cmd.kind];
+    return materialsCost(state, cmd.kind, cmd.x, cmd.y) + s.workers * s.days * WAGE_OUTSIDE;
+  }
+  if (cmd.type === 'BuildRoad') return roadCost(state, cmd.x, cmd.y, cmd.x2, cmd.y2);
+  if (cmd.type === 'Zone') return cmd.zone === 'none' ? 0 : zoneChanges(state, cmd).changed * ZONE_COST_PER_TILE;
+  return 0;
+}
+
 /** Valida sin aplicar. El motor es quien decide si un comando es legal. */
 /** Mientras gobierna el alcalde rival, sus órdenes pasan por aquí (no las del jugador). */
 let governing = false;

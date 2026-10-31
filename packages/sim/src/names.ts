@@ -5,6 +5,13 @@ export const FIRST_NAMES = [
   'Julia', 'Álvaro', 'Irene', 'Mario', 'Alba', 'Rubén', 'Clara', 'Óscar', 'Noelia', 'Adrián',
   'Celia', 'Gonzalo', 'Paula', 'Víctor', 'Lorena', 'Emilio', 'Teresa', 'Jaime', 'Aitana', 'Félix',
 ];
+/** Nombres de mujer entre los que usa el juego (v1.9.1: para el oficio en femenino). */
+export const FEMALE_NAMES: ReadonlySet<string> = new Set([
+  'Ana', 'Carmen', 'Elena', 'Rosa', 'Nuria', 'Marta', 'Lola', 'Inés', 'Pilar', 'Sara',
+  'Julia', 'Irene', 'Alba', 'Clara', 'Noelia', 'Celia', 'Paula', 'Lorena', 'Teresa', 'Aitana', 'Lucía',
+]);
+/** ¿El nombre de pila es de mujer? */
+export const isFemaleName = (name: string): boolean => FEMALE_NAMES.has(name.split(' ')[0] ?? '');
 export const SURNAMES = [
   'García', 'López', 'Martín', 'Sánchez', 'Romero', 'Navarro', 'Torres', 'Gil', 'Ruiz', 'Molina',
   'Ortega', 'Delgado', 'Castro', 'Vidal', 'Rubio', 'Serrano', 'Marín', 'Iglesias', 'Pascual', 'Prieto',

@@ -457,6 +457,10 @@ export const DEBT = {
   tightMood: 2,
   /** Aplazamiento que concede el alcalde: meses de cuota fija, sin recargo. */
   planMonths: 12,
+  /** v1.9.1: días que espera respuesta quien pide un aplazamiento; sin ella, se lo guarda (rencor). */
+  answerDays: 30,
+  unansweredGrudge: 5,
+  unansweredMood: -3,
 } as const;
 
 /** v1.9 (petición del creador): sueldo mínimo que el ayuntamiento obliga a pagar a las empresas del pueblo. */

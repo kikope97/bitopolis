@@ -8,6 +8,8 @@ interface Step {
   /** Selector del elemento al que apunta la flecha (o null: el mapa). */
   target: (tool: ToolId) => string | null;
   done: (s: GameState, tool: ToolId, ctx: Ctx) => boolean;
+  /** v1.9.1: algo del mapa que hay que encontrar (destella y la cámara va allí). */
+  focus?: 'townhall';
 }
 
 interface Ctx {
@@ -57,9 +59,10 @@ const STEPS: Step[] = [
   },
   {
     // v1.8: el ayuntamiento por niveles.
-    text: 'Toca el ayuntamiento (en el centro) y pulsa «Ampliar a nivel 2»: desbloquea las zonas, el colegio, la policía y los plenos.',
+    text: 'Toca el ayuntamiento (el edificio que destella, en el centro) y pulsa «Ampliar a nivel 2»: desbloquea las zonas, el colegio, la policía y los plenos.',
     target: () => null,
     done: (s) => (s.townhallLevel ?? 1) >= 2,
+    focus: 'townhall',
   },
   {
     // Ronda 12: el paso anterior no se cerraba nunca; ahora llega el momento del desbloqueo.
@@ -76,6 +79,10 @@ export class Tutorial {
   private arrow: HTMLElement;
   private skip: HTMLButtonElement;
   private started = false;
+  /** Último paso cuyo `focus` ya se enseñó (para no mover la cámara en cada refresco). */
+  private focused = -1;
+  /** Lo pone game.ts: destaca en el mapa lo que pide el paso. */
+  onFocus: ((what: 'townhall') => void) | null = null;
 
   constructor(private storageKey: string) {
     this.arrow = h('div', { class: 'tut-arrow', 'aria-hidden': 'true' }, '▼');
@@ -97,7 +104,13 @@ export class Tutorial {
     return this.step < STEPS.length;
   }
 
+  /** Qué hay que encontrar en el mapa en el paso actual (o null). */
+  get focus(): 'townhall' | null {
+    return (this.active && this.started && STEPS[this.step]!.focus) || null;
+  }
+
   start(state: GameState, fromScratch = false) {
+    this.focused = -1;
     if (fromScratch) this.step = 0;
     // Un pueblo ya hecho (importado o de otra partida) no empieza el tutorial desde cero (ronda 11).
     else if (this.step === 0 && state.citizens.length >= 10) {
@@ -141,6 +154,10 @@ export class Tutorial {
     // Último paso: sin cierre automático; se cierra con «Entendido».
     this.skip.textContent = this.step === STEPS.length - 1 ? 'Entendido' : 'Saltar';
     const cur = STEPS[this.step]!;
+    if (cur.focus && this.focused !== this.step) {
+      this.focused = this.step;
+      this.onFocus?.(cur.focus);
+    }
     const p = this.box.querySelector('p')!;
     if (p.textContent !== cur.text) p.textContent = cur.text;
     // Los botones del mapa suben por encima de la caja (ronda 12: la caja tapaba «Capas» y «?»).
