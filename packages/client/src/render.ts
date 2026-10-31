@@ -1,4 +1,4 @@
-import { type GameState, Tile, Zone } from '@bitopolis/sim';
+import { type GameState, isWater, Terrain, Tile, Zone } from '@bitopolis/sim';
 import { happinessMarks, type LayerId, layerCanvas, missingMarks, NEED_ICON } from './layers.ts';
 import { pixelIcon } from './icons.ts';
 
@@ -22,7 +22,12 @@ import {
   type TimeOfDay,
   toCanvas,
   treeSprite,
+  bridgeTile,
+  hillTile,
+  seaTile,
+  snowGrass,
   walkerSprite,
+  waterTile,
   zoneTile,
 } from './sprites.ts';
 
@@ -148,17 +153,79 @@ interface Ground {
 }
 const grounds = new Map<TimeOfDay, Ground>();
 
+/** Fotograma del agua (0/1) y si nieva: los fija render() antes de pintar el suelo. */
+let waterFrame: 0 | 1 = 0;
+let snowing = false;
+
 function tileKey(state: GameState, x: number, y: number, occupied: Set<number>): string {
   const { w, h, tiles, zones } = state.map;
+  const ter = state.map.terrain ?? [];
   const i = y * w + x;
+  // Fuera del mapa cuenta como agua (el río y el mar siguen más allá).
+  const wet = (xx: number, yy: number) => xx < 0 || yy < 0 || xx >= w || yy >= h || isWater(ter[yy * w + xx]);
+  const t = ter[i] ?? 0;
   if (tiles[i] === Tile.Road) {
     const r = (xx: number, yy: number) => xx >= 0 && yy >= 0 && xx < w && yy < h && tiles[yy * w + xx] === Tile.Road;
+    // v1.7: carretera sobre el río = puente.
+    if (t === Terrain.River) return `b${+(r(x - 1, y) || r(x + 1, y))}${+wet(x, y - 1)}${+wet(x + 1, y)}${+wet(x, y + 1)}${+wet(x - 1, y)}${waterFrame}`;
     return `r${+r(x, y - 1)}${+r(x + 1, y)}${+r(x, y + 1)}${+r(x - 1, y)}`;
   }
-  return `g${zones[i] !== Zone.None && !occupied.has(i) ? zones[i] : 0}`;
+  const nesw = `${+wet(x, y - 1)}${+wet(x + 1, y)}${+wet(x, y + 1)}${+wet(x - 1, y)}`;
+  if (t === Terrain.River) return `w${nesw}${waterFrame}${+snowing}`;
+  if (t === Terrain.Sea) return `s${nesw}${waterFrame}${+snowing}`;
+  const zone = zones[i] !== Zone.None && !occupied.has(i) ? zones[i] : 0;
+  if (t === Terrain.Hill) {
+    const hill = (xx: number, yy: number) => xx >= 0 && yy >= 0 && xx < w && yy < h && ter[yy * w + xx] === Terrain.Hill;
+    return `h${+hill(x, y - 1)}${+hill(x + 1, y)}${+hill(x, y + 1)}${+hill(x - 1, y)}${zone}${+snowing}`;
+  }
+  return `g${zone}${+snowing}`;
 }
 
+/** Superpone `top` sobre `base` (lo transparente de `top` deja ver `base`). */
+function over(base: Pix, top: Pix): Pix {
+  const out = new Pix(base.w, base.h);
+  out.data.set(base.data);
+  for (let k = 0; k < top.data.length; k++) if (top.data[k]! >= 0) out.data[k] = top.data[k]!;
+  return out;
+}
+const terrainCache = new Map<string, Pix>();
+
 function tilePix(state: GameState, x: number, y: number, key: string): Pix {
+  const b = (k: number) => key[k] === '1';
+  if (key[0] === 'w' || key[0] === 's' || key[0] === 'b') {
+    const v = Math.floor(hash(x, y, 9) * 4);
+    const k = `${key}-${v}`;
+    let tile = terrainCache.get(k);
+    if (!tile) {
+      if (key[0] === 'b') {
+        // Puente: agua debajo (abierta a lo largo del cauce) y el tablero encima.
+        const horiz = b(1);
+        const fr = Number(key[6]) as 0 | 1;
+        const water = waterTile(horiz || b(2), !horiz || b(3), horiz || b(4), !horiz || b(5), v, fr);
+        tile = over(water, bridgeTile(horiz, v));
+      } else {
+        const fr = Number(key[5]) as 0 | 1;
+        tile = (key[0] === 'w' ? waterTile : seaTile)(b(1), b(2), b(3), b(4), v, fr);
+        // Con nieve, también la hierba de la orilla.
+        if (key[6] === '1') tile = snowGrass(tile, v);
+      }
+      terrainCache.set(k, tile);
+    }
+    return tile;
+  }
+  if (key[0] === 'h') {
+    const v = Math.floor(hash(x, y, 1) * GRASS_VARIANTS);
+    const k = `${key}-${v}`;
+    let tile = terrainCache.get(k);
+    if (!tile) {
+      let p = hillTile(v, b(1), b(2), b(3), b(4));
+      if (key[6] === '1') p = snowGrass(p, v);
+      const z = Number(key[5]);
+      tile = z ? zoneTile(ZONE_LETTER[z]!, p) : p;
+      terrainCache.set(k, tile);
+    }
+    return tile;
+  }
   if (key[0] === 'r') {
     const rv = Math.floor(hash(x, y, 2) * 6);
     const k = `${key.slice(1)}-${rv}`;
@@ -166,11 +233,16 @@ function tilePix(state: GameState, x: number, y: number, key: string): Pix {
     if (!tile) roadCache.set(k, (tile = roadTile(key[1] === '1', key[2] === '1', key[3] === '1', key[4] === '1', rv)));
     return tile;
   }
-  // La hierba (ruido suave, lo más caro) se calcula una vez por casilla.
-  const gi = y * 4096 + x;
+  // La hierba (ruido suave, lo más caro) se calcula una vez por casilla (y nevada, otra).
+  const snow = key[2] === '1';
+  const gi = y * 4096 + x + (snow ? 1 << 24 : 0);
   let g = grassCache.get(gi);
-  if (!g) grassCache.set(gi, (g = grassTile(Math.floor(hash(x, y, 1) * GRASS_VARIANTS), x, y)));
-  const z = Number(key.slice(1));
+  if (!g) {
+    g = grassTile(Math.floor(hash(x, y, 1) * GRASS_VARIANTS), x, y);
+    if (snow) g = snowGrass(g, Math.floor(hash(x, y, 1) * 4));
+    grassCache.set(gi, g);
+  }
+  const z = Number(key[1]);
   return z ? zoneTile(ZONE_LETTER[z]!, g) : g;
 }
 
@@ -292,14 +364,18 @@ export function render(
   ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
   const tod = timeOfDay(state.tick);
-  const sig = mapSignature(state);
+  // v1.7: el agua se mueve (dos fotogramas lentos) y la nieve cubre el suelo y los tejados.
+  waterFrame = opts.reducedMotion ? 0 : ((Math.floor(opts.time / 1200) % 2) as 0 | 1);
+  snowing = state.weather?.kind === 'nieve';
+  const mapSig = mapSignature(state);
+  const sig = `${mapSig}${waterFrame}${+snowing}`;
   if (`${sig}${tod}` !== groundSig) {
     ground = groundFor(state, tod);
     groundSig = `${sig}${tod}`;
   } else warmGrounds(state, tod, sig);
-  if (runsSig !== sig) {
+  if (runsSig !== mapSig) {
     runs = roadRuns(state);
-    runsSig = sig;
+    runsSig = mapSig;
   }
   const still = opts.reducedMotion;
   const people = walkers(state, opts.time, still, tod);
@@ -362,7 +438,7 @@ export function render(
         if (tiles[y * w + x] === Tile.Tree) {
           // Viento: la copa se mece con un desfase por árbol.
           const frame = still ? 0 : Math.floor(opts.time / 900 + hash(x, y, 4) * 4) % 2;
-          ctx.drawImage(treeSprite(Math.floor(hash(x, y, 3) * TREE_VARIANTS), frame, tod), px, py, ts, BH * z);
+          ctx.drawImage(treeSprite(Math.floor(hash(x, y, 3) * TREE_VARIANTS), frame, tod, snowing), px, py, ts, BH * z);
         }
         continue;
       }
@@ -380,11 +456,11 @@ export function render(
       }
       // Squash & stretch al terminarse (anclado abajo, en el centro).
       const [sx, sy] = squash(b.id, opts.time);
-      if (sx === 1 && sy === 1) ctx.drawImage(buildingSprite(b.kind, b.id, tod), px, py, ts, BH * z);
+      if (sx === 1 && sy === 1) ctx.drawImage(buildingSprite(b.kind, b.id, tod, snowing), px, py, ts, BH * z);
       else {
         const dw = Math.round(ts * sx);
         const dh = Math.round(BH * z * sy);
-        ctx.drawImage(buildingSprite(b.kind, b.id, tod), px + Math.round((ts - dw) / 2), py + BH * z - dh, dw, dh);
+        ctx.drawImage(buildingSprite(b.kind, b.id, tod, snowing), px + Math.round((ts - dw) / 2), py + BH * z - dh, dw, dh);
       }
       // Humo de chimeneas (fábricas, central y casas): bocanadas que suben y crecen.
       // En casas solo alguna chimenea y una bocanada: que no parezca contaminación.
@@ -468,6 +544,9 @@ export function render(
     }
   }
 
+  drawProtest(ctx, state, cam, opts.time, opts.reducedMotion, tod);
+  drawWeather(ctx, state, opts.time, opts.reducedMotion);
+
   const corner = (tx: number, ty: number, color: number, thick: number) => {
     const px = tx * ts - cam.x;
     const py = ty * ts - cam.y;
@@ -489,4 +568,67 @@ export function render(
   if (opts.selected) corner(opts.selected.x, opts.selected.y, 4, 2);
   // Cursor de teclado: esquinas blancas gruesas (se distingue de la selección por forma y color).
   if (opts.cursor) corner(opts.cursor.x, opts.cursor.y, 12, 3);
+}
+
+/**
+ * v1.7: lluvia y nieve sobre el mapa (sin destellos: la tormenta no hace
+ * relámpagos en pantalla). Con movimiento reducido, quietas y más escasas.
+ */
+function drawWeather(ctx: CanvasRenderingContext2D, state: GameState, time: number, still: boolean): void {
+  const k = state.weather?.kind;
+  if (k !== 'lluvia' && k !== 'tormenta' && k !== 'nieve') return;
+  const W = ctx.canvas.width;
+  const H = ctx.canvas.height;
+  const unit = Math.max(1, Math.round(W / 400));
+  const n = Math.round(((W * H) / (unit * unit * 2600)) * (k === 'tormenta' ? 1.8 : 1) * (still ? 0.4 : 1));
+  const t = still ? 0 : time / 1000;
+  if (k === 'nieve') {
+    ctx.fillStyle = P(12);
+    for (let i = 0; i < n; i++) {
+      const x = (hash(i, 1) * W + Math.sin(t + i) * 6 * unit) % W;
+      const y = (hash(i, 2) * H + t * (14 + hash(i, 3) * 10) * unit) % H;
+      const sz = (hash(i, 4) > 0.7 ? 2 : 1) * unit;
+      ctx.fillRect(Math.round(x), Math.round(y), sz, sz);
+    }
+    return;
+  }
+  ctx.fillStyle = P(k === 'tormenta' ? 13 : 11);
+  for (let i = 0; i < n; i++) {
+    const x = (hash(i, 1) * W + t * 40 * unit) % W;
+    const y = (hash(i, 2) * H + t * 260 * unit) % H;
+    // Gota: trazo inclinado de 1 px de ancho.
+    for (let j = 0; j < 4; j++) ctx.fillRect(Math.round(x - j * unit), Math.round(y + j * 2 * unit), unit, 2 * unit);
+  }
+}
+
+/**
+ * v1.7: la manifestación, durante un día, delante del ayuntamiento: vecinos
+ * con pancartas en la calle (cuantos más, más gente; como mucho 24).
+ */
+function drawProtest(ctx: CanvasRenderingContext2D, state: GameState, cam: Camera, time: number, still: boolean, tod: TimeOfDay): void {
+  const e = [...state.events].reverse().find((x) => x.kind === 'protest');
+  if (!e || state.tick - e.tick > 24) return;
+  const crowd = Math.min(24, Number(/unas (\d+) personas/.exec(e.text)?.[1] ?? 0));
+  const hall = state.buildings.find((b) => b.kind === 'townhall');
+  if (!crowd || !hall) return;
+  const z = cam.zoom;
+  for (let i = 0; i < crowd; i++) {
+    // En filas sobre la calle de delante, centradas en el ayuntamiento.
+    const col = (i % 8) - 3.5;
+    const row = Math.floor(i / 8);
+    const fx = (hall.x + 0.5) * T + col * 9 + (hash(i, 31) - 0.5) * 4;
+    const fy = (hall.y + 1) * T + 10 + row * 7;
+    const bob = still ? 0 : Math.floor(time / 400 + i) % 2;
+    const img = walkerSprite(Math.floor(hash(i, 32) * 64), 0, i % 2 ? 1 : -1, tod);
+    ctx.drawImage(img, (fx - 3) * z - cam.x, (fy - 11 - bob) * z - cam.y, 7 * z, 12 * z);
+    if (i % 3 === 0) {
+      // Pancarta: palo y cartel.
+      ctx.fillStyle = P(19);
+      ctx.fillRect((fx + 2) * z - cam.x, (fy - 18 - bob) * z - cam.y, z, 8 * z);
+      ctx.fillStyle = P(12);
+      ctx.fillRect((fx - 2) * z - cam.x, (fy - 22 - bob) * z - cam.y, 9 * z, 5 * z);
+      ctx.fillStyle = P(2);
+      ctx.fillRect((fx - 1) * z - cam.x, (fy - 20 - bob) * z - cam.y, 7 * z, z);
+    }
+  }
 }

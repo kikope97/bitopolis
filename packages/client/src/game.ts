@@ -7,9 +7,12 @@ import {
   type GameEvent,
   type GameState,
   coverageSummary,
+  SEASON_TEXT,
+  seasonOf,
+  WEATHER_TEXT,
   happinessFactors,
   missingServices,
-  NEED_TEXT,
+  NEED_LABEL,
   occupants,
   roadCost,
   Terrain,
@@ -23,6 +26,7 @@ import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
 import { openNeighbours, openReport, openTaxes as openTaxesSheet } from './economy-ui.ts';
 import { LAYERS, type LayerId, NEED_ICON } from './layers.ts';
 import { openTownHall } from './civic-ui.ts';
+import { openAlbum, snapMoments } from './album-ui.ts';
 import { objectivesNode, openAdvisor, openCitizen, openDiary, openPleno, portraitCanvas, rememberSeen, renderObjectives, resumeSummary, type SocialCtx } from './social-ui.ts';
 import { api, ApiError } from './api.ts';
 import { nextHint } from './hints.ts';
@@ -238,7 +242,10 @@ export function startGame(opts: GameOptions): void {
   $('#hud-happy').replaceChildren(pixelIcon('smile'), happyText);
   let lastStats = state.stats.length;
   let lastPop = state.citizens.length;
+  const albumSeen = { n: state.album?.length ?? 0 };
   function onState() {
+    // v1.7: foto de cada momento nuevo del álbum (en este navegador).
+    snapMoments(token, state, albumSeen);
     if (layer === 'missing' && Math.floor(state.tick / 24) !== legendDay) missingLegend();
     // Ronda 12: al llegar a 10 vecinos, un momento de desbloqueo que lleva a la bandeja.
     if (lastPop < ZONE_UNLOCK_POP && state.citizens.length >= ZONE_UNLOCK_POP) {
@@ -265,6 +272,15 @@ export function startGame(opts: GameOptions): void {
     const d = tickToDate(state.tick);
     $('#hud-date').textContent = shortDate(d);
     $('#hud-date').setAttribute('aria-label', formatDate(d));
+    // v1.7: el tiempo de hoy junto a la fecha (icono y, en pantallas anchas, el nombre).
+    const wk = state.weather?.kind ?? 'sol';
+    const wEl = $('#hud-weather');
+    if (wEl.dataset.kind !== wk) {
+      wEl.dataset.kind = wk;
+      const icon = { sol: 'sun', nubes: 'rain', lluvia: 'rain', tormenta: 'storm', nieve: 'snow', calor: 'heat' }[wk];
+      wEl.replaceChildren(...(wk === 'nubes' ? [] : [pixelIcon(icon)]), h('span', { class: 'weather-name' }, WEATHER_TEXT[wk]));
+      wEl.setAttribute('aria-label', `${SEASON_TEXT[seasonOf(d.month)]}: ${WEATHER_TEXT[wk].toLowerCase()}`);
+    }
     if (d.hour === 0 || dayAgoTreasury.length === 0) {
       dayAgoTreasury.push(state.treasury);
       if (dayAgoTreasury.length > 2) dayAgoTreasury.shift();
@@ -418,6 +434,24 @@ export function startGame(opts: GameOptions): void {
         const decide = /Responde antes|puedes organizarlas/.test(e.text);
         if (decide && speed >= 3) setSpeed(1);
         toast(e.text, { kind: 'info', sticky: decide, onClick: () => openTownHall(social, /fiestas/i.test(e.text) ? 'festival' : 'grants') });
+      } else if (e.kind === 'info' && /^(Nieva|Ola de calor|Tormenta sobre|El río crece)/.test(e.text)) {
+        // v1.7: el tiempo que cambia algo (no el sol ni las nubes).
+        toast(e.text, { kind: 'info' });
+      } else if (e.kind === 'info' && e.text.startsWith('El río se desborda')) {
+        sfx.warn();
+        vibrate(80);
+        calmPause();
+        toast(e.text, { kind: 'warn', sticky: true, onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+      } else if (e.kind === 'protest') {
+        sfx.warn();
+        duck(1.5);
+        calmPause();
+        toast(e.text, { kind: 'warn', sticky: true, onClick: () => openTownHall(social, 'associations') });
+      } else if (e.kind === 'politics' && /Asociación|asociación/.test(e.text)) {
+        // v1.7: asociaciones. Si convocan una manifestación, hay 3 días para reunirse con ellos: baja a x1.
+        const urgent = e.text.includes('convoca una manifestación');
+        if (urgent && speed >= 3) setSpeed(1);
+        toast(e.text, { kind: urgent ? 'warn' : 'info', sticky: urgent || e.text.startsWith('Nace'), onClick: () => openTownHall(social, 'associations') });
       } else if (e.kind === 'politics' && /presupuesto/i.test(e.text)) {
         const decide = e.text.startsWith('Toca presentar');
         if (decide && speed >= 3) setSpeed(1);
@@ -1239,7 +1273,7 @@ export function startGame(opts: GameOptions): void {
       if (b.kind === 'house' || b.kind === 'res') {
         for (const n of missingServices(state, b.x, b.y)) {
           if (n.key === 'agua' || n.key === 'luz') continue;
-          pills.push(h('span', { class: `pill ${n.status === 'falta' ? 'bad' : 'warn'}` }, `${n.status === 'falta' ? 'Sin' : 'Lleno:'} ${NEED_TEXT[n.key]}`));
+          pills.push(h('span', { class: `pill ${n.status === 'falta' ? 'bad' : 'warn'}` }, `${n.status === 'falta' ? 'Sin' : 'Lleno:'} ${NEED_LABEL[n.key]}`));
         }
       }
       if (pills.length) content.push(h('div', { class: 'status-row' }, ...pills));
@@ -1331,6 +1365,9 @@ export function startGame(opts: GameOptions): void {
     const offers = state.grants.filter((g) => g.status === 'offered').length;
     const townSum: string[] = [budgetOpen ? `Presupuesto ${d.year} por aprobar` : `Presupuesto ${state.budget.plan}`];
     if (offers) townSum.push(plural(offers, 'subvención por responder', 'subvenciones por responder'));
+    const assocs = state.associations ?? [];
+    const protest = assocs.some((a) => a.protestDay >= 0);
+    if (assocs.length) townSum.push(protest ? 'manifestación convocada' : plural(assocs.length, 'asociación vecinal', 'asociaciones vecinales'));
     sheet(
       'Pueblo',
       card(
@@ -1344,7 +1381,7 @@ export function startGame(opts: GameOptions): void {
         'build',
         'Ayuntamiento',
         [townSum.join(' · ')],
-        item('Presupuesto y fiestas', go(() => openTownHall(social)), budgetOpen || offers > 0),
+        item('Presupuesto y fiestas', go(() => openTownHall(social)), budgetOpen || offers > 0 || protest),
         item('Pleno municipal', go(() => openPleno(social))),
         item('Política y elecciones', go(() => openPolitics(social))),
         item('Consejero', go(() => openAdvisor(social))),
@@ -1356,6 +1393,7 @@ export function startGame(opts: GameOptions): void {
         item('Vecinos', go(openPeople)),
         item('Felicidad', go(openHappiness)),
         item('Diario del pueblo', go(() => openDiary(social))),
+        item('Álbum del pueblo', go(() => openAlbum(social))),
       ),
       h('section', { class: 'hub-card' }, h('h3', {}, pixelIcon('smile'), 'Objetivos'), objectivesNode(state)),
       ...(state.aiMode
@@ -1453,7 +1491,7 @@ export function startGame(opts: GameOptions): void {
     legendDay = Math.floor(state.tick / 24);
     const sum = coverageSummary(state);
     const rows = sum.map((r) =>
-      h('span', { class: 'legend-need' }, pixelIcon(NEED_ICON[r.key]), `${NEED_TEXT[r.key][0]!.toUpperCase()}${NEED_TEXT[r.key].slice(1)}: ${r.falta ? `falta en ${r.falta}` : ''}${r.falta && r.lleno ? ', ' : ''}${r.lleno ? `lleno en ${r.lleno}` : ''}`),
+      h('span', { class: 'legend-need' }, pixelIcon(NEED_ICON[r.key]), `${NEED_LABEL[r.key][0]!.toUpperCase()}${NEED_LABEL[r.key].slice(1)}: ${r.falta ? `falta en ${r.falta}` : ''}${r.falta && r.lleno ? ', ' : ''}${r.lleno ? `lleno en ${r.lleno}` : ''}`),
     );
     $('#legend').replaceChildren(
       h('strong', {}, 'Qué falta'),

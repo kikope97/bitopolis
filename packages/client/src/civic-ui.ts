@@ -1,5 +1,5 @@
 import { tickToDate } from '@bitopolis/shared';
-import { BUDGET_TEXT, type BudgetPlan, canHoldFestival, FESTIVAL, GRANT_NAME, kidsCount } from '@bitopolis/sim';
+import { ASSOCIATIONS, BUDGET_TEXT, type BudgetPlan, CAUSE_ASK, canHoldFestival, FESTIVAL, GRANT_NAME, kidsCount } from '@bitopolis/sim';
 import { formatDate, money } from './i18n.ts';
 import type { SocialCtx } from './social-ui.ts';
 import { confirmDialog, h, sheet } from './ui.ts';
@@ -11,7 +11,7 @@ import { confirmDialog, h, sheet } from './ui.ts';
 const STATUS: Record<string, string> = { open: 'por aprobar (enero)', approved: 'aprobado', prorrogado: 'prorrogado' };
 const SIZE: Record<string, string> = { none: 'aún no', pequena: 'pequeñas', grande: 'grandes', popular: 'populares (las montaron los vecinos)' };
 
-export function openTownHall(ctx: SocialCtx, focus?: 'budget' | 'festival' | 'grants'): void {
+export function openTownHall(ctx: SocialCtx, focus?: 'budget' | 'festival' | 'grants' | 'associations'): void {
   const s = ctx.state();
   const b = s.budget;
   const d = tickToDate(s.tick);
@@ -92,11 +92,34 @@ export function openTownHall(ctx: SocialCtx, focus?: 'budget' | 'festival' | 'gr
     }
   }
 
+  /* --- asociaciones (v1.7) --- */
+  const assoc: (Node | string)[] = [h('h3', { id: 'th-associations' }, 'Asociaciones vecinales')];
+  if (!s.associations?.length) {
+    assoc.push(h('p', { class: 'muted' }, `Ninguna ahora. Nacen cuando ${ASSOCIATIONS.minMembers} o más vecinos con nombre comparten una queja (desde ${ASSOCIATIONS.minPop} vecinos).`));
+  }
+  for (const a of s.associations ?? []) {
+    const leader = s.citizens.find((c) => c.id === a.leaderId);
+    const lines: (Node | string)[] = [
+      h('p', {}, h('strong', {}, a.name)),
+      h('p', { class: 'muted small' }, `${a.members.length} socios con nombre, con ${leader?.name ?? 'su junta'} al frente. Piden ${CAUSE_ASK[a.cause]}.`),
+    ];
+    if (a.protestDay >= 0) lines.push(h('p', { class: 'pol-tag' }, `Manifestación convocada para el ${formatDate(tickToDate(a.protestDay))}.`));
+    if (a.promiseUntil >= 0) lines.push(h('p', { class: 'small' }, `Les prometiste una solución antes del ${formatDate(tickToDate(a.promiseUntil))}. Si no, volverán más enfadados.`));
+    const met = a.lastMeeting >= 0 && s.tick - a.lastMeeting < 30 * 24;
+    const btn = h('button', { class: 'btn wide', ...(met ? { 'aria-disabled': 'true' } : {}) }, met ? 'Ya os reunisteis este mes' : `Reunirse y prometer una solución en ${ASSOCIATIONS.promiseMonths} meses`);
+    btn.addEventListener('click', async () => {
+      if (met) return;
+      if (await ctx.command({ type: 'MeetAssociation', associationId: a.id })) reopen();
+    });
+    lines.push(btn);
+    assoc.push(h('div', { class: 'petition' }, ...lines));
+  }
+
   /* --- vecinos --- */
   const kids = kidsCount(s);
   const census = h('p', { class: 'muted small' }, `${s.citizens.length} adultos y ${kids} ${kids === 1 ? 'niño' : 'niños'} (los niños van al colegio y a los 18 se independizan).`);
 
-  const el = sheet('Ayuntamiento', ...budget, ...fest, ...grants, h('h3', {}, 'Censo'), census);
+  const el = sheet('Ayuntamiento', ...budget, ...assoc, ...fest, ...grants, h('h3', {}, 'Censo'), census);
   // Desde un aviso, directo a su sección (ronda 11: «Aceptar» quedaba fuera de la pantalla).
   if (focus) el.querySelector(`#th-${focus}`)?.scrollIntoView({ block: 'start' });
 }

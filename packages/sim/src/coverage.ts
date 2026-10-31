@@ -9,7 +9,7 @@ import { DIRS, type GameState, inBounds, Tile, tileIndex, Zone } from './state.t
  */
 export type NeedKey = 'agua' | 'luz' | 'colegio' | 'salud' | 'policia' | 'ocio';
 export const NEED_KEYS: NeedKey[] = ['agua', 'luz', 'colegio', 'salud', 'policia', 'ocio'];
-export const NEED_TEXT: Record<NeedKey, string> = {
+export const NEED_LABEL: Record<NeedKey, string> = {
   agua: 'agua',
   luz: 'luz',
   colegio: 'colegio',

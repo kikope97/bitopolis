@@ -65,7 +65,10 @@ export function albumDay(state: GameState): void {
     else if (e.kind === 'election') add(state, 'elecciones', e.text, hall, false);
     else if (e.text.startsWith('¡Llega un bebé')) add(state, 'primer_bebe', `Primer bebé del pueblo: ${e.text.replace(/^¡/, '').replace(/!$/, '')}`, where(e.ref), true);
     else if (e.text.startsWith('Nos ha dejado')) add(state, 'primera_despedida', e.text.split('. ')[0]!, where(e.ref), true);
-    else if (e.text.startsWith('El río se desborda')) add(state, 'riada', e.text, where(e.ref), false);
+    else if (e.text.startsWith('El río se desborda')) {
+      // Una foto de riada al mes como mucho (las tormentas pueden durar dos días seguidos).
+      if (!state.album.some((m) => m.kind === 'riada' && state.tick - m.tick < 30 * TICKS_PER_DAY)) add(state, 'riada', e.text, where(e.ref), false);
+    }
     else if (e.text.startsWith('Se construye un puente')) add(state, 'primer_puente', 'El primer puente sobre el río', hall, true);
     else if (e.kind === 'protest') add(state, 'primera_manifestacion', e.text, hall, true);
     else if (e.text.startsWith('Nace la Asociación')) add(state, 'primera_asociacion', e.text.split(' (')[0]!, where(e.ref), true);

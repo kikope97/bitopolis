@@ -1799,8 +1799,9 @@ export function sprite(key: string, make: () => Pix, tod: TimeOfDay = 'day'): HT
 }
 
 /** Sprite de 32×48 de un edificio. Las viviendas y tiendas varían con su id. */
-export function buildingSprite(kind: string, id: number, tod: TimeOfDay = 'day'): HTMLCanvasElement {
-  const s = (key: string, make: () => Pix) => sprite(key, make, tod);
+export function buildingSprite(kind: string, id: number, tod: TimeOfDay = 'day', snow = false): HTMLCanvasElement {
+  // v1.7: en invierno con nieve, tejados nevados (otra entrada de la caché).
+  const s = (key: string, make: () => Pix) => (snow ? sprite(`snow-${key}`, () => snowify(make()), tod) : sprite(key, make, tod));
   switch (kind) {
     case 'townhall':
       return s('townhall', townhall);
@@ -1845,7 +1846,11 @@ export function buildingSprite(kind: string, id: number, tod: TimeOfDay = 'day')
 
 export const constructionSprite = (stage: number, id: number, tod: TimeOfDay = 'day') => sprite(`obra${stage}-${id % 3}`, () => construction(stage, id % 3), tod);
 /** Árbol con dos fotogramas de viento (la copa se mece 1 px). */
-export const treeSprite = (v: number, frame = 0, tod: TimeOfDay = 'day') => sprite(`tree${v}-${frame}`, () => (frame ? sway(treeTile(v), 30) : treeTile(v)), tod);
+export const treeSprite = (v: number, frame = 0, tod: TimeOfDay = 'day', snow = false) =>
+  sprite(`${snow ? 'snow-' : ''}tree${v}-${frame}`, () => {
+    const p = frame ? sway(treeTile(v), 30) : treeTile(v);
+    return snow ? snowify(p) : p;
+  }, tod);
 export const iconSprite = (k: 'noWater' | 'noPower') => sprite(`icon-${k}`, k === 'noWater' ? iconNoWater : iconNoPower);
 export const letterSprite = (ch: 'R' | 'C' | 'I', color: number) => sprite(`L${ch}${color}`, () => letter(ch, color));
 

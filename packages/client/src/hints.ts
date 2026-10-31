@@ -1,4 +1,4 @@
-import { coverageSummary, type GameState, NEED_TEXT, ZONE_UNLOCK_POP, freeHomes, taxLevels } from '@bitopolis/sim';
+import { coverageSummary, type GameState, NEED_LABEL, ZONE_UNLOCK_POP, freeHomes, taxLevels } from '@bitopolis/sim';
 import type { ToolId } from './tools.ts';
 
 export interface Hint {
@@ -34,7 +34,7 @@ export function nextHint(state: GameState): Hint {
   if (gap) {
     const n = gap.falta + gap.lleno;
     return {
-      text: `${n} viviendas no tienen ${NEED_TEXT[gap.key]}${gap.lleno && !gap.falta ? ' con sitio libre (está lleno)' : ' cerca'}. Constrúyelo donde más falta: mira la capa «Qué falta».`,
+      text: `${n} viviendas no tienen ${NEED_LABEL[gap.key]}${gap.lleno && !gap.falta ? ' con sitio libre (está lleno)' : ' cerca'}. Constrúyelo donde más falta: mira la capa «Qué falta».`,
       tool: TOOL[gap.key],
     };
   }
