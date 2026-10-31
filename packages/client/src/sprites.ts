@@ -1324,6 +1324,460 @@ function razorWire(p: Pix, x: number, y: number, w: number) {
   }
 }
 
+/* ============== servicios por niveles (v1.8): cárcel y niveles 2 y 3 ============== */
+
+/** Depósito cilíndrico en 3/4: cuerpo sombreado de izquierda a derecha y tapa elíptica. */
+function tank(p: Pix, x: number, y: number, w: number, h: number, m: Mat, lid: Mat = MAT.metal) {
+  const r = w / 2;
+  const ry = Math.max(1, Math.round(w / 7));
+  const curve = (i: number) => {
+    const u = (i + 0.5 - r) / r;
+    return Math.round(ry * Math.sqrt(Math.max(0, 1 - u * u)));
+  };
+  for (let i = 0; i < w; i++) {
+    const t = i / (w - 1);
+    const c = t < 0.18 ? m[0] : t < 0.55 ? m[1] : t < 0.85 ? m[2] : m[3];
+    p.vline(x + i, y, h + curve(i), c);
+    p.set(x + i, y + h + curve(i), m[3]);
+  }
+  p.ellipse(x + r, y, r, ry, lid[1]);
+  p.ellipse(x + r - 1, y - 0.4, Math.max(1, r - 2.5), Math.max(0.6, ry - 0.8), lid[0]);
+  for (let i = 0; i < w; i++) p.set(x + i, y + curve(i), lid[2]);
+}
+
+/** Torre de refrigeración (hiperboloide) centrada en cx. */
+function coolingTower(p: Pix, cx: number, top: number, bottom: number, waist: number, spread: number, seed: number) {
+  for (let y = top; y < bottom; y++) {
+    const t = (y - top) / (bottom - top);
+    const half = waist + Math.abs(t - 0.62) * spread * (t < 0.62 ? 0.6 : 1.4);
+    const x0 = Math.round(cx - half);
+    const x1 = Math.round(cx + half);
+    for (let x = x0; x <= x1; x++) {
+      const u = (x - x0) / (x1 - x0 || 1);
+      let c = u < 0.2 ? MAT.stone[0] : u < 0.6 ? MAT.stone[1] : u < 0.85 ? MAT.stone[2] : MAT.stone[3];
+      if (y % 5 === 0 && u > 0.1) c = MAT.stone[2];
+      p.set(x, y, c);
+    }
+  }
+  p.ellipse(cx, top, waist + 0.62 * spread * 0.6, 1.5, MAT.stone[3]);
+  p.ball(cx - 2, top - 4, 3, [31, 12, 13, 14], seed);
+  p.ball(cx + 3, top - 6, 2.4, [31, 12, 13, 13], seed + 1);
+}
+
+/** Chimenea alta a franjas rojas y blancas, con baliza. */
+function stripedStack(p: Pix, x: number, top: number, bottom: number, seed: number) {
+  for (let y = top; y < bottom; y++) {
+    const band = Math.floor((y - top) / 4) % 2 === 0 ? MAT.red : MAT.white;
+    for (let i = 0; i < 4; i++) p.set(x + i, y, band[i]!);
+  }
+  p.hline(x - 1, top, 6, MAT.metal[2]);
+  p.set(x + 1, top + 1, nightLights ? C.lampWarm : MAT.red[1]);
+  p.ball(x + 2, top - 4, 2.4, [31, 12, 13, 14], seed);
+  p.ball(x + 4, top - 8, 1.9, [31, 12, 13, 13], seed + 1);
+}
+
+/** Vehículo en 3/4: coche patrulla (9 px) o ambulancia (10 px). */
+function car(p: Pix, x: number, y: number, kind: 'police' | 'ambulance') {
+  const body = MAT.white;
+  const w = kind === 'ambulance' ? 10 : 9;
+  p.shadow(x + 1, y + 6, w, 1);
+  if (kind === 'ambulance') {
+    p.rect(x, y - 1, 6, 6, body[1]);
+    p.hline(x, y - 1, 6, body[0]);
+    p.vline(x, y - 1, 6, body[0]);
+    p.rect(x + 6, y + 1, 4, 4, body[1]);
+    p.rect(x + 7, y + 1, 2, 2, MAT.glass[1]);
+    p.hline(x, y + 3, 10, MAT.red[1]);
+    p.rect(x + 2, y, 2, 3, MAT.red[1]);
+    p.hline(x + 1, y + 1, 4, MAT.red[1]);
+    p.set(x + 1, y - 2, nightLights ? C.lamp : MAT.blue[1]);
+    p.set(x + 4, y - 2, nightLights ? C.lampWarm : MAT.red[1]);
+  } else {
+    p.rect(x + 2, y, 5, 2, body[1]);
+    p.rect(x + 3, y, 3, 1, MAT.glass[1]);
+    p.rect(x, y + 2, 9, 3, body[1]);
+    p.hline(x, y + 2, 9, body[0]);
+    p.hline(x, y + 3, 9, MAT.blue[1]);
+    p.set(x + 3, y - 1, nightLights ? C.lamp : MAT.blue[1]);
+    p.set(x + 5, y - 1, nightLights ? C.lampWarm : MAT.red[1]);
+    p.set(x + 8, y + 2, nightLights ? C.lamp : 4);
+  }
+  p.hline(x, y + 4, w, body[2]);
+  for (const dx of kind === 'ambulance' ? [1, 7] : [1, 6]) {
+    p.rect(x + dx, y + 5, 2, 1, 0);
+    p.set(x + dx, y + 4, 0);
+  }
+}
+
+/** Foco o farola en un mástil (encendido de noche). */
+function floodlight(p: Pix, x: number, top: number, bottom: number) {
+  p.vline(x, top + 2, bottom - top - 2, MAT.metal[3]);
+  p.rect(x - 1, top, 3, 2, nightLights ? C.lamp : MAT.metal[0]);
+  p.hline(x - 1, top + 2, 3, MAT.metal[2]);
+}
+
+/** Mástil de antena de celosía con baliza. */
+function antenna(p: Pix, x: number, top: number, bottom: number) {
+  for (let y = top; y < bottom; y++) {
+    p.set(x, y, MAT.metal[2]);
+    p.set(x + 2, y, MAT.metal[3]);
+    if (y % 2 === 0) p.set(x + 1, y, MAT.metal[1]);
+  }
+  p.hline(x - 1, top + 3, 5, MAT.metal[2]);
+  p.hline(x - 2, top + 7, 7, MAT.metal[2]);
+  p.set(x + 1, top - 1, nightLights ? C.lampWarm : MAT.red[1]);
+}
+
+/** Banderas de colores en un mástil. */
+function flag(p: Pix, x: number, top: number, h: number, colors: readonly number[]) {
+  p.vline(x, top, h, MAT.metal[2]);
+  colors.forEach((c, k) => p.rect(x + 1, top + k, 5, 1, c));
+}
+
+function waterTower2(seed: number): Pix {
+  const p = new Pix(T, BH);
+  p.shadow(14, 44, 18, 2);
+  // Depósito elevado, más alto y grande, a la derecha.
+  for (const x of [13, 27]) p.rect(x, 19, 2, 26, MAT.metal[2]);
+  for (let i = 0; i < 12; i++) {
+    p.set(14 + i, 23 + i, MAT.metal[3]);
+    p.set(27 - i, 23 + i, MAT.metal[3]);
+  }
+  p.hline(13, 30, 16, MAT.metal[2]);
+  tank(p, 10, 5, 21, 14, MAT.blue, MAT.slate);
+  p.hline(10, 10, 21, MAT.blue[3]);
+  p.hline(10, 15, 21, MAT.blue[3]);
+  p.ball(16, 12, 2.5, [31, 11, 10, 9], seed);
+  p.vline(20, 0, 3, MAT.metal[3]);
+  p.set(20, 0, nightLights ? C.lampWarm : MAT.red[1]);
+  for (let y = 7; y < 44; y += 2) p.hline(29, y, 2, MAT.metal[1]);
+  p.vline(29, 7, 37, MAT.metal[3]);
+  // Depósito de tierra.
+  tank(p, 17, 36, 11, 8, MAT.stone, MAT.metal);
+  p.hline(17, 39, 11, MAT.stone[3]);
+  // Caseta de bombeo de ladrillo, más grande.
+  castShadow(p, 1, 31, 12, 15);
+  facade(p, 1, 33, 12, 13, MAT.brick, 'brick', seed);
+  p.hline(0, 32, 14, MAT.blue[2]);
+  p.hline(0, 31, 14, MAT.blue[1]);
+  p.hline(1, 30, 12, MAT.blue[0]);
+  windowAt(p, 3, 35, 2, 3);
+  doorAt(p, 7, 38, 4, 7, MAT.teal);
+  // Tubería azul entre la caseta, el depósito y la torre.
+  p.hline(13, 43, 4, MAT.blue[1]);
+  p.hline(13, 44, 4, MAT.blue[3]);
+  p.vline(15, 30, 13, MAT.blue[1]);
+  p.vline(16, 30, 13, MAT.blue[3]);
+  return p;
+}
+
+function waterPlant(seed: number): Pix {
+  const p = new Pix(T, BH);
+  // Depósito elevado esbelto al fondo a la derecha.
+  for (const x of [20, 29]) p.rect(x, 14, 2, 21, MAT.metal[2]);
+  for (let i = 0; i < 9; i++) {
+    p.set(21 + i, 15 + i, MAT.metal[3]);
+    p.set(29 - i, 15 + i, MAT.metal[3]);
+  }
+  tank(p, 17, 3, 15, 12, MAT.blue, MAT.slate);
+  p.hline(17, 8, 15, MAT.blue[3]);
+  p.ball(22, 10, 2, [31, 11, 10, 9], seed);
+  // Edificio de tratamiento.
+  castShadow(p, 1, 17, 22, 17);
+  facade(p, 1, 20, 22, 14, MAT.white, 'plaster', seed);
+  flatRoof(p, 0, 15, 24, 6, MAT.blue, seed);
+  p.hline(1, 26, 22, MAT.blue[1]);
+  for (const x of [3, 8, 18]) windowAt(p, x, 22, 3, 2, { frame: 13 });
+  doorAt(p, 12, 28, 3, 5, MAT.blue, 12);
+  p.ball(5, 30, 2, [31, 11, 10, 9], seed);
+  // Tubos hacia el depósito.
+  p.hline(23, 31, 8, MAT.blue[1]);
+  p.hline(23, 32, 8, MAT.blue[3]);
+  // Explanada con dos balsas de decantación redondas y puente giratorio.
+  p.rect(0, 34, 32, 14, MAT.stone[1]);
+  p.dither(0, 34, 32, 14, MAT.stone[0], 1);
+  for (const cx of [8, 24]) {
+    p.ellipse(cx, 41, 7.5, 5.5, MAT.stone[3]);
+    p.ellipse(cx, 40.5, 7, 5, MAT.stone[0]);
+    p.ellipse(cx, 41, 6, 4, C.waterDeep);
+    p.ellipse(cx - 1, 40.5, 4.5, 2.6, C.water);
+    p.set(cx - 3, 39, C.waterLight);
+    p.set(cx + 2, 42, C.waterLight);
+    p.hline(cx - 6, 41, 13, MAT.metal[2]);
+    p.hline(cx - 6, 40, 13, MAT.metal[0]);
+    p.rect(cx - 1, 39, 3, 3, MAT.yellow[1]);
+    p.set(cx, 39, nightLights ? C.lamp : MAT.yellow[0]);
+  }
+  p.hline(0, 47, 32, MAT.stone[3]);
+  return p;
+}
+
+function powerPlant2(seed: number): Pix {
+  const p = powerPlant(seed);
+  // Segunda chimenea, a franjas, sobre la nave.
+  stripedStack(p, 3, 4, 23, seed + 3);
+  // Turbina nueva: nave anexa al pie de la torre.
+  castShadow(p, 19, 35, 12, 11);
+  facade(p, 19, 37, 12, 9, MAT.yellow, 'metal', seed);
+  flatRoof(p, 18, 33, 14, 5, MAT.metal, seed);
+  tank(p, 21, 29, 5, 4, MAT.metal, MAT.metal);
+  windowAt(p, 21, 39, 3, 2, { lit: true });
+  windowAt(p, 26, 39, 3, 2, { lit: true });
+  p.rect(23, 43, 4, 2, MAT.metal[3]);
+  return p;
+}
+
+function powerPlant3(seed: number): Pix {
+  const p = new Pix(T, BH);
+  // Dos torres de refrigeración y la chimenea entre ellas.
+  coolingTower(p, 8, 7, 30, 4, 8, seed + 7);
+  coolingTower(p, 24, 8, 30, 4.5, 8, seed);
+  stripedStack(p, 14, 3, 24, seed + 3);
+  // Nave de turbinas moderna.
+  castShadow(p, 1, 24, 30, 12);
+  facade(p, 1, 26, 30, 10, MAT.metal, 'metal', seed);
+  flatRoof(p, 0, 22, 32, 5, MAT.blue, seed);
+  for (const x of [3, 8, 21, 26]) windowAt(p, x, 28, 3, 3, { lit: true });
+  doorAt(p, 14, 29, 4, 6, MAT.yellow, MAT.metal[2]);
+  // Campo de paneles solares en tres filas.
+  p.rect(0, 36, 32, 12, MAT.moss[1]);
+  p.dither(0, 36, 32, 12, MAT.moss[2], 0);
+  for (let r = 0; r < 3; r++) {
+    const y = 37 + r * 4;
+    for (let x = 1; x < 31; x++) {
+      const gap = (x - 1) % 5 === 4;
+      p.set(x, y, gap ? MAT.metal[1] : x % 2 ? MAT.glass[0] : MAT.glass[1]);
+      p.set(x, y + 1, gap ? MAT.metal[2] : MAT.glass[2]);
+      p.set(x, y + 2, MAT.metal[3]);
+    }
+  }
+  return p;
+}
+
+function school2(seed: number): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 1, 18, 30, 28);
+  // Ala nueva: moderna, de revoco y con tejado plano.
+  facade(p, 20, 24, 11, 22, MAT.cream, 'plaster', seed + 1);
+  flatRoof(p, 19, 20, 13, 5, MAT.yellow, seed);
+  for (let f = 0; f < 2; f++) windowAt(p, 22, 27 + f * 8, 7, 4, { frame: 13 });
+  p.hline(20, 33, 11, MAT.yellow[1]);
+  // Edificio antiguo de ladrillo.
+  facade(p, 1, 20, 20, 26, MAT.red, 'brick', seed);
+  gableRoof(p, 0, 10, 22, 4, 7, MAT.slate);
+  for (let f = 0; f < 2; f++) for (const x of [3, 16]) windowAt(p, x, 24 + f * 9, 3, 5, { frame: 12 });
+  doorAt(p, 9, 35, 4, 10, MAT.wood);
+  p.ball(11, 26, 3, [31, 12, 13, 14], seed);
+  p.set(11, 25, 0);
+  p.set(12, 26, 0);
+  p.rect(7, 31, 8, 3, 12);
+  for (let i = 0; i < 3; i++) p.set(8 + i * 2, 32, 9);
+  // Mástil con bandera sobre el ala nueva.
+  p.vline(30, 2, 18, MAT.metal[2]);
+  p.rect(24, 2, 6, 4, 4);
+  p.hline(24, 3, 6, 2);
+  return p;
+}
+
+function school3(seed: number): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 1, 10, 30, 20);
+  // Edificio principal al fondo, con torre del reloj.
+  facade(p, 1, 14, 30, 17, MAT.red, 'brick', seed);
+  gableRoof(p, 0, 6, 32, 3, 5, MAT.slate);
+  facade(p, 12, 4, 8, 11, MAT.cream, 'plaster', seed + 2);
+  gableRoof(p, 11, 0, 10, 1, 4, MAT.slate);
+  p.ball(16, 9, 2.6, [31, 12, 13, 14], seed);
+  p.set(16, 8, 0);
+  p.set(16, 7, 0);
+  p.set(17, 9, 0);
+  for (const x of [3, 8, 22, 27]) windowAt(p, x, 17, 3, 4, { frame: 12 });
+  for (const x of [3, 8, 22, 27]) windowAt(p, x, 24, 3, 3, { frame: 12 });
+  doorAt(p, 14, 21, 4, 9, MAT.wood);
+  p.rect(13, 16, 6, 3, 12);
+  for (let i = 0; i < 3; i++) p.set(14 + i * 2, 17, 9);
+  // Patio con pista y valla.
+  p.rect(0, 31, 32, 17, MAT.stone[1]);
+  p.dither(0, 31, 32, 17, MAT.stone[0], 0);
+  p.rect(2, 33, 28, 12, MAT.terracotta[1]);
+  p.frame(2, 33, 28, 12, 12);
+  p.vline(16, 33, 12, 12);
+  p.ellipse(16.5, 39, 2.5, 2, 12);
+  p.ellipse(16.5, 39, 1.5, 1, MAT.terracotta[1]);
+  for (const x of [2, 28]) {
+    p.frame(x, 37, 2, 5, 31);
+    p.dither(x, 38, 2, 3, MAT.metal[1], 0);
+  }
+  person(p, 9, 36, MAT.blue[1]);
+  person(p, 21, 37, MAT.red[1], C.hairBlond);
+  p.ball(13, 41, 1, MAT.white, seed);
+  for (let x = 0; x < 32; x += 2) p.vline(x, 45, 3, MAT.metal[2]);
+  p.hline(0, 45, 32, MAT.metal[1]);
+  p.hline(0, 47, 32, MAT.metal[3]);
+  return p;
+}
+
+function clinic2(seed: number): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 2, 12, 28, 34);
+  facade(p, 2, 14, 28, 32, MAT.white, 'plaster', seed);
+  flatRoof(p, 1, 7, 30, 8, MAT.white, seed);
+  // Cruz, más alta.
+  p.rect(13, 0, 6, 13, 12);
+  p.rect(10, 3, 12, 6, 12);
+  p.rect(14, 1, 4, 11, MAT.red[1]);
+  p.rect(11, 4, 10, 4, MAT.red[1]);
+  p.vline(17, 1, 11, MAT.red[2]);
+  for (let f = 0; f < 2; f++) for (const x of [5, 11, 20, 25]) windowAt(p, x, 17 + f * 6, 3, 3, { frame: 13 });
+  p.hline(2, 29, 28, MAT.red[1]);
+  p.hline(2, 30, 28, MAT.red[2]);
+  // Urgencias: marquesina roja sobre la puerta.
+  doorAt(p, 11, 36, 8, 9, MAT.glass, MAT.metal[2]);
+  p.rect(9, 33, 14, 2, MAT.red[1]);
+  p.hline(9, 33, 14, MAT.red[0]);
+  p.hline(9, 35, 14, MAT.red[3]);
+  p.vline(9, 36, 9, MAT.metal[2]);
+  p.vline(22, 36, 9, MAT.metal[2]);
+  windowAt(p, 4, 36, 3, 4, { frame: 13 });
+  windowAt(p, 25, 33, 3, 3, { frame: 13 });
+  car(p, 21, 40, 'ambulance');
+  return p;
+}
+
+function hospital(seed: number): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 1, 8, 30, 38);
+  facade(p, 1, 11, 30, 35, MAT.white, 'plaster', seed);
+  // Azotea con helipuerto.
+  flatRoof(p, 0, 2, 32, 10, MAT.white, seed);
+  p.ellipse(16, 6.5, 7, 3.4, 4);
+  p.ellipse(16, 6.5, 5.8, 2.5, MAT.stone[2]);
+  p.vline(14, 5, 3, 12);
+  p.vline(18, 5, 3, 12);
+  p.hline(14, 6, 5, 12);
+  for (const x of [2, 29]) p.set(x, 3, nightLights ? C.lamp : MAT.red[1]);
+  // Cruz en la fachada.
+  p.rect(13, 12, 6, 7, 12);
+  p.rect(15, 12, 2, 7, MAT.red[1]);
+  p.rect(13, 14, 6, 3, MAT.red[1]);
+  // Tres plantas de ventanas.
+  for (let f = 0; f < 3; f++) for (const x of [3, 8, 22, 27]) windowAt(p, x, 13 + f * 6, 3, 3, { frame: 13 });
+  for (let f = 1; f < 3; f++) windowAt(p, 14, 13 + f * 6, 4, 3, { frame: 13 });
+  p.hline(1, 32, 30, MAT.red[1]);
+  p.hline(1, 33, 30, MAT.red[2]);
+  // Entrada acristalada con marquesina.
+  doorAt(p, 11, 37, 8, 8, MAT.glass, MAT.metal[2]);
+  p.rect(9, 34, 14, 2, MAT.red[1]);
+  p.hline(9, 34, 14, MAT.red[0]);
+  p.vline(9, 36, 9, MAT.metal[2]);
+  p.vline(22, 36, 9, MAT.metal[2]);
+  car(p, 21, 40, 'ambulance');
+  car(p, 0, 40, 'ambulance');
+  return p;
+}
+
+function policeStation2(seed: number): Pix {
+  const p = policeStation(seed);
+  // Antena de celosía y bandera en el tejado.
+  antenna(p, 25, 0, 13);
+  flag(p, 5, 1, 11, [MAT.red[1], MAT.yellow[0], MAT.yellow[0], MAT.red[1]]);
+  // Escudo sobre la puerta.
+  p.rect(14, 31, 4, 3, MAT.blue[1]);
+  p.hline(15, 34, 2, MAT.blue[1]);
+  p.hline(15, 32, 2, 4);
+  // El coche pequeño se cambia por dos patrullas.
+  p.rect(24, 42, 8, 5, NONE);
+  castShadow(p, 2, 16, 28, 30);
+  windowAt(p, 23, 35, 4, 5, { frame: 13 });
+  car(p, 0, 40, 'police');
+  car(p, 22, 40, 'police');
+  return p;
+}
+
+function policeHQ(seed: number): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 2, 6, 28, 40);
+  facade(p, 2, 9, 28, 37, MAT.white, 'plaster', seed);
+  flatRoof(p, 1, 4, 30, 6, MAT.blue, seed);
+  antenna(p, 25, 0, 5);
+  p.rect(5, 2, 4, 3, MAT.metal[2]);
+  p.rect(5, 2, 2, 2, MAT.red[1]);
+  p.rect(7, 2, 2, 2, MAT.blue[1]);
+  // Fachada acristalada central de cuatro plantas.
+  p.rect(11, 10, 10, 24, MAT.glass[2]);
+  for (let y = 10; y < 34; y++) {
+    for (let x = 11; x < 21; x++) {
+      const row = (y - 10) % 6;
+      const lit = nightLights && hash(x >> 1, Math.floor(y / 6), 9) > 0.35;
+      if (row === 5) p.set(x, y, MAT.metal[1]);
+      else if (x % 3 === 2) p.set(x, y, MAT.metal[2]);
+      else if (lit) p.set(x, y, row < 2 ? C.lamp : C.lampWarm);
+      else if (row < 2) p.set(x, y, MAT.glass[1]);
+    }
+  }
+  p.frame(10, 9, 12, 26, MAT.metal[3]);
+  for (let f = 0; f < 4; f++) for (const x of [4, 24]) windowAt(p, x, 11 + f * 6, 4, 3, { frame: 13 });
+  // Franja azul con rótulo.
+  p.rect(2, 35, 28, 3, MAT.blue[1]);
+  p.hline(2, 35, 28, MAT.blue[0]);
+  for (let i = 0; i < 8; i++) p.rect(5 + i * 3, 36, 2, 1, 12);
+  // Escudo y puerta.
+  p.rect(14, 26, 4, 4, MAT.blue[1]);
+  p.frame(14, 26, 4, 4, 4);
+  p.hline(15, 30, 2, 4);
+  doorAt(p, 13, 39, 6, 6, MAT.blue, 12);
+  car(p, 0, 41, 'police');
+  car(p, 22, 41, 'police');
+  return p;
+}
+
+/** Ventana de celda: hueco oscuro con barrotes. */
+function barredWin2(p: Pix, x: number, y: number, w: number, h: number) {
+  p.rect(x - 1, y - 1, w + 2, h + 2, MAT.stone[3]);
+  p.rect(x, y, w, h, nightLights && hash(x, y, 5) > 0.45 ? C.lampWarm : 26);
+  for (let i = x; i < x + w; i += 2) p.vline(i, y, h, MAT.metal[1]);
+  p.hline(x - 1, y + h + 1, w + 2, MAT.stone[0]);
+}
+
+/** Muro de piedra con concertina encima. */
+function prisonWall(p: Pix, x: number, y: number, w: number, h: number, seed: number) {
+  facade(p, x, y, w, h, MAT.stone, 'stone', seed);
+  p.hline(x, y, w, MAT.stone[0]);
+  for (let i = x; i < x + w; i++) {
+    if ((i - x) % 5 === 0) p.vline(i, y - 3, 3, MAT.metal[3]);
+    else p.set(i, y - 2 - (i % 2), MAT.metal[1]);
+  }
+}
+
+/** Garita de vigilancia: fuste de piedra, cabina acristalada y tejadillo. */
+function watchTower(p: Pix, x: number, top: number, bottom: number, seed: number) {
+  castShadow(p, x + 1, top + 6, 5, bottom - top - 6);
+  facade(p, x + 1, top + 6, 5, bottom - top - 6, MAT.stone, 'stone', seed);
+  p.rect(x, top + 2, 7, 4, MAT.stone[2]);
+  p.rect(x + 1, top + 3, 5, 2, nightLights ? C.lamp : MAT.glass[1]);
+  p.set(x + 3, top + 3, MAT.stone[3]);
+  p.hline(x - 1, top + 6, 9, MAT.stone[3]);
+  p.hline(x - 1, top + 5, 9, MAT.stone[0]);
+  p.hline(x - 1, top + 1, 9, MAT.slate[2]);
+  p.hline(x, top, 7, MAT.slate[1]);
+  p.hline(x + 2, top - 1, 3, MAT.slate[0]);
+}
+
+/** Pabellón de celdas con tejado plano y ventanas con barrotes. */
+function cellBlock(p: Pix, x: number, y: number, w: number, h: number, floors: number, seed: number) {
+  castShadow(p, x, y, w, h);
+  facade(p, x, y, w, h, MAT.stone, 'brick', seed);
+  flatRoof(p, x - 1, y - 5, w + 2, 6, MAT.slate, seed);
+  for (let f = 0; f < floors; f++) for (let i = x + 3; i < x + w - 3; i += 5) barredWin2(p, i, y + 3 + f * 6, 3, 3);
+}
+
+/** Portón metálico de barrotes. */
+function gate(p: Pix, x: number, y: number, w: number, h: number) {
+  p.rect(x, y, w, h, MAT.metal[3]);
+  for (let i = x + 1; i < x + w - 1; i += 2) p.vline(i, y + 1, h - 1, MAT.metal[1]);
+  p.hline(x, y, w, MAT.metal[2]);
+}
+
 function jail(seed: number): Pix {
   const p = new Pix(T, BH);
   // Módulo de celdas al fondo: hormigón claro, dos filas de ventanucos.
@@ -1403,6 +1857,258 @@ function jail(seed: number): Pix {
   p.set(3, 32, nightLights ? 2 : 53);
   bush(p, 3, 45, 1.8, seed);
   return p;
+}
+
+
+function jail2(seed: number): Pix {
+  const p = new Pix(T, BH);
+  p.rect(0, 34, 32, 14, MAT.dirt[2]);
+  p.dither(0, 34, 32, 14, MAT.dirt[1], 1);
+  cellBlock(p, 6, 16, 20, 22, 3, seed);
+  watchTower(p, 0, 9, 46, seed);
+  watchTower(p, 25, 9, 46, seed + 1);
+  prisonWall(p, 6, 39, 20, 7, seed);
+  gate(p, 12, 39, 8, 7);
+  return p;
+}
+
+function jail3(seed: number): Pix {
+  const p = new Pix(T, BH);
+  p.rect(0, 30, 32, 18, MAT.dirt[2]);
+  p.dither(0, 30, 32, 18, MAT.dirt[1], 1);
+  // Pabellón alto con torre central de control.
+  cellBlock(p, 4, 13, 24, 18, 3, seed);
+  facade(p, 13, 4, 6, 9, MAT.stone, 'stone', seed + 2);
+  p.rect(12, 2, 8, 3, MAT.stone[2]);
+  p.rect(13, 3, 6, 1, nightLights ? C.lamp : MAT.glass[1]);
+  p.hline(11, 1, 10, MAT.slate[1]);
+  p.hline(13, 0, 6, MAT.slate[0]);
+  // Doble cerca: muro interior y muro exterior, con garitas en las esquinas.
+  prisonWall(p, 4, 32, 24, 6, seed + 3);
+  gate(p, 13, 32, 6, 6);
+  prisonWall(p, 0, 41, 32, 6, seed + 4);
+  gate(p, 12, 41, 8, 6);
+  watchTower(p, 0, 9, 41, seed);
+  watchTower(p, 25, 9, 41, seed + 1);
+  floodlight(p, 10, 37, 41);
+  floodlight(p, 21, 37, 41);
+  return p;
+}
+
+/** Farola de parque. */
+function lampPost(p: Pix, x: number, y: number) {
+  p.vline(x, y, 7, MAT.metal[3]);
+  p.rect(x - 1, y - 2, 3, 2, nightLights ? C.lamp : MAT.yellow[0]);
+  p.set(x, y - 3, MAT.metal[3]);
+}
+
+/** Césped cuidado del parque. */
+function lawn(p: Pix, seed: number) {
+  p.rect(0, 16, 32, 32, 5);
+  p.dither(0, 16, 32, 32, 23, 0);
+  for (let i = 0; i < 40; i++) p.set(Math.floor(hash(i, seed) * 32), 16 + Math.floor(hash(seed, i) * 32), 22);
+}
+
+/** Parterre con borde de seto y flores. */
+function flowerBed(p: Pix, x: number, y: number, w: number, h: number, seed: number) {
+  p.rect(x, y, w, h, MAT.leaf[2]);
+  p.frame(x, y, w, h, MAT.leaf[3]);
+  p.hline(x, y, w, MAT.leaf[1]);
+  for (let j = y + 1; j < y + h - 1; j++) for (let i = x + 1; i < x + w - 1; i++) if ((i + j) % 2 === 0) p.set(i, j, [2, 4, 12, 61, 62][Math.floor(hash(i, j, seed) * 5)]!);
+}
+
+function park2(seed: number): Pix {
+  const p = new Pix(T, BH);
+  lawn(p, seed);
+  // Paseos en cruz y glorieta de grava.
+  p.rect(13, 16, 6, 32, MAT.stone[1]);
+  p.rect(0, 29, 32, 6, MAT.stone[1]);
+  p.ellipse(16, 32, 11, 7.5, MAT.stone[2]);
+  p.ellipse(16, 32, 10, 6.5, MAT.stone[1]);
+  for (let y = 16; y < 48; y++) for (let x = 0; x < 32; x++) if (p.get(x, y) === MAT.stone[1] && (x + y) % 2) p.set(x, y, MAT.stone[0]);
+  // Fuente de dos tazas.
+  p.ellipse(16, 33, 8, 5, MAT.stone[3]);
+  p.ellipse(16, 32.5, 7.2, 4.3, MAT.stone[0]);
+  p.ellipse(16, 33, 6, 3.4, MAT.blue[1]);
+  p.ellipse(14.5, 32, 3, 1.4, MAT.blue[0]);
+  p.rect(15, 28, 3, 5, MAT.stone[1]);
+  p.vline(15, 28, 5, MAT.stone[0]);
+  p.ellipse(16.5, 28, 3.5, 1.4, MAT.stone[0]);
+  p.hline(14, 29, 6, MAT.stone[2]);
+  p.vline(16, 24, 4, 11);
+  p.set(15, 24, 31);
+  p.set(17, 24, 31);
+  for (const [x, y] of [[11, 31], [21, 31], [13, 35], [19, 35]] as const) p.set(x, y, 31);
+  // Parterres en las esquinas, árboles, bancos y farolas.
+  flowerBed(p, 1, 37, 10, 8, seed);
+  flowerBed(p, 21, 37, 10, 8, seed + 1);
+  tree(p, 6, 20, seed, 'round');
+  tree(p, 26, 18, seed + 5, 'pine');
+  p.rect(22, 25, 6, 2, MAT.wood[1]);
+  p.hline(22, 24, 6, MAT.wood[2]);
+  lampPost(p, 12, 21);
+  lampPost(p, 20, 39);
+  return p;
+}
+
+function park3(seed: number): Pix {
+  const p = new Pix(T, BH);
+  lawn(p, seed);
+  // Estanque con surtidor, juncos y patos.
+  p.ellipse(16, 36, 14, 8, MAT.dirt[0]);
+  p.ellipse(16, 36, 13, 7, C.waterDeep);
+  p.ellipse(15, 35, 11, 5.5, C.water);
+  for (const [x, y] of [[7, 34], [20, 39], [24, 33], [11, 39]] as const) p.hline(x, y, 2, C.waterLight);
+  p.ellipse(16, 32, 2.5, 1, MAT.stone[0]);
+  p.vline(16, 27, 5, 11);
+  p.set(15, 28, 31);
+  p.set(17, 28, 31);
+  for (const x of [3, 4, 28]) p.vline(x, 39, 3, MAT.moss[2]);
+  p.set(4, 38, MAT.wood[3]);
+  for (const [x, y] of [[8, 37], [22, 36]] as const) {
+    p.rect(x, y, 3, 2, 12);
+    p.set(x + 2, y - 1, 12);
+    p.set(x + 3, y - 1, 4);
+    p.hline(x, y + 2, 3, C.waterDeep);
+  }
+  // Quiosco de música con tejado a franjas.
+  p.ellipse(7, 26, 6.5, 2.5, MAT.stone[3]);
+  p.ellipse(7, 25.5, 6, 2, MAT.stone[0]);
+  for (const x of [2, 5, 9, 12]) p.vline(x, 20, 6, 12);
+  for (let j = 0; j < 6; j++) {
+    const half = 1 + j * 1.2;
+    for (let x = Math.round(7 - half); x <= Math.round(7 + half); x++) p.set(x, 14 + j, Math.floor((x + 20) / 2) % 2 ? MAT.red[1] : 12);
+  }
+  p.hline(0, 20, 15, MAT.red[2]);
+  p.set(7, 13, 4);
+  p.set(7, 25, nightLights ? C.lamp : MAT.stone[1]);
+  // Árboles, banco y farolas.
+  tree(p, 24, 19, seed + 3, 'round');
+  tree(p, 29, 41, seed + 5, 'pine');
+  p.rect(16, 21, 6, 2, MAT.wood[1]);
+  p.hline(16, 20, 6, MAT.wood[2]);
+  lampPost(p, 14, 21);
+  lampPost(p, 2, 43);
+  bush(p, 30, 27, 2.5, seed, true);
+  return p;
+}
+
+function library2(seed: number): Pix {
+  const p = library(seed);
+  // Pórtico de columnas en el cuerpo central.
+  p.rect(8, 23, 16, 21, MAT.cream[2]);
+  p.hline(8, 23, 16, MAT.cream[3]);
+  windowAt(p, 14, 26, 4, 6);
+  doorAt(p, 14, 35, 4, 9, MAT.wood, MAT.stone[0]);
+  if (nightLights) p.rect(15, 36, 2, 3, C.lampWarm);
+  for (const x of [8, 11, 19, 22]) {
+    p.rect(x, 24, 2, 20, 12);
+    p.vline(x + 1, 24, 20, 13);
+    p.hline(x - 1, 23, 4, 31);
+    p.hline(x - 1, 44, 4, 13);
+  }
+  p.hline(7, 22, 18, 31);
+  // Faroles a los lados de la escalinata.
+  for (const x of [1, 30]) lampPost(p, x, 39);
+  return p;
+}
+
+function library3(seed: number): Pix {
+  const p = new Pix(T, BH);
+  // Cúpula de cobre sobre un tambor con ventanas.
+  const copper: Mat = [63, 7, 25, 26];
+  p.ball(16, 8, 7, copper, seed);
+  facade(p, 9, 8, 14, 6, MAT.cream, 'stone', seed);
+  for (const x of [11, 15, 19]) {
+    p.rect(x, 9, 2, 3, nightLights ? C.lampWarm : MAT.glass[2]);
+    p.set(x, 9, nightLights ? C.lamp : MAT.glass[1]);
+  }
+  p.hline(8, 8, 16, MAT.stone[0]);
+  p.rect(15, 0, 2, 2, 4);
+  p.set(15, 0, 12);
+  p.blit(library2(seed), 0, 0);
+  // Estatuas en las esquinas del tejado.
+  for (const x of [2, 28]) {
+    p.rect(x, 10, 2, 3, MAT.stone[0]);
+    p.set(x, 9, MAT.stone[0]);
+    p.set(x + 1, 11, MAT.stone[2]);
+  }
+  return p;
+}
+
+function sports2(seed: number): Pix {
+  const p = sports(seed);
+  // Gradas al pie de la pista.
+  p.rect(0, 43, 32, 5, MAT.stone[2]);
+  for (let r = 0; r < 2; r++) {
+    p.hline(1, 43 + r * 2, 30, MAT.stone[0]);
+    for (let x = 1; x < 31; x++) if (x % 2) p.set(x, 44 + r * 2, r ? MAT.yellow[1] : MAT.red[1]);
+  }
+  p.hline(2, 42, 28, 12);
+  // Torres de focos y marcador.
+  floodlight(p, 1, 22, 43);
+  floodlight(p, 30, 22, 43);
+  p.rect(20, 8, 8, 4, 0);
+  p.frame(20, 8, 8, 4, MAT.metal[2]);
+  for (const x of [21, 22, 25, 26]) p.set(x, 9 + (x % 2), nightLights ? C.lamp : 4);
+  p.set(23, 10, 12);
+  return p;
+}
+
+function sports3(seed: number): Pix {
+  const p = sports2(seed);
+  // La canasta deja sitio a un ventanal: dentro está la piscina.
+  facade(p, 1, 20, 30, 11, MAT.brick, 'brick', seed);
+  p.hline(1, 20, 30, MAT.terracotta[2]);
+  p.rect(3, 23, 7, 8, MAT.metal[3]);
+  for (let y = 24; y < 31; y += 2) p.hline(4, y, 5, MAT.metal[2]);
+  p.hline(3, 22, 7, MAT.metal[0]);
+  windowAt(p, 13, 23, 7, 4, { frame: 12 });
+  doorAt(p, 23, 24, 5, 6, MAT.glass, MAT.metal[2]);
+  if (nightLights) p.rect(24, 24, 3, 5, C.lampWarm);
+  // Piscina exterior con calles, trampolín y escalerilla.
+  p.rect(0, 31, 32, 12, MAT.stone[0]);
+  p.dither(0, 31, 32, 12, MAT.stone[1], 0);
+  p.rect(3, 32, 26, 10, C.waterDeep);
+  p.rect(4, 33, 24, 8, C.water);
+  for (let x = 5; x < 27; x += 4) p.hline(x, 33 + (x % 3), 2, C.waterLight);
+  for (const y of [35, 38]) for (let x = 3; x < 29; x++) p.set(x, y, x % 2 ? MAT.red[1] : 12);
+  p.frame(2, 31, 28, 12, 12);
+  p.rect(0, 36, 5, 1, 12);
+  p.vline(1, 37, 2, MAT.metal[3]);
+  p.vline(26, 31, 3, MAT.metal[1]);
+  p.vline(28, 31, 3, MAT.metal[1]);
+  p.set(27, 32, MAT.metal[1]);
+  // Sombrilla y tumbona.
+  p.vline(31, 31, 5, MAT.metal[3]);
+  p.hline(29, 30, 3, MAT.red[1]);
+  p.hline(30, 29, 2, 12);
+  return p;
+}
+
+/** Edificio mejorado de cada servicio en los niveles 2 y 3. */
+const UPGRADES: Record<string, readonly [() => Pix, () => Pix]> = {
+  water: [() => waterTower2(3), () => waterPlant(3)],
+  power: [() => powerPlant2(5), () => powerPlant3(5)],
+  school: [() => school2(2), () => school3(2)],
+  clinic: [() => clinic2(4), () => hospital(4)],
+  police: [() => policeStation2(6), () => policeHQ(6)],
+  jail: [() => jail2(17), () => jail3(17)],
+  park: [() => park2(11), () => park3(11)],
+  library: [() => library2(15), () => library3(15)],
+  sports: [() => sports2(16), () => sports3(16)],
+};
+
+/**
+ * Sprite de 32×48 de un servicio según su nivel (1–3). El nivel 1 es el de
+ * `buildingSprite`; el 2 y el 3, el mismo edificio ampliado.
+ */
+export function serviceSprite(kind: string, id: number, level: number, tod: TimeOfDay = 'day', snow = false): HTMLCanvasElement {
+  const lv = Math.max(1, Math.min(3, Math.floor(level) || 1));
+  const make = lv > 1 ? UPGRADES[kind]?.[lv - 2] : undefined;
+  if (!make) return buildingSprite(kind, id, tod, snow);
+  const key = `${kind}-lv${lv}`;
+  return snow ? sprite(`snow-${key}`, () => snowify(make()), tod) : sprite(key, make, tod);
 }
 
 /** Árbol: copa redonda o pino, con tronco y sombra. */
