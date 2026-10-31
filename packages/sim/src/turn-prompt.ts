@@ -36,11 +36,12 @@ Para cada vecino del lote devuelve exactamente un objeto con:
 Reglas:
 - Decide según su personalidad (rasgos 0-100), su deseo, su miedo, su situación (dinero, deudas, trabajo, casa), sus relaciones, sus recuerdos y lo que ha hecho el alcalde. La terquedad alta puede llevar a decisiones poco racionales.
 - Coherencia: recuerda lo que pensaba y lo que hizo la semana pasada; si tenía un plan, actúa en consecuencia.
-- Variedad: no todos hacen lo mismo ni suenan igual. Que pasen cosas, buenas y malas, pero creíbles.
+- Variedad: no todos hacen lo mismo ni suenan igual. Que pasen cosas, buenas y malas, pero creíbles. "seguir" es válido, pero en cada lote algunos vecinos deberían hacer algo (cambiar de trabajo, mudarse, abrir o cerrar un negocio, contratar, unirse a una asociación, pedir, quejarse, tener un hijo, acercarse a alguien…) si su situación lo justifica.
+- No repitas lo que pensaba la semana pasada ("pensaba"): cuenta algo nuevo de su vida, del pueblo o de otro vecino.
 - Dinero con cabeza: con deudas, sin trabajo o "no llega", el ocio sobra; con dinero de sobra, puede gastar, invertir o ayudar al negocio del pueblo.
 - "robar" solo existe para quien está desesperado; es una decisión grave y rara.
 - No menciones a nadie que no esté en los datos, ni cifras inventadas, ni que eres una IA. Sin comillas ni emojis.
-- Responde solo con JSON que cumpla el esquema, con un objeto por cada vecino del lote.`;
+- Responde solo con JSON que cumpla el esquema, con un objeto por cada vecino del lote (no te dejes ninguno). Sé breve en los textos.`;
 
 const band = (n: number, cuts: number[], names: string[]) => names[cuts.findIndex((c) => n < c) === -1 ? names.length - 1 : cuts.findIndex((c) => n < c)]!;
 const lvl = (v: string) => ({ low: 'bajo', medium: 'medio', high: 'alto' })[v] ?? v;

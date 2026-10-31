@@ -54,7 +54,7 @@ export interface TurnResult {
 export const TURN_BATCH = 15;
 const TURN_PARALLEL = 4;
 const TURN_TIMEOUT_MS = 60_000;
-const TURN_OUT_PER_CITIZEN = 160;
+const TURN_OUT_PER_CITIZEN = 320;
 
 const TIMEOUT_MS = 20_000;
 const MAX_OUT_PER_CITIZEN = 120;
@@ -227,7 +227,9 @@ export class AiService {
       return;
     }
     const shared = turnShared(state);
-    const one = async (ids: number[]): Promise<void> => {
+    /** Pide un lote; a los vecinos que la IA se haya dejado se les pregunta una vez más, solos. */
+    const one = async (ids: number[], retry = true): Promise<void> => {
+      let missing: number[] = [];
       const req = buildTurnRequest(state, ids, shared);
       const est = costEur(this.prices, s.model, s.provider, { in: Math.ceil((req.system.length + req.shared.length + req.user.length) / 3.2), cachedIn: 0, out: ids.length * TURN_OUT_PER_CITIZEN }) * 1.5;
       const blocked = await this.reserve(gameId, s, est);
@@ -253,7 +255,8 @@ export class AiService {
         valid = parsed.acts.length;
         result.acts.push(...parsed.acts);
         result.answered += parsed.acts.length;
-        if (parsed.missing.length) status = 'partial';
+        missing = parsed.missing;
+        if (missing.length) status = 'partial';
       } catch (e) {
         status = (e as Error).name === 'TimeoutError' ? 'timeout' : 'error';
         g.lastError = `La IA no respondió a tiempo (${(e as Error).message}). Esta semana deciden las reglas para parte del pueblo.`;
@@ -275,11 +278,12 @@ export class AiService {
             eur: costEur(this.prices, s.model, s.provider, usage),
             requested: ids.length,
             valid,
-            retried: 0,
+            retried: retry ? 0 : 1,
             status,
           })
           .execute();
       }
+      if (retry && missing.length && missing.length < ids.length) await one(missing, false);
     };
     // El primer lote va solo (escribe la caché del bloque común); los demás, en paralelo.
     try {
