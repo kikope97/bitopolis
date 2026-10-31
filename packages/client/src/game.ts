@@ -1,6 +1,5 @@
 import { tickToDate, type Command } from '@bitopolis/shared';
 import {
-  BUILD,
   BUILD_NAMES,
   type Building,
   salePrice,
