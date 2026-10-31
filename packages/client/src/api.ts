@@ -70,9 +70,14 @@ export const api = {
 
 export interface AiMeta {
   providers: { id: string; label: string; cheap: string; premium: string; baseUrl: string; needsKey: boolean; models?: string[] }[];
+  /** La IA la pone el servidor (/admin): todas las partidas son de Modo IA. */
   serverKey: boolean;
   maxCitizens: number;
-  canStoreKeys: boolean;
+  /** Sin IA del servidor, ¿puede cada partida poner su propia key? */
+  playerKeys: boolean;
+  newGames: boolean;
+  /** URL pública para los enlaces (vacía: la del navegador). */
+  publicUrl: string;
 }
 
 export interface AiSettings {

@@ -1,4 +1,4 @@
-import { mkdtempSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
@@ -8,7 +8,7 @@ import { AiService } from '../src/ai/service.ts';
 import { buildApp } from '../src/app.ts';
 import { loadConfig } from '../src/config.ts';
 import { openDb } from '../src/db/index.ts';
-import { loadSecret, SettingsStore, verifyPassword } from '../src/settings.ts';
+import { loadSecret, resetAdminIfAsked, SettingsStore, verifyPassword } from '../src/settings.ts';
 import { newGameToken } from '../src/tokens.ts';
 
 const dir = mkdtempSync(join(tmpdir(), 'bitopolis-admin-'));
@@ -236,5 +236,15 @@ describe('partidas y copias', () => {
     const reopened = await SettingsStore.open(db);
     expect(reopened.get().admin.user).toBe('alcaldesa');
     expect(reopened.get().backups.keep).toBe(3);
+  });
+
+  it('reset-admin devuelve la cuenta a admin/admin sin tocar el resto', async () => {
+    expect(await resetAdminIfAsked(store, dir)).toBe(false);
+    writeFileSync(join(dir, 'reset-admin'), '');
+    expect(await resetAdminIfAsked(store, dir)).toBe(true);
+    expect(existsSync(join(dir, 'reset-admin'))).toBe(false);
+    expect(store.get().admin).toMatchObject({ user: 'admin', mustChange: true });
+    expect(store.get().backups.keep).toBe(3);
+    expect((await login('admin', 'admin')).r.json().mustChange).toBe(true);
   });
 });

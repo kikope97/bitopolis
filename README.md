@@ -4,27 +4,33 @@ Simulador de alcalde en pixel art donde los vecinos son agentes de IA. Se juega 
 
 ## Instalación (5 líneas)
 
-1. Copia [`docker-compose.yml`](docker-compose.yml) en Portainer (Stacks) o en una carpeta de tu servidor.
-2. Cambia `BITOPOLIS_MASTER_KEY` por una clave larga y aleatoria (`openssl rand -base64 32`).
-3. Pon en `BITOPOLIS_PUBLIC_URL` la URL con la que entrarás (idealmente detrás de un proxy con HTTPS).
-4. Arranca: `docker compose up -d` (o "Deploy the stack" en Portainer).
-5. Abre la URL. Los datos y las copias diarias quedan en el volumen `/data`.
+1. Copia [`docker-compose.yml`](docker-compose.yml) en Portainer (Stacks) o en una carpeta de tu servidor. No hay que rellenar nada.
+2. Arranca: `docker compose up -d` (o "Deploy the stack" en Portainer).
+3. Abre `http://tu-servidor:8080/admin` y entra con usuario **`admin`** y contraseña **`admin`**.
+4. El panel te obliga a cambiar la contraseña la primera vez; después configura lo que quieras (IA, contraseña para jugar, URL…).
+5. Abre `http://tu-servidor:8080/` y juega. Los datos y las copias diarias quedan en el volumen `/data`.
 
 Imágenes: `ghcr.io/kikope97/bitopolis:latest` (última versión publicada), `:X.Y.Z` (cada versión) y `:test` (último `main`). Las versiones se publican solas al fusionar en `main` un cambio de `version` en `package.json`.
 
-## Variables de entorno
+Lo ideal es ponerlo detrás de un proxy inverso con HTTPS: el enlace de cada partida funciona como su contraseña.
 
-Todas son opcionales salvo las dos primeras. Lo que se define por variable **manda**: en el juego aparece en solo lectura («definido por el servidor») y no se puede cambiar desde Configurar.
+## Panel de administración (`/admin`)
 
-### Básicas
+La imagen **no usa variables de entorno**: todo se configura en `/admin` y los cambios valen al momento, sin reiniciar.
 
-| Variable | Por defecto | Para qué sirve |
-|---|---|---|
-| `BITOPOLIS_MASTER_KEY` | — (**obligatoria**) | Cifra (AES-256-GCM) las API keys que se guardan desde el juego. Si la pierdes o la cambias, las keys guardadas dejan de valer y hay que volver a ponerlas. Genera una con `openssl rand -base64 32`. |
-| `BITOPOLIS_PUBLIC_URL` | `http://localhost:8080` | URL con la que se entra al juego; se usa para los enlaces de las partidas. |
-| `PORT` | `8080` | Puerto del servidor dentro del contenedor. |
-| `BITOPOLIS_PASSWORD` | — | Si la pones, todo el servidor pide esta contraseña al entrar; solo la contraseña, sin usuario. Sirve para que solo jueguen tus amigos y nadie más gaste tu API key si abres el juego a internet. Tras 5 fallos se bloquea 15 minutos y la sesión dura 30 días. Si la cambias, se cierran todas las sesiones. |
-| `LOG_LEVEL` | `info` | `debug`, `info`, `warn` o `error`. Las API keys no salen nunca en los logs. |
+| Apartado | Qué se configura |
+|---|---|
+| **Partidas y acceso** | URL pública de los enlaces (en blanco, la del navegador) · permitir o no **partidas nuevas** (las que ya existen siguen funcionando; tampoco se puede importar) · **pedir contraseña para jugar**: una sola para todos, sin usuario, para que solo jueguen tus amigos y nadie más gaste tu API key. Tras 5 fallos se bloquea 15 minutos; la sesión dura 30 días; cambiarla cierra las sesiones abiertas. |
+| **IA** | API key del servidor · modelos · vecinos con IA por partida (1–20) · topes de gasto (servidor al mes, partida al mes, partida al día) · si cada partida puede poner su propia key · endpoint propio y precios (avanzado) · botón **Probar la IA**. |
+| **Partidas** | Lista con población, fecha y gasto de IA del mes; exportar o borrar. |
+| **Copias de seguridad** | Cuántas se guardan (7 por defecto), hacer una ahora y descargarlas. |
+| **Cuenta del administrador** | Usuario y contraseña del panel. |
+
+El panel tiene su propio inicio de sesión (independiente de la contraseña para jugar), bloqueo tras 5 fallos y sesión de 12 horas. Las contraseñas se guardan con scrypt.
+
+**Si olvidas la contraseña del panel:** crea un archivo vacío `reset-admin` en el volumen (por ejemplo `docker exec <contenedor> touch /data/reset-admin`, o desde la consola del contenedor en Portainer) y reinicia el contenedor. La cuenta vuelve a `admin`/`admin` con cambio obligatorio; el resto de ajustes, las partidas y las keys no se tocan.
+
+**Mover el servidor:** copia la carpeta `/data` entera. Incluye `secret.key`, la clave que se genera sola la primera vez y cifra las API keys (AES-256-GCM). Sin ella, las keys guardadas dejan de valer y hay que volver a ponerlas.
 
 ### IA de los vecinos
 
@@ -35,49 +41,25 @@ Solo hace falta una **API key de Anthropic o de OpenAI**. No hay que elegir prov
 
 Hay dos maneras de dar la key. Sin key se juega en Modo normal.
 
-1. **Desde el juego (sin tocar el Docker).** Si `BITOPOLIS_API_KEY` no está definida, en **Configurar → Modo IA** hay un campo «API key». Debajo pone que se acepta key de Anthropic o de OpenAI, y al escribirla indica cuál ha detectado. La key se guarda cifrada en el servidor y nunca vuelve al navegador; solo se ve enmascarada, por ejemplo `sk-ant-…abcd`.
-2. **Para todo el servidor, en el `docker-compose.yml`.** Con `BITOPOLIS_API_KEY` todas las partidas usan esa key, y en Configurar solo hay que aceptar el aviso de gasto.
+1. **Para todo el servidor, en `/admin` → IA.** Todas las partidas pasan a Modo IA con esa key; en el juego solo hay que aceptar el aviso de gasto, y lo que fijes en el panel aparece en el juego como «definido por el servidor».
+2. **Por partida, desde el juego.** Sin key del servidor (y si el panel lo permite), en **Configurar → Modo IA** hay un campo «API key». Debajo pone que se acepta key de Anthropic o de OpenAI, y al escribirla indica cuál ha detectado.
 
-| Variable | Valores | Para qué sirve |
-|---|---|---|
-| `BITOPOLIS_API_KEY` | `sk-ant-…` o `sk-…` | API key para todo el servidor. El proveedor sale de la key. |
-| `BITOPOLIS_AI_MODEL` | ver tabla | Opcional. Modelo para las decisiones diarias de los vecinos (muchas llamadas pequeñas). Si falta, el de serie del proveedor. |
-| `BITOPOLIS_AI_MODEL_PREMIUM` | ver tabla | Opcional. Modelo para el consejero, la crónica del diario y los plenos (pocas llamadas). Si falta, se usa `BITOPOLIS_AI_MODEL` y, si tampoco está, el premium de serie. |
-| `BITOPOLIS_AI_BASE_URL` | URL | Solo para un modelo local compatible con OpenAI (Ollama, LM Studio). Con esta variable no hace falta key. |
-| `BITOPOLIS_AI_MAX_CITIZENS` | `1`–`20` (por defecto `20`) | Cuántos vecinos con nombre deciden con IA. |
+En los dos casos la key se guarda cifrada en el servidor y nunca vuelve al navegador; solo se ve enmascarada, por ejemplo `sk-ant-…abcd`. Tampoco sale en logs ni exportaciones.
 
-Modelos (se puede poner cualquier otro que admita tu cuenta; los modelos también se pueden cambiar por partida en Configurar → Opciones avanzadas):
+Modelos (se puede poner cualquier otro que admita tu cuenta):
 
-| Key | Decisiones (por defecto) | Premium (por defecto) | Otros |
+| Key | Decisiones (por defecto) | Premium: plenos, consejero y diario | Otros |
 |---|---|---|---|
 | Anthropic | `claude-haiku-5-5` | `claude-sonnet-5-5` | `claude-opus-5-5` |
 | OpenAI | `gpt-5.4-nano` | `gpt-5.4-mini` | — |
 
-Con Anthropic se usa el SDK oficial con salida estructurada (JSON validado con el esquema), caché de prompt y esfuerzo de razonamiento bajo, para gastar lo mínimo.
+Con Anthropic se usa el SDK oficial con salida estructurada (JSON validado con el esquema), caché de prompt y esfuerzo de razonamiento bajo, para gastar lo mínimo. Para un modelo local (Ollama, LM Studio), pon su endpoint compatible con OpenAI en «Avanzado»; no hace falta key.
 
-### Topes de gasto
+**Topes de gasto.** Se comprueban en el servidor antes de cada llamada: el gasto previsto se reserva primero y, si no cabe, no se llama y deciden las reglas del juego. Se calculan en euros con una tabla de precios orientativos, que puedes corregir en «Avanzado» (€ por millón de tokens, por ejemplo `{"claude-haiku-5-5": {"in": 0.092, "cachedIn": 0.0092, "out": 0.46}}`). Pon también un límite de gasto en el panel de tu proveedor: es la última barrera si algo falla.
 
-Se comprueban **en el servidor antes de cada llamada**: el gasto previsto se reserva primero y, si no cabe, no se llama y deciden las reglas del juego. Las cantidades son en euros y se calculan con la tabla de precios orientativos.
+### Ajustes internos de la imagen
 
-| Variable | Ejemplo | Para qué sirve |
-|---|---|---|
-| `BITOPOLIS_BUDGET_SERVER_MONTHLY_EUR` | `10` | Tope mensual de todo el servidor (todas las partidas juntas). |
-| `BITOPOLIS_BUDGET_GAME_MONTHLY_EUR` | `5` | Tope mensual por partida. Si no lo pones, cada partida elige el suyo en Configurar. |
-| `BITOPOLIS_BUDGET_GAME_DAILY_EUR` | `0.5` | Tope diario por partida. |
-| `BITOPOLIS_AI_PRICES_JSON` | `{"claude-haiku-5-5": {"in": 0.092, "cachedIn": 0.0092, "out": 0.46}}` | Sustituye precios de la tabla incluida (€ por millón de tokens de entrada, de entrada en caché y de salida). Úsalo si cambian los precios o usas un modelo que no está en la tabla. |
-
-Pon también un límite de gasto en el panel de tu proveedor: es la última barrera si algo falla.
-
-### Ejemplo: key de Anthropic para todo el servidor
-
-```yaml
-    environment:
-      BITOPOLIS_MASTER_KEY: "una-clave-larga-y-aleatoria"
-      BITOPOLIS_PUBLIC_URL: "https://bitopolis.example.com"
-      BITOPOLIS_API_KEY: "sk-ant-..."
-      BITOPOLIS_AI_MODEL: "claude-haiku-5-5"
-      BITOPOLIS_BUDGET_SERVER_MONTHLY_EUR: "10"
-```
+Vienen fijados en la imagen y no hace falta tocarlos: `PORT` (8080), `BITOPOLIS_DATA_DIR` (`/data`), `BITOPOLIS_CLIENT_DIR` y `BITOPOLIS_VERSION`. `LOG_LEVEL` (`info` por defecto) solo sirve para depurar.
 
 ## Desarrollo
 

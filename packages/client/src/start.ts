@@ -12,8 +12,6 @@ export async function showStart(token: string): Promise<void> {
   const root = $('#start');
   root.hidden = false;
   $('#game').hidden = true;
-  const url = `${location.origin}/p/${token}`;
-
   let info: Awaited<ReturnType<typeof api.get>>;
   let meta: AiMeta;
   try {
@@ -23,17 +21,24 @@ export async function showStart(token: string): Promise<void> {
     return;
   }
 
+  const url = `${meta.publicUrl || location.origin}/p/${token}`;
+  // Sin partidas nuevas (se decide en /admin), un enlace sin partida no lleva a nada.
+  const closed = !info.exists && !meta.newGames;
   // Con key de servidor solo existe el Modo IA (spec §10.2).
   let mode: 'normal' | 'ai' = meta.serverKey ? 'ai' : 'normal';
   const body = $('#start-body');
   body.replaceChildren();
   if (info.exists) {
     body.append(statsCard(info.summary, info.mode));
+  } else if (closed) {
+    body.append(h('p', { class: 'notice closed' }, 'Este servidor no admite partidas nuevas ahora mismo. Si ya tienes una, abre su enlace.'));
   } else {
     body.append(modePicker());
   }
 
   const playBtn = $('#play') as HTMLButtonElement;
+  playBtn.hidden = closed;
+  $('.link-box').hidden = closed;
   playBtn.textContent = info.exists ? t('continue') : t('play');
   playBtn.onclick = async () => {
     playBtn.disabled = true;
@@ -104,7 +109,8 @@ export async function showStart(token: string): Promise<void> {
     };
     const list = h('div', { class: 'radio-list', role: 'radiogroup', 'aria-label': 'Modo de juego' });
     if (!meta.serverKey) list.append(choice('normal', t('modeNormal'), 'Los vecinos deciden con reglas. Sin coste.'));
-    list.append(
+    // Sin IA del servidor ni keys propias, solo queda el Modo normal.
+    if (meta.serverKey || meta.playerKeys) list.append(
       choice(
         'ai',
         t('modeAi'),
@@ -134,22 +140,24 @@ export async function showStart(token: string): Promise<void> {
       const exp = h('a', { class: 'btn wide', href: `/api/games/${token}/export`, download: '' }, t('export'));
       items.push(regen, exp);
     }
-    const input = h('input', { type: 'file', accept: '.bitopolis,application/octet-stream', id: 'import-file', class: 'visually-hidden' }) as HTMLInputElement;
-    const label = h('label', { class: 'btn wide', for: 'import-file' }, t('import'));
-    input.onchange = async () => {
-      const f = input.files?.[0];
-      if (!f) return;
-      try {
-        const r = await api.import(f);
-        location.assign(`/p/${r.token}`);
-      } catch (e) {
-        toast((e as Error).message, { kind: 'warn' });
-      }
-    };
-    items.push(input, label, h('p', { class: 'muted' }, 'Importar crea una partida nueva con otro enlace. Las copias nunca incluyen la API key.'));
+    if (meta.newGames) {
+      const input = h('input', { type: 'file', accept: '.bitopolis,application/octet-stream', id: 'import-file', class: 'visually-hidden' }) as HTMLInputElement;
+      const label = h('label', { class: 'btn wide', for: 'import-file' }, t('import'));
+      input.onchange = async () => {
+        const f = input.files?.[0];
+        if (!f) return;
+        try {
+          const r = await api.import(f);
+          location.assign(`/p/${r.token}`);
+        } catch (e) {
+          toast((e as Error).message, { kind: 'warn' });
+        }
+      };
+      items.push(input, label, h('p', { class: 'muted' }, 'Importar crea una partida nueva con otro enlace. Las copias nunca incluyen la API key.'));
+    }
     const gameMode = info.exists ? info.mode : null;
     items.push(h('h3', {}, 'Modo'), h('p', {}, gameMode ? `${gameMode === 'ai' ? t('modeAi') : t('modeNormal')} (fijo en esta partida)` : 'Se elige en la pantalla de inicio.'));
-    if (gameMode === 'ai' || (!gameMode && !meta.serverKey)) {
+    if (gameMode === 'ai' || (!gameMode && !meta.serverKey && meta.playerKeys && meta.newGames)) {
       const aiBtn = h('button', { class: 'btn wide' }, gameMode === 'ai' ? 'Ajustes de la IA (modelo, key y topes)' : 'Configurar la IA');
       aiBtn.onclick = () => void openAiConfig(token, sid, () => void showStart(token));
       items.push(aiBtn);

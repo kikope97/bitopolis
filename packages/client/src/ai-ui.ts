@@ -113,7 +113,6 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
     estimate,
     advanced,
     h('label', { class: 'check warning' }, accept, h('span', {}, 'Pon un límite de gasto en el panel de tu proveedor. Bitópolis es un proyecto personal y no se hace responsable si la key se filtra o se usa de más.')),
-    !meta.canStoreKeys && !locked.has('key') ? h('p', { class: 'error' }, 'El servidor no tiene BITOPOLIS_MASTER_KEY: no se pueden guardar keys.') : '',
     h('div', { class: 'sticky-actions' }, save, previewBtn),
   );
   void refresh();

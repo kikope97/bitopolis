@@ -1,5 +1,5 @@
 import { randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
-import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import type { Price } from './ai/catalog.ts';
@@ -121,4 +121,18 @@ export class SettingsStore {
     this.current = next;
     return next;
   }
+}
+
+/**
+ * Contraseña del panel olvidada: si existe <dataDir>/reset-admin al arrancar,
+ * la cuenta vuelve a admin / admin (con cambio obligatorio) y se borra el
+ * archivo. El resto de ajustes no se toca.
+ */
+export async function resetAdminIfAsked(store: SettingsStore, dataDir: string): Promise<boolean> {
+  const flag = join(dataDir, 'reset-admin');
+  if (!existsSync(flag)) return false;
+  const hash = await hashPassword(DEFAULT_ADMIN.password);
+  await store.update((s) => ({ ...s, admin: { user: DEFAULT_ADMIN.user, hash, mustChange: true } }));
+  rmSync(flag, { force: true });
+  return true;
 }

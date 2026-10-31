@@ -200,13 +200,13 @@ Mudarse al pueblo o no, irse y vender la casa, comprar o alquilar casa, buscar o
 - Arriba, un botón **Configurar**.
 - Selector de **modo**:
   - Sin API configurada: se ven **Modo normal** y **Modo IA**. Al pulsar Modo IA se abre la configuración de la IA (proveedor, modelo, key y topes de gasto).
-  - Con API configurada (en la partida o por variable de entorno): **solo Modo IA**.
+  - Con API configurada (en la partida o en el panel `/admin`): **solo Modo IA**.
 - **El modo se elige antes de empezar y queda fijo** para toda la partida.
 - Flujo previsto: el creador entra, se genera la URL, configura la IA y le pasa la URL a un amigo. El amigo abre el enlace, ve Jugar en Modo IA y juega sin configurar nada.
 
 ## 11. API key y seguridad *(decisión del creador)*
 
-- La key se guarda en la base de datos, **asociada a la partida**, cifrada con AES-256-GCM. La clave maestra está en `BITOPOLIS_MASTER_KEY`, nunca en la BD.
+- La key se guarda en la base de datos, **asociada a la partida** (o, la del servidor, en los ajustes de `/admin`), cifrada con AES-256-GCM. La clave maestra se genera sola la primera vez en `/data/secret.key` (permisos 600), nunca en la BD.
 - **Todas las llamadas a la IA las hace el servidor.** La key nunca vuelve al cliente: en Configurar solo se ve `sk-…abcd`. Nunca aparece en logs, exportaciones ni respuestas de la API.
 - Al guardar la key aparece un **aviso que hay que aceptar** con una casilla: "Pon un límite de gasto en el panel de tu proveedor. Bitópolis es un proyecto personal y no se hace responsable si la key se filtra o se usa de más."
 - Los topes de gasto se aplican en el servidor, porque cualquiera con la URL usa la key.
@@ -220,27 +220,20 @@ Mudarse al pueblo o no, irse y vender la casa, comprar o alquilar casa, buscar o
 - Los datos se guardan en el volumen `/data`: `bitopolis.db` y copias diarias automáticas con rotación.
 - Endpoint `/healthz` para el healthcheck.
 - Pensada para ir detrás de un proxy inverso con HTTPS. Debe funcionar también por HTTP en una LAN, avisando de que es inseguro.
-- En el repo: `Dockerfile` multi-stage y un `docker-compose.yml` de ejemplo con todas las variables opcionales comentadas. El `README.md` explica la instalación en 5 líneas.
+- En el repo: `Dockerfile` multi-stage y un `docker-compose.yml` de ejemplo **sin variables**. El `README.md` explica la instalación en 5 líneas.
 
-### 12.2 Variables de entorno
+### 12.2 Panel de administración, sin variables de entorno *(decisión del creador, v1.2, octubre de 2026)*
 
-| Variable | Obligatoria | Efecto |
-|---|---|---|
-| `BITOPOLIS_MASTER_KEY` | sí | Cifra las API keys guardadas. Si se pierde, se pierden las keys. |
-| `BITOPOLIS_PUBLIC_URL` | sí | URL pública, para generar los enlaces. |
-| `PORT` | no (8080) | Puerto interno. |
-| `BITOPOLIS_PASSWORD` | no | Si se define, todo el servidor pide esa contraseña al entrar (login propio, cookie `HttpOnly`/`Secure`/`SameSite`, bloqueo tras varios intentos fallidos). Es un acceso común, no son cuentas: **solo contraseña, sin usuario** (decisión del creador, octubre de 2026; antes `BITOPOLIS_USER` + `BITOPOLIS_PASSWORD`). |
-| `BITOPOLIS_API_KEY` | no | Key por defecto para **todas** las partidas: todas arrancan en Modo IA y la key no se ve ni se cambia desde el juego. **El proveedor se deduce de la key** (decisión del creador, octubre de 2026): `sk-ant-…` es Anthropic y cualquier otra, OpenAI. No hay variable para elegirlo, y en Configurar solo se pide la key («se acepta API key de Anthropic o de OpenAI»). |
-| `BITOPOLIS_AI_BASE_URL` | no | Endpoint propio compatible con OpenAI (Ollama, LM Studio…); con él no hace falta key. |
-| `BITOPOLIS_AI_MODEL` | no | Modelo barato. |
-| `BITOPOLIS_AI_MODEL_PREMIUM` | no | Modelo premium (si falta, se usa el barato). |
-| `BITOPOLIS_AI_MAX_CITIZENS` | no (20) | Vecinos con IA por partida. |
-| `BITOPOLIS_BUDGET_SERVER_MONTHLY_EUR` | no | Tope mensual de todo el servidor. |
-| `BITOPOLIS_BUDGET_GAME_MONTHLY_EUR` | no | Tope mensual por partida. |
-| `BITOPOLIS_BUDGET_GAME_DAILY_EUR` | no | Tope diario por partida. |
-| `BITOPOLIS_AI_PRICES_JSON` | no | Tabla de precios por modelo (sustituye a la incluida). |
+Sustituye a la tabla de variables de entorno anterior (`BITOPOLIS_MASTER_KEY`, `BITOPOLIS_PUBLIC_URL`, `BITOPOLIS_PASSWORD`, `BITOPOLIS_API_KEY`, `BITOPOLIS_AI_*`, `BITOPOLIS_BUDGET_*`). La imagen Docker **no pide ninguna variable**; todo se configura en **`/admin`** y los cambios valen al momento.
 
-**Regla:** lo que se define por variable queda fijo y en Configurar aparece en solo lectura, como "definido por el servidor". Lo que no se define se puede configurar por partida.
+- **Acceso:** usuario y contraseña propios del panel; la primera vez, **`admin` / `admin`**, y el panel obliga a cambiar la contraseña antes de dejar configurar nada. Contraseñas con scrypt, cookie `HttpOnly`/`SameSite=Strict`, bloqueo tras 5 fallos, sesión de 12 h. Contraseña olvidada: archivo `/data/reset-admin` y reiniciar.
+- **Partidas y acceso:** URL pública para los enlaces (en blanco, la del navegador); permitir o no partidas nuevas (si no, no se crean ni importan, y las existentes siguen); contraseña común para jugar, activable y **solo contraseña, sin usuario** (decisión del creador anterior, que se mantiene).
+- **IA:** API key del servidor (el proveedor se sigue deduciendo de la key: `sk-ant-…` Anthropic, el resto OpenAI), modelo y modelo premium, endpoint propio, vecinos con IA (1–20), topes (servidor/mes, partida/mes, partida/día), tabla de precios, si cada partida puede poner su propia key, y «Probar la IA».
+- **Partidas** (lista, exportar, borrar), **copias** (cuántas se guardan, hacer una ahora, descargar) y **cuenta** del panel.
+- **Clave maestra:** se genera sola en `/data/secret.key`. Copiar `/data` entera basta para mover el servidor.
+- Solo quedan ajustes internos fijados en la imagen: `PORT`, `BITOPOLIS_DATA_DIR`, `BITOPOLIS_CLIENT_DIR`, `BITOPOLIS_VERSION` (y `LOG_LEVEL` para depurar).
+
+**Regla:** lo que se fija en `/admin` manda y en Configurar aparece en solo lectura, como "definido por el servidor". Lo que no se fija se puede configurar por partida.
 
 ### 12.3 Repositorio y CI
 - Código en **GitHub**, en un repo llamado `bitopolis`. Si no existe, créalo con `gh` como privado. Haz commits pequeños y frecuentes con mensajes claros.
