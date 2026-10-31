@@ -11,6 +11,7 @@ import {
   CRIME,
   jailCapacity,
   canUpgradeBuilding,
+  totalDebt,
   cellsOf,
   jailPlacesOf,
   levelOf,
@@ -52,6 +53,7 @@ import { objectivesNode, openAdvisor, openCitizen, openDiary, openPleno, portrai
 import { api, ApiError } from './api.ts';
 import { nextHint } from './hints.ts';
 import { openManagement } from './manage-ui.ts';
+import { pocketMark } from './money-ui.ts';
 import { formatDate, money, MONTHS, plural, shortDate, t } from './i18n.ts';
 import { type Camera, type Preview, render, restartAnimations } from './render.ts';
 import type { FromWorker, SaveBatch, ToWorker } from './sim.worker.ts';
@@ -430,6 +432,13 @@ export function startGame(opts: GameOptions): void {
           const th = state.buildings.find((b) => b.kind === 'townhall');
           if (th) coins(...screenOf(th.x, th.y), Math.ceil(Math.min(net, 6000) / 600));
         } else sfx.warn();
+        // v1.9: un solo aviso al mes con quien no ha podido pagar.
+        if ((m.unpaid ?? 0) > 0 && (m.debtors ?? 0) > 0) {
+          toast(`${m.debtors} ${m.debtors === 1 ? 'vecino debe' : 'vecinos deben'} dinero; este mes quedaron ${money(m.unpaid ?? 0)} sin pagar al ayuntamiento. Toca para verlos.`, {
+            kind: 'warn',
+            onClick: () => openNeighbours(state, (c) => withBack('Vecinos', () => openNeighbours(state, () => {}, true), () => openCitizen(social, c.id)), true),
+          });
+        }
       }
     }
     const d = tickToDate(state.tick);
@@ -605,6 +614,9 @@ export function startGame(opts: GameOptions): void {
       } else if (e.kind === 'info' && /^(Nieva|Ola de calor|Tormenta sobre|El río crece)/.test(e.text)) {
         // v1.7: el tiempo que cambia algo (no el sol ni las nubes).
         toast(e.text, { kind: 'info' });
+      } else if (e.kind === 'info' && /^(Desahucian|El banco se queda)/.test(e.text)) {
+        // v1.9: desahucios y embargos.
+        if (!quiet) toast(e.text, { kind: 'warn', onClick: e.ref ? () => openCitizen(social, e.ref!) : undefined });
       } else if (e.kind === 'info' && e.text.startsWith('El río se desborda')) {
         sfx.warn();
         vibrate(80);
@@ -1471,6 +1483,7 @@ export function startGame(opts: GameOptions): void {
         townHall: () => withBack('Gestión', () => focusBuilding(b.id), () => openTownHall(social)),
         politics: () => withBack('Gestión', () => focusBuilding(b.id), () => openPolitics(social)),
         accounts: () => withBack('Gestión', () => focusBuilding(b.id), openAccounts),
+        taxes: () => withBack('Gestión', () => focusBuilding(b.id), openTaxes),
         focus: (x, y) => {
           closeSheet();
           centerOn(x, y);
@@ -1524,6 +1537,12 @@ export function startGame(opts: GameOptions): void {
           pills.push(h('span', { class: `pill ${b.hasPower ? 'good' : 'bad'}` }, b.hasPower ? 'Luz ✓' : `SIN LUZ${b.darkDays ? ` (${plural(b.darkDays, 'día', 'días')})` : ''}`));
         }
         if (b.kind === 'shop' || b.kind === 'factory') pills.push(h('span', { class: 'pill' }, money(unitValue(state, b))));
+        // v1.9: las cuentas de la empresa el mes pasado (salud de las empresas).
+        if ((b.kind === 'shop' || b.kind === 'factory') && b.books) {
+          const k = b.books;
+          const profit = k.sales - k.wages - k.taxes;
+          content.push(h('p', { class: profit < 0 ? 'neg' : '' }, `El mes pasado: vendió ${money(k.sales)}, pagó ${money(k.wages)} en sueldos y ${money(k.taxes)} en impuestos → ${profit >= 0 ? `ganó ${money(profit)}` : `perdió ${money(-profit)}`}. Caja: ${money(b.cash)}.`));
+        }
         if (pills.length) content.push(h('div', { class: 'status-row' }, ...pills));
       }
       // v1.8: comisaría (calabozos) y cárcel (presos).
@@ -1541,9 +1560,11 @@ export function startGame(opts: GameOptions): void {
         // Resumen de quien vive aquí antes de la lista.
         const avg = Math.round(res.reduce((t, c) => t + c.happiness, 0) / res.length);
         const inTown = res.filter((c) => c.jobId !== null).length;
+        const broke = res.filter((c) => totalDebt(c) > 0).length;
         content.push(
           h('h3', {}, 'Viven aquí'),
           h('p', { class: 'muted small' }, `${plural(res.length, 'vecino', 'vecinos')} · felicidad media ${avg} · ${inTown} trabajan en el pueblo, ${res.length - inTown} fuera`),
+          broke ? h('p', { class: 'pocket-warn' }, `€ ${broke === 1 ? 'Uno debe' : `${broke} deben`} dinero: ${money(res.reduce((t, c) => t + totalDebt(c), 0))} en total.`) : '',
           citizenList(res),
         );
       } else if (res.length) content.push(h('h3', {}, 'Viven aquí'), citizenList(res));
@@ -1618,6 +1639,8 @@ export function startGame(opts: GameOptions): void {
           {},
           h('span', { class: 'p-name' }, c.name),
           h('span', { class: 'p-sub' }, `${c.age} años · ${c.owns ? 'propietario' : 'quiere ' + DESIRE_TEXT[c.desire]}${worry ? ` · le preocupa ${worry.label.toLowerCase()}` : ''}`),
+          // v1.9: quien no llega o debe dinero, marcado.
+          pocketMark(c) ? h('span', { class: 'p-sub pocket-warn' }, pocketMark(c) === '€!' ? `€ Debe ${money(totalDebt(c))}` : '€ No llega a fin de mes') : '',
           last ? h('em', { class: 'p-sub quote' }, `«${last.motivo}»`) : '',
         ),
         h('span', { class: `p-mood ${c.happiness >= 65 ? 'good' : c.happiness < 40 ? 'bad' : ''}`, 'aria-hidden': 'true' }, String(Math.round(c.happiness))),

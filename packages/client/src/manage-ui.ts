@@ -14,6 +14,7 @@ import {
   townLevel,
 } from '@bitopolis/sim';
 import { money, MONTHS } from './i18n.ts';
+import { economyLines } from './money-ui.ts';
 import { pixelIcon } from './icons.ts';
 import type { SocialCtx } from './social-ui.ts';
 import { townhallSprite } from './sprites.ts';
@@ -28,6 +29,7 @@ export interface ManageLinks {
   townHall: () => void;
   politics: () => void;
   accounts: () => void;
+  taxes: () => void;
   focus: (x: number, y: number) => void;
 }
 
@@ -124,6 +126,8 @@ export function openManagement(ctx: SocialCtx, links: ManageLinks): void {
     'Seguridad',
     'handcuffs',
     row('Robos', String(j.robberies)),
+    row('Robos en casas', String(j.homeRobberies ?? 0)),
+    row('Robos de vecinos del pueblo', String(j.localThefts ?? 0)),
     row('Detenciones', String(j.arrests)),
     row(`Multas cobradas (${CRIME.finePerDay} €/día por detenido)`, money(j.fines ?? 0)),
     row('Calabozos', stations ? `${j.cells.length} de ${cap}` : 'sin comisaría', stations && j.cells.length >= cap ? 'neg' : ''),
@@ -148,7 +152,13 @@ export function openManagement(ctx: SocialCtx, links: ManageLinks): void {
   thBtn.addEventListener('click', links.townHall);
   pol.append(h('div', { class: 'mg-actions' }, polBtn, thBtn));
 
-  const el = sheet('Gestión del pueblo', h('div', { class: 'mg' }, hall, how, missing, has, safety, pol));
+  /* --- v1.9: el bolsillo de los vecinos y la salud de las empresas --- */
+  const pockets = card('Vecinos y empresas', 'coin', ...economyLines(s).map((l) => row(l.label, l.value, l.bad ? 'neg' : '')));
+  const taxesBtn = h('button', { class: 'btn' }, 'Impuestos y sueldo mínimo');
+  taxesBtn.addEventListener('click', links.taxes);
+  pockets.append(h('div', { class: 'mg-actions' }, taxesBtn));
+
+  const el = sheet('Gestión del pueblo', h('div', { class: 'mg' }, hall, how, pockets, missing, has, safety, pol));
   el.classList.add('full');
   // Tapa toda la pantalla: modal también en tableta y horizontal (ronda 14).
   el.setAttribute('aria-modal', 'true');

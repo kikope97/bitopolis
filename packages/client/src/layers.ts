@@ -1,4 +1,4 @@
-import { coverageCtx, type GameState, homeSites, missingServices, type CoverageNeed, type NeedKey, SERVICE } from '@bitopolis/sim';
+import { coverageCtx, type GameState, homeSites, missingServices, pocketOf, radiusOf, type CoverageNeed, type NeedKey, SERVICE } from '@bitopolis/sim';
 import { PALETTE } from './palette.ts';
 import { prefs } from './prefs.ts';
 import { T } from './sprites.ts';
@@ -8,7 +8,7 @@ import { T } from './sprites.ts';
  * servicios y contaminación. Cada nivel usa una trama distinta además del
  * color, para que el color nunca sea la única señal.
  */
-export type LayerId = 'none' | 'missing' | 'happiness' | 'land' | 'services' | 'pollution';
+export type LayerId = 'none' | 'missing' | 'happiness' | 'pocket' | 'land' | 'services' | 'pollution';
 
 interface LayerDef {
   id: LayerId;
@@ -35,6 +35,8 @@ export const LAYERS: LayerDef[] = [
   // v1.7 (propuesta del creador): en cada vivienda y solar R, qué servicio le falta.
   { id: 'missing', label: 'Qué falta', colors: GOOD, legend: legend(['Faltan 3 o más', 'Faltan 2', 'Falta 1', 'Nada'], 'good') },
   { id: 'happiness', label: 'Felicidad de los vecinos', colors: GOOD, legend: legend(['Muy baja', 'Baja', 'Alta', 'Muy alta'], 'good') },
+  // v1.9: cómo llegan a fin de mes los que viven en cada casa.
+  { id: 'pocket', label: 'Bolsillo de los vecinos', colors: GOOD, legend: legend(['Endeudados', 'No llegan', 'Van justos', 'Holgados'], 'good') },
   { id: 'land', label: 'Valor del suelo', colors: GOOD, legend: legend(['Muy bajo', 'Bajo', 'Alto', 'Muy alto'], 'good') },
   { id: 'services', label: 'Cobertura de servicios', colors: GOOD, legend: legend(['Ninguno', '1 servicio', '2 servicios', '3 o más'], 'good') },
   { id: 'pollution', label: 'Contaminación', colors: BAD, legend: legend(['Limpio', 'Algo', 'Bastante', 'Mucha'], 'bad') },
@@ -62,21 +64,24 @@ function values(state: GameState, layer: LayerId): (number | null)[] {
     for (const b of state.buildings) {
       const s = SERVICE[b.kind];
       if (!s || !b.built) continue;
-      for (let y = Math.max(0, b.y - s.radius); y <= Math.min(h - 1, b.y + s.radius); y++) {
-        for (let x = Math.max(0, b.x - s.radius); x <= Math.min(w - 1, b.x + s.radius); x++) {
-          if (Math.abs(x - b.x) + Math.abs(y - b.y) <= s.radius) kinds[y * w + x]!.add(b.kind);
+      // v1.8: el alcance crece con el nivel del servicio.
+      const r = radiusOf(b);
+      for (let y = Math.max(0, b.y - r); y <= Math.min(h - 1, b.y + r); y++) {
+        for (let x = Math.max(0, b.x - r); x <= Math.min(w - 1, b.x + r); x++) {
+          if (Math.abs(x - b.x) + Math.abs(y - b.y) <= r) kinds[y * w + x]!.add(b.kind);
         }
       }
     }
     return kinds.map((k) => Math.min(100, k.size * 34));
   }
-  // Felicidad: media de quienes viven en cada edificio.
+  // Felicidad (o bolsillo): media de quienes viven en cada edificio.
   const out: (number | null)[] = new Array(n).fill(null);
   const sum = new Map<number, [number, number]>();
+  const POCKET_VALUE = { endeudado: 0, no_llega: 30, justo: 60, holgado: 100 } as const;
   for (const c of state.citizens) {
     if (c.homeId === null) continue;
     const e = sum.get(c.homeId) ?? [0, 0];
-    e[0] += c.happiness;
+    e[0] += layer === 'pocket' ? POCKET_VALUE[pocketOf(c)] : c.happiness;
     e[1]++;
     sum.set(c.homeId, e);
   }
