@@ -248,3 +248,49 @@ describe('partidas y copias', () => {
     expect((await login('admin', 'admin')).r.json().mustChange).toBe(true);
   });
 });
+
+describe('ronda 08: seguridad', () => {
+  it('codificar la ruta no salta el login del panel', async () => {
+    for (const url of ['/api/%61dmin/settings', '/api/admin%2Fsettings', '/api/ADMIN/settings', '/api/%61dmin/backups']) {
+      const r = await app.inject({ method: 'GET', url });
+      expect([401, 404]).toContain(r.statusCode);
+    }
+    const put = await app.inject({ method: 'PUT', url: '/api/%61dmin/settings', payload: { newGames: false } });
+    expect([401, 404]).toContain(put.statusCode);
+    expect(store.get().newGames).toBe(true);
+  });
+
+  it('con key del servidor, una partida no puede desviarla a otro endpoint', async () => {
+    const { cookie: c } = await login('admin', 'admin');
+    await app.inject({ method: 'POST', url: '/api/admin/account', payload: { currentPassword: 'admin', newPassword: 'otra-clave-larga' }, ...as(c) });
+    const fresh = (await login('admin', 'otra-clave-larga')).cookie;
+    await put({ ai: { key: 'sk-proj-SERVIDOR-12345678', baseUrl: '', playerKeys: true } }, fresh);
+    const t = newGameToken();
+    await app.inject({ method: 'PUT', url: `/api/games/${t}/ai-config`, payload: { sessionId: SID, baseUrl: 'https://malo.example/v1', accepted: true } });
+    const row = await db.selectFrom('games').select('id').where('token', '=', t).executeTakeFirstOrThrow();
+    const s = await ai.settings(row.id);
+    expect(s.baseUrl).toBeUndefined();
+    expect(s.locked).toContain('baseUrl');
+  });
+
+  it('X-Forwarded-For de fuera no cambia la IP del bloqueo', async () => {
+    for (let i = 0; i < 6; i++) {
+      await app.inject({ method: 'POST', url: '/api/admin/login', payload: { user: 'admin', password: 'x' }, remoteAddress: '203.0.113.7', headers: { 'x-forwarded-for': `198.51.100.${i}` } });
+    }
+    const r = await app.inject({ method: 'POST', url: '/api/admin/login', payload: { user: 'admin', password: 'x' }, remoteAddress: '203.0.113.7', headers: { 'x-forwarded-for': '198.51.100.99' } });
+    expect(r.statusCode).toBe(429);
+  });
+
+  it('reactivar la contraseña de juego no revive cookies antiguas; salir revoca la sesión del panel', async () => {
+    const { cookie: c } = await login('admin', 'otra-clave-larga');
+    await put({ access: { enabled: true, password: 'amigos-2' } }, c);
+    const ok = await app.inject({ method: 'POST', url: '/api/login', payload: { password: 'amigos-2' } });
+    const game = ok.cookies[0]!;
+    await put({ access: { enabled: false } }, c);
+    await put({ access: { enabled: true } }, c);
+    expect((await app.inject({ method: 'GET', url: '/api/ai/meta', cookies: { [game.name]: game.value } })).statusCode).toBe(401);
+    await put({ access: { enabled: false } }, c);
+    await app.inject({ method: 'POST', url: '/api/admin/logout', ...as(c) });
+    expect((await app.inject({ method: 'GET', url: '/api/admin/settings', ...as(c) })).statusCode).toBe(401);
+  });
+});

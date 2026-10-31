@@ -29,24 +29,31 @@ test('admin: primer acceso, ajustes que valen al momento y vista móvil', async 
   await page.getByLabel('Repite la contraseña nueva').fill('otra-distinta');
   await page.getByRole('button', { name: 'Guardar y entrar' }).click();
   await expect(page.getByRole('alert')).toContainText('no coinciden');
+  await expect(page.getByLabel('Repite la contraseña nueva')).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByLabel('Repite la contraseña nueva')).toBeFocused();
   await page.getByLabel('Repite la contraseña nueva').fill('plaza-mayor-1');
   await page.getByRole('button', { name: 'Guardar y entrar' }).click();
-  await expect(page.getByRole('heading', { name: 'Resumen' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Resumen' })).toBeFocused();
   await shot('2-panel');
 
   const acceso = page.getByRole('region', { name: 'Partidas y acceso' });
 
+  // Enlace para invitar (la raíz, no el de una partida).
+  await expect(acceso.locator('.invite .mono')).toHaveText(`${ADMIN}/`);
+  // Sin la casilla, la contraseña para jugar no se puede escribir.
+  await expect(acceso.getByRole('textbox', { name: 'Contraseña para jugar' })).toBeDisabled();
+
   // Partidas nuevas desactivadas: el enlace nuevo no lleva a ninguna partida.
   await acceso.getByLabel('Permitir partidas nuevas').uncheck();
-  await acceso.getByRole('button', { name: 'Guardar' }).click();
+  await acceso.getByRole('button', { name: 'Guardar acceso' }).click();
   await expect(page.locator('.toast').last()).toContainText('Guardado');
   const visitor = await browser.newPage();
   await visitor.goto(`${ADMIN}/`);
-  await expect(visitor.locator('.notice.closed')).toContainText('no admite partidas nuevas');
+  await expect(visitor.locator('.notice.closed')).toContainText('no se pueden empezar partidas nuevas');
   await expect(visitor.getByRole('button', { name: 'Jugar' })).toBeHidden();
   await acceso.getByLabel('Permitir partidas nuevas').check();
   await acceso.getByLabel('URL pública').fill('https://bitopolis.example.com');
-  await acceso.getByRole('button', { name: 'Guardar' }).click();
+  await acceso.getByRole('button', { name: 'Guardar acceso' }).click();
   await expect(page.locator('.toast').last()).toContainText('Guardado');
   await visitor.reload();
   await expect(visitor.getByRole('button', { name: 'Jugar' })).toBeVisible();
@@ -56,18 +63,19 @@ test('admin: primer acceso, ajustes que valen al momento y vista móvil', async 
   await acceso.getByLabel('URL pública').fill('');
   await acceso.getByLabel('Pedir contraseña para jugar').check();
   await acceso.getByRole('textbox', { name: 'Contraseña para jugar' }).fill('amigos');
-  await acceso.getByRole('button', { name: 'Guardar' }).click();
+  await acceso.getByRole('button', { name: 'Guardar acceso' }).click();
   await expect(page.locator('.toast').last()).toContainText('Guardado');
   const friend = await (await browser.newContext()).newPage();
   await friend.goto(`${ADMIN}/`);
   await expect(friend).toHaveURL(/\/login\.html/);
+  await expect(friend.locator('#login-why')).toContainText('Pide la contraseña');
   await friend.getByLabel('Contraseña').fill('amigos');
   await friend.getByRole('button', { name: 'Entrar' }).click();
   await expect(friend).toHaveURL(/\/p\/[0-9A-Za-z]{22}$/);
   await friend.getByRole('button', { name: 'Jugar' }).click();
   await expect(friend.locator('#game')).toBeVisible();
   await acceso.getByLabel('Pedir contraseña para jugar').uncheck();
-  await acceso.getByRole('button', { name: 'Guardar' }).click();
+  await acceso.getByRole('button', { name: 'Guardar acceso' }).click();
   await expect(page.locator('.toast').last()).toContainText('Guardado');
 
   // IA del servidor: un endpoint propio (el LLM falso) y probar la conexión.
@@ -78,7 +86,7 @@ test('admin: primer acceso, ajustes que valen al momento y vista móvil', async 
   await ia.getByLabel('Servidor al mes').fill('5');
   await ia.getByRole('button', { name: 'Guardar la IA' }).click();
   await expect(page.locator('.server-ai')).toContainText('Endpoint propio');
-  await page.getByRole('button', { name: 'Probar la IA' }).click();
+  await page.getByRole('button', { name: 'Guardar y probar' }).click();
   await expect(page.locator('.toast').last()).toContainText('Funciona');
   await visitor.goto(`${ADMIN}/`);
   await expect(visitor.getByText('Configurada por el servidor')).toBeVisible();
@@ -97,6 +105,7 @@ test('admin: primer acceso, ajustes que valen al momento y vista móvil', async 
   await partidas.getByRole('button', { name: 'Borrar' }).first().click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Borrar' }).click();
   await expect(partidas.locator('li')).toHaveCount(before - 1);
+  await expect(partidas.getByRole('heading', { name: 'Partidas' }).or(partidas.getByRole('button', { name: 'Borrar' }).first())).toBeFocused();
   const copias = page.getByRole('region', { name: 'Copias de seguridad' });
   await copias.getByRole('button', { name: 'Hacer una copia ahora' }).click();
   await expect(copias.getByRole('link', { name: 'Descargar' }).first()).toBeVisible();

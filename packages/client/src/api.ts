@@ -28,7 +28,7 @@ async function call<T>(method: string, url: string, body?: unknown, keepalive = 
   });
   const data = await r.json().catch(() => null);
   if (r.status === 401) {
-    location.href = `/login.html?next=${encodeURIComponent(location.pathname)}`;
+    location.href = `/login.html?caducada=1&next=${encodeURIComponent(location.pathname)}`;
   }
   if (!r.ok) throw new ApiError(r.status, data?.error ?? `Error ${r.status}`, data);
   return data as T;

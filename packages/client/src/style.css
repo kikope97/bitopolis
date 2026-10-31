@@ -505,3 +505,10 @@ html[data-font='pixel'] .sheet-head h2, html[data-font='pixel'] .sheet h3, html[
 .admin-list li { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; border-top: 1px solid var(--line); }
 .admin-list li.row { flex-direction: row; }
 .notice.closed { padding: 12px; border: 2px dashed var(--accent); text-align: center; }
+/* En el panel, los avisos abajo a la derecha: no tapan el formulario. */
+.admin-page #toasts { left: auto; right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); width: min(360px, calc(100vw - 32px)); }
+.admin-list a { display: inline-flex; align-items: center; min-height: 44px; }
+.admin-card h2:focus { outline: none; }
+.admin-card h2:focus-visible { outline: 3px solid var(--accent); }
+.invite { padding: 8px 12px; border-left: 4px solid var(--good); background: var(--panel-2); margin: 0 0 12px; }
+.invite p { margin: 4px 0; }

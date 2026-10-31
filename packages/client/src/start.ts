@@ -31,7 +31,7 @@ export async function showStart(token: string): Promise<void> {
   if (info.exists) {
     body.append(statsCard(info.summary, info.mode));
   } else if (closed) {
-    body.append(h('p', { class: 'notice closed' }, 'Este servidor no admite partidas nuevas ahora mismo. Si ya tienes una, abre su enlace.'));
+    body.append(h('p', { class: 'notice closed' }, 'Ahora mismo no se pueden empezar partidas nuevas (lo decide quien gestiona este servidor). Si ya jugabas, abre el enlace que guardaste; si lo perdiste, pídeselo a esa persona.'));
   } else {
     body.append(modePicker());
   }
@@ -119,7 +119,8 @@ export async function showStart(token: string): Promise<void> {
           : 'Los vecinos con nombre deciden con IA. Necesita una API key y tiene coste.',
       ),
     );
-    return h('div', { class: 'mode-picker' }, h('p', { class: 'muted' }, 'El modo se elige ahora y queda fijo para toda la partida.'), list);
+    const noAi = !meta.serverKey && !meta.playerKeys ? h('p', { class: 'muted small' }, 'El Modo IA no está disponible en este servidor.') : '';
+    return h('div', { class: 'mode-picker' }, h('p', { class: 'muted' }, 'El modo se elige ahora y queda fijo para toda la partida.'), list, noAi);
   }
 
   function openConfig(exists: boolean) {

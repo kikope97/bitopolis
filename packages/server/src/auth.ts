@@ -28,7 +28,18 @@ const PUBLIC = [
   /^\/api\/admin\//,
 ];
 
-function safeEqual(a: string, b: string): boolean {
+/** Ruta para decidir permisos: el patrón de la ruta resuelta o, si no hay, la ruta decodificada. */
+export function routePath(req: FastifyRequest): string {
+  if (req.routeOptions.url) return req.routeOptions.url;
+  const raw = req.url.split('?')[0]!;
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+export function safeEqual(a: string, b: string): boolean {
   const ha = createHash('sha256').update(a).digest();
   const hb = createHash('sha256').update(b).digest();
   return timingSafeEqual(ha, hb);
@@ -68,13 +79,13 @@ export function setCookie(req: FastifyRequest, reply: FastifyReply, name: string
 
 export async function registerAuth(app: FastifyInstance, store: SettingsStore, secret: string): Promise<void> {
   await app.register(cookie);
-  const session = signedCookie(secret, () => `access:${store.get().access.hash}`);
+  const session = signedCookie(secret, () => `access:${store.get().access.hash}:${store.get().access.epoch ?? 0}`);
   const guard = lockout();
   const enabled = () => store.get().access.enabled && !!store.get().access.hash;
 
   app.addHook('onRequest', async (req, reply) => {
     if (!enabled()) return;
-    const path = req.url.split('?')[0]!;
+    const path = routePath(req);
     if (PUBLIC.some((r) => r.test(path))) return;
     if (session.valid(req.cookies[COOKIE])) return;
     if (path.startsWith('/api/')) return reply.code(401).send({ error: 'Hace falta iniciar sesión' });

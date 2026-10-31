@@ -101,8 +101,10 @@ export class AiService {
     }
     // Sin permiso para keys propias, la partida tampoco elige endpoint.
     if (!env.key && !srv.playerKeys) locked.push('key');
-    const baseUrl = pick('baseUrl', env.baseUrl, srv.playerKeys ? row?.base_url : undefined);
-    if (!srv.playerKeys && !locked.includes('baseUrl')) locked.push('baseUrl');
+    // Con key del servidor, la partida no elige endpoint: podría mandar la key a otro sitio.
+    const ownEndpoint = srv.playerKeys && !env.key;
+    const baseUrl = pick('baseUrl', env.baseUrl, ownEndpoint ? row?.base_url : undefined);
+    if (!ownEndpoint && !locked.includes('baseUrl')) locked.push('baseUrl');
     // El proveedor no se elige: sale de la key (o del endpoint propio).
     const provider = providerFromKey(key, baseUrl);
     if (env.key || env.baseUrl) locked.push('provider');

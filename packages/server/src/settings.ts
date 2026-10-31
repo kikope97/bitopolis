@@ -13,13 +13,15 @@ const scrypt = promisify(scryptCb) as (pw: string, salt: Buffer, len: number) =>
  * se leen de memoria en cada petición, así que los cambios valen al momento.
  */
 export interface ServerSettings {
-  admin: { user: string; hash: string; mustChange: boolean };
+  /** `epoch` sube al cerrar sesión: invalida todas las sesiones del panel. */
+  admin: { user: string; hash: string; mustChange: boolean; epoch?: number };
   /** URL pública para los enlaces de las partidas; vacía = la del navegador. */
   publicUrl: string;
   /** Si es false, no se crean ni importan partidas (las que hay siguen). */
   newGames: boolean;
   /** Contraseña común para entrar a jugar (sin usuario). */
-  access: { enabled: boolean; hash: string };
+  /** `epoch` sube con cada cambio: las cookies antiguas no reviven al reactivar. */
+  access: { enabled: boolean; hash: string; epoch?: number };
   ai: ServerAi;
   backups: { keep: number };
 }
@@ -132,7 +134,7 @@ export async function resetAdminIfAsked(store: SettingsStore, dataDir: string): 
   const flag = join(dataDir, 'reset-admin');
   if (!existsSync(flag)) return false;
   const hash = await hashPassword(DEFAULT_ADMIN.password);
-  await store.update((s) => ({ ...s, admin: { user: DEFAULT_ADMIN.user, hash, mustChange: true } }));
+  await store.update((s) => ({ ...s, admin: { user: DEFAULT_ADMIN.user, hash, mustChange: true, epoch: (s.admin.epoch ?? 0) + 1 } }));
   rmSync(flag, { force: true });
   return true;
 }

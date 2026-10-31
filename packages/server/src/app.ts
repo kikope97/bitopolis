@@ -45,7 +45,8 @@ export async function buildApp(config: Config, db: Db, deps: AppDeps = {}): Prom
       // La URL de la partida es una contraseña: no se escribe en los logs.
       serializers: { req: (req) => ({ method: req.method, url: req.url.replace(/\/p\/[^/?]+|\/api\/games\/[^/?]+/g, (m) => m.replace(/[^/]+$/, '…')) }) },
     },
-    trustProxy: true,
+    // Solo se cree X-Forwarded-For si viene de un proxy local (Docker, LAN): desde fuera se podría falsear la IP.
+    trustProxy: ['loopback', 'linklocal', 'uniquelocal'],
     bodyLimit: 8 * 1024 * 1024,
   });
 

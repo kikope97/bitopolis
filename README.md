@@ -30,7 +30,7 @@ El panel tiene su propio inicio de sesión (independiente de la contraseña para
 
 **Si olvidas la contraseña del panel:** crea un archivo vacío `reset-admin` en el volumen (por ejemplo `docker exec <contenedor> touch /data/reset-admin`, o desde la consola del contenedor en Portainer) y reinicia el contenedor. La cuenta vuelve a `admin`/`admin` con cambio obligatorio; el resto de ajustes, las partidas y las keys no se tocan.
 
-**Mover el servidor:** copia la carpeta `/data` entera. Incluye `secret.key`, la clave que se genera sola la primera vez y cifra las API keys (AES-256-GCM). Sin ella, las keys guardadas dejan de valer y hay que volver a ponerlas.
+**Mover el servidor:** copia la carpeta `/data` entera (en Portainer es el volumen `bitopolis-data`; si prefieres una carpeta del NAS, cambia la línea del volumen por `- /ruta/de/tu/nas/bitopolis:/data`). Incluye `secret.key`, la clave que se genera sola la primera vez y cifra las API keys (AES-256-GCM). Sin ella, las keys guardadas dejan de valer y hay que volver a ponerlas. La copia que se descarga desde el panel es solo la base de datos (partidas y ajustes): guarda también `secret.key` si quieres conservar las keys.
 
 ### IA de los vecinos
 

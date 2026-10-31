@@ -9,7 +9,7 @@ import { DEFAULT_PRICES, PROVIDER_INFO, providerFromKey } from './ai/catalog.ts'
 import { encryptSecret, maskKey } from './ai/crypto.ts';
 import { makeProvider } from './ai/providers.ts';
 import type { AiService } from './ai/service.ts';
-import { lockout, setCookie, signedCookie } from './auth.ts';
+import { lockout, safeEqual, setCookie, signedCookie } from './auth.ts';
 import type { Config } from './config.ts';
 import { backupNow, BACKUP_RE } from './db/backup.ts';
 import type { Db } from './db/index.ts';
@@ -89,7 +89,7 @@ export async function registerAdminRoutes(
   deps: { db: Db; raw?: Database.Database; config: Config; store: SettingsStore; ai: AiService },
 ): Promise<void> {
   const { db, raw, config, store, ai } = deps;
-  const session = signedCookie(config.secret, () => `admin:${store.get().admin.user}:${store.get().admin.hash}`);
+  const session = signedCookie(config.secret, () => `admin:${store.get().admin.user}:${store.get().admin.hash}:${store.get().admin.epoch ?? 0}`);
   const guard = lockout();
   const bad = (reply: FastifyReply, error: string, code = 400) => reply.code(code).send({ error });
   const zodError = (e: z.ZodError) => e.issues[0]?.message ?? 'datos no válidos';
@@ -99,7 +99,8 @@ export async function registerAdminRoutes(
   const OPEN = new Set(['/api/admin/login', '/api/admin/logout']);
   const BEFORE_CHANGE = new Set(['/api/admin/me', '/api/admin/account']);
   app.addHook('onRequest', async (req, reply) => {
-    const path = req.url.split('?')[0]!;
+    // El patrón de la ruta ya resuelta, no req.url: «/api/%61dmin/…» llega a la misma ruta.
+    const path = req.routeOptions.url ?? '';
     if (!path.startsWith('/api/admin/') || OPEN.has(path)) return;
     if (!session.valid(req.cookies?.[COOKIE])) return reply.code(401).send({ error: 'Inicia sesión como administrador' });
     if (store.get().admin.mustChange && !BEFORE_CHANGE.has(path)) {
@@ -111,7 +112,9 @@ export async function registerAdminRoutes(
     if (guard.locked(req.ip)) return bad(reply, 'Demasiados intentos. Espera unos minutos.', 429);
     const b = Login.safeParse(req.body);
     const s = store.get().admin;
-    const ok = b.success && b.data.user === s.user && (await verifyPassword(b.data.password, s.hash));
+    // scrypt siempre, aunque el usuario no coincida: el tiempo no delata qué usuarios existen.
+    const pwOk = await verifyPassword(b.success ? b.data.password : '', s.hash);
+    const ok = b.success && safeEqual(b.data.user, s.user) && pwOk;
     if (!ok) {
       guard.fail(req.ip);
       return bad(reply, 'Usuario o contraseña incorrectos', 401);
@@ -121,7 +124,9 @@ export async function registerAdminRoutes(
     return { ok: true, mustChange: s.mustChange };
   });
 
-  app.post('/api/admin/logout', async (_req, reply) => {
+  app.post('/api/admin/logout', async (req, reply) => {
+    // Salir cierra todas las sesiones del panel (una cookie robada deja de valer).
+    if (session.valid(req.cookies?.[COOKIE])) await store.update((s) => ({ ...s, admin: { ...s.admin, epoch: (s.admin.epoch ?? 0) + 1 } }));
     reply.clearCookie(COOKIE, { path: '/' });
     return { ok: true };
   });
@@ -138,7 +143,7 @@ export async function registerAdminRoutes(
     if (pw && pw === DEFAULT_ADMIN.password) return bad(reply, 'La contraseña nueva no puede ser «admin»');
     if (pw && pw === b.data.currentPassword) return bad(reply, 'La contraseña nueva tiene que ser distinta');
     const hash = pw ? await hashPassword(pw) : s.hash;
-    await store.update((x) => ({ ...x, admin: { user: b.data.user ?? x.admin.user, hash, mustChange: false } }));
+    await store.update((x) => ({ ...x, admin: { ...x.admin, user: b.data.user ?? x.admin.user, hash, mustChange: false } }));
     // La firma depende del usuario y la contraseña: se renueva la sesión de quien la cambia.
     setCookie(req, reply, COOKIE, session.sign(Date.now() + SESSION_MS), SESSION_MS);
     return { ok: true, user: store.get().admin.user };
@@ -161,7 +166,7 @@ export async function registerAdminRoutes(
     await store.update((s) => {
       if (p.publicUrl !== undefined) s.publicUrl = p.publicUrl.replace(/\/+$/, '');
       if (p.newGames !== undefined) s.newGames = p.newGames;
-      if (p.access) s.access = { enabled: p.access.enabled, hash: accessHash ?? s.access.hash };
+      if (p.access) s.access = { enabled: p.access.enabled, hash: accessHash ?? s.access.hash, epoch: (s.access.epoch ?? 0) + 1 };
       if (p.backups) s.backups = p.backups;
       const a = p.ai;
       if (a) {
