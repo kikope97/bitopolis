@@ -7,6 +7,8 @@ import {
   DEATH_RATE_MAX,
   DEATH_RATE_PER_YEAR_OVER,
   DEATH_START_AGE,
+  MUNICIPAL_PRICE_CAP,
+  KID_YEARS,
   KIDS_MAX,
 } from './balance.ts';
 import { monthRates, sellOnDeparture, unitValue } from './economy.ts';
@@ -40,10 +42,13 @@ export function dies(state: GameState, c: Citizen): void {
   const home = state.buildings.find((b) => b.id === c.homeId);
   if (c.owns && home && heir && heir.homeId === c.homeId && !heir.owns) {
     // La casa pasa a quien vivía con él o ella; el ayuntamiento cobra la plusvalía (como en la realidad).
-    const gain = Math.max(0, unitValue(state, home) - c.boughtPrice);
+    // Mismo valor que en una venta (con el tope de la vivienda que fue municipal), y el heredero
+    // la adquiere a ese valor: la plusvalía no se cobra dos veces (ronda 11).
+    const value = c.subsidized ? Math.min(unitValue(state, home), MUNICIPAL_PRICE_CAP) : unitValue(state, home);
+    const gain = Math.max(0, value - c.boughtPrice);
     heir.owns = true;
-    heir.boughtPrice = c.boughtPrice;
-    heir.boughtTick = c.boughtTick;
+    heir.boughtPrice = value;
+    heir.boughtTick = state.tick;
     heir.mortgage = c.mortgage;
     heir.mortgageTo = c.mortgageTo;
     heir.subsidized = c.subsidized;
@@ -82,7 +87,7 @@ export function lifeYear(state: GameState): void {
   // Hijos que se hacen mayores: se independizan en el pueblo si hay casa; si no, se van a estudiar fuera.
   for (const c of [...state.citizens]) {
     const kids = c.kids ?? [];
-    const grown = kids.filter((t) => state.tick - t >= ADULT_AGE * YEAR_TICKS);
+    const grown = kids.filter((t) => state.tick - t >= KID_YEARS * YEAR_TICKS);
     if (!grown.length) continue;
     c.kids = kids.filter((t) => !grown.includes(t));
     for (let i = 0; i < grown.length; i++) {

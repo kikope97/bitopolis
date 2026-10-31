@@ -50,9 +50,14 @@ export function materialsCost(state: GameState, kind: BuildingKind | 'road'): nu
   return Math.round(BUILD[kind as keyof typeof BUILD].materials * budgetFx(state).materials);
 }
 
-function estimatedCost(kind: BuildingKind): number {
+/**
+ * Coste de referencia para la subvención: los materiales que de verdad se pagan
+ * (con el presupuesto en vigor) y la mitad de la mano de obra de fuera, porque
+ * suelen trabajar obreros del pueblo (ronda 11: con el precio de lista pagaba casi el 90 %).
+ */
+function estimatedCost(state: GameState, kind: BuildingKind): number {
   const s = BUILD[kind as keyof typeof BUILD];
-  return s.materials + s.workers * s.days * WAGE_OUTSIDE;
+  return materialsCost(state, kind) + Math.round((s.workers * s.days * WAGE_OUTSIDE) / 2);
 }
 
 /* ---------------- presupuesto ---------------- */
@@ -68,8 +73,9 @@ export function proposeBudget(state: GameState, plan: BudgetPlan): void {
   let yes = 0;
   let no = 0;
   if (!politicsActive(state)) {
-    // Sin facciones todavía, el pleno lo aprueba por asentimiento.
-    yes = state.citizens.length;
+    // Sin facciones todavía, cada vecino vota según lo contento que esté (ronda 11: salía todo por unanimidad).
+    for (const c of state.citizens) if (c.happiness >= 55) yes++;
+    else no++;
   } else {
     for (const f of FACTIONS) {
       const info = state.politics.factions[f];
@@ -133,11 +139,12 @@ export function festivalMood(state: GameState): { label: string; value: number }
 /* ---------------- subvenciones ---------------- */
 
 const GRANT_KINDS: BuildingKind[] = ['school', 'clinic', 'police', 'park'];
-const UNLOCK: Partial<Record<BuildingKind, number>> = { school: 25, clinic: 25, police: 0, park: 0 };
+// Solo se ofrece lo que ya se puede construir (ronda 11: salían comisarías imposibles).
+const unlockOf = (k: BuildingKind) => BUILD[k as keyof typeof BUILD].unlockPop ?? 0;
 
 function offerGrant(state: GameState): void {
   const options = GRANT_KINDS.filter(
-    (k) => state.citizens.length >= (UNLOCK[k] ?? 0) && (!state.buildings.some((b) => b.kind === k) || saturated(state, k)),
+    (k) => state.citizens.length >= unlockOf(k) && (!state.buildings.some((b) => b.kind === k) || saturated(state, k)),
   );
   if (!options.length) return;
   const kind = pick(state.rng, options);
@@ -173,7 +180,7 @@ export function answerGrant(state: GameState, grantId: number, accept: boolean):
   g.status = 'accepted';
   g.minId = state.nextId;
   g.deadline = state.tick + GRANT_DEADLINE_DAYS * TICKS_PER_DAY;
-  g.advance = Math.round(estimatedCost(g.kind) * GRANT_ADVANCE);
+  g.advance = Math.round(estimatedCost(state, g.kind) * GRANT_ADVANCE);
   transfer(state, OUTSIDE, TREASURY, g.advance, 'subvenciones');
   const until = tickToDate(g.deadline);
   pushEvent(state, 'info', `Subvención aceptada: anticipo de ${g.advance} €. Construye ${GRANT_NAME[g.kind]} y termínalo antes del ${until.day}/${until.month} del año ${until.year}`);
@@ -183,7 +190,7 @@ export function answerGrant(state: GameState, grantId: number, accept: boolean):
 export function onBuildingDone(state: GameState, b: Building): void {
   const g = state.grants.find((x) => x.status === 'accepted' && x.kind === b.kind && b.id >= x.minId && state.tick <= x.deadline);
   if (!g) return;
-  const rest = Math.max(0, Math.round(estimatedCost(g.kind) * g.share) - g.advance);
+  const rest = Math.max(0, Math.round(estimatedCost(state, g.kind) * g.share) - g.advance);
   transfer(state, OUTSIDE, TREASURY, rest, 'subvenciones');
   g.status = 'paid';
   pushEvent(state, 'milestone', `La Diputación paga la subvención de ${GRANT_NAME[g.kind]}: ${rest} € más`);

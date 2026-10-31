@@ -214,18 +214,22 @@ export const BIRTH_CHANCE_COUPLE = 0.03;
 export const BIRTH_CHANCE_ADULT = 0.002;
 export const KIDS_MAX = 3;
 export const ADULT_AGE = 18;
+/** Los niños crecen deprisa (tiempo de juego comprimido): se independizan a los 6 años de partida. */
+export const KID_YEARS = 6;
 
 /** Presupuesto anual: efecto de cada plan. */
 export const BUDGET = {
-  austero: { maintenance: 0.85, salaries: 0.9, materials: 1, services: 0.9 },
+  // Ronda 11: el austero ganaba siempre (+49 % de caja) y el inversor hundía al derrochador.
+  austero: { maintenance: 0.92, salaries: 0.95, materials: 1, services: 0.8 },
   equilibrado: { maintenance: 1, salaries: 1, materials: 1, services: 1 },
-  inversor: { maintenance: 1.1, salaries: 1, materials: 0.85, services: 1 },
+  inversor: { maintenance: 1.05, salaries: 1, materials: 0.85, services: 1 },
 } as const;
 
 /** Fiestas: coste, felicidad (puntos) y días que dura el buen recuerdo. */
 export const FESTIVAL = {
   pequena: { cost: 1_500, mood: 4, days: 30, spend: 8 },
-  grande: { cost: 5_000, mood: 8, days: 45, spend: 20 },
+  // Ronda 11: las grandes no compensaban nunca (3,3 veces el coste por el doble de ánimo).
+  grande: { cost: 3_000, mood: 8, days: 60, spend: 40 },
   popular: { cost: 0, mood: 2, days: 20, spend: 3 },
 } as const;
 export const FESTIVAL_MONTH = 8;
