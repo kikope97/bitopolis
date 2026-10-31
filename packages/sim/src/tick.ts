@@ -574,7 +574,8 @@ function businessPayroll(state: GameState, r: ReturnType<typeof monthRates>): vo
     if (!isBusiness(b) || !b.built) continue;
     const workers = state.citizens.filter((c) => c.jobId === b.id);
     if (b.kind === 'factory') {
-      const rev = workers.length * FACTORY_REVENUE_PER_WORKER;
+      // Ronda 15: las fábricas repercuten la mitad de la subida del sueldo en sus precios.
+      const rev = workers.length * (FACTORY_REVENUE_PER_WORKER + Math.round(0.5 * (wage - MIN_WAGE.none)));
       transfer(state, OUTSIDE, b.id, rev);
       b.sales = (b.sales ?? 0) + rev;
     }

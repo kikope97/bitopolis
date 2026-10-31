@@ -314,12 +314,13 @@ export function freeShopLot(state: GameState): number | null {
 }
 
 /**
- * v1.9 (ronda 15): la caja inicial de un negocio tiene que cubrir dos nóminas al
+ * v1.9 (ronda 15): la caja inicial de un negocio tiene que cubrir una nómina al
  * sueldo vigente; con el sueldo mínimo alto hace falta más dinero para empezar y se
  * abren menos (antes abrían y cerraban en bucle).
  */
 export function foundSeed(state: GameState): number {
-  return Math.max(FOUND_SEED, 2 * MIN_WAGE[state.minWage ?? 'none'] * JOBS.shop);
+  // Ronda 15: una nómina (con dos casi no se fundaban empresas y no había empresarios vecinos).
+  return Math.max(FOUND_SEED, MIN_WAGE[state.minWage ?? 'none'] * JOBS.shop);
 }
 
 export function canFound(state: GameState, c: Citizen): boolean {

@@ -438,7 +438,7 @@ export const DEBT = {
   repayShare: 0.3,
   repayMin: 50,
   /** Meses de alquiler privado impagado hasta el desahucio. */
-  evictMonths: 3,
+  evictMonths: 4,
   /** Meses sin que nadie le alquile tras un desahucio (si no tiene dinero, se acaba yendo). */
   evictedMonths: 6,
   /** Cuotas de hipoteca impagadas hasta que el banco ejecuta y vende la vivienda. */
@@ -461,7 +461,8 @@ export const DEBT = {
 
 /** v1.9 (petición del creador): sueldo mínimo que el ayuntamiento obliga a pagar a las empresas del pueblo. */
 export type MinWageLevel = 'none' | 'low' | 'medium' | 'high';
-export const MIN_WAGE: Record<MinWageLevel, number> = { none: 900, low: 1_000, medium: 1_100, high: 1_250 };
+// Ronda 15: el alto, 1.250 → 1.150 (con 1.250 las fábricas pagaban lo que ingresaban y cerraba un 15–20 % de empresas al año).
+export const MIN_WAGE: Record<MinWageLevel, number> = { none: 900, low: 1_000, medium: 1_100, high: 1_150 };
 export const MIN_WAGE_STEP: Record<MinWageLevel, number> = { none: 0, low: 1, medium: 2, high: 3 };
 export const MIN_WAGE_FX = {
   /** Felicidad de quien trabaja en una empresa del pueblo, por escalón. */
