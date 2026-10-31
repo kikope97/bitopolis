@@ -124,6 +124,13 @@ export const MIGRATIONS: Record<number, Migration> = {
     justice: s.justice ?? { cells: [], jail: [], hot: [], robberies: 0, arrests: 0, fullWarned: -1 },
     townhallLevel: s.townhallLevel ?? levelForPop(s.citizens?.length ?? 0),
   }),
+  // v1.9: economía de cada vecino (sueldo mínimo y contabilidad de la deuda; las deudas empiezan en cero).
+  11: (s) => ({
+    ...s,
+    formatVersion: 12,
+    minWage: s.minWage ?? 'none',
+    debtLedger: s.debtLedger ?? { created: 0, repaid: 0, written: 0, forgiven: 0 },
+  }),
 };
 
 export function migrate(raw: unknown): GameState {

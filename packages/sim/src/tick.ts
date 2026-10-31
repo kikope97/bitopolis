@@ -11,10 +11,12 @@ import {
   FACTORY_REVENUE_PER_WORKER,
   GROWTH,
   HOMES,
-  LIVING_COST,
-  LOCAL_SPEND_SHARE,
   PIE_PER_CITIZEN,
-  PRIVATE_SALARY,
+  DEBT,
+  JOBS_OUTSIDE,
+  MIN_WAGE,
+  MIN_WAGE_FX,
+  MIN_WAGE_STEP,
   PUBLIC_SALARY,
   SERVICE,
   SERVICE_SALARY,
@@ -33,6 +35,7 @@ import {
   averageTaxMood,
   businessTaxes,
   maybeSplitTaxes,
+  housingTroubles,
   monthlyHousing,
   monthlyMarket,
   monthRates,
@@ -52,6 +55,7 @@ import { crimeDay, jailNear } from './crime.ts';
 import { townLevel, zonesUnlocked } from './townhall.ts';
 import { finishUpgrades, jobsOf, maintenanceOf, plantCapacityOf, radiusOf, serviceHappiness } from './levels.ts';
 import { lifeDay, lifeMonth, lifeYear } from './lifecycle.ts';
+import { basicLiving, drownedInDebt, economyStats, outsideJobsMonth, settleMonth, totalDebt } from './household.ts';
 import { FIRST_NAMES, SURNAMES } from './names.ts';
 import { goalFor, memoryMood, onCitizenLeaves, PROFESSIONS, relationMood, socialDay } from './social.ts';
 import { politicsDay } from './politics.ts';
@@ -207,7 +211,8 @@ export function computeDemand(state: GameState): GameState['demand'] {
   const clamp = (v: number) => Math.round(Math.max(-100, Math.min(100, v)));
   const zones = zonesUnlocked(state);
   const R = 40 + vacancies(state) * 5 - Math.max(0, free - 8) * 1.5 + (happy - 55) + averageTaxMood(state) - (zones ? jobless * 2 : 0);
-  const C = !zones ? 0 : (pop / 12 - shops) * 25;
+  // v1.9: con sueldo mínimo alto, las empresas suben precios y hay algo menos de demanda comercial.
+  const C = !zones ? 0 : (pop / 12 - shops) * 25 - MIN_WAGE_STEP[state.minWage ?? 'none'] * MIN_WAGE_FX.demandC;
   const I = !zones ? 0 : jobless * 6 - factories * 10 + 20;
   return { R: clamp(R), C: clamp(C), I: clamp(I) };
 }
@@ -251,8 +256,22 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
     if (noise > 25) f.push({ label: 'Ruido', value: -Math.round((noise - 25) / 6) });
     if (crime > 20) f.push({ label: 'Inseguridad', value: -Math.round((crime - 20) / 5) });
   }
-  f.push(c.jobId !== null ? { label: 'Trabaja en el pueblo', value: 8 } : { label: 'Trabaja fuera', value: -4 });
+  if (c.jobId !== null) f.push({ label: 'Trabaja en el pueblo', value: 8 });
+  else if (c.unemployedSince !== undefined) f.push({ label: 'En paro', value: -JOBS_OUTSIDE.mood });
+  else f.push({ label: 'Trabaja fuera', value: -4 });
   if (c.mortgage > 0 && c.money < 300) f.push({ label: 'Le cuesta pagar la hipoteca', value: -6 });
+  // v1.9 (petición del creador): deber dinero pesa; ir justo, algo.
+  const owes = totalDebt(c);
+  if (owes > 0) f.push({ label: 'Debe dinero', value: -Math.min(DEBT.moodMax, Math.round(DEBT.moodBase + owes / DEBT.moodPer)) });
+  else if (c.money < DEBT.tightBelow) f.push({ label: 'Llega justo a fin de mes', value: -DEBT.tightMood });
+  // v1.9: sueldo mínimo: lo agradece quien trabaja en una empresa del pueblo y lo nota quien la tiene.
+  const step = MIN_WAGE_STEP[state.minWage ?? 'none'];
+  if (step > 0) {
+    const job = c.jobId !== null ? state.buildings.find((b) => b.id === c.jobId) : undefined;
+    if (job && isBusiness(job)) f.push({ label: 'Mejor sueldo (sueldo mínimo)', value: MIN_WAGE_FX.workerMood * step });
+    const employs = state.buildings.some((b) => b.owner === c.id && isBusiness(b) && state.citizens.some((x) => x.jobId === b.id));
+    if (employs) f.push({ label: 'Le suben los costes (sueldo mínimo)', value: -MIN_WAGE_FX.ownerMood * step });
+  }
   f.push(...taxMood(state, c));
   f.push(...relationMood(c));
   const mem = memoryMood(state, c);
@@ -313,7 +332,8 @@ function progressProjects(state: GameState): void {
   }
   // Quien trabajó hoy en una obra no cobra como commuter.
   for (const c of state.citizens) {
-    if (c.jobId === null && !busy.has(c.id)) transfer(state, OUTSIDE, c.id, COMMUTER_DAILY, 'commuter');
+    // v1.9: quien está en paro no cobra (cobra la prestación al mes).
+    if (c.jobId === null && c.unemployedSince === undefined && !busy.has(c.id)) transfer(state, OUTSIDE, c.id, COMMUTER_DAILY, 'commuter');
   }
 }
 
@@ -472,12 +492,14 @@ function departures(state: GameState): void {
     if (c.named) continue;
     const unhappy = c.happiness < 35 && chance(state.rng, 0.04);
     const broke = c.money === 0 && c.homeId === null && chance(state.rng, 0.1);
-    if (unhappy || broke) {
+    // v1.9: ahogado por las deudas.
+    const drowned = !unhappy && !broke && drownedInDebt(state, c) && chance(state.rng, DEBT.leaveChance);
+    if (unhappy || broke || drowned) {
       sellOnDeparture(state, c);
       onCitizenLeaves(state, c);
       transfer(state, c.id, OUTSIDE, c.money);
       state.citizens = state.citizens.filter((x) => x !== c);
-      const why = broke ? 'sin casa ni dinero' : 'descontento';
+      const why = broke ? 'sin casa ni dinero' : drowned ? 'ahogado por las deudas' : 'descontento';
       pushEvent(state, 'departure', `${c.name} se va del pueblo (${why})`);
     }
   }
@@ -533,26 +555,39 @@ function endOfDay(state: GameState): void {
   accumulateRates(state);
 }
 
-function payBusinesses(state: GameState, r: ReturnType<typeof monthRates>): void {
-  // Las tiendas dañadas en disturbios no venden hasta que se reparan (v1.8).
-  const shops = state.buildings.filter((b) => b.kind === 'shop' && b.built && !b.damaged);
-  // Gasto de los vecinos: una parte a tiendas del pueblo, el resto fuera.
-  for (const c of state.citizens) {
-    const spend = Math.min(c.money, LIVING_COST);
-    const local = shops.length > 0 ? Math.floor(spend * LOCAL_SPEND_SHARE) : 0;
-    if (local > 0) transfer(state, c.id, shops[c.id % shops.length]!.id, local);
-    transfer(state, c.id, OUTSIDE, spend - local);
-  }
+/**
+ * v1.9: las empresas pagan nóminas (con el sueldo mínimo que fije el ayuntamiento)
+ * e impuestos con la caja del mes anterior, y apuntan sus cuentas para la «salud de
+ * las empresas». Va antes que el gasto de los vecinos: todos los sueldos, primero.
+ */
+function businessPayroll(state: GameState, r: ReturnType<typeof monthRates>): void {
+  const wage = MIN_WAGE[state.minWage ?? 'none'];
   for (const b of state.buildings) {
     if (!isBusiness(b) || !b.built) continue;
     const workers = state.citizens.filter((c) => c.jobId === b.id);
-    if (b.kind === 'factory') transfer(state, OUTSIDE, b.id, workers.length * FACTORY_REVENUE_PER_WORKER);
+    if (b.kind === 'factory') {
+      const rev = workers.length * FACTORY_REVENUE_PER_WORKER;
+      transfer(state, OUTSIDE, b.id, rev);
+      b.sales = (b.sales ?? 0) + rev;
+    }
     let paidAll = true;
-    for (const c of workers) if (transfer(state, b.id, c.id, PRIVATE_SALARY) < PRIVATE_SALARY) paidAll = false;
+    let wages = 0;
+    for (const c of workers) {
+      const p = transfer(state, b.id, c.id, wage);
+      wages += p;
+      if (p < wage) paidAll = false;
+    }
+    const before = b.cash;
     businessTaxes(state, b, r);
+    b.books = { sales: b.sales ?? 0, wages, taxes: before - b.cash };
+    b.sales = 0;
     b.unpaidMonths = paidAll ? 0 : b.unpaidMonths + 1;
-    payDividends(state, b);
   }
+}
+
+/** Tras el gasto del mes: dividendos y cierres de las empresas que no pagan. */
+function payBusinesses(state: GameState): void {
+  for (const b of state.buildings) if (isBusiness(b) && b.built) payDividends(state, b);
   for (const b of [...state.buildings]) {
     if (isBusiness(b) && b.unpaidMonths >= 2) {
       pushEvent(state, 'business', `Cierra ${b.name ?? BUILD_NAMES[b.kind]?.toLowerCase()}: no puede pagar las nóminas`, { ref: b.id });
@@ -569,8 +604,17 @@ function endOfMonth(state: GameState): void {
     const job = c.jobId !== null ? state.buildings.find((b) => b.id === c.jobId) : undefined;
     if (job && !isBusiness(job)) transfer(state, TREASURY, c.id, Math.round((SERVICE[job.kind] ? SERVICE_SALARY : PUBLIC_SALARY) * budgetFx(state).salaries), 'sueldos');
   }
+  // v1.9: todos los sueldos primero; luego cada vecino paga lo básico, la vivienda y los
+  // tributos (lo que no pueda, como deuda), devuelve deudas y, si le sobra, ocio.
+  businessPayroll(state, r);
+  outsideJobsMonth(state);
+  // Las tiendas destrozadas en disturbios no venden hasta que se reparan (v1.8).
+  const shops = state.buildings.filter((b) => b.kind === 'shop' && b.built && !b.damaged);
+  basicLiving(state, shops);
   monthlyHousing(state, r);
-  payBusinesses(state, r);
+  settleMonth(state, shops);
+  housingTroubles(state);
+  payBusinesses(state);
   // PIE: el Estado paga por vecino empadronado, más si el pueblo está contento.
   const pie = Math.round(PIE_PER_CITIZEN * state.citizens.length * Math.max(0.6, Math.min(1.2, averageHappiness(state) / 60)));
   transfer(state, OUTSIDE, TREASURY, pie, 'PIE');
@@ -609,6 +653,7 @@ function endOfMonth(state: GameState): void {
     income: state.month.income,
     expenses: state.month.expenses,
     breakdown: state.month.breakdown,
+    ...economyStats(state),
   });
   if (state.stats.length > 120) state.stats.splice(0, state.stats.length - 120);
   state.month = { income: 0, expenses: 0, breakdown: {}, rateSums: { ibi: 0, tasas: 0, plusvalia: 0 }, taxDays: 0 };

@@ -39,9 +39,14 @@ function add(state: GameState, account: number, amount: number): void {
     else state.ledger.externalIn -= amount;
     return;
   }
-  const h = holder(state, account);
-  if (h.money !== undefined) h.money += amount;
-  else h.cash = (h.cash ?? 0) + amount;
+  const h = holder(state, account) as Holder & { flow?: [number, number] };
+  if (h.money !== undefined) {
+    h.money += amount;
+    // v1.9: balance del mes de cada vecino (lo que entra y lo que sale).
+    const f = (h.flow ??= [0, 0]);
+    if (amount > 0) f[0] += amount;
+    else f[1] -= amount;
+  } else h.cash = (h.cash ?? 0) + amount;
 }
 
 /**

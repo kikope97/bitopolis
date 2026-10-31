@@ -33,8 +33,12 @@ import {
   TRANSACTION_COST,
   BUY_CHANCE,
   SERVICE_CAPACITY,
+  DEBT,
+  MIN_WAGE_STEP,
+  MIN_WAGE_FX,
 } from './balance.ts';
 import { hash32 } from './hash.ts';
+import { charge } from './household.ts';
 import { radiusOf, serviceCapacityOf } from './levels.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance } from './prng.ts';
@@ -241,17 +245,39 @@ export function sellOnDeparture(state: GameState, c: Citizen): void {
   if (home.kind === 'house') {
     // La vivienda vuelve al ayuntamiento, que paga el precio y cobra lo que se le debía.
     transfer(state, TREASURY, c.id, price, 'recompra de viviendas');
-    transfer(state, c.id, c.mortgageTo, c.mortgage, 'cuotas de vivienda');
+    charge(state, c, c.mortgageTo, c.mortgage, 'cuotas de vivienda');
     home.privateUnits = Math.max(0, (home.privateUnits ?? 0) - 1);
   } else {
     transfer(state, OUTSIDE, c.id, price);
-    transfer(state, c.id, c.mortgageTo, c.mortgage, 'cuotas de vivienda');
+    charge(state, c, c.mortgageTo, c.mortgage, 'cuotas de vivienda');
   }
   const gain = Math.max(0, price - c.boughtPrice);
   const rate = monthRates(state).plusvalia;
-  if (gain > 0) transfer(state, c.id, TREASURY, Math.round(gain * rate), 'plusvalía');
+  if (gain > 0) charge(state, c, TREASURY, Math.round(gain * rate), 'plusvalía');
   c.owns = false;
   c.mortgage = 0;
+}
+
+/**
+ * v1.9: consecuencias de no pagar la vivienda. Tras varias cuotas de hipoteca sin
+ * pagar, el banco ejecuta y vende la vivienda (lo que falte queda como deuda) y el
+ * vecino sigue en ella de alquiler. Tras varios meses sin pagar el alquiler privado,
+ * desahucio. La vivienda municipal no desahucia: el alcalde aplaza o perdona.
+ */
+export function housingTroubles(state: GameState): void {
+  for (const c of state.citizens) {
+    if (c.owns && (c.missedQuotas ?? 0) >= DEBT.foreclosureMonths) {
+      sellOnDeparture(state, c);
+      c.missedQuotas = 0;
+      addMemory(state, c, 'embargado', 5, -6);
+      pushEvent(state, 'info', `El banco se queda la vivienda de ${c.name}: llevaba ${DEBT.foreclosureMonths} cuotas de hipoteca sin pagar. Sigue en ella de alquiler`, { ref: c.id });
+    } else if (!c.owns && c.homeId !== null && (c.rentArrears ?? 0) >= DEBT.evictMonths) {
+      c.homeId = null;
+      c.rentArrears = 0;
+      addMemory(state, c, 'desahuciado', 6, -6);
+      pushEvent(state, 'info', `Desahucian a ${c.name}: debía ${DEBT.evictMonths} meses de alquiler`, { ref: c.id });
+    }
+  }
 }
 
 /* ---------------- empresas de vecinos ---------------- */
@@ -282,7 +308,9 @@ export function freeShopLot(state: GameState): number | null {
 }
 
 export function canFound(state: GameState, c: Citizen): boolean {
-  return c.money >= FOUND_MIN_MONEY && state.demand.C > 10 && freeShopLot(state) !== null;
+  // v1.9: con el sueldo mínimo alto, montar un negocio sale menos a cuenta (hace falta más demanda).
+  const step = MIN_WAGE_STEP[state.minWage ?? 'none'];
+  return c.money >= FOUND_MIN_MONEY && state.demand.C > 10 + step * 100 * MIN_WAGE_FX.foundPenalty && freeShopLot(state) !== null;
 }
 
 export function shopTypesFor(state: GameState, c: Citizen): string[] {
@@ -342,22 +370,27 @@ export function monthlyHousing(state: GameState, r: MonthRates): void {
     const ibi = Math.round((unitValue(state, b) * r.ibi) / 12);
     let municipal = municipalUnits(b);
     for (const c of residents) {
+      // v1.9: lo que no puede pagar queda como deuda (charge), y se cuentan los meses de impago.
       if (c.owns) {
-        // Cuota de amortización + interés sobre lo pendiente.
+        // Cuota de amortización + interés sobre lo pendiente. Los intereses impagados son deuda;
+        // la cuota impagada sigue en la hipoteca y cuenta para la ejecución.
         const interest = Math.ceil(c.mortgage * MORTGAGE_INTEREST);
         const quota = Math.min(c.mortgage, Math.ceil(c.boughtPrice / MORTGAGE_MONTHS));
-        transfer(state, c.id, c.mortgageTo, interest, 'cuotas de vivienda');
-        c.mortgage -= transfer(state, c.id, c.mortgageTo, quota, 'cuotas de vivienda');
-        transfer(state, c.id, TREASURY, ibi, 'IBI');
+        charge(state, c, c.mortgageTo, interest, 'cuotas de vivienda');
+        const paid = transfer(state, c.id, c.mortgageTo, quota, 'cuotas de vivienda');
+        c.mortgage -= paid;
+        c.missedQuotas = paid < quota ? (c.missedQuotas ?? 0) + 1 : 0;
+        charge(state, c, TREASURY, ibi, 'IBI');
       } else if (municipal > 0) {
         municipal--;
-        transfer(state, c.id, TREASURY, MUNICIPAL_RENT, 'alquileres');
+        charge(state, c, TREASURY, MUNICIPAL_RENT, 'alquileres');
       } else {
         // El casero (de fuera) paga el IBI y lo repercute en el alquiler.
-        transfer(state, c.id, OUTSIDE, PRIVATE_RENT + ibi);
+        const paid = charge(state, c, OUTSIDE, PRIVATE_RENT + ibi);
+        c.rentArrears = paid < PRIVATE_RENT + ibi ? (c.rentArrears ?? 0) + 1 : 0;
         transfer(state, OUTSIDE, TREASURY, ibi, 'IBI');
       }
-      transfer(state, c.id, TREASURY, r.basuras, 'tasas');
+      charge(state, c, TREASURY, r.basuras, 'tasas');
     }
     // Viviendas privadas vacías: el dueño de fuera paga su IBI.
     const capacity = HOMES[b.kind] ?? 0;

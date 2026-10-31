@@ -29,3 +29,4 @@ export * from './crime.ts';
 export * from './barrio.ts';
 export * from './townhall.ts';
 export * from './levels.ts';
+export * from './household.ts';

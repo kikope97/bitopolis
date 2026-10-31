@@ -1,10 +1,11 @@
 import { canMeetAssociation, meetAssociation } from './associations.ts';
 import { canUpgradeBuilding, startUpgrade } from './levels.ts';
+import { canMicrocredit, canSettleDebt, grantMicrocredit, settleDebt } from './household.ts';
 import { serviceCounts } from './economy.ts';
 import { BUILD_LEVEL, canUpgradeTownhall, plenoUnlocked, townLevel, upgradeTownhall, zonesUnlocked } from './townhall.ts';
 import { answerGrant, canAnswerGrant, canHoldFestival, canProposeBudget, holdFestival, materialsCost, proposeBudget } from './civic.ts';
 import { Command, TICKS_PER_DAY, tickToDate, type BuildKind, type ZoneKind } from '@bitopolis/shared';
-import { ASSOCIATIONS, BUILD, DEBT_LIMIT, TERRAIN, WAGE_OUTSIDE, ZONE_COST_PER_TILE } from './balance.ts';
+import { ASSOCIATIONS, BUILD, DEBT_LIMIT, MICROCREDIT, MIN_WAGE, MIN_WAGE_FX, MIN_WAGE_STEP, TERRAIN, WAGE_OUTSIDE, ZONE_COST_PER_TILE } from './balance.ts';
 import { isWater, Terrain } from './terrain.ts';
 import { applyDecision, canApplyDecision } from './decisions.ts';
 import { campaign, canCampaign, canMotion, motion } from './politics.ts';
@@ -210,6 +211,12 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       const b = state.buildings.find((x) => x.id === cmd.buildingId);
       return canUpgradeBuilding(state, b, b ? serviceCounts(state).get(b.id) : undefined);
     }
+    case 'SetMinimumWage':
+      return (state.minWage ?? 'none') === cmd.level ? { ok: false, error: 'Ya está en ese nivel' } : { ok: true };
+    case 'SettleDebt':
+      return canSettleDebt(state, state.citizens.find((c) => c.id === cmd.citizenId), cmd.mode);
+    case 'GrantMicrocredit':
+      return canMicrocredit(state, state.citizens.find((c) => c.id === cmd.citizenId));
     case 'ConvenePleno': {
       if (!plenoUnlocked(state)) return { ok: false, error: 'Los plenos llegan con el ayuntamiento de nivel 2' };
       const r = canConvenePleno(state);
@@ -351,6 +358,33 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
     case 'UpgradeTownhall':
       upgradeTownhall(state);
       break;
+    case 'SetMinimumWage': {
+      const before = MIN_WAGE_STEP[state.minWage ?? 'none'];
+      const after = MIN_WAGE_STEP[cmd.level];
+      state.minWage = cmd.level;
+      // Quien tiene empleados lo nota en la caja y se acuerda (como con los impuestos).
+      if (after > before) {
+        for (const c of state.citizens) {
+          if (state.buildings.some((b) => b.owner === c.id && (b.kind === 'shop' || b.kind === 'factory'))) c.grudge = Math.min(40, c.grudge + MIN_WAGE_FX.ownerGrudge * (after - before));
+        }
+      }
+      pushEvent(state, 'info', cmd.level === 'none' ? 'Sin sueldo mínimo municipal: las empresas pagan lo de siempre' : `Nuevo sueldo mínimo: ${MIN_WAGE[cmd.level]} € al mes en las empresas del pueblo`);
+      break;
+    }
+    case 'SettleDebt': {
+      const c = state.citizens.find((x) => x.id === cmd.citizenId)!;
+      const amount = c.debt?.town ?? 0;
+      settleDebt(state, c, cmd.mode);
+      if (cmd.mode === 'perdonar') addMemory(state, c, 'logro_vecinal', 3, 4);
+      pushEvent(state, 'info', cmd.mode === 'aplazar' ? `Aplazas la deuda de ${c.name}: pagará ${c.debt?.plan?.perMonth ?? 0} € al mes durante un año, sin recargo` : `Perdonas a ${c.name} los ${amount} € que debía al ayuntamiento`, { ref: c.id });
+      break;
+    }
+    case 'GrantMicrocredit': {
+      const c = state.citizens.find((x) => x.id === cmd.citizenId)!;
+      grantMicrocredit(state, c);
+      pushEvent(state, 'info', `Microcrédito municipal a ${c.name}: ${MICROCREDIT.amount} € que devolverá en ${MICROCREDIT.months} meses, sin intereses`, { ref: c.id });
+      break;
+    }
     case 'UpgradeBuilding': {
       const b = state.buildings.find((x) => x.id === cmd.buildingId)!;
       startUpgrade(state, b);

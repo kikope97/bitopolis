@@ -7,6 +7,8 @@ import { hash32 } from './hash.ts';
 import { onCitizenLeaves } from './social.ts';
 import { factionOf, voteLean } from './politics.ts';
 import { protestFor } from './associations.ts';
+import { DEBT } from './balance.ts';
+import { totalDebt } from './household.ts';
 import {
   type Citizen,
   type DecisionLogEntry,
@@ -26,6 +28,8 @@ export const DECISION_DELAY_TICKS = 12;
 /** Días antes de las elecciones en que los vecinos con nombre deciden su voto. */
 const VOTE_WINDOW_DAYS = 10;
 const COOLDOWN_TICKS = TICKS_PER_DAY * 4;
+/** v1.9: se le pregunta qué hace con sus deudas como mucho cada 2 meses. */
+const DEBT_ASK_TICKS = TICKS_PER_DAY * 60;
 const LOG_LIMIT = 300;
 export const LEISURE_COST = 120;
 export const MOTIVO_MAX = 160;
@@ -47,6 +51,8 @@ export const ACTION_LABELS: Record<string, string> = {
   abstenerse: 'no ir a votar',
   manifestarse: 'ir a la manifestación de su asociación ante el ayuntamiento',
   no_ir: 'no ir a la manifestación',
+  apretarse: 'apretarse el cinturón para pagar lo que debe',
+  pedir_aplazamiento: 'pedir al alcalde que le aplace la deuda con el ayuntamiento',
 };
 
 const NEEDS = ['parque', 'colegio', 'centro_salud', 'tienda', 'empleo'] as const;
@@ -82,6 +88,14 @@ export function validActions(state: GameState, c: Citizen, trigger: Trigger): st
       return ['votar_gobierno', 'votar_oposicion', 'abstenerse'];
     case 'protesta':
       return ['manifestarse', 'no_ir'];
+    case 'deudas':
+      // v1.9: debe dinero. Aplazar solo si lo debe al ayuntamiento.
+      return [
+        'apretarse',
+        ...(c.debt && c.debt.town > 0 && !c.debt.plan ? ['pedir_aplazamiento'] : []),
+        ...vacantJobs(state, c).map((b) => `aceptar_trabajo:${b.id}`),
+        'irse',
+      ];
     case 'opinion': {
       // Lo que le pide al alcalde: solo cosas que aún faltan.
       const has = (k: string) => state.buildings.some((b) => b.kind === k);
@@ -125,7 +139,10 @@ export function detectTriggers(state: GameState): void {
     }
     if (c.cooldownUntil > state.tick) continue;
     if (taxUp) addPending(state, c, 'subida_impuestos');
-    else if (c.happiness < 38) addPending(state, c, 'infeliz');
+    else if (totalDebt(c) >= DEBT.noticeable && state.tick - (c.debtAsked ?? -Infinity) >= DEBT_ASK_TICKS) {
+      c.debtAsked = state.tick;
+      addPending(state, c, 'deudas');
+    } else if (c.happiness < 38) addPending(state, c, 'infeliz');
     else if (c.jobId === null && vacantJobs(state, c).length > 0) addPending(state, c, 'sin_trabajo');
     else if (canFound(state, c) && c.traits.ambicion > 40) addPending(state, c, 'emprender');
     else if (canBuyHome(state, c)) addPending(state, c, 'comprar_casa');
@@ -208,6 +225,13 @@ export function applyDecision(state: GameState, citizenId: number, action: strin
     case 'seguir_fuera':
       effect = 'sigue trabajando fuera';
       break;
+    case 'apretarse':
+      c.happiness = Math.max(0, c.happiness - 1);
+      effect = 'se aprieta el cinturón para pagar lo que debe';
+      break;
+    case 'pedir_aplazamiento':
+      effect = `pide al alcalde que le aplace lo que debe al ayuntamiento (${c.debt?.town ?? 0} €; tócalo para decidir)`;
+      break;
     case 'manifestarse':
     case 'no_ir': {
       const a = protestFor(state, c);
@@ -260,6 +284,8 @@ const TEMPLATES: Record<string, string[]> = {
   abstenerse: ['Todos son iguales. Ese día me quedo en casa.', 'No me convence nadie, la verdad.', 'Que decidan otros; yo paso.'],
   manifestarse: ['Si no nos escuchan, que nos vean en la calle.', 'Allí estaré, con la pancarta.', 'Llevamos meses pidiéndolo. Toca plantarse.'],
   no_ir: ['Estoy de acuerdo, pero manifestarme no va conmigo.', 'Ese día trabajo; que vayan otros.', 'Prefiero darle algo más de tiempo al alcalde.'],
+  apretarse: ['Nada de caprichos hasta que lo pague todo.', 'Toca apretarse el cinturón unos meses.', 'Debo dinero y lo voy a devolver, aunque cueste.'],
+  pedir_aplazamiento: ['Alcalde, deme unos meses: lo pagaré, pero ahora no llego.', 'No es que no quiera pagar, es que no puedo. Necesito tiempo.', 'Con un aplazamiento lo devuelvo poco a poco.'],
 };
 
 /** Coletillas según el rasgo dominante: la misma decisión suena distinta en cada vecino. */
@@ -289,7 +315,7 @@ function score(c: Citizen, state: GameState, action: string): number {
   const [verb, arg] = action.split(':');
   switch (verb) {
     case 'irse':
-      return (40 - c.happiness) * 2 - t.terco * 0.6 + (c.fear === 'impuestos' ? 15 : 0);
+      return (40 - c.happiness) * 2 - t.terco * 0.6 + (c.fear === 'impuestos' ? 15 : 0) + (totalDebt(c) > 2_000 && c.money === 0 ? 30 : 0);
     case 'quejarse':
       return 20 + t.social * 0.4 - t.terco * 0.1 + (c.fear === 'impuestos' ? 10 : 0);
     case 'quedarse':
@@ -320,6 +346,10 @@ function score(c: Citizen, state: GameState, action: string): number {
     }
     case 'no_ir':
       return 30 + t.ahorro * 0.1 + (c.happiness >= 60 ? 15 : 0);
+    case 'apretarse':
+      return 35 + t.ahorro * 0.4 + t.terco * 0.2 + (c.fear === 'deudas' ? 10 : 0);
+    case 'pedir_aplazamiento':
+      return 30 + t.social * 0.3 + (totalDebt(c) > 1_000 ? 20 : 0);
     case 'pedir': {
       const has = (k: string) => state.buildings.some((b) => b.kind === k);
       const missing = arg === 'parque' ? !has('park') : arg === 'colegio' ? !has('school') : arg === 'centro_salud' ? !has('clinic') : arg === 'tienda' ? !has('shop') : true;

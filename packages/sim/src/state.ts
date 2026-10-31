@@ -1,3 +1,4 @@
+import type { MinWageLevel } from './balance.ts';
 import type { TaxLevel } from '@bitopolis/shared';
 import { emptyFields, type Fields } from './fields.ts';
 import { chance, nextInt, type RngState, seedRng } from './prng.ts';
@@ -12,7 +13,7 @@ import type { Departed } from './family.ts';
 import type { Justice } from './crime.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
-export const FORMAT_VERSION = 11;
+export const FORMAT_VERSION = 12;
 
 export const MAP_W = 48;
 export const MAP_H = 48;
@@ -57,6 +58,9 @@ export interface Building {
   owner: number;
   /** Caja propia (empresas). Euros enteros ≥ 0. */
   cash: number;
+  /** v1.9: ventas del mes en curso y cuentas del mes pasado (salud de las empresas). */
+  sales?: number;
+  books?: { sales: number; wages: number; taxes: number };
   /** false mientras es una obra. */
   built: boolean;
   /** Servicios recibidos por red (se recalculan cada día). */
@@ -148,6 +152,36 @@ export interface Citizen {
   parents?: number[];
   /** v1.7: decisión sobre la manifestación de la asociación `id`: `id` si va, `-id` si no. */
   protest?: number;
+  /** v1.9: lo que debe (al ayuntamiento y al banco o casero). Ver household.ts. */
+  debt?: CitizenDebt;
+  /** v1.9: ingresos y gastos del mes en curso [entra, sale] (los anota transfer). */
+  flow?: [number, number];
+  /** v1.9: el mes pasado: lo que entró, salió y devolvió de deudas. */
+  last?: { in: number; out: number; repaid: number };
+  /** v1.9: antecedentes penales (ladrones del pueblo). */
+  record?: number;
+  /** v1.9: meses seguidos sin pagar todo el alquiler privado / la hipoteca. */
+  rentArrears?: number;
+  missedQuotas?: number;
+  /** v1.9: en paro (sin trabajo ni en el pueblo ni fuera): desde qué tick, y meses de prestación que le quedan. */
+  unemployedSince?: number;
+  benefitLeft?: number;
+  /** v1.9: última vez que decidió qué hacer con sus deudas (tick). */
+  debtAsked?: number;
+}
+
+export interface CitizenDebt {
+  /** Con el ayuntamiento (impuestos, tasas, alquiler municipal, multas, microcréditos). */
+  town: number;
+  /** Con el banco o el casero (de fuera). */
+  bank: number;
+  /** Desde cuándo debe (tick). */
+  since: number;
+  /** Deuda con el ayuntamiento nacida este mes y el anterior (para el recargo único). */
+  fresh: number;
+  aged: number;
+  /** Aplazamiento concedido por el alcalde: cuota fija sin recargo hasta `until`. */
+  plan?: { perMonth: number; until: number };
 }
 
 export type TaxKey = 'ibi' | 'tasas' | 'plusvalia';
@@ -174,7 +208,7 @@ export interface Pending {
   dueTick: number;
 }
 
-export type Trigger = 'llegada' | 'sin_trabajo' | 'infeliz' | 'subida_impuestos' | 'ahorros' | 'opinion' | 'comprar_casa' | 'emprender' | 'elecciones' | 'protesta';
+export type Trigger = 'llegada' | 'sin_trabajo' | 'infeliz' | 'subida_impuestos' | 'ahorros' | 'opinion' | 'comprar_casa' | 'emprender' | 'elecciones' | 'protesta' | 'deudas';
 
 export interface DecisionLogEntry {
   tick: number;
@@ -223,6 +257,15 @@ export interface MonthStat {
   expenses: number;
   /** Desglose del mes (por concepto). */
   breakdown: Record<string, number>;
+  /** v1.9: impagos al ayuntamiento del mes, lo que le deben al cerrar, vecinos con deudas y en paro. */
+  unpaid?: number;
+  owed?: number;
+  debtors?: number;
+  jobless?: number;
+  /** v1.9: salud de las empresas: margen medio, cuántas pierden dinero y sueldo medio en el pueblo. */
+  margin?: number;
+  losing?: number;
+  wage?: number;
 }
 
 export interface GameState {
@@ -247,6 +290,9 @@ export interface GameState {
     income: number;
     expenses: number;
     breakdown: Record<string, number>;
+    /** v1.9: lo que los vecinos no han podido pagar al ayuntamiento este mes, y lo que se da por perdido. */
+    unpaid?: number;
+    writtenOff?: number;
     /** Suma diaria de los tipos: el tipo efectivo del mes es la media. */
     rateSums: Record<TaxKey, number>;
     taxDays: number;
@@ -295,6 +341,10 @@ export interface GameState {
   departed: Departed[];
   /** v1.8: nivel del ayuntamiento (1–5): desbloquea edificios y partes del juego. */
   townhallLevel: number;
+  /** v1.9: sueldo mínimo obligatorio para las empresas del pueblo. */
+  minWage: MinWageLevel;
+  /** v1.9: contabilidad de la deuda de los vecinos (conservación: deuda viva = altas − pagos − incobrables − perdonadas). */
+  debtLedger: { created: number; repaid: number; written: number; forgiven: number };
   /** v1.8: calabozos, cárcel y robos. */
   justice: Justice;
   /** Última despedida (como mucho una por semana). */
@@ -391,6 +441,8 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20 }: Ne
     departed: [],
     justice: { cells: [], jail: [], hot: [], robberies: 0, arrests: 0, fullWarned: -1 },
     townhallLevel: 1,
+    minWage: 'none',
+    debtLedger: { created: 0, repaid: 0, written: 0, forgiven: 0 },
   };
   // Árboles dispersos (se talan gratis al construir encima).
   for (let i = 0; i < tiles.length; i++) {

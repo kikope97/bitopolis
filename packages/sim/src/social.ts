@@ -5,6 +5,7 @@ import { BUILD_NAMES } from './commands.ts';
 import { canFound, freeShopLot, saturated, taxLevels } from './economy.ts';
 import { hash32 } from './hash.ts';
 import { radiusOf } from './levels.ts';
+import { leaveTown } from './household.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance, pick } from './prng.ts';
 import type { Building, Citizen, GameState } from './state.ts';
@@ -64,6 +65,12 @@ export const MEMORY_KINDS = [
   // v1.8: delincuencia.
   'le_robaron',
   'detenido',
+  // v1.9: economía de cada vecino.
+  'desahuciado',
+  'embargado',
+  'robo_en_casa',
+  'antecedentes',
+  'en_paro',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -229,6 +236,16 @@ export function memoryText(state: GameState, m: Memory): string {
       return 'Le robaron en su negocio';
     case 'detenido':
       return 'Le detuvieron en unos disturbios';
+    case 'desahuciado':
+      return 'Le echaron de casa por no pagar el alquiler';
+    case 'embargado':
+      return 'El banco se quedó su casa por la hipoteca';
+    case 'robo_en_casa':
+      return 'Le entraron a robar en casa';
+    case 'antecedentes':
+      return 'Le detuvieron por robar';
+    case 'en_paro':
+      return 'Se quedó sin trabajo';
   }
 }
 
@@ -411,6 +428,8 @@ function updateRelations(state: GameState): void {
 
 /** Cuando un vecino se va, sus amistades lo recuerdan. */
 export function onCitizenLeaves(state: GameState, leaving: Citizen): void {
+  // v1.9: salda lo que pueda; lo que deba y no pague se da por perdido.
+  leaveTown(state, leaving);
   rememberDeparted(state, leaving, 'se_fue');
   for (const c of state.citizens) {
     const r = relation(c, leaving.id);
