@@ -167,6 +167,7 @@ export function closeSheet(fromBack = false) {
   openSheetEl.remove();
   openSheetEl = null;
   document.body.classList.remove('sheet-open');
+  sheetWatch?.(null);
   // Si lo que tenía el foco ya no existe (p. ej. el aviso que abrió la hoja), al mapa.
   (lastFocus?.isConnected ? lastFocus : document.querySelector<HTMLElement>('#map'))?.focus();
 }
@@ -213,13 +214,14 @@ export function sheet(title: string | Node, ...content: (Node | string)[]): HTML
   }
   const el = h(
     'section',
-    { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'sheet-title' },
+    { class: 'sheet', role: 'dialog', 'aria-modal': String(!sidePanel()), 'aria-labelledby': 'sheet-title' },
     h('header', { class: 'sheet-head' }, back, h('h2', { id: 'sheet-title' }, title), close),
     h('div', { class: 'sheet-body' }, ...content),
   );
   // Trampa de foco: con el teclado, Tab no sale de la hoja hasta cerrarla (Esc o ✕).
   el.addEventListener('keydown', (e) => {
-    if (e.key !== 'Tab') return;
+    // Como panel lateral (tableta, horizontal) no es modal: Tab puede salir al mapa (ronda 12).
+    if (e.key !== 'Tab' || sidePanel()) return;
     const items = [...el.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])')].filter((x) => !x.hasAttribute('disabled') && x.tabIndex >= 0 && x.offsetParent !== null);
     if (!items.length) return;
     const first = items[0]!;
@@ -235,8 +237,20 @@ export function sheet(title: string | Node, ...content: (Node | string)[]): HTML
   document.body.append(el);
   document.body.classList.add('sheet-open');
   openSheetEl = el;
+  sheetWatch?.(titleText);
   close.focus();
   return el;
+}
+
+/** En tableta y en horizontal la hoja es un panel al lado del mapa (ver style.css). */
+function sidePanel(): boolean {
+  return matchMedia('(min-width: 720px) and (min-height: 540px), (orientation: landscape) and (max-height: 500px)').matches;
+}
+
+let sheetWatch: ((title: string | null) => void) | null = null;
+/** Avisa al abrir o cerrar hojas (para marcar la pestaña «Pueblo»). */
+export function onSheetChange(fn: ((title: string | null) => void) | null): void {
+  sheetWatch = fn;
 }
 
 export function isSheetOpen() {

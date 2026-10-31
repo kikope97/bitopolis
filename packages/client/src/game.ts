@@ -28,7 +28,7 @@ import SimWorker from './sim.worker.ts?worker';
 import { buildingSprite, letterSprite, T } from './sprites.ts';
 import { commandFor, costText, isLocked, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayCost, unlockPop } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
-import { $, clearToastLog, closeSheet, confirmDialog, currentSheet, h, isSheetOpen, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack } from './ui.ts';
+import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, h, isSheetOpen, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack } from './ui.ts';
 import { pixelIcon } from './icons.ts';
 import { duck, sfx, startAmbience, startMusic, stopMusic, unlockAudio } from './audio.ts';
 import { coins, dust, pop, shake, shakeOffset } from './fx.ts';
@@ -1133,8 +1133,10 @@ export function startGame(opts: GameOptions): void {
     else right = Math.min(right, sr.left);
     if (bottom - top < 40 || right - left < 40) return;
     const [sx, sy] = screenOf(t.x, t.y);
-    const m = tileSize() / dpr();
-    if (sx > left + m && sx < right - m && sy > top + m && sy < bottom - m) return;
+    // Si queda cerca del borde (o debajo de la hoja), se centra en lo que queda a la vista.
+    const mx = Math.max(2 * tileSize() / dpr(), (right - left) * 0.15);
+    const my = Math.max(2 * tileSize() / dpr(), (bottom - top) * 0.15);
+    if (sx > left + mx && sx < right - mx && sy > top + my && sy < bottom - my) return;
     cam.x = Math.round((t.x + 0.5) * tileSize() - ((left + right) / 2 - r.left) * dpr());
     cam.y = Math.round((t.y + 0.5) * tileSize() - ((top + bottom) / 2 - r.top) * dpr());
     clampCam();
@@ -1285,7 +1287,7 @@ export function startGame(opts: GameOptions): void {
         'build',
         'Ayuntamiento',
         [townSum.join(' · ')],
-        item('Ayuntamiento', go(() => openTownHall(social)), budgetOpen || offers > 0),
+        item('Presupuesto y fiestas', go(() => openTownHall(social)), budgetOpen || offers > 0),
         item('Pleno municipal', go(() => openPleno(social))),
         item('Política y elecciones', go(() => openPolitics(social))),
         item('Consejero', go(() => openAdvisor(social))),
@@ -1317,6 +1319,9 @@ export function startGame(opts: GameOptions): void {
       ),
     );
   }
+  // La pestaña «Pueblo» se marca mientras su panel (o una hoja abierta desde él) está a la vista.
+  onSheetChange((title) => $('#menu').setAttribute('aria-expanded', String(title === 'Pueblo')));
+  $('#menu').setAttribute('aria-expanded', 'false');
   const openPeople = () => openNeighbours(state, (c) => withBack('Vecinos', () => withBack('Pueblo', openHub, openPeople), () => openCitizen(social, c.id)));
 
   /** Por qué el pueblo está contento o no: causas medias y los vecinos más tristes (v1.6). */
@@ -1446,8 +1451,9 @@ export function startGame(opts: GameOptions): void {
   function paintSpeed() {
     const play = $('#play-pause');
     play.textContent = speed === 0 ? '▶' : '❚❚';
-    play.setAttribute('aria-label', speed === 0 ? `Poner en marcha (x${lastSpeed})` : 'Pausa');
-    play.setAttribute('aria-pressed', String(speed === 0));
+    // La etiqueta dice la acción; el estado va en data-paused (ronda 12: «pulsado» en pausa confundía).
+    play.setAttribute('aria-label', speed === 0 ? `Poner en marcha a x${lastSpeed}` : 'Pausar');
+    play.dataset.paused = String(speed === 0);
     const sp = $('#speed');
     sp.textContent = `x${lastSpeed}`;
     sp.dataset.speed = String(lastSpeed);
@@ -1501,6 +1507,7 @@ export function startGame(opts: GameOptions): void {
         void api.release(token, sessionId);
         $('#game').hidden = true;
         document.body.classList.remove('in-game', 'tray-open', 'sheet-open');
+        onSheetChange(null);
         clearToastLog();
         opts.onExit();
       });

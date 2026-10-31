@@ -50,7 +50,7 @@ test('v0.5: ajustes de accesibilidad, teclado y carretera con dos toques', async
   await expect(page.locator('#speed')).toHaveAttribute('aria-disabled', 'true');
   await page.locator('#speed').click({ force: true });
   await expect(page.locator('#speed')).toHaveText('x1');
-  await expect(page.locator('#play-pause')).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('#play-pause')).toHaveAttribute('data-paused', 'false');
   await shot('texto-200');
   // Las preferencias se recuerdan al recargar.
   await page.reload();

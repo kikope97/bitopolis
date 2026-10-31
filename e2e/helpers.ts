@@ -31,7 +31,7 @@ export async function drag(page: Page, a: [number, number], b: [number, number])
 
 /** Velocidad con el dock de la v1.4: ⏯ (#play) y el botón x1 → x3 → x10 (#speed). */
 export async function setSpeed(page: Page, n: 0 | 1 | 3 | 10) {
-  const paused = async () => (await page.locator('#play-pause').getAttribute('aria-pressed')) === 'true';
+  const paused = async () => (await page.locator('#play-pause').getAttribute('data-paused')) === 'true';
   if (n === 0) {
     if (!(await paused())) await page.locator('#play-pause').click();
     return;
