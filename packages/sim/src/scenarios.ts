@@ -43,6 +43,9 @@ function fmtEur(n: number): string {
   return `${n < 0 ? '−' : ''}${s} €`;
 }
 
+/** Objetivos que el pueblo de partida ya cumple (ids de `OBJECTIVES`, social.ts). */
+const STARTER_OBJECTIVES = ['carretera', 'agua_luz', 'diez', 'zonas', 'parque'];
+
 type Village = { house: number; res: number; shop: number; factory: number; park: number };
 
 /** Casillas de la calle mayor y de las parcelas a sus lados (el centro siempre es llano). */
@@ -158,6 +161,8 @@ export function applyScenario(state: GameState): void {
     state.treasury = r.treasury;
     state.scenario.goal = { kind: 'reparar', target: r.goalPop, progress: wrecked.length };
   }
+  // Lo que el pueblo ya tenía no se premia como objetivo (lo comprueba un test con OBJECTIVES).
+  state.objectivesDone.push(...STARTER_OBJECTIVES);
   state.scenario.deadline = months * TICKS_PER_MONTH;
   state.scenario.done = false;
   // Lucía sigue siendo la administrativa del ayuntamiento.

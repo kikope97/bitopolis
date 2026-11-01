@@ -6,6 +6,7 @@ import {
   createInitialState,
   generateTerrain,
   hashState,
+  OBJECTIVES,
   replay,
   runSimulation,
   SCENARIOS,
@@ -84,6 +85,13 @@ describe('escenarios', () => {
       expect(a.report.invariantErrors).toEqual([]);
       expect(hashState(replay(3, a.report.commands, a.state.tick, { scenario, terrain: 'rio' }))).toBe(a.report.stateHash);
       expect(hashState(createInitialState({ seed: 3, scenario }))).not.toBe(hashState(createInitialState({ seed: 3 })));
+    }
+  });
+  it('lo que el pueblo de partida ya cumple no se cobra como objetivo', () => {
+    for (const scenario of ['quiebra', 'vaciado', 'riada'] as const) {
+      const s = createInitialState({ seed: 6, scenario });
+      const met = OBJECTIVES.filter((o) => o.done(s)).map((o) => o.id);
+      expect(new Set(s.objectivesDone), scenario).toEqual(new Set(met));
     }
   });
   it('Pueblo en quiebra: caja en negativo, vecinos resentidos y meta de superávit', () => {
