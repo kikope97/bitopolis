@@ -9,7 +9,9 @@
  * (`Dilemma.intro`, validada); la IA nunca escribe las opciones.
  */
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
-import { CARE, DEBT, DILEMMA, GRUDGE_MAX } from './balance.ts';
+import { CARE, DEBT, DILEMMA, GRUDGE_MAX, WATERWORKS } from './balance.ts';
+import { riverNear, startSpill } from './waterworks.ts';
+import { residenceFree } from './care.ts';
 import type { CommandResult } from './commands.ts';
 import { directorOwns } from './director-core.ts';
 import { hash32 } from './hash.ts';
@@ -123,7 +125,8 @@ function factoryCandidates(state: GameState): DilemmaCandidate[] {
   for (const b of state.buildings) {
     if (b.kind !== 'factory' || !b.built || b.damaged) continue;
     const pol = state.fields.pollution[b.y * state.map.w + b.x] ?? 0;
-    if (pol < f.pollution || !nearRiver(state, b, f.reach)) continue;
+    // Ronda 20: solo si el río baja sucio junto a ella (con depuradora o río limpio, no hay dilema).
+    if (pol < f.pollution || !nearRiver(state, b, f.reach) || riverNear(state, b.x, b.y, f.reach) <= WATERWORKS.dirtyPump) continue;
     const workers = state.citizens.filter((c) => c.jobId === b.id);
     if (workers.length < f.fired) continue;
     const fired = workers.slice(-f.fired);
@@ -257,9 +260,9 @@ export function dilemmaOption(state: GameState, d: Dilemma, option: string): { l
     case 'microcredito':
       return { label: 'Darle un microcrédito', effect: `Préstamo municipal sin intereses para salir del bache; +${fam.microMood} de ánimo` };
     case 'multar':
-      return { label: 'Multar a la fábrica', effect: `Hasta ${f.fine} € a la caja; despide a ${f.fired} trabajadores` };
+      return { label: 'Multar a la fábrica', effect: `Hasta ${f.fine} € a la caja y vierte la mitad un año; despide a ${f.fired} trabajadores` };
     case 'mirar_otro_lado':
-      return { label: 'Mirar a otro lado', effect: `Nadie pierde el trabajo; los vecinos de la orilla se enfadan (rencor +${f.lookAwayGrudge})` };
+      return { label: 'Mirar a otro lado', effect: `Nadie pierde el trabajo; sigue vertiendo y los vecinos de la orilla se enfadan (rencor +${f.lookAwayGrudge})` };
     case 'pedir_indulto':
       return { label: 'Pedir el indulto', effect: `${first(a)} sale ya (+${p.pardonFamilyMood} de ánimo a su familia); a los de mano dura no les gustará` };
     case 'que_cumpla':
@@ -278,6 +281,8 @@ export function canResolveDilemma(state: GameState, id: number, option: string):
   if (!main) return { ok: false, error: 'Ese vecino ya no vive en el pueblo' };
   if (option === 'ampliar' && state.treasury < DILEMMA.expandCost) return { ok: false, error: `Ampliar cuesta ${DILEMMA.expandCost} €` };
   if (option === 'plaza_segundo' && !byId(state, d.citizenIds[1])) return { ok: false, error: 'Ese vecino ya no vive en el pueblo' };
+  if ((option === 'plaza_primero' || option === 'plaza_segundo') && residenceFree(state) < 1) return { ok: false, error: 'Ya no queda ninguna plaza: amplía la residencia' };
+  if (option === 'desahuciar' && (main.owns || !(main.debt?.town ?? 0) || main.homeId === null || (d.buildingId !== undefined && main.homeId !== d.buildingId))) return { ok: false, error: 'Ya no hay a quién desahuciar: pagó, se mudó o compró casa' };
   if (option === 'microcredito') {
     const m = canMicrocredit(state, main);
     if (!m.ok) return m;
@@ -302,7 +307,11 @@ export function resolveDilemma(state: GameState, id: number, option: string): vo
     case 'plaza_segundo':
     case 'ampliar': {
       const r = DILEMMA.residence;
-      if (option === 'ampliar') transfer(state, TREASURY, OUTSIDE, DILEMMA.expandCost, 'residencia');
+      if (option === 'ampliar') {
+        transfer(state, TREASURY, OUTSIDE, DILEMMA.expandCost, 'residencia');
+        // Ronda 20: ampliar suma plazas de verdad (si no, al mes salía el más joven).
+        state.care.extraPlaces = (state.care.extraPlaces ?? 0) + r.expandPlaces;
+      }
       const winners = option === 'ampliar' ? [a, b] : option === 'plaza_primero' ? [a] : [b];
       for (const c of winners) {
         if (!c) continue;
@@ -365,8 +374,10 @@ export function resolveDilemma(state: GameState, id: number, option: string): vo
       if (!fab) break;
       const paid = transfer(state, fab.id, TREASURY, Math.min(f.fine, Math.max(0, fab.cash)), 'multas');
       const workers = state.citizens.filter((c) => c.jobId === fab.id);
+      fab.cleanUntil = state.tick + 12 * TICKS_PER_MONTH;
       for (const c of workers.slice(-f.fired)) {
         c.jobId = null;
+        c.unemployedSince = state.tick; // ronda 20: al paro de verdad (antes «trabajaban fuera»)
         if (c.named) addMemory(state, c, 'perdio_trabajo', 4, -4);
       }
       fab.staff = Math.max(0, workers.length - f.fired);
@@ -383,6 +394,8 @@ export function resolveDilemma(state: GameState, id: number, option: string): vo
         mood(c, f.lookAwayMood);
         addMemory(state, c, 'dilema_en_contra', 3, -2);
       }
+      // Ronda 20: mirar a otro lado tiene consecuencia: la fábrica sigue vertiendo, y más.
+      if (fab) startSpill(state, fab.id);
       pushEvent(state, 'info', `El ayuntamiento no hace nada con los vertidos de ${fab?.name ?? 'la fábrica'}`, { ref: d.buildingId });
       break;
     }

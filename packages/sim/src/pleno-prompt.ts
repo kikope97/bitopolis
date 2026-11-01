@@ -65,7 +65,7 @@ export function buildPlenoRequest(state: GameState, pleno: PlenoTalkInput): Plen
         postura: s.postura,
         sobre: p ? NEED_TEXT[p.need] : 'el pueblo',
         tono: toneOf(c),
-        felicidad: Math.round(c.happiness),
+        felicidad: c.happiness >= 70 ? 'contento' : c.happiness >= 45 ? 'regular' : 'descontento',
         recuerdos: [...c.memories].sort((a, b) => b.importance - a.importance).slice(0, 2).map((m) => memoryText(state, m)),
       };
     }),
@@ -113,11 +113,13 @@ export function parsePleno(raw: string, req: PlenoRequest, pleno: PlenoTalkInput
   const list = (data as { intervenciones?: unknown })?.intervenciones;
   if (!Array.isArray(list)) return [];
   const out: { id: number; postura: PlenoStance; linea: string }[] = [];
-  const one: TextRequest = { ...req, max: PLENO_TALK.maxLine };
+  // Ronda 20: los ids no cuentan como cifras que se puedan decir («llevo 12 años…» con el vecino 12).
+  const one: TextRequest = { ...req, user: req.user.replace(/"vecino":\d+/g, '"vecino":0'), max: PLENO_TALK.maxLine };
   for (const item of list) {
     const { vecino, postura, linea } = (item ?? {}) as { vecino?: unknown; postura?: unknown; linea?: unknown };
     const s = (pleno.speakers ?? []).find((x) => x.id === vecino);
-    if (!s || !req.ids.includes(s.id) || out.some((x) => x.id === s.id) || postura !== s.postura || typeof linea !== 'string') continue;
+    if (!s || !req.ids.includes(s.id) || out.some((x) => x.id === s.id) || typeof linea !== 'string') continue;
+    void postura; // la postura la pone el motor (si el modelo la cambia, no se tira la línea)
     const text = parseText(JSON.stringify({ texto: linea }), one);
     if (!text || text.length > PLENO_TALK.maxLine) continue;
     out.push({ id: s.id, postura: s.postura, linea: text });

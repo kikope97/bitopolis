@@ -362,10 +362,14 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
     const prev = lastPleno.get(g.row.id);
     if (prev !== undefined && prev !== body.tick && Math.abs(body.tick - prev) < 24 * 25) return { lines: null, reason: 'solo un pleno al mes' };
     // Solo vecinos con nombre que existen y peticiones del propio pleno.
-    const speakers = body.speakers.filter((s, i, a) => a.findIndex((x) => x.id === s.id) === i && body.petitions.some((p) => p.id === s.petitionId) && st.citizens.some((c) => c.id === s.id && c.named));
+    // Ronda 20: si el estado guardado ya tiene este pleno, mandan sus datos (no los del cliente).
+    const srv = st.pleno && st.pleno.tick === body.tick && st.pleno.speakers?.length ? (st.pleno as unknown as PlenoTalkInput) : null;
+    const petitions = srv ? srv.petitions : body.petitions.filter((p) => st.citizens.some((c) => c.id === p.citizenId));
+    const speakers = (srv ? srv.speakers : body.speakers).filter((s, i, a) => a.findIndex((x) => x.id === s.id) === i && petitions.some((p) => p.id === s.petitionId) && st.citizens.some((c) => c.id === s.id && c.named));
     if (!speakers.length) return { lines: null, reason: 'nadie habla' };
-    const pleno: PlenoTalkInput = { tick: body.tick, petitions: body.petitions, speakers };
+    const pleno: PlenoTalkInput = { tick: body.tick, petitions, speakers };
     lastPleno.set(g.row.id, body.tick);
+    if (lastPleno.size > 2000) lastPleno.delete(lastPleno.keys().next().value!);
     let run = plenoAsking.get(key);
     if (!run) {
       const request = buildPlenoRequest(st, pleno);

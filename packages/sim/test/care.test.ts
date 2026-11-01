@@ -90,7 +90,7 @@ describe('guardería (2.4)', () => {
     const [a] = couples(s, 1)[0]!;
     expect(birthFx(s, a!, nurseryUse(s)).fx).toBe(1);
     const n = built(s, 'nursery', 12, 12);
-    expect(birthFx(s, a!, nurseryUse(s)).fx).toBe(CARE.birthWithPlace);
+    expect(birthFx(s, a!, nurseryUse(s)).fx).toBe(CARE.birthWithPlace[s.care.nurseryFee]);
     // Lejos (fuera del radio), no cuenta.
     n.x = 40;
     n.y = 40;
@@ -190,20 +190,24 @@ describe('residencia, pensión y mayores (2.4)', () => {
     built(s, 'residence', 20, 20);
     const h = built(s, 'house', 10, 10);
     const p = resident(s, 80, h.id, 0);
+    // Ronda 20: con la cuota normal (más de media pensión) y sin ahorros no entra; con la reducida, sí.
+    careMonth(s);
+    expect(p.care).toBeUndefined();
+    s.care.residenceFee = 'reducida';
     careMonth(s);
     expect(p.care).toBe('residencia');
     expect(attended(p)).toBe(true);
     // Sin dinero y sin hijos: deuda del propio mayor con el ayuntamiento.
-    expect(p.debt?.town).toBe(CARE.residence.fee.normal);
+    expect(p.debt?.town).toBe(CARE.residence.fee.reducida);
     // Con un hijo en el pueblo, el hijo paga lo que falta.
     const kid = resident(s, 50, h.id, 5_000);
     kid.parents = [p.id];
     transfer(s, OUTSIDE, p.id, 100);
     const caja = s.treasury;
     careMonth(s);
-    expect(s.treasury - caja).toBe(CARE.residence.fee.normal);
-    expect(kid.money).toBe(5_000 - (CARE.residence.fee.normal - 100));
-    expect(totalDebt(p)).toBe(CARE.residence.fee.normal);
+    expect(s.treasury - caja).toBe(CARE.residence.fee.reducida);
+    expect(kid.money).toBe(5_000 - (CARE.residence.fee.reducida - 100));
+    expect(totalDebt(p)).toBe(CARE.residence.fee.reducida);
     expect(checkInvariants(s)).toEqual([]);
   });
 

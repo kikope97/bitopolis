@@ -141,7 +141,9 @@ const spilling = (state: GameState, b: Building) => (b.spill ?? -1) > state.tick
 export function dumpOf(state: GameState, b: Building): number {
   if (!b.built || b.damaged) return 0;
   const d = W.dump[b.kind] ?? 0;
-  return spilling(state, b) ? d * W.spill.mult : d;
+  // Ronda 20: una fábrica multada echa la mitad durante un año.
+  const fined = (b.cleanUntil ?? -1) > state.tick ? 0.5 : 1;
+  return (spilling(state, b) ? d * W.spill.mult : d) * fined;
 }
 
 export interface RiverLoad {

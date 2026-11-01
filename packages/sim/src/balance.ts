@@ -145,8 +145,9 @@ export const MAINTENANCE: Record<BuildingKind, number> = {
   residence: 250,
   busstation: 150,
   sewage: 350,
-  solar: 40,
-  wind: 80,
+  // Ronda 20: unos 8–10 € por edificio con luz (antes salían mucho más baratas que la central).
+  solar: 120,
+  wind: 300,
 };
 
 /** Radio de cobertura de los servicios (tiles) y su efecto en la felicidad. */
@@ -1265,7 +1266,8 @@ export const CARE = {
    */
   residence: { places: 12, fee: { gratis: 0, reducida: 200, normal: 400 }, unhappyEnter: 45, savingsMonths: 12, livingShare: 0.3 },
   /** Pareja con plaza de guardería: natalidad ×1,5. Sin plaza, prob. al mes de que deje el trabajo de fuera. */
-  birthWithPlace: 1.5,
+  /** Ronda 20: con plaza, la natalidad depende de la cuota (gratis anima más a tener hijos). */
+  birthWithPlace: { gratis: 1.7, reducida: 1.5, normal: 1.25 } as Record<string, number>,
   quitWithoutPlace: 0.15,
   /** Pensión mínima desde los 67 años (de fuera). */
   pension: 650,
@@ -1284,6 +1286,11 @@ export const TRANSIT = {
   /** El Consorcio paga esta parte del mantenimiento (de fuera). */
   consortium: 0.5,
   findChance: 0.45,
+  /** Ronda 20: el billete también cuenta: gratis ayuda a encontrar trabajo fuera, caro lo frena. */
+  findByFare: { gratis: 0.5, normal: 0.45, caro: 0.38 } as Record<string, number>,
+  freeMood: 1,
+  /** Ronda 20: lo que suma buscar trabajo fuera en autobús (además de la tirada del mes). */
+  searchBonus: 0.15,
   loseChance: 0.02,
   mood: 2,
   demandR: 8,
@@ -1305,12 +1312,12 @@ export const WATERWORKS = {
   /** Lo que echa cada edificio a ≤ `reach` casillas del río (res/shop/factory), y lo que baja por casilla. */
   reach: 6,
   dump: { res: 1, shop: 2, factory: 6 } as Record<string, number>,
-  decayPerTile: 0.04,
+  decayPerTile: 0.02,
   sewage: { buildings: 60, clean: 0.85 },
   /** Río > dirtyPump: la bomba pierde su +25 %; la orilla, −3. Al salir > fineAt: multa trimestral. */
   dirtyPump: 40,
   shoreMood: -3,
-  fineAt: 60,
+  fineAt: 35,
   fine: 1_500,
   solar: { buildings: 15, winter: 0.6, snow: 0.4 },
   wind: { buildings: 30, storm: 1.2, noise: 30, noiseRadius: 3, complainRadius: 3, retireeMood: 3, complainScore: 6 },
@@ -1346,9 +1353,9 @@ export const DILEMMA = {
   /** Presentación del director (IA), en caracteres. */
   introMax: 200,
   /** La última plaza de la residencia: ánimo de quien entra y de quien se queda fuera (y su rencor). */
-  residence: { chosenMood: 6, leftOutMood: -6, leftOutGrudge: 3 },
+  residence: { chosenMood: 6, leftOutMood: -6, leftOutGrudge: 3, expandPlaces: 3 },
   /** Familia con deudas: deuda mínima con el ayuntamiento; desahucio, perdón o microcrédito. */
-  family: { minDebt: 400, evictMood: -10, neighborsGrudge: 1, neighborsRadius: 4, forgiveMood: 5, microMood: 3 },
+  family: { minDebt: 200, evictMood: -10, neighborsGrudge: 1, neighborsRadius: 4, forgiveMood: 5, microMood: 3 },
   /** La fábrica que vierte: contaminación en su casilla y río a menos de `reach`; multa y despidos o mirar a otro lado. */
   factory: { pollution: 40, reach: 6, fine: 1_200, fired: 2, lookAwayGrudge: 2, lookAwayMood: -2, maxNeighbors: 3 },
   /** El preso arrepentido: días de condena que le quedan como mínimo; indulto o que cumpla. */
@@ -1368,7 +1375,7 @@ export const SEASONS = {
   /** Mínimo de vecinos para que haya fiesta de temporada. */
   minPop: 5,
   /** Lo que pone cada vecino con nombre si la comisión tiene que recaudar (solo quien lo tiene). */
-  collectPerNamed: 10,
+  collectPerNamed: 40,
   budgetShare: { nada: 0, poco: 0.5, todo: 1 } as Record<string, number>,
   nadaGrudge: 1,
   /** Actos del programa: entre 2 y 3. */

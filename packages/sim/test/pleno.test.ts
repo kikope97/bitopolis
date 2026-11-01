@@ -71,8 +71,8 @@ describe('plenos hablados (2.4)', () => {
       p,
     );
     expect(out.map((x) => x.id)).toEqual([a!.id]);
-    // Una postura que no es la suya o un vecino que no habla tampoco.
-    expect(parsePleno(answer([{ vecino: a!.id, postura: a!.postura === 'en_contra' ? 'a_favor' : 'en_contra', linea: 'Estoy muy de acuerdo con todo esto.' }]), req, p)).toEqual([]);
+    // Ronda 20: si el modelo cambia la postura, manda la del motor (no se tira la línea); un vecino que no habla, no.
+    expect(parsePleno(answer([{ vecino: a!.id, postura: a!.postura === 'en_contra' ? 'a_favor' : 'en_contra', linea: 'Estoy muy de acuerdo con todo esto.' }]), req, p).map((x) => x.postura)).toEqual([a!.postura]);
     expect(parsePleno(answer([{ vecino: 999_999, postura: 'a_favor', linea: 'Estoy muy de acuerdo con todo esto.' }]), req, p)).toEqual([]);
     expect(parsePleno('no es json', req, p)).toEqual([]);
     // Las cifras de los datos sí valen (los votos).

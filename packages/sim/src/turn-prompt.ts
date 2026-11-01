@@ -22,7 +22,10 @@ import { LANDMARK_EFFECT, LANDMARK_NAMES } from './landmarks.ts';
 import { ruralHomes, touristified } from './tourism.ts';
 import { bigFactory, PHASE_NAME } from './region.ts';
 import { scenarioStatus } from './scenarios.ts';
-import { committeeBrief, FESTIVAL_ACTS } from './seasons.ts';
+import { committeeBrief, FESTIVAL_ACTS, SEASON_NAMES } from './seasons.ts';
+import { careBuildings, residenceFree } from './care.ts';
+import { busStation } from './transit.ts';
+import { hasRiver, riverExit } from './waterworks.ts';
 import { newRecordLine } from './achievements.ts';
 import { averageHappiness } from './tick.ts';
 import { GESTURES, gestureCandidates, isAiCitizen, PLANS, planText, SPEND, type TurnAct, turnMenu } from './turns.ts';
@@ -35,13 +38,14 @@ import { GESTURES, gestureCandidates, isAiCitizen, PLANS, planText, SPEND, type 
  * La salida tiene un esquema fijo (sin uniones por vecino); cada parte se valida
  * en el motor con el menú del vecino. Nunca va texto libre del jugador.
  */
-export const TURN_PROMPT_VERSION = 13;
+export const TURN_PROMPT_VERSION = 14;
 
 export const TURN_SYSTEM = `Eres la mente de los vecinos de Bitópolis, un pueblo español pequeño. Cada semana decides, a la vez, qué hace cada vecino de la lista. Ellos viven de verdad: trabajan, compran, se enamoran, se enfadan, ahorran o se arruinan, y reaccionan a lo que hace quien gobierna: el alcalde (el jugador) o, si ganó las elecciones, el rival (mira "politica.gobierna"). El vecino que tenga "es_alcalde" gobierna él: piensa y actúa como alcalde.
 
 Para cada vecino del lote devuelve exactamente un objeto con:
 - "vecino": su id.
 - "accion": UNA de las acciones de su lista "acciones" (copia el texto exacto). Si no quiere hacer nada especial, "seguir". No inventes acciones.
+  Vida (2.4): "llevar_a_residencia"/"cuidar_en_casa" pesan el cariño, la cuota y lo que gana; "buscar_trabajo_fuera" solo si de verdad quiere trabajar fuera; "apuntarse_comision" si le gustan las fiestas. "vida" cuenta cómo están las fiestas, el autobús, las cuotas y el río.
 - "gesto": con quién (id de su lista "con_quien", o 0) y qué ("ninguno", "acercarse", "enfadarse", "hacer_las_paces", "pedir_salir", "romper").
 - "actitud": qué piensa ahora de quien gobierna, de -2 (muy en contra) a 2 (muy a favor). Tiene que salir de lo que vive: impuestos, servicios, su bolsillo, sus planes.
 - "gasto": dónde compra este mes ("pueblo", "fuera" o "ahorrar"), en qué tienda del pueblo si la prefiere (id de la lista de tiendas, o 0) y si se da algún capricho ("ocio"). Comer y lo básico se pagan siempre: tú decides dónde y si hay ocio. Si nadie compra en las tiendas del pueblo, cierran y su gente se queda sin trabajo: compra en el pueblo si le va bien y le compensa.
@@ -50,7 +54,7 @@ Para cada vecino del lote devuelve exactamente un objeto con:
 - "motivo": por qué hace lo que hace esta semana, en una frase corta en primera persona (máx. 160 caracteres).
 - "escudo": solo si en el pueblo hay "votacion_escudo", su voto: una "pieza" y un "lema" (ids de esa votación), según lo que le importa; si no, "" y "".
 - "biografia": solo si el turno es "mensual": su vida en 2 o 3 frases en tercera persona (máx. 280 caracteres), reescribiendo "su_biografia" con lo que ha pasado (sus notas y recuerdos); si no es mensual, "".
-- "programa": solo si en sus datos aparece "comision_fiestas" y encabeza la comisión (o se apunta ahora con "apuntarse_comision" y no hay nadie más), 2 o 3 actos de "actos_posibles" a su gusto; si no, [].
+- "programa": solo si en sus datos aparece "comision_fiestas" y encabeza la comisión (o se apunta ahora con "apuntarse_comision" y no hay nadie más), 2 o 3 "id" de "actos_posibles" a su gusto (mira su coste y su efecto); si no, [].
 - "recuerdo": lo que apunta de esta semana para acordarse (un hecho, no un sentimiento; máx. 120 caracteres), o "" si no pasó nada. Sus notas anteriores están en "sus_notas".
 
 Reglas:
@@ -73,6 +77,24 @@ const band = (n: number, cuts: number[], names: string[]) => names[cuts.findInde
 const lvl = (v: string) => ({ low: 'bajo', medium: 'medio', high: 'alto' })[v] ?? v;
 
 /** Cómo está el pueblo (igual para todos los lotes del turno). */
+/** Ronda 20: fiestas, autobús, cuidados y río, en palabras (lo que hay; sin cifras). */
+function vidaBlock(state: GameState): Record<string, string> {
+  const out: Record<string, string> = {};
+  const f = state.seasons?.current;
+  if (f) {
+    const st = f.status === 'comision' ? (f.budget ? 'la comisión prepara la fiesta' : 'la comisión pide presupuesto al ayuntamiento') : f.status === 'aprobada' ? `aprobada (${f.budget === 'todo' ? 'la paga entera el ayuntamiento' : f.budget === 'poco' ? 'el ayuntamiento paga la mitad' : 'sin dinero del ayuntamiento'})` : f.status;
+    out.fiesta = `${SEASON_NAMES[f.season]}: ${st}`;
+  }
+  if (busStation(state)) out.autobus = `hay estación; billete ${state.transit.fare}`;
+  if (careBuildings(state, 'nursery').length) out.guarderia = `cuota ${state.care.nurseryFee}`;
+  if (careBuildings(state, 'residence').length) out.residencia = `cuota ${state.care.residenceFee}; ${residenceFree(state) > 0 ? 'quedan plazas' : 'llena'}`;
+  if (hasRiver(state)) {
+    const r = riverExit(state);
+    out.rio = r < 20 ? 'limpio' : r < 40 ? 'turbio' : 'sucio';
+  }
+  return out;
+}
+
 export function turnShared(state: GameState): string {
   const d = tickToDate(state.tick);
   const kinds = new Set(state.buildings.filter((b) => b.built).map((b) => b.kind));
@@ -90,7 +112,7 @@ export function turnShared(state: GameState): string {
     cuentas: `nota ${state.rating ?? 'B'} (A la mejor, D sin crédito), carga de los préstamos ${loadBand(loanLoad(state))}`,
     impuestos: state.taxesSplit ? { ibi: lvl(state.taxes.ibi), tasas: lvl(state.taxes.tasas), plusvalia: lvl(state.taxes.plusvalia) } : lvl(state.taxLevel),
     sueldo_minimo_empresas: `${MIN_WAGE[state.minWage ?? 'none']} € al mes`,
-    servicios: ['water', 'power', 'park', 'school', 'clinic', 'police', 'bar', 'chapel', 'cemetery', 'library', 'sports', 'jail', 'cleanpoint'].filter((k) => kinds.has(k as never)).map((k) => BUILD_NAMES[k]!.toLowerCase()),
+    servicios: ['water', 'power', 'park', 'school', 'clinic', 'police', 'bar', 'chapel', 'cemetery', 'library', 'sports', 'jail', 'cleanpoint', 'nursery', 'residence', 'busstation', 'sewage', 'solar', 'wind'].filter((k) => kinds.has(k as never)).map((k) => BUILD_NAMES[k]!.toLowerCase()),
     economia: last
       ? {
           vecinos_con_deudas: last.debtors ?? 0,
@@ -120,6 +142,8 @@ export function turnShared(state: GameState): string {
     ...(rankCandidates(state) ? { votacion_escudo: { rango: rankCandidates(state)!.rango, piezas: rankCandidates(state)!.piezas, lemas: rankCandidates(state)!.lemas } } : {}),
     // 2.3: metas grandes (comarca, grandes obras, escenario, turismo, gran empresa y récords).
     metas: bigGoals(state),
+    // Ronda 20: la vida del pueblo (2.4), en bandas y sin cifras; igual en todos los lotes.
+    vida: vidaBlock(state),
   };
   return `Así está el pueblo:\n${JSON.stringify(data)}`;
 }

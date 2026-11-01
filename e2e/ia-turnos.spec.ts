@@ -9,7 +9,7 @@ test('2.0: un turno del pueblo con IA llega, se aplica y se ve en «Qué está p
   await page.goto('/');
   await page.getByRole('radio', { name: /Modo IA/ }).click();
   await page.locator('details.advanced summary').first().click();
-  await page.locator('#ai-base').fill('http://localhost:8099/v1');
+  await page.locator('#ai-base').fill(`http://localhost:${process.env.PW_LLM_PORT ?? 8099}/v1`);
   await page.getByRole('button', { name: 'Cargar modelos' }).click();
   await page.locator('#ai-model-list').selectOption('falso-mini');
   await page.locator('#ai-accept').check();

@@ -136,7 +136,13 @@ describe('estación de autobuses (2.4)', () => {
     expect(turnMenu(s, c!).at(-1)!.accion).toBe('buscar_trabajo_fuera');
     c!.traits.ambicion = 80;
     expect(transitRuleAction(s, c!)).toBe('buscar_trabajo_fuera');
-    for (let i = 0; i < 40 && c!.unemployedSince !== undefined; i++) extraAction(s, c!, 'buscar_trabajo_fuera', undefined);
+    // Ronda 20: una búsqueda al mes (la IA no puede tirar los dados cada semana).
+    extraAction(s, c!, 'buscar_trabajo_fuera', undefined);
+    if (c!.unemployedSince !== undefined) expect(turnMenu(s, c!).some((m) => m.accion === 'buscar_trabajo_fuera')).toBe(false);
+    for (let i = 0; i < 80 && c!.unemployedSince !== undefined; i++) {
+      s.tick += 30 * 24;
+      extraAction(s, c!, 'buscar_trabajo_fuera', undefined);
+    }
     expect(c!.unemployedSince).toBeUndefined();
     expect(turnMenu(s, c!).some((m) => m.accion === 'buscar_trabajo_fuera')).toBe(false);
   });

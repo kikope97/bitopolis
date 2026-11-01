@@ -8,11 +8,12 @@
  * mantenimiento. IA: el parado puede `buscar_trabajo_fuera` y el director
  * puede organizar una `excursion` de jubilados (suceso bueno).
  */
-import { TICKS_PER_DAY } from '@bitopolis/shared';
+import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { JOBS_OUTSIDE, TRANSIT } from './balance.ts';
 import { isRetired } from './care.ts';
 import type { CommandResult } from './commands.ts';
 import { directorOwns } from './director-core.ts';
+import { charge, outsideJobsFx } from './household.ts';
 import { maintenanceOf } from './levels.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance } from './prng.ts';
@@ -53,7 +54,7 @@ export function riders(state: GameState): number {
 
 /** Probabilidades al mes del trabajo de fuera (con estación, mejores). */
 export function transitJobs(state: GameState): { find: number; lose: number } {
-  return busStation(state) ? { find: TRANSIT.findChance, lose: TRANSIT.loseChance } : { find: JOBS_OUTSIDE.findChance, lose: JOBS_OUTSIDE.loseChance };
+  return busStation(state) ? { find: TRANSIT.findByFare[state.transit.fare] ?? TRANSIT.findChance, lose: TRANSIT.loseChance } : { find: JOBS_OUTSIDE.findChance, lose: JOBS_OUTSIDE.loseChance };
 }
 
 /** Demanda de vivienda que añade la estación. */
@@ -76,6 +77,7 @@ export function transitMood(state: GameState, c: Citizen): { label: string; valu
   if (!isRider(state, c)) return [];
   const out = [{ label: 'Va en autobús al trabajo', value: TRANSIT.mood }];
   if (state.transit.fare === 'caro') out.push({ label: 'El billete del autobús es caro', value: TRANSIT.dearMood });
+  if (state.transit.fare === 'gratis') out.push({ label: 'El autobús es gratis', value: TRANSIT.freeMood });
   return out;
 }
 
@@ -96,7 +98,8 @@ export function transitMonth(state: GameState, shops: Building[], visitors: numb
   for (const c of state.citizens) {
     if (!isRider(state, c)) continue;
     n++;
-    if (fare > 0) transfer(state, c.id, TREASURY, fare, 'autobús');
+    // Ronda 20: cobro obligatorio: lo que no pueda pagar queda como deuda.
+    if (fare > 0) charge(state, c, TREASURY, fare, 'autobús');
   }
   state.transit.riders = n;
   transfer(state, OUTSIDE, TREASURY, Math.round(maintenanceOf(st) * TRANSIT.consortium), 'Consorcio');
@@ -117,6 +120,8 @@ export function transitMonth(state: GameState, shops: Building[], visitors: numb
 /** Acciones del menú de la IA (al final del menú). */
 export function transitMenu(state: GameState, c: Citizen): MenuItem[] {
   if (!busStation(state) || c.jobId !== null || c.unemployedSince === undefined || isRetired(c)) return [];
+  // Ronda 20: una vez al mes (si no, la IA tiraba los dados cada semana).
+  if (c.busSearch !== undefined && state.tick - c.busSearch < TICKS_PER_MONTH) return [];
   return [{ accion: 'buscar_trabajo_fuera', detalle: `buscar trabajo fuera del pueblo en autobús (está en paro; con la estación es más fácil encontrarlo)` }];
 }
 
@@ -128,7 +133,9 @@ export function transitRuleAction(state: GameState, c: Citizen): string | null {
 /** Busca trabajo fuera: el motor decide si lo encuentra. */
 export function searchJobOutside(state: GameState, c: Citizen): string {
   if (!transitMenu(state, c).length) return 'al final no busca trabajo fuera';
-  if (chance(state.rng, TRANSIT.findChance)) {
+  c.busSearch = state.tick;
+  // Ronda 20: la crisis de la comarca también cuenta, y la búsqueda solo da un empujón sobre la tirada del mes.
+  if (chance(state.rng, Math.min(0.95, TRANSIT.searchBonus * outsideJobsFx(state)))) {
     delete c.unemployedSince;
     delete c.benefitLeft;
     if (c.named) pushEvent(state, 'info', `${c.name} encuentra trabajo fuera del pueblo: irá cada día en autobús`, { ref: c.id });

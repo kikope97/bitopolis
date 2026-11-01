@@ -89,7 +89,8 @@ describe('candidaturas y recuento (2.2)', () => {
     const big = [...byFaction].sort((x, y) => members(y.f) - members(x.f))[0]!;
     const small = [...byFaction].sort((x, y) => members(x.f) - members(y.f))[0]!;
     // 2.4: con los jubilados más contentos (pensión), su lista puede empatar a votos con la pequeña (por redondeo).
-    if (members(big.f) > members(small.f) * 1.5) expect(big.votes).toBeGreaterThanOrEqual(small.votes);
+    // Ronda 20: la satisfacción de cada facción también pesa; se admite un voto de diferencia.
+    if (members(big.f) > members(small.f) * 1.5) expect(big.votes).toBeGreaterThanOrEqual(small.votes - 1);
   });
 
   it('empate: gana quien gobierna (el jugador o el rival)', () => {

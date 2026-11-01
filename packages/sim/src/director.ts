@@ -296,8 +296,8 @@ export function directorMenu(state: GameState): DirectorCandidate[] {
   }
   // 2.4 (bloque C): vertidos al río.
   out.push(...waterworksCandidates(state));
-  // 2.4: dilemas (gastan cupo de drama; no hace falta avisarlos).
-  add(dilemmaDirectorCandidates(state).map((c) => ({ ...c, kind: 'dilema' as const, bad: true })));
+  // 2.4: dilemas (cupo propio: uno al mes; no hace falta avisarlos).
+  add(dilemmaDirectorCandidates(state).map((c) => ({ ...c, kind: 'dilema' as const, bad: false })));
   // 2.4: excursión de jubilados en autobús (buena).
   const trip = excursionCandidate(state);
   if (trip) out.push({ ...trip, kind: 'excursion', bad: false });
@@ -424,10 +424,13 @@ export function applyDirector(state: GameState, choice: DirectorChoice): TurnLog
   for (const s of choice.sucesos) {
     const c = menu.find((m) => m.id === s.id);
     if (!c || used.has(c.id) || total <= 0) continue;
-    if (c.bad) {
+    // Ronda 20: un dilema tiene su propio cupo (uno al mes, `canOpenDilemma`): no gasta drama
+    // (si no, un pueblo contento no tenía nunca dilemas con IA) ni hace falta avisarlo.
+    if (c.kind === 'dilema') {
+      // sin cupo de drama
+    } else if (c.bad) {
       // Lo malo, solo si se avisó en un turno anterior y cabe en el presupuesto.
-      // 2.4: un dilema no se avisa (ya da 7 días para decidir), pero gasta cupo de drama.
-      const warned = c.kind === 'dilema' || brewing.find((b) => b.id === c.id && b.since < opened);
+      const warned = brewing.find((b) => b.id === c.id && b.since < opened);
       if (!warned || bad <= 0) continue;
       bad--;
     } else if (good-- <= 0) continue;
@@ -435,21 +438,20 @@ export function applyDirector(state: GameState, choice: DirectorChoice): TurnLog
     if (!line) continue;
     used.add(c.id);
     total--;
-    if (c.bad) ai.drama.bad++;
+    if (c.kind === 'dilema') {
+      // no cuenta como drama
+    } else if (c.bad) ai.drama.bad++;
     else ai.drama.good++;
     ai.brewing = (ai.brewing ?? []).filter((b) => b.id !== c.id);
     lines.push({ ...line, motivo: clean(s.motivo) });
   }
   // 2.4: el dilema elegido aparte (con su presentación), si cabe en el cupo de drama.
-  const dl = applyDirectorDilemma(state, choice, menu, used, bad, total);
-  if (dl) {
-    ai.drama.bad++;
-    lines.push(dl);
-  }
+  const dl = applyDirectorDilemma(state, choice, menu, used, total);
+  if (dl) lines.push(dl);
   // Avisos nuevos (lo que podría pasar: el jugador aún puede reaccionar).
   for (const a of choice.avisos) {
     const c = menu.find((m) => m.id === a.id);
-    if (!c || used.has(c.id) || (ai.brewing ?? []).some((b) => b.id === c.id) || (ai.brewing ?? []).length >= DIRECTOR.maxBrewing) continue;
+    if (!c || c.kind === 'dilema' || used.has(c.id) || (ai.brewing ?? []).some((b) => b.id === c.id) || (ai.brewing ?? []).length >= DIRECTOR.maxBrewing) continue;
     ai.brewing = [...(ai.brewing ?? []), { id: c.id, text: brewingText(c), since: state.tick, bad: c.bad }];
   }
   // 2.1: El Eco de esta semana (lo escribe el director) y el encargo con su carta.
@@ -730,9 +732,9 @@ export function brewingNow(state: GameState, menu = directorMenu(state)): Brewin
  * 2.4: el dilema que el director eligió en `dilema` (si no lo puso ya en
  * `sucesos`). Gasta un hueco del cupo de drama malo y del total de la semana.
  */
-function applyDirectorDilemma(state: GameState, choice: DirectorChoice, menu: DirectorCandidate[], used: Set<string>, bad: number, total: number): TurnLog['lines'][number] | null {
+function applyDirectorDilemma(state: GameState, choice: DirectorChoice, menu: DirectorCandidate[], used: Set<string>, total: number): TurnLog['lines'][number] | null {
   const pick = choice.dilema;
-  if (!pick?.id || used.has(pick.id) || bad <= 0 || total <= 0) return null;
+  if (!pick?.id || used.has(pick.id) || total <= 0) return null;
   const c = menu.find((m) => m.id === pick.id && m.kind === 'dilema');
   if (!c) return null;
   const line = directorDilemma(state, c.id, pick.presentacion || undefined);

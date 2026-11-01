@@ -14,7 +14,7 @@ test('Modo IA: configurar, jugar y ver un motivo de la IA', async ({ page }, inf
   await page.locator('#ai-key').fill('');
   // En el test se usa un LLM falso local (endpoint propio, compatible con OpenAI).
   await page.locator('details.advanced summary').first().click();
-  await page.locator('#ai-base').fill('http://localhost:8099/v1');
+  await page.locator('#ai-base').fill(`http://localhost:${process.env.PW_LLM_PORT ?? 8099}/v1`);
   // «Cargar modelos» prueba el endpoint sin guardarlo y llena los desplegables (con «Otro…»).
   await page.getByRole('button', { name: 'Cargar modelos' }).click();
   await expect(page.locator('#ai-model-list option')).toHaveText([/^Automático/, 'falso-mini', 'falso-grande', 'falso-viejo', 'Otro…']);

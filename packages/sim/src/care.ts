@@ -121,7 +121,7 @@ function smallKids(state: GameState, homeId: number): number[] {
  */
 export function birthFx(state: GameState, c: Citizen, nm: NurseryUse): { fx: number; nursery?: Building } {
   const n = nm.free(homeOf(state, c));
-  return n ? { fx: CARE.birthWithPlace, nursery: n } : { fx: 1 };
+  return n ? { fx: CARE.birthWithPlace[state.care.nurseryFee] ?? 1.5, nursery: n } : { fx: 1 };
 }
 
 export function onBirth(state: GameState, c: Citizen, nm: NurseryUse, nursery: Building | undefined): void {
@@ -169,7 +169,8 @@ export function childcareMonth(state: GameState, nm: NurseryUse = nurseryUse(sta
 /* ---------------- residencia y mayores ---------------- */
 
 export function residencePlaces(state: GameState): number {
-  return careBuildings(state, 'residence').length * CARE.residence.places;
+  const n = careBuildings(state, 'residence').length;
+  return n ? n * CARE.residence.places + (state.care.extraPlaces ?? 0) : 0;
 }
 
 export function residenceFree(state: GameState): number {
@@ -304,7 +305,8 @@ export function careMonth(state: GameState, nm: NurseryUse = nurseryUse(state)):
   const fee = residenceFee(state);
   const alone = state.citizens
     .filter((p) => p.age >= CARE.elderAge && !p.care && livesAlone(state, p) && !childrenOf(state, p).length && (p.age >= CARE.homeCare.parentAge || p.happiness < CARE.residence.unhappyEnter))
-    .filter((p) => fee <= CARE.pension || p.money >= fee * CARE.residence.savingsMonths)
+    // Ronda 20: con la cuota alta (más de media pensión) solo entra quien tiene ahorros.
+    .filter((p) => fee <= CARE.pension * 0.5 || p.money >= fee * CARE.residence.savingsMonths)
     .sort((a, b) => b.age - a.age || a.id - b.id);
   for (const p of alone) {
     if (residenceFree(state) <= 0) break;

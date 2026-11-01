@@ -23,7 +23,7 @@
  * fuera; el gasto de la fiesta, de fuera a las tiendas).
  */
 import { TICKS_PER_DAY, tickToDate } from '@bitopolis/shared';
-import { SEASONS } from './balance.ts';
+import { GRUDGE_MAX, SEASONS } from './balance.ts';
 import type { CommandResult } from './commands.ts';
 import { flagRisk, fireStationsFor, placeName } from './fire.ts';
 import { hash32 } from './hash.ts';
@@ -113,13 +113,20 @@ export function joinCommittee(state: GameState, c: Citizen): string {
 }
 
 /** Lo que se le cuenta a la IA del vecino (solo si puede apuntarse o encabeza la comisión sin programa). */
-export function committeeBrief(state: GameState, c: Citizen): { fiesta: string; eres: string; actos_posibles: string[] } | null {
+/** Ronda 20: cada acto con su coste y su efecto, en palabras (la IA no elige a ciegas). */
+function actBrief(id: FestivalAct): { id: string; coste: string; efecto: string } {
+  const a = SEASONS.acts[id]!;
+  const fx = [a.mood >= 3 ? 'mucha alegría' : 'alegría', a.spend >= 10 ? 'mucho gasto en las tiendas' : a.spend >= 5 ? 'gasto en las tiendas' : '', a.noise >= 3 ? 'ruido' : ''].filter(Boolean).join(', ');
+  return { id, coste: a.cost >= 700 ? 'caro' : a.cost >= 400 ? 'medio' : 'barato', efecto: fx };
+}
+
+export function committeeBrief(state: GameState, c: Citizen): { fiesta: string; eres: string; actos_posibles: { id: string; coste: string; efecto: string }[] } | null {
   const f = state.seasons?.current;
   if (!f || f.status !== 'comision' || f.asked || f.programBy) return null;
   const leads = f.committee[0] === c.id;
   const couldLead = f.committee.length === 0 && canJoinCommittee(state, c);
   if (!leads && !couldLead) return null;
-  return { fiesta: SEASON_NAMES[f.season], eres: leads ? 'líder de la comisión' : 'puede encabezar la comisión si se apunta', actos_posibles: availableActs(state, f.season) };
+  return { fiesta: SEASON_NAMES[f.season], eres: leads ? 'líder de la comisión' : 'puede encabezar la comisión si se apunta', actos_posibles: availableActs(state, f.season).map((id) => actBrief(id)) };
 }
 
 /** Por reglas: los más sociables con nombre que aún no están (y no gobiernan). */
@@ -275,10 +282,13 @@ export function festivalPlan(state: GameState, f: SeasonFestival, budget: Festiv
     const town = Math.round(cost * share);
     return { town, collect: cost - town, ok: cost - town <= cap };
   };
-  for (let n = f.program.length; n >= 1; n--) {
-    const acts = f.program.slice(0, n);
+  // Ronda 20: si no llega, se quita primero el acto más caro (antes caía siempre el primero).
+  let acts = [...f.program];
+  while (acts.length) {
     const r = fits(acts);
     if (r.ok) return { acts, town: r.town, collect: r.collect, lights: f.season === 'navidad' };
+    const dear = acts.reduce((m, a, i) => ((SEASONS.acts[a]?.cost ?? 0) > (SEASONS.acts[acts[m]!]?.cost ?? 0) ? i : m), 0);
+    acts = acts.filter((_, i) => i !== dear);
   }
   // Solo las luces de Navidad, si llegan.
   if (f.season === 'navidad' && fits([]).ok) {
@@ -320,12 +330,13 @@ function celebrate(state: GameState, f: SeasonFestival): void {
   // Las patronales siguen contando como las fiestas del año (turismo, bar, septiembre).
   if (f.season === 'patronales') {
     state.festival.year = f.year;
-    state.festival.size = budget === 'todo' ? 'grande' : budget === 'poco' ? 'pequena' : 'popular';
+    // Ronda 20: un programa de la comisión es una fiesta pequeña (la grande sigue siendo HoldFestival).
+    state.festival.size = budget === 'nada' ? 'popular' : 'pequena';
     state.festival.until = f.until!;
   }
   if (!reduced) for (const c of state.citizens) if (c.named) addMemory(state, c, 'fue_a_las_fiestas', 2, Math.min(3, Math.round(mood / 2)));
   // Con «nada», la comisión se lo guarda (sin respuesta, no: nadie les dijo que no).
-  if (budget === 'nada' && !silent) for (const id of f.committee) { const c = state.citizens.find((x) => x.id === id); if (c) c.grudge += SEASONS.nadaGrudge; }
+  if (budget === 'nada' && !silent) for (const id of f.committee) { const c = state.citizens.find((x) => x.id === id); if (c) c.grudge = Math.min(GRUDGE_MAX, c.grudge + SEASONS.nadaGrudge); }
   const what = reduced ? (plan.lights ? 'solo las luces' : 'una fiesta popular, sin programa') : [...(plan.lights ? ['luces'] : []), ...plan.acts.map((a) => ACT_NAMES[a as FestivalAct].toLowerCase())].join(', ');
   pushEvent(state, 'milestone', `¡${seasonName(state, f.season).replace(/^./, (x) => x.toUpperCase())}! ${what}${silent ? ' (el ayuntamiento no contestó a la comisión)' : ''}`);
   // San Juan: las ascuas de la hoguera pueden dejar un riesgo de incendio (con su aviso).

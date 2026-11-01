@@ -147,6 +147,7 @@ describe('dilemas morales (2.4)', () => {
     for (const w of ws) w.jobId = fab.id;
     s0.fields.pollution[10 * s0.map.w + 10] = 80;
     s0.map.terrain[10 * s0.map.w + 12] = 1;
+    s0.fields.river[10 * s0.map.w + 12] = 80; // ronda 20: solo hay dilema si el río baja sucio
     const neighbor = named(s0)[0]!;
     const house = newBuilding(s0, 'res', 11, 11, OUTSIDE);
     house.built = true;
@@ -250,6 +251,7 @@ describe('dilemas morales (2.4)', () => {
     const d = s.dilemmas.at(-1)!;
     expect(d.intro).toContain('una sola plaza');
     expect(d.options).toEqual(['plaza_primero', 'plaza_segundo', 'ampliar']);
-    expect(s.ai.drama!.bad).toBe(1);
+    // Ronda 20: el dilema tiene su propio cupo (no gasta drama: también sale en un pueblo contento).
+    expect(s.ai.drama?.bad ?? 0).toBe(0);
   }, 120_000);
 });

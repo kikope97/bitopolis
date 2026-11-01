@@ -129,6 +129,8 @@ export interface Building {
   rural?: boolean;
   /** 2.4: vertido al río sin depurar (tick hasta el que dura, waterworks.ts). */
   spill?: number;
+  /** Ronda 20: multada por verter (dilema): echa la mitad hasta este tick. */
+  cleanUntil?: number;
 }
 
 /** 2.2: cultivos de las fincas (ver farm.ts). */
@@ -154,6 +156,8 @@ export interface Project {
 export interface Citizen {
   /** 2.4: mayor atendido en la residencia o cuidado en casa por un hijo (care.ts). */
   care?: 'residencia' | 'casa';
+  /** Ronda 20: última vez que buscó trabajo fuera en autobús (una vez al mes). */
+  busSearch?: number;
   id: number;
   name: string;
   age: number;
@@ -922,6 +926,8 @@ export type FeeLevel = 'gratis' | 'reducida' | 'normal';
 export interface CareState {
   nurseryFee: FeeLevel;
   residenceFee: FeeLevel;
+  /** Ronda 20: plazas de más en la residencia (ampliada desde un dilema). */
+  extraPlaces?: number;
 }
 
 export type BusFare = 'gratis' | 'normal' | 'caro';
