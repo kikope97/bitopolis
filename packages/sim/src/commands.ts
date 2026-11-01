@@ -77,7 +77,10 @@ export const BUILD_NAMES: Record<string, string> = {
   stadium: 'Estadio',
   cathedral: 'Catedral',
   bigfactory: 'Fábrica',
-  // 2.4 (bloque C): agua y energía.
+  // 2.4: cuidados, transporte (bloques A y B), agua y energía (bloque C).
+  nursery: 'Guardería',
+  residence: 'Residencia de mayores',
+  busstation: 'Estación de autobuses',
   sewage: 'Depuradora',
   solar: 'Placas solares',
   wind: 'Molino de viento',
