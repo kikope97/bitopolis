@@ -50,7 +50,8 @@ export function networkRoads(state: GameState, kind: 'water' | 'power'): Set<num
   const queue: number[] = [];
   const { tiles, w } = state.map;
   for (const p of state.buildings) {
-    if (p.kind !== kind || !p.built) continue;
+    // 2.4: la luz también sale de placas y molinos.
+    if (!(p.kind === kind || (kind === 'power' && (p.kind === 'solar' || p.kind === 'wind'))) || !p.built) continue;
     for (const [dx, dy] of DIRS) {
       const x = p.x + dx;
       const y = p.y + dy;
@@ -119,7 +120,7 @@ export function missingServices(state: GameState, x: number, y: number, ctx: Cov
     DIRS.some(([dx, dy]) => inBounds(state, x + dx, y + dy) && set.has(tileIndex(state, x + dx, y + dy)));
   for (const key of ctx.active) {
     if (key === 'agua' || key === 'luz') {
-      if (b?.kind === 'water' || b?.kind === 'power') continue;
+      if (b?.kind === 'water' || b?.kind === 'power' || b?.kind === 'solar' || b?.kind === 'wind') continue;
       const ok = b && b.built ? (key === 'agua' ? b.hasWater : b.hasPower) : roadNear(key === 'agua' ? ctx.water : ctx.power);
       if (!ok) out.push({ key, status: 'falta' });
       continue;

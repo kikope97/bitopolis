@@ -36,10 +36,11 @@ import { streetCandidates } from './streets.ts';
 import { applyVolunteers, LANDMARK_NAMES, landmarksInProgress } from './landmarks.ts';
 import { applyTouristNoise, applyTvReport, HERITAGE_NAMES, heritageOf, heritageVariant, ruralHomes, touristNoiseCandidate, tvReportCandidate } from './tourism.ts';
 import { announceEre, bigFactory, ereCandidate, hireBatch, hireCandidates } from './region.ts';
+import { startSpill, waterworksCandidates } from './waterworks.ts';
 
 const plural = (n: number) => (n === 1 ? 'un edificio' : `${n} edificios`);
 
-export const DIRECTOR_KINDS = ['robo_tienda', 'robo_casa', 'asociacion', 'manifestacion', 'pelea', 'reconciliacion', 'gratitud', 'rumor', 'oposicion', 'local', 'encuentro', 'ayuda', 'incendio', 'susto', 'ratas', 'licitacion', 'homenaje', 'cosecha', 'granizo', 'voluntarios_obra', 'polemica_obra', 'reportaje_tv', 'turistas_ruido', 'ere_gran_empresa', 'contrata_vecinos'] as const;
+export const DIRECTOR_KINDS = ['robo_tienda', 'robo_casa', 'asociacion', 'manifestacion', 'pelea', 'reconciliacion', 'gratitud', 'rumor', 'oposicion', 'local', 'encuentro', 'ayuda', 'incendio', 'susto', 'ratas', 'licitacion', 'homenaje', 'cosecha', 'granizo', 'voluntarios_obra', 'polemica_obra', 'reportaje_tv', 'turistas_ruido', 'ere_gran_empresa', 'contrata_vecinos', 'vertido'] as const;
 export type DirectorKind = (typeof DIRECTOR_KINDS)[number];
 
 export interface DirectorCandidate {
@@ -289,6 +290,8 @@ export function directorMenu(state: GameState): DirectorCandidate[] {
     const [a, b] = founders;
     if (relation(a!, b!.id)?.kind !== 'pareja') out.push({ id: `local:${pairId(a!.id, b!.id)}`, kind: 'local', bad: false, text: `${first(a!)} y ${first(b!)} quieren el mismo local para abrir un negocio`, why: 'solo queda un local libre' });
   }
+  // 2.4 (bloque C): vertidos al río.
+  out.push(...waterworksCandidates(state));
   return out;
 }
 
@@ -479,6 +482,8 @@ function brewingText(c: DirectorCandidate): string {
       return `Hay vecinos hartos del jaleo de los turistas (${c.why})`;
     case 'ere_gran_empresa':
       return `En la fábrica grande se habla de recortes: ${c.why}`;
+    case 'vertido':
+      return `Los pescadores dicen que el agua baja rara junto a ${c.text.replace(' vierte al río sin depurar', '')}: ${c.why}`;
     default:
       return c.text;
   }
@@ -679,6 +684,11 @@ function perform(state: GameState, c: DirectorCandidate): { id: number; text: st
       const before = new Set(state.citizens.filter((x) => x.jobId === Number(arg)).map((x) => x.id));
       if (!hireBatch(state, DIRECTOR.hireBatch)) return null;
       return { id: state.citizens.find((x) => x.jobId === Number(arg) && !before.has(x.id))?.id ?? 0, text: c.text };
+    }
+    case 'vertido': {
+      const id = Number(arg);
+      if (!startSpill(state, id)) return null;
+      return { id: state.citizens.find((x) => x.jobId === id)?.id ?? 0, text: c.text };
     }
     case 'local': {
       const [a, b] = pair();

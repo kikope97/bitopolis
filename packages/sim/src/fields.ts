@@ -1,6 +1,6 @@
 import type { GameState } from './state.ts';
 import { Tile } from './state.ts';
-import { CRIME, FIELDS, REGION, TERRAIN, TRASH } from './balance.ts';
+import { CRIME, FIELDS, REGION, TERRAIN, TRASH, WATERWORKS } from './balance.ts';
 import { landmarkStamps } from './landmarks.ts';
 import { radiusOf } from './levels.ts';
 import { isWater, Terrain } from './terrain.ts';
@@ -97,6 +97,10 @@ export function updateFields(state: GameState): void {
       case 'police':
         stamp(police, w, h, b.x, b.y, radiusOf(b), 1);
         stamp(good, w, h, b.x, b.y, 6, 5);
+        break;
+      case 'wind':
+        // 2.4: el molino no contamina, pero zumba (radio 3).
+        stamp(noise, w, h, b.x, b.y, WATERWORKS.wind.noiseRadius, WATERWORKS.wind.noise);
         break;
       case 'bigfactory':
         // 2.3: la fábrica de la gran empresa contamina el doble que un taller (REGION.bigCompany.pollution).

@@ -13,6 +13,7 @@ import { hash32 } from './hash.ts';
 import { buildingAt, DIRS, footprint, type GameState, hasAdjacentRoad, terrainAt, Tile, tileIndex, Zone } from './state.ts';
 import { freeHomes } from './tick.ts';
 import { farmZoneUnlocked } from './farm.ts';
+import { nearestRiverTile, riverCourse, riverExit, riverWorst } from './waterworks.ts';
 
 /**
  * Perfiles de jugador automático para el CLI headless. Cada perfil tiene su
@@ -246,6 +247,17 @@ function industrialBlock(state: GameState, from: { x: number; y: number }[], kee
   return null;
 }
 
+/** 2.4: depuradora cuando el río baja sucio, en el sitio más aguas abajo (trata a todo lo de arriba). */
+function sewagePlan(state: GameState, spots: { x: number; y: number }[], reserve: number): Command | null {
+  if (state.buildings.some((b) => b.kind === 'sewage')) return null;
+  if (riverWorst(state) <= 30 && riverExit(state) <= 20) return null;
+  if (state.treasury < buildCost('sewage') + reserve) return null;
+  const course = riverCourse(state);
+  const down = (s: { x: number; y: number }) => course.section[nearestRiverTile(state, s.x, s.y, undefined, course)] ?? Infinity;
+  const ok = spots.filter((s) => validateCommand(state, { type: 'Build', kind: 'sewage', x: s.x, y: s.y }).ok).sort((a, b) => down(a) - down(b));
+  return ok[0] ? { type: 'Build', kind: 'sewage', x: ok[0].x, y: ok[0].y } : null;
+}
+
 function buildingKindOf(state: GameState, id: number): string | undefined {
   return state.buildings.find((b) => b.id === id)?.kind;
 }
@@ -355,6 +367,12 @@ function planner(name: string, o: PlannerOpts): Profile {
           out.push(...lm);
           return out;
         }
+      }
+      // 2.4: con el río sucio, una depuradora lo más abajo posible.
+      const sewage = sewagePlan(state, spots, o.reserve);
+      if (sewage) {
+        out.push(sewage);
+        return out;
       }
       const zonesOn = zonesUnlocked(state);
       // Un jugador razonable mira el parte: no añade servicios (y sus sueldos) con el mes en negativo.

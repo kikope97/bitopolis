@@ -7,6 +7,7 @@ import { newResident } from './resident.ts';
 import { achievementsMonth, historyMonth } from './achievements.ts';
 import { errandsDay } from './errands.ts';
 import { pressDay } from './press.ts';
+import { isPowerPlant, isRenewable, pumpDirty, renewableFx, waterworksDay, waterworksMonth, waterworksMood } from './waterworks.ts';
 import { TICKS_PER_DAY, TICKS_PER_MONTH, tickToDate } from '@bitopolis/shared';
 import {
   BUSINESS_SEED_CASH,
@@ -175,11 +176,12 @@ export function updateNetworks(state: GameState): { water: Set<number>; power: S
   for (const kind of ['water', 'power'] as const) {
     const flag = kind === 'water' ? 'hasWater' : 'hasPower';
     for (const plant of state.buildings) {
-      if (plant.kind !== kind || !plant.built) continue;
+      // 2.4: placas y molino también dan luz (con su propio tiempo: renewableFx).
+      if (!(plant.kind === kind || (kind === 'power' && isRenewable(plant.kind))) || !plant.built) continue;
       plant[flag] = true;
-      let capacity = Math.round(plantCapacityOf(plant) * (kind === 'water' ? weatherFx(state).water : weatherFx(state).power));
-      // v1.7: una bomba a la orilla del río da agua a más edificios.
-      if (kind === 'water' && riverside(state, plant.x, plant.y)) capacity = Math.round(capacity * TERRAIN.riverPumpBonus);
+      let capacity = Math.round(plantCapacityOf(plant) * (isRenewable(plant.kind) ? renewableFx(state, plant.kind) : kind === 'water' ? weatherFx(state).water : weatherFx(state).power));
+      // v1.7: una bomba a la orilla del río da agua a más edificios (2.4: si el río no baja sucio).
+      if (kind === 'water' && riverside(state, plant.x, plant.y) && !pumpDirty(state, plant.x, plant.y)) capacity = Math.round(capacity * TERRAIN.riverPumpBonus);
       const queue: number[] = [];
       const seen = new Set<number>();
       for (const [dx, dy] of DIRS) {
@@ -327,6 +329,8 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
   if (heat) f.push(heat);
   // 2.3: turistificación (inquilinos) y turistas ruidosos.
   f.push(...tourismMood(state, c, home));
+  // 2.4: la orilla de un río sucio y el ruido de los molinos (jubilados).
+  f.push(...waterworksMood(state, c, home));
   return f;
 }
 
@@ -522,7 +526,7 @@ function endOfDay(state: GameState): void {
   const served = updateNetworks(state);
   // v1.8: días seguidos sin agua o sin luz (el icono sobre la casa sale cuando dura).
   for (const b of state.buildings) {
-    if (!b.built || b.kind === 'water' || b.kind === 'power' || b.kind === 'farm') continue;
+    if (!b.built || b.kind === 'water' || isPowerPlant(b.kind) || b.kind === 'farm') continue;
     b.dryDays = b.hasWater ? 0 : (b.dryDays ?? 0) + 1;
     b.darkDays = b.hasPower ? 0 : (b.darkDays ?? 0) + 1;
   }
@@ -536,6 +540,8 @@ function endOfDay(state: GameState): void {
   // 2.1: el camión recoge y se amontona lo que no (antes de los campos: la suciedad sale de ahí).
   trashDay(state);
   updateFields(state);
+  // 2.4: lo que baja por el río (tras los campos).
+  waterworksDay(state);
   assignHomesAndJobs(state);
   // Inercia: la felicidad baja más rápido de lo que sube.
   for (const c of state.citizens) {
@@ -669,6 +675,8 @@ function endOfMonth(state: GameState): void {
   payBusinesses(state);
   // 2.3: visitantes, casas rurales y tasa turística.
   tourismMonth(state);
+  // 2.4: multa de la Confederación (trimestral) y vertidos por reglas.
+  waterworksMonth(state);
   // PIE: el Estado paga por vecino empadronado, más si el pueblo está contento.
   const pie = Math.round(PIE_PER_CITIZEN * state.citizens.length * Math.max(0.6, Math.min(1.2, averageHappiness(state) / 60)));
   transfer(state, OUTSIDE, TREASURY, pie, 'PIE');

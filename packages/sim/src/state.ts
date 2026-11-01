@@ -127,6 +127,8 @@ export interface Building {
   size?: 2;
   /** 2.3: vivienda en propiedad convertida en casa rural (turismo, tourism.ts). */
   rural?: boolean;
+  /** 2.4: vertido al río sin depurar (tick hasta el que dura, waterworks.ts). */
+  spill?: number;
 }
 
 /** 2.2: cultivos de las fincas (ver farm.ts). */

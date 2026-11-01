@@ -7,6 +7,7 @@ import { loanLoad, RATINGS, totalOwed } from './loans.ts';
 import { createInitialState, type GameState, type Rating } from './state.ts';
 import { averageHappiness, step } from './tick.ts';
 import { ruralHomes, ruralShare } from './tourism.ts';
+import { hasRiver, riverExit } from './waterworks.ts';
 
 export interface RunOptions {
   seed: number;
@@ -49,6 +50,8 @@ export interface SimReport {
   scenario: { id: ScenarioId; terrain: TerrainShape; done: boolean; won: boolean; month: number | null };
   /** 2.3: turismo por año: visitantes, lo que dejaron (tasa y casas rurales) y casas rurales (% de las viviendas, máximo del año). */
   tourism: { year: number; visitors: number; tax: number; rural: number; houses: number; ruralPct: number }[];
+  /** 2.4: el río a la salida por año (media y máximo de los cierres de mes), con o sin depuradora, y multas de la Confederación. */
+  river: { hasRiver: boolean; years: { year: number; exitAvg: number; exitMax: number; sewage: number; renewables: number; fines: number }[] };
 }
 
 export interface LoanMetrics {
@@ -80,6 +83,7 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
   const eventCounts: Record<string, number> = {};
   const sales: SimReport['sales'] = [];
   const tourism: SimReport['tourism'] = [];
+  const river: SimReport['river'] = { hasRiver: hasRiver(state), years: [] };
   let lastIn = state.ledger.externalIn;
   const loans: LoanMetrics = { rating: state.rating, worst: state.rating, months: { A: 0, B: 0, C: 0, D: 0 }, maxLoadPct: 0, requested: 0, requestedAmount: 0, treasury: 0, owed: 0, interest: 0 };
   let statsSeen = 0;
@@ -126,6 +130,16 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
       t.rural += state.tourism.lastRural ?? 0;
       t.houses = Math.max(t.houses, ruralHomes(state).length);
       t.ruralPct = Math.max(t.ruralPct, Math.round(ruralShare(state) * 1000) / 10);
+      // 2.4: el río a la salida.
+      let rv = river.years.find((r) => r.year === year);
+      if (!rv) river.years.push((rv = { year, exitAvg: 0, exitMax: 0, sewage: 0, renewables: 0, fines: 0 }));
+      const exit = riverExit(state);
+      const m = ((state.tick / TICKS_PER_MONTH - 1) % 12) + 1;
+      rv.exitAvg = Math.round((rv.exitAvg * (m - 1) + exit) / m);
+      rv.exitMax = Math.max(rv.exitMax, exit);
+      rv.sewage = state.buildings.filter((b) => b.kind === 'sewage' && b.built).length;
+      rv.renewables = state.buildings.filter((b) => (b.kind === 'solar' || b.kind === 'wind') && b.built).length;
+      rv.fines += -(state.stats.at(-1)?.breakdown['multa del río'] ?? 0);
     }
     // 2.2: al cerrar cada mes, la nota y la carga.
     for (const t of state.loanLedger.treasuryTicks) {
@@ -182,6 +196,7 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
       loans,
       scenario: { id: state.scenario.id, terrain: opts.terrain ?? 'aleatorio', done: state.scenario.done, won: !!state.scenario.won, month: scenarioMonth },
       tourism,
+      river,
     },
   };
 }

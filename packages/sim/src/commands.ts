@@ -24,6 +24,7 @@ import { canSetCareFee, setCareFee } from './care.ts';
 import { canResolveDilemma, resolveDilemma } from './dilemmas.ts';
 import { approveFestival, canApproveFestival } from './seasons.ts';
 import { canSetBusFare, setBusFare } from './transit.ts';
+import { canBuildWaterworks } from './waterworks.ts';
 import { campaign, canCampaign, canMotion, motion } from './politics.ts';
 import { addMemory, answerPetition, canConvenePleno, closePleno, convenePleno, talkTo } from './social.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
@@ -76,6 +77,10 @@ export const BUILD_NAMES: Record<string, string> = {
   stadium: 'Estadio',
   cathedral: 'Catedral',
   bigfactory: 'Fábrica',
+  // 2.4 (bloque C): agua y energía.
+  sewage: 'Depuradora',
+  solar: 'Placas solares',
+  wind: 'Molino de viento',
 };
 
 const ZONE_VALUE: Record<ZoneKind, number> = { none: Zone.None, R: Zone.R, C: Zone.C, I: Zone.I, A: Zone.A };
@@ -238,6 +243,9 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
         const h = canBuildHeritage(state);
         if (!h.ok) return h;
       }
+      // 2.4: la depuradora, junto al río; el molino, en la colina.
+      const ww = canBuildWaterworks(state, cmd.kind, cmd.x, cmd.y);
+      if (!ww.ok) return ww;
       // 2.2: licitación (la local es la de siempre: mismo coste y misma validación).
       if (cmd.offer && cmd.offer !== 'local') {
         const o = canOffer(state, cmd.kind, cmd.x, cmd.y, cmd.offer);

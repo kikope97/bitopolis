@@ -1302,7 +1302,15 @@ export const WATERWORKS = {
   fineAt: 60,
   fine: 1_500,
   solar: { buildings: 15, winter: 0.6, snow: 0.4 },
-  wind: { buildings: 30, storm: 1.2, noise: 30, noiseRadius: 3, complainRadius: 3 },
+  wind: { buildings: 30, storm: 1.2, noise: 30, noiseRadius: 3, complainRadius: 3, retireeMood: 3, complainScore: 6 },
+  /** La orilla: casas a ≤ `shoreRadius` casillas del río (ánimo y queja «Salvemos el río»). */
+  shoreRadius: 2,
+  /** Ecologistas: satisfacción por cada renovable (hasta `greenMax`) y por tener depuradora. */
+  greenPerRenewable: 3,
+  greenMax: 9,
+  greenSewage: 4,
+  /** Vertido (director o, sin él, dados al mes): días que dura, cuánto más echa la fábrica y probabilidad por reglas. */
+  spill: { days: 10, mult: 8, ruleChance: 0.06, ecoMemory: -3 },
 };
 
 /** Bloque D: plenos hablados (texto fuera del estado) y sus reacciones. */
