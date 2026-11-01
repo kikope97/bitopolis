@@ -54,7 +54,16 @@ export function monthlyCostEstimate(s: GameState, extraLevels = 0): number {
   return Math.round(base + extra);
 }
 
-export function openManagement(ctx: SocialCtx, links: ManageLinks, note?: string): void {
+/**
+ * El aviso tras ampliar se guarda un rato: la hoja se rehace sola con cada
+ * cambio del estado y, si no, el aviso se perdía al momento.
+ */
+let doneNote: { text: string; at: number } | null = null;
+const NOTE_MS = 20_000;
+
+export function openManagement(ctx: SocialCtx, links: ManageLinks, fresh?: string): void {
+  if (fresh) doneNote = { text: fresh, at: performance.now() };
+  const note = doneNote && performance.now() - doneNote.at < NOTE_MS ? doneNote.text : undefined;
   const s = ctx.state();
   const lv = townLevel(s);
   const info = TOWNHALL_LEVELS[lv - 1]!;

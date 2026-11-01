@@ -472,7 +472,7 @@ export function startGame(opts: GameOptions): void {
   /**
    * Pruebas 2.5: la vuelta a x1 no se notaba (solo cambiaba el «x1» de arriba).
    * Ahora se dice por qué y hay un botón para volver a la velocidad de antes.
-   * Se quita sola a los 15 s o cuando el jugador cambia la velocidad.
+   * Se quita sola a los 20 s o cuando el jugador cambia la velocidad.
    */
   let slowTimer = 0;
   let slowFrom = 0;
@@ -483,7 +483,7 @@ export function startGame(opts: GameOptions): void {
     $('#slow-back').textContent = `Volver a x${before}`;
     note.hidden = false;
     clearTimeout(slowTimer);
-    slowTimer = window.setTimeout(hideSlowNote, 15_000);
+    slowTimer = window.setTimeout(hideSlowNote, 20_000);
   }
   function hideSlowNote() {
     clearTimeout(slowTimer);
