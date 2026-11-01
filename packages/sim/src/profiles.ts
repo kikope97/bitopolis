@@ -1,7 +1,7 @@
 import type { BuildKind, Command, TaxLevel } from '@bitopolis/shared';
 import { LOANS, PLANT_CAPACITY, TRASH } from './balance.ts';
 import { averageIncome, canRequestLoan, loanCapacity, loanOffer } from './loans.ts';
-import { canUpgradeTownhall, nextLevel, zonesUnlocked } from './townhall.ts';
+import { canUpgradeTownhall, isUnlocked, nextLevel, zonesUnlocked } from './townhall.ts';
 import { buildCost, validateCommand } from './commands.ts';
 import { chance, type RngState, seedRng } from './prng.ts';
 import { buildingAt, DIRS, type GameState, hasAdjacentRoad, Tile, tileIndex, Zone } from './state.ts';
@@ -42,6 +42,8 @@ interface PlannerOpts {
    * de agua y luz no llegaba a la zona industrial (semillas 3 y 5: 35 vecinos).
    */
   keepRoads?: boolean;
+  /** 2.3: construye el patrimonio en cuanto puede (con su reserva) y pone la tasa turística media (1 €/noche). */
+  tourism?: boolean;
 }
 
 /**
@@ -229,6 +231,9 @@ function planner(name: string, o: PlannerOpts): Profile {
           return out;
         }
       }
+      // 2.3: el patrimonio (uno por partida) y la tasa turística media.
+      if (o.tourism && has('heritage') && state.tourism.tax !== 1) out.push({ type: 'SetTouristTax', level: 1 });
+      if (o.tourism && !has('heritage') && isUnlocked(state, 'heritage') && tryBuild('heritage')) return out;
       const zonesOn = zonesUnlocked(state);
       // Un jugador razonable mira el parte: no añade servicios (y sus sueldos) con el mes en negativo.
       const last = state.stats.at(-1);
@@ -282,7 +287,7 @@ function planner(name: string, o: PlannerOpts): Profile {
 
 export const PROFILES: Record<string, Profile> = {
   pasivo: { name: 'pasivo', decide: () => [] },
-  casual: planner('casual', { tax: 'medium', reserve: 3_000, activity: 0.3, services: ['park'], municipalHousing: false }),
+  casual: planner('casual', { tax: 'medium', reserve: 3_000, activity: 0.3, services: ['park'], municipalHousing: false, tourism: true }),
   // 2.2: un jugador casual que además pinta zona agraria (para medir el campo).
   campo: planner('campo', { tax: 'medium', reserve: 3_000, activity: 0.3, services: ['park'], municipalHousing: false, farms: 8 }),
   ahorrador: planner('ahorrador', { tax: 'low', reserve: 4_000, activity: 0.5, services: ['park'], municipalHousing: false }),
@@ -304,6 +309,7 @@ export const PROFILES: Record<string, Profile> = {
     municipalHousing: true,
     borrow: 'prudente',
     keepRoads: true,
+    tourism: true,
   }),
   // 2.2: como el constructor, pero pidiendo prestado todo lo que le dejen (equilibrio de los préstamos).
   endeudado: planner('endeudado', {

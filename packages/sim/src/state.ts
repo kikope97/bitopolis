@@ -554,6 +554,14 @@ export interface Tourism {
   lastIncome: number;
   tax: 0 | 1 | 2;
   protectedId?: number;
+  /** De lo que dejaron: tasa (al ayuntamiento) y casas rurales (a sus dueños). */
+  lastTax?: number;
+  lastRural?: number;
+  /** Media de visitantes del último año (media móvil): decide si abre otra casa rural. */
+  avg?: number;
+  /** IA (director): reportaje de la tele y turistas ruidosos, hasta este tick. */
+  tvUntil?: number;
+  noiseUntil?: number;
 }
 
 /** 2.3: escenario de la partida (scenarios.ts). Al cumplirse (o al vencer) queda `done` y sigue como Libre. */

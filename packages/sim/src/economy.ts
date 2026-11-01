@@ -46,6 +46,7 @@ import { radiusOf, serviceCapacityOf } from './levels.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance } from './prng.ts';
 import { compostMonth, trashFee, trashServed } from './trash.ts';
+import { privateRentFx } from './tourism.ts';
 import { addMemory, onBusinessFounded } from './social.ts';
 import {
   type Building,
@@ -382,6 +383,7 @@ export function monthlyHousing(state: GameState, r: MonthRates): void {
   // 2.1: la tasa de basuras solo la paga quien tiene recogida (sin nieve: el servicio de siempre).
   const served = trashServed(state);
   compostMonth(state, served);
+  const rentFx = privateRentFx(state);
   const byHome = new Map<number, Citizen[]>();
   for (const c of state.citizens) {
     if (c.homeId === null) continue;
@@ -413,8 +415,10 @@ export function monthlyHousing(state: GameState, r: MonthRates): void {
         charge(state, c, TREASURY, MUNICIPAL_RENT, 'alquileres');
       } else {
         // El casero (de fuera) paga el IBI y lo repercute en el alquiler.
-        const paid = charge(state, c, OUTSIDE, PRIVATE_RENT + ibi);
-        c.rentArrears = paid < PRIVATE_RENT + ibi ? (c.rentArrears ?? 0) + 1 : 0;
+        // 2.3: con demasiadas casas rurales, el alquiler privado sube (privateRentFx).
+        const rent = Math.round(PRIVATE_RENT * rentFx);
+        const paid = charge(state, c, OUTSIDE, rent + ibi);
+        c.rentArrears = paid < rent + ibi ? (c.rentArrears ?? 0) + 1 : 0;
         transfer(state, OUTSIDE, TREASURY, ibi, 'IBI');
       }
       charge(state, c, TREASURY, trashFee(state, r.basuras, served.get(b.id)), 'tasas');

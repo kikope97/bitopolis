@@ -1,6 +1,6 @@
 import { loansMonth } from './loans.ts';
 import { landmarksDay, landmarksMonth } from './landmarks.ts';
-import { tourismMonth } from './tourism.ts';
+import { tourismMonth, tourismMood } from './tourism.ts';
 import { regionMonth } from './region.ts';
 import { scenariosMonth } from './scenarios.ts';
 import { achievementsMonth, historyMonth } from './achievements.ts';
@@ -326,6 +326,8 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
   // v1.7: el calor sin sombra cerca.
   const heat = weatherMood(state, home);
   if (heat) f.push(heat);
+  // 2.3: turistificación (inquilinos) y turistas ruidosos.
+  f.push(...tourismMood(state, c, home));
   return f;
 }
 
