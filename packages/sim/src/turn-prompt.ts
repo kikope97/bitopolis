@@ -2,7 +2,8 @@ import { loadBand, loanLoad } from './loans.ts';
 import { TICKS_PER_MONTH, tickToDate } from '@bitopolis/shared';
 import { z } from 'zod';
 import { CAUSE_ASK } from './associations.ts';
-import { MIN_WAGE } from './balance.ts';
+import { DILEMMA, MIN_WAGE } from './balance.ts';
+import { dilemmaBrief } from './dilemmas.ts';
 import { BUILD_NAMES } from './commands.ts';
 import { freeShopLot } from './economy.ts';
 import { debtBand, pocketOf } from './household.ts';
@@ -33,7 +34,7 @@ import { GESTURES, gestureCandidates, isAiCitizen, PLANS, planText, SPEND, type 
  * La salida tiene un esquema fijo (sin uniones por vecino); cada parte se valida
  * en el motor con el menú del vecino. Nunca va texto libre del jugador.
  */
-export const TURN_PROMPT_VERSION = 12;
+export const TURN_PROMPT_VERSION = 13;
 
 export const TURN_SYSTEM = `Eres la mente de los vecinos de Bitópolis, un pueblo español pequeño. Cada semana decides, a la vez, qué hace cada vecino de la lista. Ellos viven de verdad: trabajan, compran, se enamoran, se enfadan, ahorran o se arruinan, y reaccionan a lo que hace quien gobierna: el alcalde (el jugador) o, si ganó las elecciones, el rival (mira "politica.gobierna"). El vecino que tenga "es_alcalde" gobierna él: piensa y actúa como alcalde.
 
@@ -62,6 +63,7 @@ Reglas:
 - "ayudar_incendio", "acoger" y "hacerse_voluntario" son para quien tiene relación o medios: no todo el pueblo a la vez.
 - "tirar_al_monte" solo aparece si no pasa el camión de la basura y la tiene en la puerta: lo hace quien es terco o está harto; los vecinos lo ven mal. Lo normal es quejarse o pedir "recogida".
 - "donar_obra" es para quien cree en la obra y le apoya (el juego pone la cantidad); "abrir_casa_rural", para el propietario con ambición si vienen visitantes; "quejarse_turistas", para quien los sufre. Mira "metas" del pueblo.
+- "reaccion_pleno:…" solo aparece para quien habló en el pleno: elige cómo reacciona a lo que respondió el alcalde según lo que defendía y su carácter. Si en "su_caso" hay un asunto difícil que el alcalde ha decidido, que se note en su actitud, su gesto y su pensamiento.
 - No menciones a nadie que no esté en los datos, ni cifras inventadas, ni que eres una IA. Sin comillas ni emojis.
 - Responde solo con JSON que cumpla el esquema, con un objeto por cada vecino del lote (no te dejes ninguno). Sé breve en los textos.`;
 
@@ -217,6 +219,7 @@ function citizenBrief(state: GameState, c: Citizen) {
     ...(state.ai?.turn?.monthly ? { su_biografia: c.bio?.text ?? narrativeSummary(state, c) } : {}),
     ...(lastLine ? { la_semana_pasada: lastLine.text } : {}),
     ...(c.plan ? { su_plan: planText(c.plan) } : {}),
+    ...lifeBrief(state, c),
     actitud_anterior: c.attitude ?? 0,
     necesidades: needsOf(state, c).slice(0, 3),
     acciones: turnMenu(state, c).map((m) => (m.detalle ? `${m.accion} (${m.detalle})` : m.accion)),
@@ -394,6 +397,7 @@ Devuelve:
 - "titulares": hasta 3 titulares de El Eco de Bitópolis, uno por sección ("sucesos", "cartas" al director, "anuncios"). Cada titular cuenta solo una de "noticias" o uno de los sucesos que eliges esta semana (su id en "sobre"), con un "texto" de periódico de pueblo (máx. 110 caracteres). No cuentes cómo acaba un suceso: lo decide el juego. Si una sección no tiene noticia, no pongas titular. En "cartas", la voz de un vecino.
 - "pies": solo si hay "fotos": un pie de foto para cada una ("id" y "texto", máx. 110 caracteres, como en un álbum de pueblo, sin inventar nada); si no, lista vacía.
 - "gobierno_rival": solo si hay "gobierno_rival" en los datos (gobierna el partido rival, no el jugador): como su alcalde, elige 0 a 2 "picks" (ids de sus "opciones", coherentes con su estilo y sus promesas) y un "discurso" de una frase (máx. 140 caracteres) en su voz; si no hay, picks vacío y discurso "".
+- "dilema": si en el menú hay alguno de tipo "dilema" y cabe en "presupuesto_drama", puedes plantear uno al alcalde: su "id" y una "presentacion" (máx. 200 caracteres) que cuente el caso con los datos de su "por_que", sin opinar ni proponer soluciones (las opciones las pone el juego). Como mucho uno; si no, id "" y presentacion "".
 - "encargo": si encaja con la semana, uno de "encargos_posibles" ("id") con la "carta" (máx. 220 caracteres, en primera persona, firmada por quien lo pide) con la que se lo pide al alcalde; si no, id "" y carta "".
 
 Reglas:
@@ -425,8 +429,9 @@ export const DIRECTOR_SCHEMA = {
       items: { type: 'object', properties: { id: { type: 'string' }, texto: { type: 'string' } }, required: ['id', 'texto'], additionalProperties: false },
     },
     gobierno_rival: { type: 'object', properties: { picks: { type: 'array', items: { type: 'string' } }, discurso: { type: 'string' } }, required: ['picks', 'discurso'], additionalProperties: false },
+    dilema: { type: 'object', properties: { id: { type: 'string' }, presentacion: { type: 'string' } }, required: ['id', 'presentacion'], additionalProperties: false },
   },
-  required: ['sucesos', 'avisos', 'foco', 'cronica', 'titulares', 'encargo', 'pies', 'gobierno_rival'],
+  required: ['sucesos', 'avisos', 'foco', 'cronica', 'titulares', 'encargo', 'pies', 'gobierno_rival', 'dilema'],
   additionalProperties: false,
 } as const;
 
@@ -493,6 +498,7 @@ const DirectorOut = z.object({
   encargo: z.object({ id: z.string().max(60), carta: z.string().max(1000) }).optional().catch(undefined),
   pies: upTo(z.object({ id: z.string().max(10), texto: z.string().max(600) }).nullable().catch(null), 8).optional().catch(undefined),
   gobierno_rival: z.object({ picks: upTo(z.string().max(60), 6), discurso: z.string().max(600).catch('') }).optional().catch(undefined),
+  dilema: z.object({ id: z.string().max(60), presentacion: z.string().max(1000).catch('') }).optional().catch(undefined),
 });
 
 /** Lee la respuesta del director: solo ids del menú y textos sin nombres inventados. Null si no vale. */
@@ -546,9 +552,28 @@ export function parseDirector(text: string, ids: string[], sent: string, extra: 
   const rivalPicks = (rp?.picks ?? []).filter((x, i, a) => extra.rival?.includes(x) && a.indexOf(x) === i).slice(0, 2);
   const discurso = clean(rp?.discurso ?? '', 140);
   const rival = extra.rival?.length && (rivalPicks.length || discurso) ? { picks: rivalPicks, discurso: bad(discurso) ? '' : discurso } : undefined;
+  const dilema = parseDilemmaPick(r.data.dilema, ids, bad);
   return {
-    director: { sucesos: picked, avisos: pick(r.data.avisos), ...(titulares.length ? { titulares } : {}), ...(encargo ? { encargo } : {}), ...(pies.length ? { pies } : {}), ...(rival ? { rival } : {}) },
+    director: { sucesos: picked, avisos: pick(r.data.avisos), ...(titulares.length ? { titulares } : {}), ...(encargo ? { encargo } : {}), ...(pies.length ? { pies } : {}), ...(rival ? { rival } : {}), ...(dilema ? { dilema } : {}) },
     focus: bad(focus) ? '' : focus,
     chronicle: bad(chronicle) ? '' : chronicle,
   };
+}
+
+/* ---------------- 2.4 (bloque D): pleno y dilemas en el turno ---------------- */
+
+/** Lo que el vecino vive del pleno y de los dilemas (datos del motor). */
+function lifeBrief(state: GameState, c: Citizen): { su_caso?: string } {
+  const d = dilemmaBrief(state, c);
+  return d ? { su_caso: d } : {};
+}
+
+/**
+ * El dilema del director: solo un id «dilema:…» del menú y una presentación
+ * corta sin nombres ni cifras inventadas (si no vale, se abre con el texto del motor).
+ */
+function parseDilemmaPick(p: { id: string; presentacion: string } | undefined, ids: string[], bad: (t: string) => boolean): DirectorChoice['dilema'] | undefined {
+  if (!p?.id || !p.id.startsWith('dilema:') || !ids.includes(p.id)) return undefined;
+  const text = clean(p.presentacion, DILEMMA.introMax);
+  return { id: p.id, presentacion: text.length >= 10 && p.presentacion.trim().length <= DILEMMA.introMax + 20 && !bad(text) ? text : '' };
 }

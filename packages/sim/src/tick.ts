@@ -6,6 +6,7 @@ import { scenarioFx, scenariosMonth } from './scenarios.ts';
 import { newResident } from './resident.ts';
 import { achievementsMonth, historyMonth } from './achievements.ts';
 import { errandsDay } from './errands.ts';
+import { dilemmasDay } from './dilemmas.ts';
 import { pressDay } from './press.ts';
 import { TICKS_PER_DAY, TICKS_PER_MONTH, tickToDate } from '@bitopolis/shared';
 import {
@@ -576,6 +577,8 @@ function endOfDay(state: GameState): void {
   // 2.1: encargos del pueblo y El Eco de Bitópolis.
   errandsDay(state);
   pressDay(state);
+  // 2.4: dilemas (vencen, se cierran o se abren por reglas).
+  dilemmasDay(state);
   accumulateRates(state);
 }
 

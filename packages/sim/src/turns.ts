@@ -11,7 +11,8 @@ import type { DirectorChoice } from './director.ts';
 import { hash32 } from './hash.ts';
 import { totalDebt } from './household.ts';
 import { jobsOf } from './levels.ts';
-import { addMemory, goalFor, NEED_TEXT, needOf, needsOf, PROFESSIONS, relation, setRelation } from './social.ts';
+import { addMemory, goalFor, NEED_TEXT, needOf, needsOf, plenoAwaits, plenoQuickIds, plenoReactFromTurn, plenoReactionMenu, PROFESSIONS, relation, setRelation } from './social.ts';
+import { dilemmaMayorText, dilemmaQuickIds } from './dilemmas.ts';
 import { transfer } from './money.ts';
 import { canDump, dumpTrash } from './trash.ts';
 import { canSignTemporero, HARVEST_NAME, signTemporero } from './farm.ts';
@@ -204,6 +205,8 @@ export function turnMenu(state: GameState, c: Citizen): MenuItem[] {
   if (pol.party !== null && pol.nextElection - state.tick <= 10 * TICKS_PER_DAY && !c.vote) {
     out.push({ accion: 'votar_gobierno' }, { accion: 'votar_oposicion' }, { accion: 'abstenerse' });
   }
+  // 2.4: quien habló en el pleno reacciona a la respuesta del alcalde.
+  out.push(...plenoReactionMenu(state, c));
   const assoc = protestFor(state, c);
   if (assoc && !governs && c.protest !== assoc.id && c.protest !== -assoc.id) out.push({ accion: 'manifestarse', detalle: `la asociación «${assoc.name}» convoca una manifestación` }, { accion: 'no_ir' });
   // Trabajo.
@@ -307,6 +310,8 @@ export function extraAction(state: GameState, c: Citizen, verb: string, arg: str
   switch (verb) {
     case 'seguir':
       return 'sigue con su vida';
+    case 'reaccion_pleno':
+      return plenoReactFromTurn(state, c, arg);
     case 'dimitir': {
       const job = state.buildings.find((b) => b.id === c.jobId);
       c.jobId = null;
@@ -608,8 +613,10 @@ function turnIds(state: GameState, kind: 'semana' | 'rapida'): number[] {
   const ai = state.citizens.filter((c) => isAiCitizen(state, c));
   if (kind === 'semana') return ai.slice(0, TURN.maxCitizens).map((c) => c.id);
   // Reacción rápida: los que peor lo llevan y los que más rencor guardan primero.
+  // 2.4: antes, quien habló en el pleno y los afectados por un dilema que se acaba de decidir.
+  const focus = new Set([...plenoQuickIds(state), ...dilemmaQuickIds(state)]);
   return [...ai]
-    .sort((a, b) => b.grudge - a.grudge || a.happiness - b.happiness || a.id - b.id)
+    .sort((a, b) => Number(focus.has(b.id)) - Number(focus.has(a.id)) || b.grudge - a.grudge || a.happiness - b.happiness || a.id - b.id)
     .slice(0, TURN.quickCitizens)
     .map((c) => c.id);
 }
@@ -761,7 +768,11 @@ export function mayorText(state: GameState, cmd: { type: string } & Record<strin
       return { text: cmd.level === 'none' ? 'quita el sueldo mínimo' : `fija un sueldo mínimo ${LEVEL[cmd.level as string]}`, big: true };
     case 'AnswerPetition': {
       const pet = state.pleno?.petitions.find((p) => p.id === cmd.petitionId);
-      return pet ? { text: `${cmd.answer === 'promise' ? 'promete' : 'rechaza'} en el pleno lo que pide ${cname(pet.citizenId)}`, big: cmd.answer === 'reject' } : null;
+      return pet ? { text: `${cmd.answer === 'promise' ? 'promete' : 'rechaza'} en el pleno lo que pide ${cname(pet.citizenId)}`, big: cmd.answer === 'reject' || plenoAwaits(state, pet.id) } : null;
+    }
+    case 'ResolveDilemma': {
+      const t = dilemmaMayorText(state, Number(cmd.id), String(cmd.option));
+      return t ? { text: t, big: true } : null;
     }
     case 'MeetAssociation':
       return { text: 'se reúne con una asociación de vecinos', big: false };
