@@ -136,6 +136,7 @@ export class Tutorial {
   }
 
   finish() {
+    this.mark(null);
     this.step = STEPS.length;
     this.box.remove();
     this.arrow.remove();
@@ -164,17 +165,30 @@ export class Tutorial {
     if (this.box.isConnected) document.documentElement.style.setProperty('--tut-h', `${this.box.offsetHeight + 8}px`);
     const sel = cur.target(tool);
     const target = sel ? document.querySelector<HTMLElement>(sel) : null;
+    this.mark(target);
     if (!target) {
       this.arrow.hidden = true;
       return;
     }
     target.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
     const r = target.getBoundingClientRect();
-    this.arrow.hidden = false;
-    this.arrow.style.left = `${Math.round(r.left + r.width / 2 - 12)}px`;
-    // Botones de arriba (▶): la flecha apunta hacia arriba, por debajo del botón.
+    // Botones de arriba (▶): la flecha apunta hacia arriba, por debajo del botón (encima del mapa, sin texto).
     const up = r.top < window.innerHeight / 3;
-    this.arrow.textContent = up ? '▲' : '▼';
-    this.arrow.style.top = `${Math.round(up ? r.bottom + 6 : r.top - 30)}px`;
+    // Ronda 21: abajo (pestañas, bandeja) la flecha flotante pisaba la franja («Z▼as») y los títulos de la bandeja.
+    // Ahora el propio botón lleva el marco y una flecha pequeña en su borde de arriba (tut-target, style.css).
+    this.arrow.hidden = !up;
+    if (!up) return;
+    this.arrow.style.left = `${Math.round(r.left + r.width / 2 - 12)}px`;
+    this.arrow.textContent = '▲';
+    this.arrow.style.top = `${Math.round(r.bottom + 6)}px`;
+  }
+
+  /** Marca el elemento señalado (y desmarca el anterior). */
+  private marked: HTMLElement | null = null;
+  private mark(el: HTMLElement | null) {
+    if (this.marked === el) return;
+    this.marked?.classList.remove('tut-target');
+    this.marked = el;
+    el?.classList.add('tut-target');
   }
 }
