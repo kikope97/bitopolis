@@ -41,3 +41,4 @@ export * from './rank.ts';
 export * from './trash.ts';
 export * from './tenders.ts';
 export * from './streets.ts';
+export * from './farm.ts';

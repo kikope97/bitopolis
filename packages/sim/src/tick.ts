@@ -30,8 +30,10 @@ import {
   TERRAIN,
   TURN,
   CIVIL,
+  FARM,
   FIRE,
 } from './balance.ts';
+import { farmMonth, growFarms } from './farm.ts';
 import { applyCommand, BUILD_NAMES, removeBuilding } from './commands.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance, nextInt, pick } from './prng.ts';
@@ -92,7 +94,8 @@ import {
 /* ---------- consultas ---------- */
 
 export function isBusiness(b: Building): boolean {
-  return b.kind === 'shop' || b.kind === 'factory';
+  // 2.2: las fincas también son empresas (nómina, IBI rústico y dividendos), con su cosecha anual.
+  return b.kind === 'shop' || b.kind === 'factory' || b.kind === 'farm';
 }
 
 export function homeCapacity(b: Building): number {
@@ -157,6 +160,8 @@ export function updateNetworks(state: GameState): { water: Set<number>; power: S
   const roadsWith = { water: new Set<number>(), power: new Set<number>() };
   const byRoad = new Map<number, Building[]>();
   for (const b of state.buildings) {
+    // 2.2: las fincas no necesitan agua ni luz (no gastan la capacidad de las plantas).
+    if (b.kind === 'farm') continue;
     for (const [dx, dy] of DIRS) {
       const nx = b.x + dx;
       const ny = b.y + dy;
@@ -293,7 +298,7 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
     if (employs) f.push({ label: 'Le suben los costes (sueldo mínimo)', value: -MIN_WAGE_FX.ownerMood * step });
   }
   // Ronda 15: su negocio pierde dinero (se nota, con o sin sueldo mínimo).
-  const losing = state.buildings.some((b) => b.owner === c.id && isBusiness(b) && b.books && b.books.sales - b.books.wages - b.books.taxes < 0);
+  const losing = state.buildings.some((b) => b.owner === c.id && isBusiness(b) && b.kind !== 'farm' && b.books && b.books.sales - b.books.wages - b.books.taxes < 0);
   if (losing) f.push({ label: 'Su negocio pierde dinero', value: -5 });
   f.push(...taxMood(state, c));
   f.push(...relationMood(c));
@@ -417,6 +422,8 @@ function growZones(state: GameState, served: { water: Set<number>; power: Set<nu
       notify: false,
     });
   }
+  // 2.2: fincas en la zona agraria (solo carretera; sin zona A no tira dados).
+  growFarms(state);
 }
 
 /* ---------- vecinos ---------- */
@@ -557,7 +564,7 @@ function endOfDay(state: GameState): void {
   const served = updateNetworks(state);
   // v1.8: días seguidos sin agua o sin luz (el icono sobre la casa sale cuando dura).
   for (const b of state.buildings) {
-    if (!b.built || b.kind === 'water' || b.kind === 'power') continue;
+    if (!b.built || b.kind === 'water' || b.kind === 'power' || b.kind === 'farm') continue;
     b.dryDays = b.hasWater ? 0 : (b.dryDays ?? 0) + 1;
     b.darkDays = b.hasPower ? 0 : (b.darkDays ?? 0) + 1;
   }
@@ -656,7 +663,8 @@ function businessPayroll(state: GameState, r: ReturnType<typeof monthRates>): vo
 function payBusinesses(state: GameState): void {
   for (const b of state.buildings) if (isBusiness(b) && b.built) payDividends(state, b);
   for (const b of [...state.buildings]) {
-    if (isBusiness(b) && b.unpaidMonths >= 2) {
+    // 2.2: una finca vive de una cosecha al año: no cierra por un mes malo.
+    if (isBusiness(b) && b.unpaidMonths >= (b.kind === 'farm' ? FARM.closeAfter : 2)) {
       const wage = MIN_WAGE_STEP[state.minWage ?? 'none'] > 0 ? ` (sueldo mínimo ${MIN_WAGE[state.minWage]} €)` : '';
       pushEvent(state, 'business', `Cierra ${b.name ?? BUILD_NAMES[b.kind]?.toLowerCase()}: no puede pagar las nóminas${wage}`, { ref: b.id });
       // Ronda 15: el dueño lo sufre y se acuerda del ayuntamiento; tarda en volver a intentarlo.
@@ -682,6 +690,8 @@ function endOfMonth(state: GameState): void {
   }
   // v1.9: todos los sueldos primero; luego cada vecino paga lo básico, la vivienda y los
   // tributos (lo que no pueda, como deuda), devuelve deudas y, si le sobra, ocio.
+  // 2.2: las fincas que cosechan este mes venden (y pagan a los temporeros) antes de las nóminas.
+  farmMonth(state);
   businessPayroll(state, r);
   outsideJobsMonth(state);
   // Las tiendas destrozadas en disturbios no venden hasta que se reparan (v1.8).

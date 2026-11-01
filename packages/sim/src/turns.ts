@@ -13,6 +13,7 @@ import { jobsOf } from './levels.ts';
 import { addMemory, goalFor, NEED_TEXT, needOf, needsOf, PROFESSIONS, relation, setRelation } from './social.ts';
 import { transfer } from './money.ts';
 import { canDump, dumpTrash } from './trash.ts';
+import { canSignTemporero, HARVEST_NAME, signTemporero } from './farm.ts';
 import { type Building, type Citizen, DESIRES, FEARS, type GameState, pushEvent, type Trigger } from './state.ts';
 
 /**
@@ -233,6 +234,9 @@ export function turnMenu(state: GameState, c: Citizen): MenuItem[] {
     const guests = homelessByFire(state).filter((x) => x !== c && c.relations.some((r) => r.id === x.id && (r.kind === 'amistad' || r.kind === 'pareja')));
     for (const g of guests.slice(0, 2)) out.push({ accion: `acoger:${g.id}`, detalle: `acoger en su casa a ${g.name.split(' ')[0]}, que se ha quedado sin ella por el fuego` });
   }
+  // 2.2: en el mes de cosecha, quien está parado puede apuntarse de temporero.
+  const harvest = canSignTemporero(state, c);
+  if (harvest?.crop) out.push({ accion: 'temporero', detalle: `apuntarse de temporero para ${HARVEST_NAME[harvest.crop]} (está sin trabajo; un sueldo de temporada)` });
   if (canVolunteer(state, c)) out.push({ accion: 'hacerse_voluntario', detalle: 'apuntarse como voluntario de protección civil (está en paro)' });
   // Solo si está desesperado: robar en una casa del pueblo.
   if (desperate(c)) out.push({ accion: 'robar', detalle: 'robar en una casa del pueblo (está sin dinero, sin trabajo y endeudado)' });
@@ -339,6 +343,8 @@ export function extraAction(state: GameState, c: Citizen, verb: string, arg: str
       return shelter(state, c, state.citizens.find((x) => x.id === Number(arg)));
     case 'hacerse_voluntario':
       return becomeVolunteer(state, c);
+    case 'temporero':
+      return signTemporero(state, c);
     case 'tirar_al_monte':
       return canDump(state, c) ? dumpTrash(state, c) : 'al final no tira la basura al monte';
     case 'robar': {
@@ -687,7 +693,7 @@ export function mayorText(state: GameState, cmd: { type: string } & Record<strin
     case 'Build':
       return cmd.kind === 'road' ? null : { text: `manda construir ${(BUILD_NAMES[cmd.kind as string] ?? String(cmd.kind)).toLowerCase()}`, big: false };
     case 'Zone':
-      return cmd.zone === 'none' ? null : { text: `marca zona ${cmd.zone === 'R' ? 'residencial' : cmd.zone === 'C' ? 'comercial' : 'industrial'}`, big: false };
+      return cmd.zone === 'none' ? null : { text: `marca zona ${cmd.zone === 'R' ? 'residencial' : cmd.zone === 'C' ? 'comercial' : cmd.zone === 'A' ? 'agraria' : 'industrial'}`, big: false };
     case 'Demolish': {
       const b = state.buildings.find((x) => x.x === cmd.x && x.y === cmd.y);
       return b ? { text: `derriba ${(b.name ?? BUILD_NAMES[b.kind] ?? b.kind).toLowerCase()}`, big: b.kind === 'house' || b.kind === 'res' || b.kind === 'shop' } : null;

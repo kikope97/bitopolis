@@ -34,9 +34,9 @@ const FIRST_KINDS: Record<string, string> = {
   sports: 'Abre el polideportivo',
 };
 
-/** 2.2: un momento suelto (p. ej. la placa de una calle), sin esperar al repaso del día. */
-export function addMoment(state: GameState, kind: string, text: string, at: { x: number; y: number }): void {
-  if (state.album) add(state, kind, text, at, false);
+/** 2.2: un momento que no sale de los sucesos del día (la primera cosecha se vende al cerrar el mes). */
+export function addMoment(state: GameState, kind: string, text: string, at: { x: number; y: number }, unique = true): void {
+  if (state.album) add(state, kind, text, at, unique);
 }
 
 function add(state: GameState, kind: string, text: string, at: { x: number; y: number }, unique: boolean): void {

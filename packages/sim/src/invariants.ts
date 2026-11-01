@@ -1,4 +1,5 @@
 import { HOMES } from './balance.ts';
+import { farmInvariants } from './farm.ts';
 import { totalInternalMoney } from './money.ts';
 import type { GameState } from './state.ts';
 import { streetErrors } from './streets.ts';
@@ -52,6 +53,8 @@ export function checkInvariants(state: GameState): string[] {
   }
   // 2.2: licitaciones (oferta válida, ids del contrato) y calles (sobre carretera o plaza).
   errors.push(...tenderErrors(state), ...streetErrors(state));
+  // 2.2: fincas solo en zona agraria y con el cultivo de su terreno.
+  errors.push(...farmInvariants(state));
   return errors;
 }
 

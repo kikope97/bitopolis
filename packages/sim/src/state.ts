@@ -28,8 +28,8 @@ export const MAP_H = 48;
 export const Tile = { Grass: 0, Road: 1, Tree: 2 } as const;
 export type Tile = (typeof Tile)[keyof typeof Tile];
 
-/** Capa de zonas. */
-export const Zone = { None: 0, R: 1, C: 2, I: 3 } as const;
+/** Capa de zonas (2.2: A = agraria, fincas). */
+export const Zone = { None: 0, R: 1, C: 2, I: 3, A: 4 } as const;
 export type Zone = (typeof Zone)[keyof typeof Zone];
 
 export type BuildingKind =
@@ -58,7 +58,9 @@ export type BuildingKind =
   /** Crecen solos sobre zonas. */
   | 'res'
   | 'shop'
-  | 'factory';
+  | 'factory'
+  /** 2.2: finca (crece sola sobre zona agraria). */
+  | 'farm';
 
 export interface Building {
   id: number;
@@ -100,7 +102,16 @@ export interface Building {
   privateUnits?: number;
   /** 2.1: basura acumulada sin recoger (ver trash.ts). */
   trash?: number;
+  /** 2.2: fincas: cultivo (sale del terreno, farm.ts) y factor de la cosecha del año (se acumula con el tiempo). */
+  crop?: Crop;
+  yieldFx?: number;
+  /** 2.2: año (de juego) de la última cosecha vendida y última tormenta sobre la finca (tick). */
+  harvested?: number;
+  stormed?: number;
 }
+
+/** 2.2: cultivos de las fincas (ver farm.ts). */
+export type Crop = 'secano' | 'regadio' | 'olivar' | 'vinedo';
 
 /** Obra en curso: necesita obreros × días. */
 export interface Project {
@@ -204,6 +215,8 @@ export interface Citizen {
   bio?: { text: string; tick: number };
   /** 2.1: voluntario de protección civil. */
   volunteer?: boolean;
+  /** 2.2: se ha apuntado de temporero para la cosecha (tick en que se apuntó). */
+  temporero?: number;
 }
 
 export interface CitizenDebt {

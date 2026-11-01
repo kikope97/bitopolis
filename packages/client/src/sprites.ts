@@ -2836,8 +2836,8 @@ export function snowify(src: Pix): Pix {
 }
 
 /** Solar recalificado: tramado del color de la zona, borde y cartel con la letra. */
-export function zoneTile(zone: 'R' | 'C' | 'I', base: Pix): Pix {
-  const color = { R: 6, C: 10, I: 4 }[zone];
+export function zoneTile(zone: 'R' | 'C' | 'I' | 'A', base: Pix): Pix {
+  const color = ZONE_COLOR[zone];
   const p = new Pix(T, T);
   p.blit(base, 0, 0);
   for (let y = 0; y < T; y += 4) for (let x = (y / 4) % 2 ? 2 : 0; x < T; x += 4) p.set(x, y, color);
@@ -2856,13 +2856,17 @@ export function zoneTile(zone: 'R' | 'C' | 'I', base: Pix): Pix {
   return p;
 }
 
+/** Color de cada zona (2.2: A, tierra de labor). */
+export const ZONE_COLOR = { R: 6, C: 10, I: 4, A: 46 } as const;
+
 const FONT: Record<string, string[]> = {
+  A: ['.###.', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
   R: ['####.', '#...#', '####.', '#..#.', '#...#', '#...#', '#...#'],
   C: ['.###.', '#...#', '#....', '#....', '#....', '#...#', '.###.'],
   I: ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '#####'],
 };
 
-export function letter(ch: 'R' | 'C' | 'I', color: number): Pix {
+export function letter(ch: 'R' | 'C' | 'I' | 'A', color: number): Pix {
   const rows = FONT[ch]!;
   const p = new Pix(5, 7);
   rows.forEach((r, y) => [...r].forEach((c, x) => c === '#' && p.set(x, y, color)));
@@ -3056,6 +3060,9 @@ function buildingSpec(kind: string, id: number, rank = VILLA_RANK): [string, () 
       return ['cleanpoint', () => cleanPoint(18)];
     case 'factory':
       return [`factory${id % 4}`, () => factory(id % 4)];
+    // 2.2: sin saber el cultivo, una finca de cereal (el render usa farmSprite con el suyo).
+    case 'farm':
+      return [`farm-secano-${id % 3}`, () => farmSecano(id % 3)];
     case 'shop':
       return [`shop${id % 16}`, () => shop(id % 16)];
     case 'house':
@@ -3272,7 +3279,7 @@ export const treeSprite = (v: number, frame = 0, tod: TimeOfDay = 'day', snow = 
     return snow ? snowify(p) : p;
   }, tod);
 export const iconSprite = (k: 'noWater' | 'noPower') => sprite(`icon-${k}`, k === 'noWater' ? iconNoWater : iconNoPower);
-export const letterSprite = (ch: 'R' | 'C' | 'I', color: number) => sprite(`L${ch}${color}`, () => letter(ch, color));
+export const letterSprite = (ch: 'R' | 'C' | 'I' | 'A', color: number) => sprite(`L${ch}${color}`, () => letter(ch, color));
 
 /** Desplaza 1 px a la derecha las filas por encima de `rows` (la copa, no el tronco). */
 function sway(p: Pix, rows: number): Pix {
@@ -3862,4 +3869,117 @@ export function burntSprite(kind: string, id: number, tod: TimeOfDay = 'day'): H
   if (!spec) return constructionSprite(0, id, tod);
   const [key, make] = spec;
   return sprite(`quemado-${key}`, () => burn(make(), id % 3), tod);
+}
+
+/* ============================ el campo (2.2) ============================ */
+
+export type CropKind = 'secano' | 'regadio' | 'olivar' | 'vinedo';
+const OLIVE: Mat = [41, 42, 25, 44];
+
+/** Casa de labor pequeña (encalada, teja) en la esquina de la finca. */
+function farmhouse(p: Pix, x: number, y: number, seed: number) {
+  p.shadow(x + 1, y + 13, 12, 2);
+  p.rect(x, y + 5, 11, 8, MAT.white[1]);
+  p.vline(x, y + 5, 8, MAT.white[0]);
+  p.vline(x + 10, y + 5, 8, MAT.white[2]);
+  // Tejado a un agua.
+  for (let j = 0; j < 5; j++) p.hline(x - 1, y + j, 13, j === 0 ? MAT.terracotta[0] : j % 2 ? MAT.terracotta[1] : MAT.terracotta[2]);
+  p.hline(x - 1, y + 4, 13, MAT.terracotta[3]);
+  // Puerta y ventanuco.
+  p.rect(x + 2, y + 8, 3, 5, MAT.wood[2]);
+  p.set(x + 4, y + 10, MAT.wood[0]);
+  p.rect(x + 7, y + 7, 2, 2, hash(seed, 3) > 0.5 ? 8 : 26);
+}
+
+/** Surcos: filas horizontales de tierra con su sombra. */
+function furrows(p: Pix, y0: number, light: number, dark: number, step: number) {
+  p.rect(0, y0, T, BH - y0, light);
+  for (let y = y0 + 1; y < BH; y += step) p.hline(0, y, T, dark);
+}
+
+function farmSecano(seed: number): Pix {
+  const p = new Pix(T, BH);
+  // Cereal dorado en hileras, con espigas sueltas.
+  furrows(p, 16, 4, 37, 3);
+  for (let y = 18; y < BH; y += 3) for (let x = 0; x < T; x += 2) if (hash(x, y, seed) > 0.55) p.set(x, y - 1, 12);
+  p.dither(0, 16, T, 3, 20, 0);
+  // Una paca de paja.
+  p.rect(22, 38, 6, 4, 20);
+  p.hline(22, 38, 6, 4);
+  p.hline(22, 41, 6, 19);
+  p.shadow(23, 42, 6, 1);
+  farmhouse(p, 2, 8, seed);
+  return p;
+}
+
+function farmRegadio(seed: number): Pix {
+  const p = new Pix(T, BH);
+  // Huerta: tierra oscura en surcos, hortalizas en fila y una acequia.
+  furrows(p, 16, 46, 47, 4);
+  for (let y = 18; y < 44; y += 4) {
+    for (let x = 1 + ((y / 4) % 2); x < T - 1; x += 4) {
+      p.set(x, y, 41);
+      p.set(x + 1, y, 42);
+      p.set(x, y - 1, 40);
+      if (hash(x, y, seed) > 0.7) p.set(x + 1, y - 1, 2);
+    }
+  }
+  p.hline(0, 44, T, 47);
+  p.rect(0, 45, T, 2, C.water);
+  for (let x = 0; x < T; x += 5) p.set(x + (seed % 3), 45, C.waterLight);
+  p.hline(0, 47, T, 47);
+  farmhouse(p, 19, 8, seed);
+  return p;
+}
+
+function farmOlivar(seed: number): Pix {
+  const p = new Pix(T, BH);
+  // Tierra clara de olivar con olivos en marco real.
+  p.rect(0, 16, T, 32, 45);
+  p.dither(0, 16, T, 32, 46, seed % 2);
+  for (let i = 0; i < 18; i++) p.set(Math.floor(hash(i, seed) * T), 16 + Math.floor(hash(seed, i) * 32), 29);
+  const spots: [number, number][] = [[8, 26], [24, 24], [8, 41], [24, 40]];
+  for (const [x, y] of spots) {
+    p.ellipse(x + 2, y + 6, 5, 1.6, 47);
+    p.rect(x - 1, y + 1, 2, 5, 35);
+    p.set(x, y + 2, 34);
+    p.ball(x - 2, y - 1, 3.5, OLIVE, seed + x);
+    p.ball(x + 2, y - 2, 3.5, OLIVE, seed + y);
+    // Aceitunas.
+    if (hash(x, y, seed) > 0.3) p.set(x + 1, y, 36);
+  }
+  return p;
+}
+
+function farmVinedo(seed: number): Pix {
+  const p = new Pix(T, BH);
+  // Cepas en espaldera: postes, hojas y racimos.
+  p.rect(0, 16, T, 32, 45);
+  p.dither(0, 16, T, 32, 46, 1);
+  for (let y = 22; y < BH; y += 6) {
+    p.hline(0, y + 2, T, 47);
+    for (let x = 1; x < T; x += 5) {
+      p.vline(x, y - 2, 4, MAT.wood[2]);
+      p.set(x + 1, y - 2, 23);
+      p.rect(x + 1, y - 1, 3, 2, 23);
+      p.set(x + 2, y - 1, 22);
+      p.set(x + 3, y, 24);
+      if (hash(x, y, seed) > 0.45) {
+        p.set(x + 2, y + 1, 1);
+        p.set(x + 3, y + 1, 62);
+      }
+    }
+  }
+  farmhouse(p, 2, 4, seed);
+  return p;
+}
+
+const FARM_MAKERS: Record<CropKind, (seed: number) => Pix> = { secano: farmSecano, regadio: farmRegadio, olivar: farmOlivar, vinedo: farmVinedo };
+
+/** 2.2: finca según su cultivo (surcos, huerta, olivos o cepas), 32×48. */
+export function farmSprite(crop: CropKind, id: number, tod: TimeOfDay = 'day', snow = false): HTMLCanvasElement {
+  const seed = id % 3;
+  const key = `farm-${crop}-${seed}`;
+  const make = () => FARM_MAKERS[crop](seed);
+  return snow ? sprite(`snow-${key}`, () => snowify(make()), tod) : sprite(key, make, tod);
 }

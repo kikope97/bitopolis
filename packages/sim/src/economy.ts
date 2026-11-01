@@ -2,6 +2,7 @@ import { TICKS_PER_MONTH, type TaxLevel } from '@bitopolis/shared';
 import {
   TAX_RELIEF_DAYS,
   BUSINESS_CASH_CAP,
+  FARM,
   DOWN_PAYMENT,
   FOUND_CHANCE,
   FOUND_COST,
@@ -367,9 +368,11 @@ export function foundBusiness(state: GameState, c: Citizen, type: string): boole
 
 /** Dividendos de una empresa: al vecino dueño o, si no, fuera. */
 export function payDividends(state: GameState, b: Building): void {
-  if (b.cash <= BUSINESS_CASH_CAP) return;
+  // 2.2: una finca guarda los sueldos del año (cobra una vez, en la cosecha).
+  const keep = b.kind === 'farm' ? FARM.cashCap : BUSINESS_CASH_CAP;
+  if (b.cash <= keep) return;
   const owner = b.owner > 0 && state.citizens.some((c) => c.id === b.owner) ? b.owner : OUTSIDE;
-  transfer(state, b.id, owner, b.cash - BUSINESS_CASH_CAP);
+  transfer(state, b.id, owner, b.cash - keep);
 }
 
 /* ---------------- cobros mensuales ---------------- */
@@ -425,7 +428,9 @@ export function monthlyHousing(state: GameState, r: MonthRates): void {
 
 /** IBI y terrazas de las empresas (de su caja). */
 export function businessTaxes(state: GameState, b: Building, r: MonthRates): void {
-  transfer(state, b.id, TREASURY, Math.round((unitValue(state, b) * r.ibi) / 12), 'IBI');
+  // 2.2: las fincas pagan IBI rústico (una parte del urbano).
+  const rustic = b.kind === 'farm' ? FARM.ibiRustic : 1;
+  transfer(state, b.id, TREASURY, Math.round((unitValue(state, b) * r.ibi * rustic) / 12), 'IBI');
   if (b.kind === 'shop') transfer(state, b.id, TREASURY, r.terrazas, 'tasas');
 }
 

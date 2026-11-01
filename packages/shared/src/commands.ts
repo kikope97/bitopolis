@@ -8,7 +8,7 @@ export type TaxLevel = z.infer<typeof TaxLevel>;
 export const BuildKind = z.enum(['road', 'water', 'power', 'park', 'school', 'clinic', 'police', 'house', 'plaza', 'market', 'bar', 'chapel', 'cemetery', 'library', 'sports', 'jail', 'firestation', 'civilprotection', 'cleanpoint']);
 export type BuildKind = z.infer<typeof BuildKind>;
 
-export const ZoneKind = z.enum(['none', 'R', 'C', 'I']);
+export const ZoneKind = z.enum(['none', 'R', 'C', 'I', 'A']);
 export type ZoneKind = z.infer<typeof ZoneKind>;
 
 const Coord = z.number().int().min(0).max(255);
