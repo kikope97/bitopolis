@@ -64,9 +64,9 @@ describe('grandes obras por fases (2.3)', () => {
     expect(validateCommand(t, { type: 'StartLandmark', kind: 'station', ...at })).toEqual({ ok: false, error: expect.stringMatching(/en caja/) });
     const u = town(70);
     for (const c of u.citizens) c.happiness = 40;
-    expect(validateCommand(u, { type: 'StartLandmark', kind: 'station', ...at })).toEqual({ ok: false, error: expect.stringMatching(/felicidad/) });
+    expect(validateCommand(u, { type: 'StartLandmark', kind: 'station', ...at })).toEqual({ ok: false, error: expect.stringMatching(/felicidad/i) });
     u.townhallLevel = 2;
-    expect(validateCommand(u, { type: 'StartLandmark', kind: 'station', ...at })).toEqual({ ok: false, error: expect.stringMatching(/ayuntamiento de nivel 3/) });
+    expect(validateCommand(u, { type: 'StartLandmark', kind: 'station', ...at })).toEqual({ ok: false, error: expect.stringMatching(/ayuntamiento de nivel 3/i) });
     // La catedral, más adelante.
     expect(validateCommand(town(200), { type: 'StartLandmark', kind: 'cathedral', ...at })).toEqual({ ok: false, error: expect.stringMatching(/más adelante/) });
   });

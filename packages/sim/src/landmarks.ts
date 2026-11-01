@@ -83,7 +83,7 @@ export interface LandmarkReq {
   ok: boolean;
   /** «120 vecinos», «felicidad 60», «ayto. nivel 4», «ermita», «14.000 €». */
   short: string;
-  /** Explicado: «Hacen falta 120 vecinos (tienes 80)». */
+  /** Explicado: «120 vecinos (tienes 80)». */
   long: string;
 }
 
@@ -95,18 +95,22 @@ export function landmarkReqs(state: GameState, kind: LandmarkKind, cost = phaseC
   const lv = state.townhallLevel ?? 1;
   const out: LandmarkReq[] = [];
   if (LANDMARK_LATER.includes(kind)) out.push({ key: 'later', ok: false, short: 'más adelante', long: `${LANDMARK_NAMES[kind]}: llegará más adelante.` });
-  out.push({ key: 'townhall', ok: lv >= s.townhall, short: `ayto. nivel\u00a0${s.townhall}`, long: `Hace falta el ayuntamiento de nivel ${s.townhall} (tienes el ${lv})` });
-  out.push({ key: 'pop', ok: pop >= s.pop, short: `${s.pop} vecinos`, long: `Hacen falta ${s.pop} vecinos (tienes ${pop})` });
-  out.push({ key: 'happiness', ok: happy >= s.happiness, short: `felicidad ${s.happiness}`, long: `Hace falta una felicidad media de ${s.happiness} (ahora ${happy})` });
+  out.push({ key: 'townhall', ok: lv >= s.townhall, short: `ayto. nivel\u00a0${s.townhall}`, long: `Ayuntamiento de nivel ${s.townhall} (tienes el ${lv})` });
+  out.push({ key: 'pop', ok: pop >= s.pop, short: `${s.pop} vecinos`, long: `${s.pop} vecinos (tienes ${pop})` });
+  out.push({ key: 'happiness', ok: happy >= s.happiness, short: `felicidad ${s.happiness}`, long: `Felicidad media de ${s.happiness} (ahora ${happy})` });
   if (s.needs) {
     const has = state.buildings.some((b) => b.kind === s.needs && b.built);
-    out.push({ key: 'needs', ok: has, short: 'ermita', long: 'Hace falta una ermita en el pueblo' });
+    out.push({ key: 'needs', ok: has, short: 'ermita', long: 'Una ermita en el pueblo' });
   }
-  out.push({ key: 'cash', ok: state.treasury >= cost, short: `${cost.toLocaleString('es-ES')}\u00a0€`, long: `Hacen falta ${cost.toLocaleString('es-ES')} € en caja para la fase (tienes ${Math.max(0, state.treasury).toLocaleString('es-ES')} €)` });
+  out.push({ key: 'cash', ok: state.treasury >= cost, short: `${cost.toLocaleString('es-ES')}\u00a0€`, long: `${cost.toLocaleString('es-ES')} € en caja para la fase (tienes ${Math.max(0, state.treasury).toLocaleString('es-ES')} €)` });
   return out;
 }
 
-const firstMissing = (reqs: LandmarkReq[]): LandmarkReq | undefined => reqs.find((r) => !r.ok);
+/** El primer requisito que falta, como error del comando («Falta: 60 vecinos (tienes 20)»). */
+const firstMissing = (reqs: LandmarkReq[]): { long: string } | undefined => {
+  const r = reqs.find((x) => !x.ok);
+  return r ? { long: r.key === 'later' ? r.long : `Falta: ${r.long}` } : undefined;
+};
 
 export const landmarkOf = (state: GameState, id: number): Landmark | undefined => state.landmarks.find((l) => l.id === id);
 export const landmarkByBuilding = (state: GameState, buildingId: number): Landmark | undefined => state.landmarks.find((l) => l.buildingId === buildingId);
