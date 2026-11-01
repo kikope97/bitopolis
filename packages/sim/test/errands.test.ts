@@ -94,10 +94,10 @@ describe('El Eco de Bitópolis (2.1)', () => {
     if (cands[0]) expect(state.errands!.list.some((e) => e.key === cands[0]!.key && e.story)).toBe(true);
     // parseDirector: ids de encargo fuera de la lista y textos con cifras inventadas fuera.
     const r = parseDirector(
-      JSON.stringify({ sucesos: [], avisos: [], foco: '', cronica: '', titulares: [{ seccion: 'sucesos', sobre: 'n99', texto: 'Roban 98765 euros' }, { seccion: 'anuncios', sobre: '', texto: 'Fiesta en la plaza' }], encargo: { id: 'paro:otro', carta: 'x' } }),
+      JSON.stringify({ sucesos: [], avisos: [], foco: '', cronica: '', titulares: [{ seccion: 'sucesos', sobre: 'n99', texto: 'Roban 98765 euros' }, { seccion: 'anuncios', sobre: 'n1', texto: 'Fiesta en la plaza' }], encargo: { id: 'paro:otro', carta: 'x' } }),
       [],
       'datos',
-      { news: [], errands: ['paro:pueblo'] },
+      { news: [{ id: 'n1' }], errands: ['paro:pueblo'] },
     );
     expect(r!.director.titulares).toEqual([{ seccion: 'anuncios', texto: 'Fiesta en la plaza' }]);
     expect(r!.director.encargo).toBeUndefined();

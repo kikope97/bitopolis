@@ -165,7 +165,8 @@ export function governmentCommand(state: GameState, cmd: Command): boolean {
 }
 
 /** En la oposición el jugador solo puede hablar con los vecinos (y la IA decidir). */
-const OPPOSITION_ALLOWED = new Set(['TalkTo', 'NotifyProject', 'CitizenAct', 'Campaign', 'Motion']);
+// Ronda 17: el turno del pueblo (IA) y los votos no son órdenes del alcalde: valen también en la oposición.
+const OPPOSITION_ALLOWED = new Set(['TalkTo', 'NotifyProject', 'CitizenAct', 'Campaign', 'Motion', 'TownTurn', 'ChooseCrest']);
 
 export function validateCommand(state: GameState, raw: unknown): CommandResult {
   const parsed = Command.safeParse(raw);

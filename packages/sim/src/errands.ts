@@ -83,10 +83,11 @@ export function errandCandidates(state: GameState): ErrandCandidate[] {
     if (!home) continue;
     const miss = missingServices(state, home.x, home.y, ctx).find((m) => m.status === 'falta' && SERVICE_KEYS.includes(m.key) && isUnlocked(state, NEED_KINDS[m.key][0] as never));
     if (!miss) continue;
-    const key = `servicio:${miss.key}_${c.id}`;
-    if (busy.has(key) || out.some((o) => o.key.startsWith(`servicio:${miss.key}_`))) continue;
+    // Ronda 17: un servicio no vuelve con otro nombre cada semana (la clave no lleva el vecino), y uno a la vez.
+    const key = `servicio:${miss.key}`;
+    if (busy.has(key) || kindsBusy.has('servicio') || out.some((o) => o.kind === 'servicio')) continue;
     out.push({ key, kind: 'servicio', by: c.id, text: `${first(c)} quiere ${WANT[miss.key] ?? NEED_LABEL[miss.key]} cerca de casa`, target: c.id, reward: ERRANDS.reward.servicio });
-    if (out.filter((o) => o.kind === 'servicio').length >= 2) break;
+    break;
   }
   const j = jobless(state);
   if (j >= ERRANDS.minJobless && !kindsBusy.has('paro') && !busy.has('paro:pueblo')) {
@@ -120,7 +121,7 @@ function met(state: GameState, e: Errand): boolean {
   switch (e.kind) {
     case 'servicio': {
       const need = e.key.slice(e.key.indexOf(':') + 1).split('_')[0] as NeedKey;
-      const c = state.citizens.find((x) => x.id === e.target);
+      const c = state.citizens.find((x) => x.id === e.by);
       const home = c && state.buildings.find((b) => b.id === c.homeId);
       return !!home && !missingServices(state, home.x, home.y).some((m) => m.key === need && m.status === 'falta');
     }

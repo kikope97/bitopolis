@@ -42,8 +42,9 @@ describe('rangos del pueblo (2.1)', () => {
   });
 
   it('el rango pide vecinos y nivel del ayuntamiento a la vez', () => {
-    expect(rankFor(townWith(RANKS[2].pop, 2))).toBe(1);
-    expect(rankFor(townWith(RANKS[2].pop, 3))).toBe(2);
+    expect(rankFor(townWith(RANKS[2].pop, 1))).toBe(0);
+    expect(rankFor(townWith(RANKS[2].pop - 1, 3))).toBe(1);
+    expect(rankFor(townWith(RANKS[2].pop, RANKS[2].townhall))).toBe(2);
     expect(rankFor(townWith(5, 5))).toBe(0);
     expect(rankFor(townWith(RANKS[4].pop, 5))).toBe(4);
   });

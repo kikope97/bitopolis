@@ -303,7 +303,7 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
   if (fest) f.push(fest);
   if (c.kids?.length) f.push({ label: c.kids.length === 1 ? 'Un hijo en casa' : `${c.kids.length} hijos en casa`, value: 3 });
   // v1.7: la biblioteca, para quien quiere prosperar; sin cementerio, el duelo pesa.
-  if (home && c.desire === 'prosperar' && state.buildings.some((b) => b.kind === 'library' && b.built && dist(b, home) <= radiusOf(b))) {
+  if (home && c.desire === 'prosperar' && state.buildings.some((b) => b.kind === 'library' && b.built && !b.damaged && dist(b, home) <= radiusOf(b))) {
     f.push({ label: 'Biblioteca cerca para formarse', value: SOCIAL_PLACES.libraryProsper });
   }
   if (!state.buildings.some((b) => b.kind === 'cemetery' && b.built) && c.memories.some((m) => m.kind === 'perdio_a' && state.tick - m.tick < 360 * TICKS_PER_DAY)) {

@@ -73,24 +73,36 @@ export function weekNews(state: GameState): { id: string; section: PressSection;
   return out;
 }
 
-/** Titulares por plantilla: el primero de cada sección (o lo que haya). */
+/** Titulares por plantilla: el primero de cada sección (o lo que haya), sin repetir lo de las 2 ediciones anteriores. */
 function ruleHeadlines(state: GameState): Headline[] {
-  const news = weekNews(state);
+  const tpl = (t: string) => t.replace(/\d+/g, '#');
+  const recent = new Set((state.press?.editions.slice(-2) ?? []).flatMap((e) => e.headlines.map((h) => tpl(h.text))));
+  const news = weekNews(state).filter((n) => !recent.has(tpl(n.text)));
   const out: Headline[] = [];
   for (const sec of PRESS_SECTIONS) {
     const n = news.find((x) => x.section === sec);
     if (n) out.push({ section: sec, text: n.text, ...(n.ref !== undefined ? { ref: n.ref } : {}) });
   }
-  // Cartas: si no hubo nada político, la queja más repetida del pueblo.
+  // Cartas: si no hubo nada político, un encargo pendiente del pueblo.
   if (!out.some((h) => h.section === 'cartas')) {
     const e = state.errands?.list.find((x) => x.status === 'ofrecido');
-    if (e) out.push({ section: 'cartas', text: `Carta al director: ${e.text}`, ref: e.by || undefined });
+    if (e && !recent.has(tpl(`Carta al director: ${e.text}`))) out.push({ section: 'cartas', text: `Carta al director: ${e.text}`, ref: e.by || undefined });
   }
-  // Anuncios: si no hubo obras ni llegadas, cómo va el pueblo.
+  // Anuncios: si no hubo obras ni llegadas, algo distinto cada semana (ronda 17: antes siempre «Semana tranquila»).
   if (!out.some((h) => h.section === 'anuncios')) {
     const n = state.citizens.length;
     const happy = n ? Math.round(state.citizens.reduce((a, c) => a + c.happiness, 0) / n) : 0;
-    out.push({ section: 'anuncios', text: `Semana tranquila: el pueblo sigue con ${n} vecinos y felicidad ${happy}` });
+    const shop = state.buildings.filter((b) => b.kind === 'shop' && b.built && (b.books?.sales ?? 0) > 0).sort((a, b) => (b.books?.sales ?? 0) - (a.books?.sales ?? 0) || a.id - b.id)[0];
+    const oldest = [...state.citizens].filter((c) => c.named).sort((a, b) => b.age - a.age || a.id - b.id)[0];
+    const pending = state.errands?.list.filter((e) => e.status === 'aceptado').length ?? 0;
+    const fillers = [
+      `El pueblo sigue con ${n} vecinos y felicidad ${happy}`,
+      ...(shop ? [`${shop.name ?? 'Una tienda'} es la que más vende del pueblo este mes`] : []),
+      ...(oldest ? [`${oldest.name}, con ${oldest.age} años, es la persona mayor del pueblo`] : []),
+      ...(pending ? [`El alcalde tiene ${pending} ${pending === 1 ? 'encargo prometido' : 'encargos prometidos'} por cumplir`] : []),
+    ].filter((t) => !recent.has(tpl(t)));
+    const ed = (state.press?.editions.at(-1)?.n ?? 0) + 1;
+    out.push({ section: 'anuncios', text: fillers.length ? fillers[ed % fillers.length]! : 'Semana tranquila en el pueblo' });
   }
   return out.slice(0, 3);
 }

@@ -138,7 +138,7 @@ function planner(name: string, o: PlannerOpts): Profile {
       const first = (state.trash?.start ?? -1) >= 0 && !has('cleanpoint');
       const dirty = state.buildings.filter((b) => (b.trash ?? 0) >= TRASH.dirtyAt).sort((a, b) => (b.trash ?? 0) - (a.trash ?? 0) || a.id - b.id)[0];
       const points = state.buildings.filter((b) => b.kind === 'cleanpoint').length;
-      const cpNear = first ? (state.buildings.find((b) => b.kind === 'townhall') ?? dirty) : dirty && points < 1 + Math.floor(pop / 40) ? dirty : undefined;
+      const cpNear = first ? (dirty ?? state.buildings.filter((b) => b.kind === 'house' || b.kind === 'res').at(-1) ?? state.buildings.find((b) => b.kind === 'townhall')) : dirty && points < 1 + Math.floor(pop / 60) ? dirty : undefined;
       if (cpNear && !state.projects.some((p) => buildingKindOf(state, p.buildingId) === 'cleanpoint') && state.treasury >= buildCost('cleanpoint') + (first ? 0 : o.reserve / 2)) {
         // En la misma red de calles que lo sucio (si no, el camión no llegaría).
         const net = roadNetworkOf(state, cpNear);

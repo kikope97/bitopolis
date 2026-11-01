@@ -36,7 +36,7 @@ export const BUILD: Record<BuildKind, BuildSpec> = {
   firestation: { materials: 4_500, workers: 4, days: 3, unlockPop: 20 },
   civilprotection: { materials: 2_500, workers: 3, days: 2, unlockPop: 30 },
   // 2.1: punto limpio con camión de la basura.
-  cleanpoint: { materials: 2_500, workers: 3, days: 3, unlockPop: 20 },
+  cleanpoint: { materials: 2_500, workers: 3, days: 3, unlockPop: 30 }, // ronda 17: con 20 frenaba el crecimiento
 };
 
 /** Obras que crecen solas sobre zonas (las paga un inversor de fuera). */
@@ -643,7 +643,7 @@ export const FIRE = {
   heat: 2.5,
   stoves: 2,
   /** Horas de aviso antes de que el riesgo pueda acabar en fuego (Modo normal) y probabilidad de que prenda. */
-  riskHours: 24,
+  riskHours: 72, // ronda 17: con 24 (2 s a x10) no daba tiempo a reaccionar
   ignite: 0.5,
   /** Con director (Modo IA), días que dura un riesgo esperando a que el director lo elija. */
   riskDaysAi: 42,
@@ -704,9 +704,9 @@ export const AMBULANCE = {
 export const RANKS = [
   { id: 'aldea', name: 'Aldea', pop: 0, townhall: 1 },
   { id: 'lugar', name: 'Lugar', pop: 12, townhall: 2 },
-  { id: 'villa', name: 'Villa', pop: 40, townhall: 3 },
-  { id: 'ciudad', name: 'Ciudad', pop: 100, townhall: 4 },
-  { id: 'capital', name: 'Capital comarcal', pop: 200, townhall: 5 },
+  { id: 'villa', name: 'Villa', pop: 40, townhall: 2 },
+  { id: 'ciudad', name: 'Ciudad', pop: 100, townhall: 3 },
+  { id: 'capital', name: 'Capital comarcal', pop: 200, townhall: 4 },
 ] as const;
 
 export const RANK = {
@@ -748,7 +748,7 @@ export const TRASH = {
   /** Con nieve, el camión no llega a las calles nevadas: recorre esta parte. */
   snowRoute: 0.5,
   /** Días de aviso desde que se puede construir el punto limpio hasta que la basura empieza a acumularse. */
-  warnDays: 20,
+  warnDays: 45, // ronda 17: con 20 llegaba justo cuando se ahorra para el ayuntamiento 3
   /** Partidas de antes (migradas): días de gracia antes de que se ensucien. */
   graceDays: 60,
   /** Nivel 2 (reciclaje): tasa más barata y facción ecologista más contenta. */

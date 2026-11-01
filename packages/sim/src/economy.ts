@@ -388,6 +388,8 @@ export function monthlyHousing(state: GameState, r: MonthRates): void {
   }
   for (const b of state.buildings) {
     if (!b.built || (b.kind !== 'house' && b.kind !== 'res')) continue;
+    // Ronda 17: una casa quemada no paga alquiler ni tributos hasta que se repare.
+    if (b.damaged?.cause === 'fuego') continue;
     const residents = byHome.get(b.id) ?? [];
     const ibi = Math.round((unitValue(state, b) * r.ibi) / 12);
     let municipal = municipalUnits(b);
@@ -449,7 +451,7 @@ export function serviceLoads(state: GameState): Map<number, number> {
   const key = `${state.tick}:${state.citizens.length}:${state.buildings.length}`;
   const hit = loadCache.get(state);
   if (hit && hit.key === key) return hit.loads;
-  const served = state.buildings.filter((b) => b.built && SERVICE_CAPACITY[b.kind]);
+  const served = state.buildings.filter((b) => b.built && !b.damaged && SERVICE_CAPACITY[b.kind]);
   const count = new Map<number, number>(served.map((b) => [b.id, 0]));
   const byId = new Map(state.buildings.map((b) => [b.id, b]));
   for (const c of state.citizens) {

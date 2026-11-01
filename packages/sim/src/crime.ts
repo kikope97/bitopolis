@@ -42,7 +42,7 @@ const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.
 
 /** Comisarías que cubren un sitio (las más cercanas primero). */
 export function stationsFor(state: GameState, x: number, y: number): Building[] {
-  return state.buildings.filter((b) => b.kind === 'police' && b.built && dist(b, { x, y }) <= radiusOf(b)).sort((a, b) => dist(a, { x, y }) - dist(b, { x, y }));
+  return state.buildings.filter((b) => b.kind === 'police' && b.built && !b.damaged && dist(b, { x, y }) <= radiusOf(b)).sort((a, b) => dist(a, { x, y }) - dist(b, { x, y }));
 }
 
 export function cellsUsed(state: GameState, stationId: number): number {
@@ -50,7 +50,7 @@ export function cellsUsed(state: GameState, stationId: number): number {
 }
 
 export function jailCapacity(state: GameState): number {
-  return state.buildings.filter((b) => b.kind === 'jail' && b.built).reduce((a, b) => a + jailPlacesOf(b), 0);
+  return state.buildings.filter((b) => b.kind === 'jail' && b.built && !b.damaged).reduce((a, b) => a + jailPlacesOf(b), 0);
 }
 
 /**

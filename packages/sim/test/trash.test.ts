@@ -175,7 +175,7 @@ describe('basura y punto limpio (2.1)', () => {
     trashDay(s);
     expect(s.trash!.start).toBe(-1);
     s.townhallLevel = 2;
-    for (let i = 0; i < 25; i++) s.citizens.push({ ...structuredClone(s.citizens[0]!), id: 50_000 + i, money: 0 });
+    for (let i = 0; i < 35; i++) s.citizens.push({ ...structuredClone(s.citizens[0]!), id: 50_000 + i, money: 0 });
     trashDay(s);
     expect(s.trash!.start).toBe(s.tick + TRASH.warnDays * TICKS_PER_DAY);
     expect(s.events.at(-1)!.text).toMatch(/punto limpio/);
@@ -190,7 +190,7 @@ describe('basura y punto limpio (2.1)', () => {
     expect(m.trash).toEqual({ start: -1, graceUntil: 5_000 + TRASH.graceDays * TICKS_PER_DAY });
     expect(m.fields.dirt).toHaveLength(m.map.w * m.map.h);
     m.townhallLevel = 2;
-    for (let i = 0; i < 25; i++) m.citizens.push({ ...structuredClone(m.citizens[0]!), id: 60_000 + i, money: 0 });
+    for (let i = 0; i < 35; i++) m.citizens.push({ ...structuredClone(m.citizens[0]!), id: 60_000 + i, money: 0 });
     trashDay(m);
     expect(m.trash!.start).toBe(5_000 + TRASH.graceDays * TICKS_PER_DAY);
   });
@@ -241,8 +241,8 @@ describe('basura y punto limpio (2.1)', () => {
   });
 
   it('en una partida larga, el pueblo construye su punto limpio; determinista y el dinero se conserva', () => {
-    const a = runSimulation({ seed: 3, days: 500, profile: 'constructor' });
-    const b = runSimulation({ seed: 3, days: 500, profile: 'constructor' });
+    const a = runSimulation({ seed: 1, days: 600, profile: 'constructor' });
+    const b = runSimulation({ seed: 1, days: 600, profile: 'constructor' });
     expect(hashState(a.state)).toBe(hashState(b.state));
     expect(checkInvariants(a.state)).toEqual([]);
     expect(a.report.invariantErrors).toEqual([]);

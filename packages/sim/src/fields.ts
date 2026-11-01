@@ -54,7 +54,8 @@ export function updateFields(state: GameState): void {
   }
 
   for (const b of state.buildings) {
-    if (!b.built) continue;
+    // Ronda 17: lo destrozado (fuego, disturbios) no actúa: ni policía ni fábrica.
+    if (!b.built || b.damaged) continue;
     switch (b.kind) {
       case 'factory':
         stamp(emit, w, h, b.x, b.y, 4, 9);
