@@ -100,15 +100,15 @@ for (const text of [100, 200] as const) {
     await page.screenshot({ path: `test-results/capturas/${info.project.name}-rangos-4-mientras-${text}.png` });
 
     // Con el botón «Siguiente».
-    await away.getByRole('button', { name: 'Momento siguiente' }).click();
+    await away.getByRole('button', { name: 'Siguiente ›' }).click();
     await expect(away.locator('.away-status')).toHaveText(`2 de ${n}`);
     // Deslizando (scroll con imán, como el dedo).
     await away.locator('.away-track').evaluate((el) => el.scrollTo({ left: el.clientWidth * 2, behavior: 'auto' }));
     await expect(away.locator('.away-status')).toHaveText(`3 de ${n}`);
     await page.screenshot({ path: `test-results/capturas/${info.project.name}-rangos-5-mientras-${text}-3.png` });
     // Hasta el final: «A jugar» cierra la tarjeta.
-    for (let i = 3; i < n; i++) await away.getByRole('button', { name: 'Momento siguiente' }).click();
-    await away.getByRole('button', { name: 'Cerrar y seguir jugando' }).click();
+    for (let i = 3; i < n; i++) await away.getByRole('button', { name: 'Siguiente ›' }).click();
+    await away.getByRole('button', { name: 'A jugar' }).click();
     await expect(away).toBeHidden();
     expect(errors).toEqual([]);
   });

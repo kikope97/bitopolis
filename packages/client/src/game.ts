@@ -1478,6 +1478,8 @@ export function startGame(opts: GameOptions): void {
           // Ronda 12: tocar algo bloqueado no hacía nada; ahora explica qué falta.
           trayMsg.textContent = lockLong(tl, state);
           trayMsg.classList.remove('muted');
+          // Ronda 17: la bandeja puede estar desplazada; el motivo también sale como aviso.
+          toast(lockLong(tl, state), { kind: 'warn' });
           sfx.error();
           vibrate(30);
           return;
@@ -1707,7 +1709,7 @@ export function startGame(opts: GameOptions): void {
       // 2.1: ardiendo o en riesgo de incendio.
       if (b.fire) {
         const left = Math.max(1, b.fire.until - state.tick);
-        content.push(h('div', { class: 'petition danger-box', 'data-fire': 'ardiendo' }, pixelIcon('fire'), h('p', {}, h('strong', {}, '¡Ardiendo! '), b.fire.covered ? `Los bomberos lo están apagando: unas ${plural(left, 'hora', 'horas')} más.` : `No hay bomberos que lleguen: arderá unas ${plural(left, 'hora', 'horas')} y quedará destrozado. Puede saltar a lo de al lado.`)));
+        content.push(h('div', { class: 'petition danger-box', 'data-fire': 'ardiendo' }, pixelIcon('fire'), h('p', {}, h('strong', {}, '¡Ardiendo! '), b.fire.covered ? `Los bomberos lo están apagando: unas ${left > 48 ? plural(Math.ceil(left / 24), 'día', 'días') : plural(left, 'hora', 'horas')} más.` : `No hay bomberos que lleguen: arderá unas ${left > 48 ? plural(Math.ceil(left / 24), 'día', 'días') : plural(left, 'hora', 'horas')} y quedará destrozado. Puede saltar a lo de al lado.`)));
       } else if (b.risk) {
         const covered = fireCovered(state, b);
         content.push(h('div', { class: 'petition warn-box', 'data-fire': 'riesgo' }, pixelIcon('fire'), h('p', {}, h('strong', {}, 'En riesgo de incendio '), `(${b.risk.why}). `, covered ? 'Los bomberos llegan a tiempo: si prende, solo será un susto.' : 'No hay bomberos cerca: si prende, quedará destrozado. Un parque de bomberos en 9 casillas lo evita.')));
@@ -1865,7 +1867,7 @@ export function startGame(opts: GameOptions): void {
     if (st === 'ratas') return row('rat', 'Basura', false, `Ratas: ${bagsText(b)} sin recoger`);
     if (st === 'bolsas') return row('trash', 'Basura', 'warn', `${bagsText(b)} en la calle${by ? '' : ' · no pasa el camión'}`);
     if (by) return row('trash', 'Basura', true, `Pasa el camión${levelOf(by) >= 2 ? ' · reciclaje' : ''}`);
-    return row('trash', 'Basura', 'warn', 'No pasa el camión (no paga la tasa)');
+    return row('trash', 'Basura', 'warn', 'No pasa el camión: no se le cobra la tasa');
   }
 
   /** Vecinos de un edificio: una fila por persona con retrato y lo esencial (v1.6). */

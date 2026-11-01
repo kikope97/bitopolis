@@ -1061,7 +1061,7 @@ body.placing .tut-arrow { visibility: hidden; }
 
 /* 2.1: «Mientras no estabas»: momentos que se deslizan (con imán) y botones. */
 .away { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.away-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; gap: 0; touch-action: pan-x pan-y; }
+.away-track { display: flex; align-items: flex-start; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; gap: 0; touch-action: pan-x pan-y; }
 .away-track::-webkit-scrollbar { display: none; }
 .away-slide { flex: 0 0 100%; min-width: 0; scroll-snap-align: start; scroll-snap-stop: always; padding: 8px 10px 10px; border: 2px solid var(--line); background: var(--bg); overflow-wrap: anywhere; }
 .away-slide h3 { margin: 0 0 8px; color: var(--accent); }
@@ -1079,7 +1079,7 @@ body.placing .tut-arrow { visibility: hidden; }
 .away-legend .sw.down { background: var(--bad); }
 .away-todo { margin: 0; padding-left: 20px; }
 .away-todo li { margin-bottom: 4px; }
-.away-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.away-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; position: sticky; bottom: 0; z-index: 1; background: var(--panel); padding: 4px 0; }
 .away-nav .btn { min-height: 48px; min-width: 48px; }
 .away-status { margin: 0; color: var(--muted); white-space: nowrap; }
 .away-dots { display: flex; justify-content: center; gap: 4px; }
@@ -1090,3 +1090,4 @@ body.placing .tut-arrow { visibility: hidden; }
   .away-nav .btn { padding: 4px 8px; }
   html[data-text='200'] .away-rank, html[data-text='200'] .away-who { flex-direction: column; }
 }
+.press-help { margin: 4px 0 6px; padding-left: 18px; }

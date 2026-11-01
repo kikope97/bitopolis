@@ -112,13 +112,15 @@ export function openPress(ctx: SocialCtx, onRef?: (ref: number) => void): void {
         box.append(h('p', { class: 'muted small' }, 'Contestar en el periódico (una vez por edición):'));
         const row = h('div', { class: 'row wrap' });
         const opts: [string, 'agradecer' | 'desmentir' | 'prometer', string][] = [
-          ['Agradecer', 'agradecer', 'Gusta a quien ya te apoya'],
-          ['Desmentir', 'desmentir', 'Calma un rumor; si no lo hay, queda raro'],
-          ['Prometer', 'prometer', 'Promete el primer encargo pendiente'],
+          ['Agradecer', 'agradecer', 'gusta a quien ya te apoya'],
+          ['Desmentir', 'desmentir', 'calma un rumor; si no lo hay, queda raro'],
+          ['Prometer', 'prometer', 'promete en el periódico el primer encargo del pueblo que tienes por responder'],
         ];
         const anyOffered = s.errands?.list.some((e) => e.status === 'ofrecido');
+        // Ronda 17: lo que hace cada respuesta, a la vista (en el móvil no hay `title`).
+        box.append(h('ul', { class: 'press-help muted small' }, ...opts.map(([l, , help]) => h('li', {}, h('strong', {}, l), `: ${help}`))));
         for (const [label, answer, help] of opts) {
-          const b = h('button', { class: 'btn', title: help, 'aria-label': `${label}: ${help}` }, label);
+          const b = h('button', { class: 'btn', 'aria-label': `${label}: ${help}` }, label);
           if (answer === 'prometer' && !anyOffered) b.setAttribute('disabled', 'true');
           b.addEventListener('click', async () => {
             if (await ctx.command({ type: 'AnswerPress', edition: ed.n, answer })) openPress(ctx, onRef);

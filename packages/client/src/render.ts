@@ -531,7 +531,9 @@ export function render(
       // 2.1: llamas (2 fotogramas, sin destellos) y aviso de riesgo encima.
       if (b.fire) {
         const frame = still ? 0 : Math.floor(opts.time / 280 + b.id) % 2;
-        ctx.drawImage(flamesSprite(frame, tod), px, py, ts, BH * z);
+        // Ronda 17: con el zoom lejano del móvil, llamas más grandes para que el fuego se vea.
+        const big = ts < 26 ? 2 : 1;
+        ctx.drawImage(flamesSprite(frame, tod), px - (ts * (big - 1)) / 2, py - BH * z * (big - 1), ts * big, BH * z * big);
         for (let k = 0; k < 3; k++) {
           const life = still ? (k + 0.5) / 3 : ((opts.time / 1800 + k / 3 + hash(b.id, k, 5) * 0.2) % 1);
           puffs.push({ x: x * T + 14 + Math.round(life * 6 + Math.sin(life * 5 + b.id) * 2), y: y * T - (BH - T) + 4 - Math.round(life * 18), size: Math.min(2, 1 + Math.floor(life * 2)) });

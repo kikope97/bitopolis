@@ -157,9 +157,9 @@ export function openAway(token: string, state: GameState, since: AwaySince, act:
   const slides = parts.map((p, i) => slide(i, n, p.title, ...p.body));
   const track = h('div', { class: 'away-track', tabindex: '0', 'aria-label': 'Momentos: desliza o usa los botones' }, ...slides);
   const status = h('p', { class: 'away-status', 'aria-live': 'polite' }, `1 de ${n}`);
-  const prev = h('button', { class: 'btn away-prev', 'aria-label': 'Momento anterior' }, '‹ Anterior');
-  const next = h('button', { class: 'btn away-next', 'aria-label': 'Momento siguiente' }, 'Siguiente ›');
-  const dots = h('div', { class: 'away-dots' }, ...slides.map((_, i) => h('button', { class: 'away-dot', 'aria-label': `Ir al momento ${i + 1} de ${n}` }, '')));
+  const prev = h('button', { class: 'btn away-prev' }, '‹ Anterior');
+  const next = h('button', { class: 'btn away-next' }, 'Siguiente ›');
+  const dots = h('div', { class: 'away-dots' }, ...slides.map((_, i) => h('button', { class: 'away-dot', tabindex: '-1', 'aria-label': `Ir al momento ${i + 1} de ${n}` }, '')));
   let at = 0;
   // Mientras se desliza por un botón, el contador no sigue al scroll (iría por los intermedios).
   let auto = 0;
@@ -170,7 +170,8 @@ export function openAway(token: string, state: GameState, since: AwaySince, act:
     status.textContent = `${at + 1} de ${n}`;
     (prev as HTMLButtonElement).disabled = at === 0;
     next.textContent = at === n - 1 ? 'A jugar' : 'Siguiente ›';
-    next.setAttribute('aria-label', at === n - 1 ? 'Cerrar y seguir jugando' : 'Momento siguiente');
+    // Ronda 17: el nombre accesible contiene el texto visible; los momentos que no se ven, inertes.
+    slides.forEach((sl, k) => ((sl as HTMLElement).inert = k !== at));
     [...dots.children].forEach((d, k) => d.setAttribute('aria-current', String(k === at)));
   };
   prev.addEventListener('click', () => show(at - 1));
