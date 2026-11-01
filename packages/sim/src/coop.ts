@@ -56,7 +56,7 @@ export function coopLevelName(state: GameState): string {
   const crops = new Set(state.coop.members.map((id) => state.citizens.find((c) => c.id === id)).map((c) => (c ? farmOf(state, c)?.crop : undefined)));
   const olive = crops.has('olivar');
   const wine = crops.has('vinedo');
-  return olive && !wine ? 'almazara' : wine && !olive ? 'bodega' : 'almazara y bodega';
+  return olive && !wine ? 'almazara' : wine && !olive ? 'bodega' : olive && wine ? 'almazara y bodega' : 'almazara o bodega';
 }
 
 /** ¿Puede hacerse socio? (hay cooperativa, tiene finca y no lo es ya) */

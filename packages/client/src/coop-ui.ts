@@ -38,7 +38,7 @@ export function coopPostBox(state: GameState, b: Building, list: (cs: Citizen[])
     h('h3', {}, pixelIcon('sheaf'), lv >= 2 ? ` Cooperativa con ${coopLevelName(state)}` : ' Cooperativa'),
     off,
     h('p', {}, h('strong', {}, `${plural(members.length, 'socio', 'socios')}`), ` de ${plural(farmers.length, 'vecino con finca', 'vecinos con finca')}`, pres ? ` · preside ${pres.name}` : ''),
-    h('p', {}, `Vende la cosecha de sus socios un ${pct || Math.round(COOP.priceFx * 100)} % más cara${lv < 2 ? ` (con la ${coopLevelName(state)}, nivel 2, un ${Math.round(COOP.priceFxLevel2 * 100)} %)` : ''}. Cada socio paga ${money(COOP.fee)} al mes.`),
+    h('p', {}, `Vende la cosecha de sus socios un ${pct || Math.round(COOP.priceFx * 100)}\u00a0% más cara${lv < 2 ? ` (con la ${coopLevelName(state)}, nivel 2, un ${Math.round(COOP.priceFxLevel2 * 100)}\u00a0%)` : ''}. Cada socio paga ${money(COOP.fee)} al mes.`),
     h('p', {}, h('strong', {}, 'Para el reparto: '), `${money(b.cash)} en caja`, state.coop.yearBonus ? ` (${money(state.coop.yearBonus)} del sobreprecio de este año)` : '', coopSurplus(state) ? ` y ${money(coopSurplus(state))} de excedente sin vender` : '', '.'),
     state.coop.shareYear !== undefined
       ? h('p', { 'data-share': String(state.coop.lastShare ?? 0) }, `Reparto del año ${state.coop.shareYear}: ${money(state.coop.lastShare ?? 0)}${state.coop.perMember ? ` (${money(state.coop.perMember)} por socio)` : ''}.`)
