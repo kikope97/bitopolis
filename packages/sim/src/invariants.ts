@@ -1,5 +1,6 @@
 import { HOMES, LISTS } from './balance.ts';
 import { farmInvariants } from './farm.ts';
+import { loanInvariants } from './invariants-loans.ts';
 import { totalInternalMoney } from './money.ts';
 import type { GameState } from './state.ts';
 import { streetErrors } from './streets.ts';
@@ -55,6 +56,8 @@ export function checkInvariants(state: GameState): string[] {
   errors.push(...tenderErrors(state), ...streetErrors(state));
   // 2.2: fincas solo en zona agraria y con el cultivo de su terreno.
   errors.push(...farmInvariants(state));
+  // 2.2: préstamos municipales.
+  errors.push(...loanInvariants(state));
   errors.push(...listInvariants(state));
   return errors;
 }

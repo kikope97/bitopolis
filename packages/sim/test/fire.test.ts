@@ -154,6 +154,10 @@ describe('incendios (2.1)', () => {
     let spread = 0;
     for (let k = 0; k < 30; k++) {
       const s = town();
+      // 2.2: con préstamos, el constructor ya tiene bomberos a los 300 días: este caso es sin ellos.
+      const stations = new Set(s.buildings.filter((x) => x.kind === 'firestation').map((x) => x.id));
+      s.buildings = s.buildings.filter((x) => !stations.has(x.id));
+      for (const c of s.citizens) if (c.jobId !== null && stations.has(c.jobId)) c.jobId = null;
       s.rng = seedRng(500 + k);
       const b = target(s);
       // Un vecino pegado (en una casilla libre de alrededor).

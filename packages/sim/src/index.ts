@@ -43,3 +43,5 @@ export * from './trash.ts';
 export * from './tenders.ts';
 export * from './streets.ts';
 export * from './farm.ts';
+export * from './loans.ts';
+export * from './invariants-loans.ts';

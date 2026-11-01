@@ -423,6 +423,39 @@ export interface GameState {
   /** 2.2: licitaciones de obras (las últimas; ver tenders.ts) y calles con nombre (streets.ts). */
   tenders?: Tender[];
   streetNames?: StreetName[];
+  /** 2.2: préstamos municipales (loans.ts), nota de las cuentas y contabilidad (Σ left = lent − repaid). */
+  loans: Loan[];
+  rating: Rating;
+  loanLedger: LoanLedger;
+}
+
+/** 2.2: nota de las cuentas del ayuntamiento (A la mejor). */
+export type Rating = 'A' | 'B' | 'C' | 'D';
+
+/** 2.2: un préstamo vivo (los devueltos se quitan). Importes enteros. */
+export interface Loan {
+  id: number;
+  /** Lo que se prestó (en los de tesorería, la suma de los huecos refinanciados). */
+  principal: number;
+  /** Lo que queda por devolver (sin intereses). */
+  left: number;
+  /** Cuota fija mensual (capital + intereses). */
+  quota: number;
+  /** Interés mensual. */
+  rate: number;
+  monthsLeft: number;
+  kind: 'banco' | 'tesoreria';
+  tick: number;
+}
+
+export interface LoanLedger {
+  /** Capital prestado y devuelto desde el principio. */
+  lent: number;
+  repaid: number;
+  /** Intereses y comisiones pagados. */
+  interest: number;
+  /** Ticks de los préstamos de tesorería de los últimos 12 meses (para la nota). */
+  treasuryTicks: number[];
 }
 
 export interface Emergencies {
@@ -542,6 +575,9 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiSh
     rank: emptyRank(seed, terrain),
     trash: { start: -1 },
     streetNames: [],
+    loans: [],
+    rating: 'B',
+    loanLedger: { lent: 0, repaid: 0, interest: 0, treasuryTicks: [] },
   };
   // Árboles dispersos (se talan gratis al construir encima).
   for (let i = 0; i < tiles.length; i++) {

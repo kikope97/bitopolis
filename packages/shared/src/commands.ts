@@ -118,6 +118,9 @@ export const Command = z.discriminatedUnion('type', [
     type: z.literal('ChooseCrest'),
     votes: z.array(z.object({ vecino: z.number().int(), pieza: z.string().regex(/^[a-z_]+$/).max(20), lema: z.string().regex(/^[a-z_]+$/).max(40) })).min(1).max(300),
   }),
+  /** 2.2: préstamo municipal (múltiplos de 1.000 €, a 12, 24 o 48 meses) y amortización anticipada (con comisión). */
+  z.object({ type: z.literal('RequestLoan'), amount: z.number().int().min(1_000).max(200_000).multipleOf(1_000), months: z.union([z.literal(12), z.literal(24), z.literal(48)]) }),
+  z.object({ type: z.literal('RepayLoan'), loanId: z.number().int().min(1), amount: z.number().int().min(1).max(10_000_000) }),
   /** 2.0: % de vecinos con IA (solo sube: nadie deja de pensar con IA). */
   z.object({ type: z.literal('SetAiShare'), share: z.number().int().min(0).max(100) }),
   /** 2.0: días de juego entre turnos de la IA (el cliente los alarga a x3/x10). */

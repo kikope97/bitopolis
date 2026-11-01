@@ -505,6 +505,8 @@ html[data-text='200'] { --ui: 1.3; }
 .tb-stat .tb-text { overflow: hidden; text-overflow: ellipsis; }
 #hud-money { flex: 1 1 auto; justify-content: flex-start; }
 #hud-money.neg { color: var(--bad); }
+/* 2.2: los préstamos se llevan más del 25 % de lo que entra. */
+#hud-money.load { color: var(--accent); }
 .trend { font-size: 0.8em; }
 .trend.up { color: var(--good); }
 .trend.down { color: var(--bad); }
@@ -1117,3 +1119,24 @@ body.placing .tut-arrow { visibility: hidden; }
 .tc-risk { font-size: 0.875rem; color: var(--bad); }
 .tc-risk.ok { color: var(--good); }
 .street-card .street-pick { display: block; text-align: left; margin-top: 6px; min-height: 48px; }
+
+/* ---------- 2.2: préstamos (Dinero › Préstamos) ---------- */
+.loan-head { display: flex; gap: 12px; align-items: center; }
+.loan-head p { margin: 2px 0; }
+.loan-badge { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 2px solid var(--line); border-radius: 4px; font-weight: 700; font-size: 1.5rem; background: var(--bg); }
+.loan-badge.r-A { color: var(--good); border-color: var(--good); }
+.loan-badge.r-B { color: var(--blue); border-color: var(--blue); }
+.loan-badge.r-C { color: var(--accent); border-color: var(--accent); }
+.loan-badge.r-D { color: var(--bad); border-color: var(--bad); }
+.loan-amount { display: flex; gap: 8px; align-items: stretch; margin: 8px 0; }
+.loan-step { min-width: 44px; min-height: 44px; padding: 0 12px; font-size: 1.4rem; }
+.loan-value { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; min-height: 44px; border: 2px solid var(--line); border-radius: 4px; font-weight: 700; font-variant-numeric: tabular-nums; background: var(--bg); }
+.loan-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.loan-chip { flex: 1 1 0; min-width: 0; min-height: 44px; padding: 6px 8px; }
+.loan-chip[aria-checked='true'] { border-color: var(--accent); box-shadow: inset 0 -4px 0 var(--accent); }
+.loan-offer { margin: 10px 0 4px; }
+.loan-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.loan-item { padding: 8px 12px; border: 2px solid var(--line); background: var(--bg); }
+.loan-item.tesoreria { border-left: 6px solid var(--accent); }
+.loan-item p { margin: 4px 0; }
+.loan-repay { width: 100%; margin-top: 4px; }

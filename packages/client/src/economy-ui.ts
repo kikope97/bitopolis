@@ -172,6 +172,8 @@ const CONCEPT: Record<string, string> = {
   mantenimiento: 'Mantenimiento',
   obras: 'Obras',
   intereses: 'Intereses de la deuda',
+  préstamo: 'Préstamos recibidos',
+  préstamos: 'Cuotas de los préstamos',
   alquileres: 'Alquileres municipales',
   IBI: 'IBI',
   tasas: 'Tasas',

@@ -1,14 +1,11 @@
+import { loansMonth } from './loans.ts';
 import { errandsDay } from './errands.ts';
 import { pressDay } from './press.ts';
 import { TICKS_PER_DAY, TICKS_PER_MONTH, tickToDate } from '@bitopolis/shared';
 import {
   BUSINESS_SEED_CASH,
   COMMUTER_DAILY,
-  DEBT_INTEREST,
   FOUND_MIN_MONEY,
-  DEBT_INTEREST_CAP,
-  DEBT_INTEREST_HIGH,
-  DEBT_INTEREST_STEP,
   DEBT_LIMIT,
   FACTORY_REVENUE_PER_WORKER,
   GROWTH,
@@ -709,16 +706,12 @@ function endOfMonth(state: GameState): void {
   lifeMonth(state);
   // 2.1: voluntarios de protección civil (por reglas).
   volunteersMonth(state);
-  if (state.treasury < 0) {
-    const debt = -state.treasury;
-    const interest = Math.min(debt, DEBT_INTEREST_STEP) * DEBT_INTEREST + Math.max(0, debt - DEBT_INTEREST_STEP) * DEBT_INTEREST_HIGH;
-    // Tope: los intereses no pasan de una parte de lo ingresado en el mes (si no, la deuda no se paga nunca).
-    const cap = Math.max(100, state.month.income * DEBT_INTEREST_CAP);
-    transfer(state, TREASURY, OUTSIDE, Math.ceil(Math.min(interest, cap)), 'intereses');
-  }
   monthlyMarket(state);
+  // 2.2: cuotas de los préstamos, préstamo de tesorería si la caja sigue en negativo y nota nueva.
+  loansMonth(state);
 
-  if (state.treasury < -DEBT_LIMIT) state.debtMonths++;
+  // Quiebra: nota D y caja por debajo de −DEBT_LIMIT tres meses seguidos.
+  if (state.treasury < -DEBT_LIMIT && state.rating === 'D') state.debtMonths++;
   else state.debtMonths = 0;
   if (state.debtMonths >= 3 && !state.bankrupt) {
     state.bankrupt = true;

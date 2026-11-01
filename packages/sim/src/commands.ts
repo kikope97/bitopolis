@@ -1,3 +1,4 @@
+import { canRepayLoan, canRequestLoan, repayLoan, requestLoan } from './loans.ts';
 import { answerErrand, canAnswerErrand } from './errands.ts';
 import { farmZoneUnlocked } from './farm.ts';
 import { answerPress, canAnswerPress } from './press.ts';
@@ -303,6 +304,10 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       return (state.minWage ?? 'none') === cmd.level ? { ok: false, error: 'Ya está en ese nivel' } : { ok: true };
     case 'SettleDebt':
       return canSettleDebt(state, state.citizens.find((c) => c.id === cmd.citizenId), cmd.mode);
+    case 'RequestLoan':
+      return canRequestLoan(state, cmd.amount, cmd.months);
+    case 'RepayLoan':
+      return canRepayLoan(state, cmd.loanId, cmd.amount);
     case 'GrantMicrocredit':
       return canMicrocredit(state, state.citizens.find((c) => c.id === cmd.citizenId));
     case 'ConvenePleno': {
@@ -503,6 +508,12 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       pushEvent(state, 'info', cmd.mode === 'aplazar' ? `Aplazas la deuda de ${c.name}: pagará ${c.debt?.plan?.perMonth ?? 0} € al mes durante un año, sin recargo` : `Perdonas a ${c.name} los ${amount} € que debía al ayuntamiento`, { ref: c.id });
       break;
     }
+    case 'RequestLoan':
+      requestLoan(state, cmd.amount, cmd.months);
+      break;
+    case 'RepayLoan':
+      repayLoan(state, cmd.loanId, cmd.amount);
+      break;
     case 'GrantMicrocredit': {
       const c = state.citizens.find((x) => x.id === cmd.citizenId)!;
       grantMicrocredit(state, c);
