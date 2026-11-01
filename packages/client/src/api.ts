@@ -47,10 +47,25 @@ export const api = {
     call<{ state: GameState; mode: string }>('POST', `/api/games/${token}`, { mode, sessionId, ...start }),
   claim: (token: string, sessionId: string, force = false) =>
     call<{ state: GameState; mode: string }>('POST', `/api/games/${token}/claim`, { sessionId, force }),
-  release: (token: string, sessionId: string) =>
-    call<{ ok: boolean }>('POST', `/api/games/${token}/release`, { sessionId }, true).catch(() => null),
-  save: (token: string, sessionId: string, b: SaveBatch & { live?: boolean }, keepalive = false) =>
+  // Con beacon, como `saveOnExit`: se suele mandar al cerrar la página.
+  release: async (token: string, sessionId: string) => {
+    const url = `/api/games/${token}/release`;
+    if (navigator.sendBeacon?.(url, new Blob([JSON.stringify({ sessionId })], { type: 'application/json' }))) return { ok: true };
+    return call<{ ok: boolean }>('POST', url, { sessionId }, true).catch(() => null);
+  },
+  save: (token: string, sessionId: string, b: SaveBatch & { live?: boolean; release?: boolean; parts?: { toTick: number; hash: string; n: number }[] }, keepalive = false) =>
     call<{ ok: true; tick: number }>('PUT', `/api/games/${token}/save`, { sessionId, ...b }, keepalive),
+  /**
+   * Guardado al cerrar o recargar la página: `sendBeacon` llega aunque la página ya no exista (un
+   * `fetch` con `keepalive` se perdía a veces con el service worker activo). Si el navegador no lo
+   * acepta (sin beacon o demasiado grande), se intenta con `keepalive`.
+   */
+  saveOnExit: (token: string, sessionId: string, b: SaveBatch & { live?: boolean; release?: boolean; parts?: { toTick: number; hash: string; n: number }[] }) => {
+    const body = JSON.stringify({ sessionId, ...b });
+    const url = `/api/games/${token}/save`;
+    if (navigator.sendBeacon?.(url, new Blob([body], { type: 'application/json' }))) return;
+    void fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => null);
+  },
   aiMeta: () => call<AiMeta>('GET', '/api/ai/meta'),
   aiConfig: (token: string) => call<AiSettings>('GET', `/api/games/${token}/ai-config`),
   saveAiConfig: (token: string, body: Record<string, unknown>) => call<AiSettings>('PUT', `/api/games/${token}/ai-config`, body),

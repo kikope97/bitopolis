@@ -144,7 +144,8 @@ function opener(c: Citizen): string {
 
 const TEMPLATES: Record<PlenoRole, string[]> = {
   pide: ['vengo a pedir {need}. Lo necesitamos ya.', 'pido {need}. No es un capricho, es lo que falta.', 'traigo una petición sencilla, {need}.'],
-  oposicion: ['{party} pregunta al alcalde qué pasa con lo de {need}.', 'desde {party} queremos saber por qué seguimos sin {need}.'],
+  // Habla el líder del partido: en primera persona y sin comillas («Desde Jóvenes por Bitópolis preguntamos…»).
+  oposicion: ['desde {party} preguntamos al alcalde qué pasa con lo de {need}.', 'en {party} queremos saber por qué seguimos sin {need}.'],
   a_favor: ['apoyo a {asker}: hace falta {need} y lo sabe todo el pueblo.', 'estoy con {asker}. Sin {need} esto no avanza.'],
   en_contra: ['yo no lo veo. Antes de {need} hay otras cosas que arreglar.', 'no estoy de acuerdo con pedir {need} ahora mismo.'],
 };
@@ -157,7 +158,7 @@ export function plenoRuleLine(state: GameState, pleno: PlenoTalkInput, s: Speake
   const p = pleno.petitions.find((x) => x.id === s.petitionId);
   const need = p ? NEED_TEXT[p.need] : 'mejoras para el pueblo';
   const asker = first(state.citizens.find((x) => x.id === p?.citizenId));
-  const party = state.politics.party ? `«${state.politics.party.name}»` : 'la oposición';
+  const party = state.politics.party ? state.politics.party.name : 'la oposición';
   const list = TEMPLATES[s.role];
   const body = list[hash32(s.id, pleno.tick, 5) % list.length]!.replace('{need}', need).replace('{asker}', asker).replace('{party}', party);
   const open = c ? opener(c) : '';

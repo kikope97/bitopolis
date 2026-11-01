@@ -9,7 +9,9 @@ import {
   checkInvariants,
   CIVIL,
   createInitialState,
+  destroyedWord,
   directorMenu,
+  placeAgreement,
   FIRE,
   fireCovered,
   fireDay,
@@ -365,4 +367,14 @@ describe('formato 14 y determinismo (2.1)', () => {
     expect(hashState(a)).toBe(hashState(b));
     expect(checkInvariants(a)).toEqual([]);
   }, 240_000);
+});
+
+describe('concordancia de los avisos del fuego', () => {
+  it('«unas viviendas destrozadas», «la ermita destrozada», «el bar destrozado»', () => {
+    expect(destroyedWord('unas viviendas')).toBe('destrozadas');
+    expect(destroyedWord('la ermita')).toBe('destrozada');
+    expect(destroyedWord('el bar')).toBe('destrozado');
+    expect(destroyedWord('Bar de Lucía')).toBe('destrozado');
+    expect(placeAgreement('unas viviendas')).toEqual({ fem: true, plural: true });
+  });
 });

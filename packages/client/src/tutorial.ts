@@ -4,7 +4,8 @@ import { $, confirmDialog, h } from './ui.ts';
 
 /** Tutorial guiado (~3 min): una flecha señala qué tocar. */
 interface Step {
-  text: string;
+  /** Texto; puede depender del puntero (ratón o dedo). */
+  text: string | (() => string);
   /** Selector del elemento al que apunta la flecha (o null: el mapa). */
   target: (tool: ToolId) => string | null;
   done: (s: GameState, tool: ToolId, ctx: Ctx) => boolean;
@@ -16,6 +17,7 @@ interface Ctx {
   roads0: number;
 }
 
+const coarse = () => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 const roadCount = (s: GameState) => s.map.tiles.filter((t) => t === 1).length;
 /** v1.6: las obras están en la bandeja «Construir»: primero la pestaña, luego la casilla. */
 const inTray = (id: string) => (document.querySelector('#tray:not([hidden])') ? `#tray [data-tool="${id}"]` : '#tab-build');
@@ -28,7 +30,11 @@ const STEPS: Step[] = [
     done: (s, tool, c) => tool === 'road' || roadCount(s) > c.roads0,
   },
   {
-    text: 'Toca el final de la calle del ayuntamiento y luego dónde quieres que acabe. Confirma con «Construir».',
+    // Con ratón no hay barra «Construir»: se confirma con un segundo clic en el final.
+    text: () =>
+      coarse()
+        ? 'Toca el final de la calle del ayuntamiento y luego dónde quieres que acabe. Confirma con «Construir».'
+        : 'Haz clic en el final de la calle del ayuntamiento y luego dónde quieres que acabe. Haz clic otra vez en el final para confirmar.',
     target: () => null,
     done: (s, _t, c) => roadCount(s) > c.roads0,
   },
@@ -71,6 +77,10 @@ const STEPS: Step[] = [
     done: (s) => s.map.zones.some((z) => z === 1),
   },
 ];
+
+/** Pasos de obras que se pueden comprobar en el pueblo (agua, luz, casa). */
+const FIRST_BUILD_STEP = 2;
+const LAST_BUILD_STEP = 4;
 
 export class Tutorial {
   private step = 0;
@@ -121,6 +131,13 @@ export class Tutorial {
     this.ctx.roads0 = roadCount(state);
     // v1.6: al volver, se saltan los pasos que el pueblo ya tiene hechos (antes empezaba en «Bienvenido»).
     if (!fromScratch && (has(state, 'water') || has(state, 'power') || has(state, 'house'))) this.step = Math.max(this.step, 2);
+    // El paso guardado nunca va por delante del pueblo: si falta el agua (o la luz, o la casa) de un
+    // paso ya pasado, se vuelve a él (p. ej. una partida que no llegó a guardarse).
+    if (!fromScratch) {
+      const was = this.step;
+      while (this.step > FIRST_BUILD_STEP && this.step <= LAST_BUILD_STEP + 1 && !STEPS[this.step - 1]!.done(state, 'inspect', this.ctx)) this.step--;
+      if (this.step !== was) this.save();
+    }
     while (!fromScratch && this.step > 1 && this.active && this.step < STEPS.length - 1 && STEPS[this.step]!.done(state, 'inspect', this.ctx)) this.step++;
     if (this.active) {
       $('#app').append(this.box, this.arrow);
@@ -136,6 +153,7 @@ export class Tutorial {
   }
 
   finish() {
+    this.mark(null);
     this.step = STEPS.length;
     this.box.remove();
     this.arrow.remove();
@@ -159,22 +177,36 @@ export class Tutorial {
       this.onFocus?.(cur.focus);
     }
     const p = this.box.querySelector('p')!;
-    if (p.textContent !== cur.text) p.textContent = cur.text;
+    const text = typeof cur.text === 'function' ? cur.text() : cur.text;
+    if (p.textContent !== text) p.textContent = text;
     // Los botones del mapa suben por encima de la caja (ronda 12: la caja tapaba «Capas» y «?»).
     if (this.box.isConnected) document.documentElement.style.setProperty('--tut-h', `${this.box.offsetHeight + 8}px`);
     const sel = cur.target(tool);
     const target = sel ? document.querySelector<HTMLElement>(sel) : null;
+    this.mark(target);
     if (!target) {
       this.arrow.hidden = true;
       return;
     }
     target.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
     const r = target.getBoundingClientRect();
-    this.arrow.hidden = false;
+    // Botones de la barra de arriba (▶): la flecha apunta hacia arriba, por debajo del botón (encima del mapa, sin texto).
+    const up = !!target.closest('.topbar');
+    // Ronda 21: abajo (pestañas, bandeja) la flecha flotante pisaba la franja («Z▼as») y los títulos de la bandeja.
+    // Ahora el propio botón lleva el marco y una flecha pequeña en su borde de arriba (tut-target, style.css).
+    this.arrow.hidden = !up;
+    if (!up) return;
     this.arrow.style.left = `${Math.round(r.left + r.width / 2 - 12)}px`;
-    // Botones de arriba (▶): la flecha apunta hacia arriba, por debajo del botón.
-    const up = r.top < window.innerHeight / 3;
-    this.arrow.textContent = up ? '▲' : '▼';
-    this.arrow.style.top = `${Math.round(up ? r.bottom + 6 : r.top - 30)}px`;
+    this.arrow.textContent = '▲';
+    this.arrow.style.top = `${Math.round(r.bottom + 6)}px`;
+  }
+
+  /** Marca el elemento señalado (y desmarca el anterior). */
+  private marked: HTMLElement | null = null;
+  private mark(el: HTMLElement | null) {
+    if (this.marked === el) return;
+    this.marked?.classList.remove('tut-target');
+    this.marked = el;
+    el?.classList.add('tut-target');
   }
 }

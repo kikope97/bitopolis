@@ -259,11 +259,16 @@ export function isSheetOpen() {
 }
 
 /** Confirmación para acciones caras o irreversibles. "No" es el botón principal. */
-export function confirmDialog(title: string, text: string, yes: string): Promise<boolean> {
+/**
+ * Diálogo de confirmación. Por defecto, para lo que no se deshace: «No» es el
+ * principal y el sí va en rojo. Con `safe` (gastos normales, como convocar un
+ * pleno), el sí es el principal y «No» un botón normal.
+ */
+export function confirmDialog(title: string, text: string, yes: string, opts: { safe?: boolean } = {}): Promise<boolean> {
   return new Promise((resolve) => {
     const prev = document.activeElement as HTMLElement | null;
-    const no = h('button', { class: 'btn primary' }, 'No');
-    const ok = h('button', { class: 'btn danger' }, yes);
+    const no = h('button', { class: opts.safe ? 'btn' : 'btn primary' }, 'No');
+    const ok = h('button', { class: opts.safe ? 'btn primary' : 'btn danger' }, yes);
     const dlg = h(
       'div',
       { class: 'modal-backdrop' },
@@ -282,7 +287,7 @@ export function confirmDialog(title: string, text: string, yes: string): Promise
     ok.addEventListener('click', () => done(true));
     dlg.addEventListener('keydown', (e) => e.key === 'Escape' && done(false));
     document.body.append(dlg);
-    no.focus();
+    (opts.safe ? ok : no).focus();
   });
 }
 

@@ -21,6 +21,15 @@ afterAll(async () => {
 const A = 'sesionA_12345678';
 const B = 'sesionB_12345678';
 
+/** Dos carreteras junto al ayuntamiento (el centro siempre es llano). */
+function roadsNear(state: GameState) {
+  const th = state.buildings.find((b) => b.kind === 'townhall')!;
+  return {
+    road: { type: 'BuildRoad', x: th.x + 3, y: th.y + 3, x2: th.x + 6, y2: th.y + 3 } as const,
+    road2: { type: 'BuildRoad', x: th.x + 3, y: th.y + 4, x2: th.x + 3, y2: th.y + 6 } as const,
+  };
+}
+
 async function create() {
   const token = newGameToken();
   const r = await app.inject({ method: 'POST', url: `/api/games/${token}`, payload: { mode: 'normal', sessionId: A } });
@@ -81,6 +90,63 @@ describe('partidas', () => {
       payload: { sessionId: A, fromTick: 0, toTick: 0, commands: [], hash: '0000000000000000' },
     });
     expect(lost.statusCode).toBe(423);
+  });
+
+  it('en pausa: lotes sin ticks (fromTick == toTick) con órdenes se reproducen y se guardan en cadena', async () => {
+    const { token, state } = await create();
+    for (let i = 0; i < 4; i++) step(state);
+    const save = (payload: object) => app.inject({ method: 'PUT', url: `/api/games/${token}/save`, payload: { sessionId: A, ...payload } });
+    // Al pausar: lo jugado del día, sin órdenes.
+    expect((await save({ fromTick: 0, toTick: 4, commands: [], hash: hashState(state) })).json()).toEqual({ ok: true, tick: 4 });
+    const { road, road2 } = roadsNear(state);
+    expect(applyCommand(state, road).ok).toBe(true);
+    expect((await save({ fromTick: 4, toTick: 4, commands: [{ tick: 4, cmd: road }], hash: hashState(state) })).json()).toEqual({ ok: true, tick: 4 });
+    expect(applyCommand(state, road2).ok).toBe(true);
+    expect((await save({ fromTick: 4, toTick: 4, commands: [{ tick: 4, cmd: road2 }], hash: hashState(state) })).json()).toEqual({ ok: true, tick: 4 });
+    const back = (await app.inject({ method: 'POST', url: `/api/games/${token}/claim`, payload: { sessionId: A } })).json().state as GameState;
+    expect(hashState(back)).toBe(hashState(state));
+    expect(back.treasury).toBeLessThan(30_000);
+  });
+
+  it('al cerrar la página: el último guardado repite lo que iba en camino y vale llegue en el orden que llegue', async () => {
+    for (const order of ['enCamino primero', 'cierre primero'] as const) {
+      const { token, state } = await create();
+      const { road, road2 } = roadsNear(state);
+        expect(applyCommand(state, road).ok).toBe(true);
+      const h1 = hashState(state);
+      expect(applyCommand(state, road2).ok).toBe(true);
+      for (let i = 0; i < 3; i++) step(state);
+      const h2 = hashState(state);
+      // El de cierre va por POST (`sendBeacon`); el normal, por PUT.
+      const put = (payload: object) =>
+        app.inject({ method: 'release' in payload ? 'POST' : 'PUT', url: `/api/games/${token}/save`, payload: { sessionId: A, ...payload } });
+      // Lote en camino (la primera carretera, en pausa) y, al cerrar, ese mismo lote más el resto.
+      const inFlight = { fromTick: 0, toTick: 0, commands: [{ tick: 0, cmd: road }], hash: h1 };
+      const onHide = {
+        fromTick: 0,
+        toTick: 3,
+        commands: [{ tick: 0, cmd: road }, { tick: 0, cmd: road2 }],
+        hash: h2,
+        release: true,
+        parts: [{ toTick: 0, hash: h1, n: 1 }, { toTick: 3, hash: h2, n: 1 }],
+      };
+      const [x, y] = order === 'enCamino primero' ? [inFlight, onHide] : [onHide, inFlight];
+      const [rx, ry] = await Promise.all([put(x), put(y)]);
+      if (order === 'enCamino primero') {
+        expect(rx.statusCode).toBe(200);
+        expect(ry.json()).toEqual({ ok: true, tick: 3 });
+      } else {
+        expect(rx.json()).toEqual({ ok: true, tick: 3 });
+        expect(ry.statusCode).toBe(409);
+      }
+      // Guardado entero y suelta: otra sesión entra sin forzar.
+      const other = await app.inject({ method: 'POST', url: `/api/games/${token}/claim`, payload: { sessionId: B } });
+      expect(other.statusCode).toBe(200);
+      expect(hashState(other.json().state)).toBe(h2);
+      // Si todo estaba ya guardado, el de cierre no hace nada (y no falla).
+      const again = await put({ ...onHide, sessionId: B });
+      expect(again.json()).toEqual({ ok: true, tick: 3 });
+    }
   });
 
   it('regenerar el enlace invalida el anterior', async () => {

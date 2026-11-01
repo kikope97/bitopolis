@@ -1,7 +1,7 @@
 {
   "name": "bitopolis",
   "private": true,
-  "version": "2.5.0",
+  "version": "2.5.1",
   "type": "module",
   "packageManager": "pnpm@10.28.0",
   "engines": {
@@ -18,7 +18,7 @@
     "e2e": "playwright test",
     "start": "node packages/server/dist/index.js",
     "ai-eval": "tsx packages/server/scripts/ai-eval.ts",
-    "perf": "BITOPOLIS_PERF=1 playwright test e2e/rendimiento.spec.ts --workers=1"
+    "perf": "BITOPOLIS_PERF=1 playwright test e2e/rendimiento.spec.ts e2e/tirones.spec.ts --workers=1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",

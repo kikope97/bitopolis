@@ -240,7 +240,24 @@ function ruleExtra(state: GameState, c: Citizen): string | null {
 
 function ruleMotivo(state: GameState, c: Citizen, action: string): string {
   const options = TEMPLATES[action.split(':')[0]!] ?? TEMPLATES.quedarse!;
-  return cleanMotivo(options[hash32(state.seed, c.id, state.tick) % options.length]!);
+  return cleanMotivo(pickTemplate(state, c, options));
+}
+
+/** Lo último que dijo este vecino (para no repetir la misma frase dos veces seguidas). */
+function lastMotivo(state: GameState, id: number): string | undefined {
+  for (let i = state.decisionLog.length - 1; i >= 0; i--) if (state.decisionLog[i]!.citizenId === id) return state.decisionLog[i]!.motivo;
+  return undefined;
+}
+
+/**
+ * Frase de plantilla por hash (determinista, sin PRNG). Si coincide con lo
+ * último que dijo, la siguiente de la lista: así nadie repite la misma frase seguida.
+ */
+export function pickTemplate(state: GameState, c: Citizen, options: string[]): string {
+  const i = hash32(state.seed, c.id, state.tick) % options.length;
+  const prev = lastMotivo(state, c.id);
+  const same = (t: string) => prev !== undefined && prev.startsWith(cleanMotivo(t.split('{x}')[0]!));
+  return same(options[i]!) && options.length > 1 ? options[(i + 1) % options.length]! : options[i]!;
 }
 
 /* ---------------- aplicar ---------------- */
@@ -380,13 +397,27 @@ const TEMPLATES: Record<string, string[]> = {
     'Aquí tengo mi sitio, no me voy a ir por esto.',
     'Me quedo. Este pueblo todavía puede mejorar.',
     'Lo he pensado bien: me quedo, pero estaré atento.',
+    'Aquí tengo a los míos; no me muevo.',
+    'Irse es fácil; yo prefiero quedarme y ver cómo sale.',
   ],
   irse: ['No aguanto más. Me voy a buscar otro sitio.', 'Lo siento, alcalde: aquí ya no me salen las cuentas.', 'Me marcho. Ojalá le vaya mejor al pueblo.'],
   quejarse: ['Esto no puede seguir así. Que el alcalde me escuche.', 'Voy a decir lo que pienso en el ayuntamiento.', 'Pago y no veo mejoras. Me quejaré.'],
   aceptar_trabajo: ['Por fin un trabajo cerca de casa.', 'Acepto. Prefiero trabajar en mi pueblo.', 'Mejor esto que coger el autobús cada día.'],
-  seguir_fuera: ['Fuera me pagan mejor; de momento sigo allí.', 'No me convence. Sigo con mi trabajo de fuera.'],
-  gastar_ocio: ['Me lo he ganado: hoy me doy un capricho.', 'Un día es un día. Voy a disfrutar un poco.'],
-  ahorrar: ['Mejor guardo el dinero, nunca se sabe.', 'Ahorrar hoy es dormir tranquilo mañana.'],
+  seguir_fuera: ['Fuera me pagan mejor; de momento sigo allí.', 'No me convence. Sigo con mi trabajo de fuera.', 'Ya conozco a la gente de allí; no cambio por ahora.'],
+  gastar_ocio: [
+    'Me lo he ganado: hoy me doy un capricho.',
+    'Un día es un día. Voy a disfrutar un poco.',
+    'Esta semana invito yo a una ronda.',
+    'Para algo se trabaja: hoy, cena fuera.',
+  ],
+  ahorrar: [
+    'Mejor guardo el dinero, nunca se sabe.',
+    'Ahorrar hoy es dormir tranquilo mañana.',
+    'Lo dejo en la cuenta, por si vienen mal dadas.',
+    'Estoy juntando para algo mío; nada de caprichos.',
+    'Con lo que está todo, prefiero tener un colchón.',
+    'Este mes lo guardo; ya habrá tiempo de gastar.',
+  ],
   comprar_casa: ['Pagar alquiler es tirar el dinero. Me la quedo.', 'Por fin algo mío en este pueblo.', 'Con la hipoteca pago menos que de alquiler.'],
   seguir_alquilando: ['No me quiero atar a una hipoteca.', 'De momento, mejor de alquiler.', 'Hipotecas no, gracias.'],
   fundar: ['Siempre quise tener mi propio negocio.', 'Este pueblo necesita {x} y la voy a abrir yo.', 'Me la juego: abro mi negocio.'],
@@ -523,7 +554,7 @@ export function ruleDecide(state: GameState, p: Pending): { action: string; moti
   }
   const [verb, arg] = best.split(':');
   const options = (p.trigger === 'deudas' && recentBlow(state, c) && AFTER_BLOW[verb!]) || TEMPLATES[verb!] || TEMPLATES.quedarse!;
-  const base = options[hash32(state.seed, c.id, state.tick) % options.length]!.replace('{x}', NEED_TEXT[arg ?? ''] ?? 'más cosas');
+  const base = pickTemplate(state, c, options).replace('{x}', NEED_TEXT[arg ?? ''] ?? 'más cosas');
   const top = (Object.entries(c.traits) as [keyof Citizen['traits'], number][]).sort((a, b) => b[1] - a[1])[0]!;
   // «Ya lo comentaré en el bar» solo si hay bar en el pueblo.
   const hasBar = state.buildings.some((b) => b.kind === 'bar' && b.built);

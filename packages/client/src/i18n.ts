@@ -24,6 +24,7 @@ const es = {
   no: 'No',
   whatNow: '¿Qué hago ahora?',
   saved: 'Guardado',
+  saving: 'Guardando…',
   saveFailed: 'Sin conexión: se guardará al volver',
   desync: 'Se ha recuperado la última partida guardada',
 } as const;

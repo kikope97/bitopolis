@@ -243,8 +243,19 @@ function rows(bd: Record<string, number>, prev: Record<string, number> | undefin
   if (!entries.length) ul.append(h('li', {}, 'Sin movimientos todavía.'));
   for (const [k, v] of entries) {
     const p = prev?.[k];
-    const trend = p === undefined ? '' : v > p ? ' ↑' : v < p ? ' ↓' : ' =';
-    ul.append(h('li', { class: v < 0 ? 'neg' : 'pos' }, h('span', {}, `${CONCEPT[k] ?? k}${trend}`), h('span', {}, `${v > 0 ? '▲ +' : '▼ '}${money(v)}`)));
+    // Pruebas 2.5: «IBI ↓» junto a «▲ +7924 €» confundía. Un solo signo (+/−) en la cifra
+    // y la comparación con el mes anterior, en palabras y en valor absoluto («más», «menos»).
+    const a = Math.abs(v);
+    const b = p === undefined ? undefined : Math.abs(p);
+    const trend = b === undefined || a === b ? '' : `${a > b ? 'más' : 'menos'} que el mes anterior`;
+    ul.append(
+      h(
+        'li',
+        { class: v < 0 ? 'neg' : 'pos' },
+        h('span', {}, CONCEPT[k] ?? k, trend ? h('span', { class: 'p-sub' }, trend) : ''),
+        h('span', {}, `${v > 0 ? '+' : v < 0 ? '−' : ''}${money(a)}`),
+      ),
+    );
   }
   return ul;
 }
@@ -260,13 +271,17 @@ export function openNeighbours(state: GameState, onPick: (c: Citizen) => void, o
     const btn = h(
       'button',
       { class: 'person-row' },
-      h('span', { 'aria-hidden': 'true' }, `${mood[0]} `),
-      h('strong', {}, c.name),
-      // 2.0: en Modo IA, los vecinos con nombre piensan con IA.
-      state.aiMode && state.ai ? h('span', { class: 'ai-mark', title: 'Piensa con IA' }, ' ✦') : '',
-      h('span', {}, ` (${mood[1]})`),
-      // Ronda 15: todo el detalle en una línea propia (la rejilla tiene 3 columnas).
-      h('span', { class: 'p-sub muted' }, `${c.age} años · ${job ? (job.name ?? BUILD_NAMES[job.kind]) : c.unemployedSince !== undefined ? 'en paro' : 'trabaja fuera'}${c.owns ? ' · propietario' : ''}`, totalDebt(c) > 0 ? h('span', { class: 'pocket-warn' }, ` · debe ${money(totalDebt(c))}`) : ''),
+      h('span', { class: 'p-face', 'aria-hidden': 'true' }, mood[0]),
+      // Ronda 21: nombre y detalle juntos en la columna ancha (antes el detalle caía en la de 28 px y salía palabra a palabra).
+      h(
+        'span',
+        { class: 'p-main' },
+        h('strong', {}, c.name),
+        // 2.0: en Modo IA, los vecinos con nombre piensan con IA.
+        state.aiMode && state.ai ? h('span', { class: 'ai-mark', title: 'Piensa con IA' }, ' ✦') : '',
+        h('span', {}, ` (${mood[1]})`),
+        h('span', { class: 'p-sub muted' }, `${c.age} años · ${job ? (job.name ?? BUILD_NAMES[job.kind]) : c.unemployedSince !== undefined ? 'en paro' : 'trabaja fuera'}${c.owns ? ' · propietario' : ''}`, totalDebt(c) > 0 ? h('span', { class: 'pocket-warn' }, ` · debe ${money(totalDebt(c))}`) : ''),
+      ),
     );
     btn.addEventListener('click', () => onPick(c));
     ul.append(h('li', {}, btn));
