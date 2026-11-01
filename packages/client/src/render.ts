@@ -1,5 +1,5 @@
 import { tickToDate } from '@bitopolis/shared';
-import { ambulanceFor, busStation, buildingAt, type GameState, heritageVariant, isWater, streetSegment, Terrain, Tile, trashStateOf, truckRoutes, Zone } from '@bitopolis/sim';
+import { ambulanceFor, busStation, buildingAt, type GameState, heritageVariant, isWater, seasonOf, streetSegment, Terrain, Tile, trashStateOf, truckRoutes, Zone } from '@bitopolis/sim';
 import { happinessMarks, type LayerId, layerCanvas, missingMarks, NEED_ICON, ruralMarks } from './layers.ts';
 import { pixelIcon } from './icons.ts';
 
@@ -76,6 +76,9 @@ const TREE_VARIANTS = 12;
 
 let ground: HTMLCanvasElement | null = null;
 let groundSig = '';
+/** Tiempo por fotograma para poner al día el suelo que se ve y para preparar los otros. */
+const GROUND_MS = 6;
+const WARM_MS = 3;
 
 function mapSignature(state: GameState): string {
   let a = 0;
@@ -259,21 +262,40 @@ function tilePix(state: GameState, x: number, y: number, key: string): Pix {
     return tile;
   }
   // La hierba (ruido suave, lo más caro) se calcula una vez por casilla (y nevada, otra).
-  const snow = key[2] === '1';
-  const gi = y * 4096 + x + (snow ? 1 << 24 : 0);
-  let g = grassCache.get(gi);
-  if (!g) {
-    g = grassTile(Math.floor(hash(x, y, 1) * GRASS_VARIANTS), x, y);
-    if (snow) g = snowGrass(g, Math.floor(hash(x, y, 1) * 4));
-    grassCache.set(gi, g);
-  }
+  const g = key[2] === '1' ? snowyGrass(x, y) : plainGrass(x, y);
   const z = Number(key[1]);
   return z ? zoneTile(ZONE_LETTER[z]!, g) : g;
 }
 
 const grassCache = new Map<number, Pix>();
+function plainGrass(x: number, y: number): Pix {
+  const gi = y * 4096 + x;
+  let g = grassCache.get(gi);
+  if (!g) grassCache.set(gi, (g = grassTile(Math.floor(hash(x, y, 1) * GRASS_VARIANTS), x, y)));
+  return g;
+}
+function snowyGrass(x: number, y: number): Pix {
+  const gi = y * 4096 + x + (1 << 24);
+  let g = grassCache.get(gi);
+  if (!g) grassCache.set(gi, (g = snowGrass(plainGrass(x, y), Math.floor(hash(x, y, 1) * 4))));
+  return g;
+}
 
-function groundFor(state: GameState, tod: TimeOfDay, budget = Infinity): HTMLCanvasElement {
+/** Casillas visibles (las primeras en repintarse). */
+interface TileRect {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/**
+ * Pone al día el suelo de un momento del día. Con `fill`, lo nunca pintado se pinta siempre (sin huecos); el
+ * resto, lo visible primero, hasta `deadline` (performance.now()). 2.5.1: antes un cambio de tiempo
+ * (nevar) o de hora repintaba el mapa entero de golpe: fotogramas de 400–600 ms a x10.
+ * Devuelve el lienzo y si quedó todo al día.
+ */
+function groundFor(state: GameState, tod: TimeOfDay, deadline = Infinity, view?: TileRect, fill = true): { canvas: HTMLCanvasElement; done: boolean } {
   const { w, h } = state.map;
   let g = grounds.get(tod);
   if (!g || g.w !== w || g.h !== h) {
@@ -283,37 +305,53 @@ function groundFor(state: GameState, tod: TimeOfDay, budget = Infinity): HTMLCan
     g = { canvas, ctx: canvas.getContext('2d')!, keys: new Array<string>(w * h).fill(''), w, h };
     grounds.set(tod, g);
   }
+  const gr = g;
   const occupied = new Set(state.buildings.map((b) => b.y * w + b.x));
-  let left = budget;
-  for (let y = 0; y < h && left > 0; y++) {
-    for (let x = 0; x < w && left > 0; x++) {
-      const key = tileKey(state, x, y, occupied);
-      if (g.keys[y * w + x] === key) continue;
-      g.keys[y * w + x] = key;
-      putPix(g.ctx, tilePix(state, x, y, key), x * T, y * T, tod);
-      left--;
+  let done = true;
+  const paint = (x: number, y: number) => {
+    const i = y * w + x;
+    const key = tileKey(state, x, y, occupied);
+    if (gr.keys[i] === key) return;
+    if ((!fill || gr.keys[i] !== '') && performance.now() > deadline) {
+      done = false;
+      return;
     }
-  }
-  return g.canvas;
+    gr.keys[i] = key;
+    putPix(gr.ctx, tilePix(state, x, y, key), x * T, y * T, tod);
+  };
+  if (view) for (let y = Math.max(0, view.y0); y <= Math.min(h - 1, view.y1); y++) for (let x = Math.max(0, view.x0); x <= Math.min(w - 1, view.x1); x++) paint(x, y);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) paint(x, y);
+  return { canvas: g.canvas, done };
 }
 
 /** Prepara poco a poco los suelos de los otros momentos del día (sin tirones al cambiar de hora). */
 const TODS: TimeOfDay[] = ['day', 'dusk', 'night'];
 let warmSig = '';
 let warmDone = new Set<TimeOfDay>();
-function warmGrounds(state: GameState, current: TimeOfDay, sig: string) {
+function warmGrounds(state: GameState, current: TimeOfDay, sig: string, deadline: number) {
   if (sig !== warmSig) {
     warmSig = sig;
     warmDone = new Set();
   }
-  const next = TODS.find((t) => t !== current && !warmDone.has(t));
-  if (!next) return;
-  const g = grounds.get(next);
-  const before = g ? g.keys.filter(Boolean).length : 0;
-  groundFor(state, next, 96);
-  const after = grounds.get(next)!.keys.filter(Boolean).length;
-  // Sin cambios pendientes en esta pasada: listo hasta que cambie el mapa.
-  if (g && after === before) warmDone.add(next);
+  for (const next of TODS) {
+    if (next === current || warmDone.has(next)) continue;
+    // También un suelo nunca pintado se hace poco a poco (fill = false).
+    if (groundFor(state, next, deadline, undefined, false).done) warmDone.add(next);
+    if (performance.now() > deadline) return;
+  }
+  // Con todo listo: en invierno se prepara la hierba nevada (lo más caro) antes de que nieve.
+  if (!snowing && seasonOf(tickToDate(state.tick).month) === 'invierno') warmSnowGrass(state, deadline);
+}
+
+let snowWarm = 0;
+function warmSnowGrass(state: GameState, deadline: number) {
+  const { w, h } = state.map;
+  while (snowWarm < w * h && performance.now() < deadline) {
+    const x = snowWarm % w;
+    const y = Math.floor(snowWarm / w);
+    snowWarm++;
+    snowyGrass(x, y);
+  }
 }
 
 const roadCache = new Map<string, Pix>();
@@ -438,10 +476,14 @@ export function render(
   snowing = state.weather?.kind === 'nieve';
   const mapSig = mapSignature(state);
   const sig = `${mapSig}${waterFrame}${+snowing}`;
+  // Como mucho unos milisegundos de suelo por fotograma (lo visible primero); el resto, en los siguientes.
+  const now = performance.now();
   if (`${sig}${tod}` !== groundSig) {
-    ground = groundFor(state, tod);
-    groundSig = `${sig}${tod}`;
-  } else warmGrounds(state, tod, sig);
+    const vis = { x0: Math.floor(cam.x / ts) - 1, y0: Math.floor(cam.y / ts) - 1, x1: Math.ceil((cam.x + ctx.canvas.width) / ts) + 1, y1: Math.ceil((cam.y + ctx.canvas.height) / ts) + 1 };
+    const r = groundFor(state, tod, now + GROUND_MS, vis);
+    ground = r.canvas;
+    if (r.done) groundSig = `${sig}${tod}`;
+  } else warmGrounds(state, tod, sig, now + WARM_MS);
   if (runsSig !== mapSig) {
     runs = roadRuns(state);
     runsSig = mapSig;
