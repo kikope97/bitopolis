@@ -1,6 +1,7 @@
 import type { GameState } from './state.ts';
 import { Tile } from './state.ts';
-import { CRIME, FIELDS, TERRAIN, TRASH } from './balance.ts';
+import { CRIME, FIELDS, REGION, TERRAIN, TRASH } from './balance.ts';
+import { landmarkStamps } from './landmarks.ts';
 import { radiusOf } from './levels.ts';
 import { isWater, Terrain } from './terrain.ts';
 
@@ -95,7 +96,14 @@ export function updateFields(state: GameState): void {
         stamp(police, w, h, b.x, b.y, radiusOf(b), 1);
         stamp(good, w, h, b.x, b.y, 6, 5);
         break;
+      case 'bigfactory':
+        // 2.3: la fábrica de la gran empresa contamina el doble que un taller (REGION.bigCompany.pollution).
+        stamp(emit, w, h, b.x, b.y, 5, 9 * REGION.bigCompany.pollution);
+        stamp(noise, w, h, b.x, b.y, 4, 45);
+        break;
       default:
+        // 2.3: grandes obras (suelo alrededor del puente, ruido del estadio el día de partido).
+        for (const st of landmarkStamps(state, b)) stamp(st.field === 'good' ? good : st.field === 'noise' ? noise : emit, w, h, st.x, st.y, st.radius, st.amount);
         break;
     }
     // 2.1: la basura sin recoger ensucia la calle (bolsas desde dirtyAt; con ratas, a tope).

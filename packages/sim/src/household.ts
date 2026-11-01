@@ -1,4 +1,6 @@
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
+import { stationJobsFx } from './landmarks.ts';
+import { regionFx } from './region.ts';
 import {
   DEBT,
   GRUDGE_MAX,
@@ -230,6 +232,11 @@ export function settleMonth(state: GameState, shops: Building[]): void {
   }
 }
 
+/** 2.3: plazas de trabajo fuera: la comarca (bonanza ×1,3, crisis ×0,6) y la estación (×1,25). */
+export function outsideJobsFx(state: GameState): number {
+  return regionFx(state).jobsOutside * stationJobsFx(state);
+}
+
 /** Paro real: quien no trabaja en el pueblo puede perder su trabajo de fuera, o encontrar uno. */
 export function outsideJobsMonth(state: GameState): void {
   for (const c of state.citizens) {
@@ -239,14 +246,14 @@ export function outsideJobsMonth(state: GameState): void {
       continue;
     }
     if (c.unemployedSince === undefined) {
-      if (chance(state.rng, JOBS_OUTSIDE.loseChance)) {
+      if (chance(state.rng, JOBS_OUTSIDE.loseChance / outsideJobsFx(state))) {
         c.unemployedSince = state.tick;
         c.benefitLeft = JOBS_OUTSIDE.benefitMonths;
         // Ronda 15: que el paro deje rastro (recuerdo y, con nombre, en el diario).
         addMemory(state, c, 'en_paro', 4, -4);
         if (c.named) pushEvent(state, 'info', `${c.name} se queda sin su trabajo de fuera: cobrará el paro ${JOBS_OUTSIDE.benefitMonths} meses`, { ref: c.id });
       }
-    } else if (chance(state.rng, JOBS_OUTSIDE.findChance)) {
+    } else if (chance(state.rng, Math.min(0.95, JOBS_OUTSIDE.findChance * outsideJobsFx(state)))) {
       delete c.unemployedSince;
       delete c.benefitLeft;
     } else if ((c.benefitLeft ?? 0) > 0) {

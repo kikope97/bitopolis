@@ -2,6 +2,8 @@ import { tickToDate, type Command } from '@bitopolis/shared';
 import {
   BUILD_NAMES,
   buildingAt,
+  isLandmarkKind,
+  LANDMARKS,
   CROP_HINT,
   isWater,
   CROP_TEXT,
@@ -97,7 +99,8 @@ import { formatDate, money, MONTHS, plural, shortDate, t } from './i18n.ts';
 import { type Camera, type Preview, render, restartAnimations, signSpot } from './render.ts';
 import type { FromWorker, SaveBatch, ToWorker } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
-import { buildingSprite, letterSprite, T, ZONE_COLOR } from './sprites.ts';
+import { buildingSprite, landmarkSprite, letterSprite, T, ZONE_COLOR } from './sprites.ts';
+import { bigCompanyContent, landmarkContent, openRegion, regionAttention, regionSummary } from './landmarks-ui.ts';
 import { commandFor, costText, isLocked, lockLong, lockShort, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayCost } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
 import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, h, isSheetOpen, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack } from './ui.ts';
@@ -1265,7 +1268,7 @@ export function startGame(opts: GameOptions): void {
       await command(line);
       return;
     }
-    if (touchInput && (tool.build || tool.id === 'dike')) {
+    if (touchInput && (tool.build || tool.id === 'dike' || tool.landmark)) {
       // Con el dedo solo construye el botón «Construir»: un doble toque no gasta (ronda 10).
       return proposePlace(tile, tile);
     }
@@ -1278,6 +1281,17 @@ export function startGame(opts: GameOptions): void {
    * ofertas (la local, la de siempre, va primero). El resto, directo.
    */
   function placeBuild(cmd: Command): Promise<boolean> {
+    // 2.3: al marcar el solar de una gran obra, se abre su ficha (para pagar la primera fase).
+    if (cmd.type === 'StartLandmark') {
+      return command(cmd).then((ok) => {
+        const lm = ok ? state.landmarks.find((l) => l.kind === cmd.kind) : undefined;
+        if (lm) {
+          selectTool('inspect');
+          focusBuilding(lm.buildingId);
+        }
+        return ok;
+      });
+    }
     if (cmd.type !== 'Build' || cmd.kind === 'road' || cmd.offer || !tenderApplies(state, cmd.kind, cmd.x, cmd.y) || !validateCommand(state, cmd).ok) return command(cmd);
     return new Promise((resolve) => {
       openTender(state, cmd, (offer) => void command({ ...cmd, offer }).then(resolve));
@@ -1393,8 +1407,8 @@ export function startGame(opts: GameOptions): void {
     pendingEnd = null;
     preview = previewFor(a, b);
     const v = validateCommand(state, cmd);
-    const hill = tool.build && tool.shape === 'tap' && terrainAt(state, a.x, a.y) === Terrain.Hill;
-    const cost = tool.id === 'dike' ? shortCost(tool) : tool.build && tool.shape === 'tap' ? `${shortCost(tool)}${hill ? ' (colina: materiales +50 %)' : ''}` : lineText(a, b);
+    const hill = (tool.build || tool.landmark) && tool.shape === 'tap' && terrainAt(state, a.x, a.y) === Terrain.Hill;
+    const cost = tool.id === 'dike' ? shortCost(tool) : tool.landmark ? `${shortCost(tool)}${hill ? ' (colina: +50 %)' : ''} · ahora solo el solar` : tool.build && tool.shape === 'tap' ? `${shortCost(tool)}${hill ? ' (colina: materiales +50 %)' : ''}` : lineText(a, b);
     // Ronda 13: el precio va en su propia línea y siempre se ve (también si no se puede: «no hay dinero»).
     const what = demolishText && v.ok ? demolishText : v.ok ? `${tool.label} aquí` : `${tool.label}: no se puede (${v.error})`;
     // v1.9.1: si con lo que falta por pagar de las obras en marcha la caja quedaría en negativo, se avisa (no se bloquea).
@@ -1403,7 +1417,7 @@ export function startGame(opts: GameOptions): void {
     $('#confirm-text').replaceChildren(h('span', { class: 'cc-what' }, what), demolishText || !cost ? '' : h('span', { class: 'cc-cost' }, v.ok ? cost : `Cuesta ${cost}`), warn);
     $('#confirm-bar').classList.toggle('warn', after < 0);
     const yes = $('#confirm-yes') as HTMLButtonElement;
-    yes.textContent = demolishText ? 'Derribar' : tool.zone ? (tool.zone === 'none' ? 'Quitar zona' : 'Marcar zona') : 'Construir';
+    yes.textContent = demolishText ? 'Derribar' : tool.zone ? (tool.zone === 'none' ? 'Quitar zona' : 'Marcar zona') : tool.landmark ? 'Marcar el solar' : 'Construir';
     yes.className = demolishText ? 'btn danger' : 'btn primary';
     yes.disabled = !v.ok;
     // Si no se puede, no se ofrece «Construir»: solo el motivo y ✕ (ronda 11).
@@ -1540,7 +1554,16 @@ export function startGame(opts: GameOptions): void {
   /* ---------- herramientas (v1.6: cinco pestañas y la bandeja «Construir») ---------- */
   function toolIcon(tl: Tool): HTMLElement {
     const wrap = h('span', { class: 'tool-icon', 'aria-hidden': 'true' });
-    if ((tl.build && tl.build !== 'road') || tl.id === 'dike') {
+    if (tl.landmark) {
+      // 2.3: la gran obra terminada (2×2, más ancha).
+      const c = landmarkSprite(tl.landmark, LANDMARKS.specs[tl.landmark].phases, LANDMARKS.specs[tl.landmark].phases);
+      const img = document.createElement('canvas');
+      img.width = c.width;
+      img.height = c.height;
+      img.getContext('2d')!.drawImage(c, 0, 0);
+      if (LANDMARKS.specs[tl.landmark].size === 2) img.classList.add('wide');
+      wrap.append(img);
+    } else if ((tl.build && tl.build !== 'road') || tl.id === 'dike') {
       const c = buildingSprite(tl.build ?? tl.id, 1);
       const img = document.createElement('canvas');
       img.width = c.width;
@@ -1594,7 +1617,7 @@ export function startGame(opts: GameOptions): void {
       const tl = TOOLS.find((x) => x.id === id)!;
       const btn = h(
         'button',
-        { class: 'tool', 'data-tool': tl.id, 'aria-pressed': 'false', title: `${tl.label} (${tl.key})` },
+        { class: 'tool', 'data-tool': tl.id, 'aria-pressed': 'false', title: tl.key ? `${tl.label} (${tl.key})` : tl.label },
         toolIcon(tl),
         h('span', { class: 'tool-label' }, tl.label),
         h('span', { class: 'tool-cost' }, trayCost(tl)),
@@ -1811,7 +1834,17 @@ export function startGame(opts: GameOptions): void {
       inspectSheet = currentSheet();
       return;
     }
+    // 2.3: las grandes obras tienen su ficha (barra de fases, «Pagar fase N», parar y la cofinanciación).
+    if (isLandmarkKind(b.kind)) {
+      inspectSheet = sheet(b.name ?? BUILD_NAMES[b.kind] ?? b.kind, ...landmarkContent(state, b, command, () => inspect({ x: b.x, y: b.y })));
+      inspectSheet.classList.add('half', 'landmark-sheet');
+      const body = document.querySelector('.sheet-body');
+      if (body) body.scrollTop = prevScroll;
+      return;
+    }
     const content: (Node | string)[] = [];
+    // 2.3: la fábrica de la gran empresa (y sus avisos).
+    if (b.kind === 'bigfactory') content.push(...bigCompanyContent(state, command, () => inspect({ x: b.x, y: b.y })));
     // 2.2: el contrato de la obra (fuera o el primo) y «Revisar el contrato» si hay rumor.
     const contract = contractBox(state, b, command, () => inspect({ x: b.x, y: b.y }));
     if (contract) content.push(contract);
@@ -2081,6 +2114,11 @@ export function startGame(opts: GameOptions): void {
     );
   const openHappening = () => openWhatsHappening(social, (id) => withBack('Qué está pasando', openHappening, () => openCitizen(social, id)));
   const openAccounts = () => openReport(state);
+  const openRegionSheet = () =>
+    openRegion(state, command, (b) => {
+      closeSheet();
+      focusBuilding(b.id);
+    }, () => withBack('Pueblo', openHub, openRegionSheet));
   const openErrandsSheet = () => openErrands(social, (id) => withBack('Encargos del pueblo', openErrandsSheet, () => openCitizen(social, id)));
   const openPressSheet = () =>
     openPress(social, (ref) => {
@@ -2156,6 +2194,8 @@ export function startGame(opts: GameOptions): void {
         // 2.3: gráficas por años y récords.
         item('Historia', go(() => openHistory(state))),
       ),
+      // 2.3: la comarca (bonanza o crisis), la gran empresa y las grandes obras.
+      card('town', 'Comarca', [regionSummary(state)], item('Comarca y grandes obras', go(openRegionSheet), regionAttention(state))),
       // 2.1: encargos del pueblo y El Eco de Bitópolis.
       card(
         'inspect',

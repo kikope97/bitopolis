@@ -1,4 +1,5 @@
 import { DAYS_PER_YEAR, TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
+import { countsAsSports } from './landmarks.ts';
 import { leaveTown } from './household.ts';
 import { hash32 } from './hash.ts';
 import { SOCIAL_PLACES } from './balance.ts';
@@ -136,7 +137,7 @@ export function lifeDay(state: GameState): void {
     if (c.age < DEATH_START_AGE || protectedIds.has(c.id) || hash32(state.seed, c.id) % DAYS_PER_YEAR !== dayOfYear) continue;
     // v1.7: con polideportivo cerca de casa, los mayores se cuidan más.
     const home = state.buildings.find((b) => b.id === c.homeId);
-    const fit = home && state.buildings.some((b) => b.kind === 'sports' && b.built && Math.abs(b.x - home.x) + Math.abs(b.y - home.y) <= 8);
+    const fit = home && state.buildings.some((b) => countsAsSports(b) && b.built && Math.abs(b.x - home.x) + Math.abs(b.y - home.y) <= 8);
     const p = Math.min(DEATH_RATE_MAX, (c.age - DEATH_START_AGE + 2) * DEATH_RATE_PER_YEAR_OVER) * (fit ? 1 - SOCIAL_PLACES.sportsHealth : 1);
     if (chance(state.rng, p)) {
       // 2.1: es una urgencia; con ambulancia que llegue a tiempo, la despedida se pospone (un año).

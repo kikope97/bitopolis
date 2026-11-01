@@ -1001,7 +1001,8 @@ export interface LandmarkSpec {
  */
 export const LANDMARKS = {
   specs: {
-    bridge: { pop: 30, happiness: 50, townhall: 2, onRiver: true, size: 1, phases: 3, phaseCost: 6_000, workers: 4, days: 5 },
+    // Medido con `pnpm sim` (casual a 4 años): con 30 vecinos, 50 de felicidad y 3 × 6.000 € salía en el mes 5; así, entre el 27 y el 40.
+    bridge: { pop: 40, happiness: 55, townhall: 3, onRiver: true, size: 1, phases: 3, phaseCost: 15_000, workers: 4, days: 5 },
     station: { pop: 60, happiness: 55, townhall: 3, size: 2, phases: 3, phaseCost: 14_000, workers: 6, days: 6 },
     fair: { pop: 80, happiness: 55, townhall: 3, size: 2, phases: 2, phaseCost: 12_000, workers: 6, days: 6 },
     stadium: { pop: 120, happiness: 60, townhall: 4, size: 2, phases: 3, phaseCost: 25_000, workers: 8, days: 8 },
@@ -1012,18 +1013,18 @@ export const LANDMARKS = {
     /** Puente de piedra: riadas −50 % en la orilla, suelo +10 a 6 casillas, atractivo +2. */
     bridge: { floodCut: 0.5, land: 10, landRadius: 6, attract: 2 },
     /** Estación: demanda R +15, plazas de trabajo fuera +25 %, coste de ir a trabajar fuera −30 %. */
-    station: { demandR: 15, jobsOutside: 1.25, commuter: 0.7 },
+    station: { demandR: 15, jobsOutside: 1.25, commuter: 0.7, trip: 10 },
     /** Feria regional: en septiembre, ventas +15 % y visitantes ×2. */
     fair: { month: 9, sales: 0.15, visitors: 2 },
-    /** Estadio: +4 de felicidad a 12 casillas, cuenta como polideportivo, ruido en el partido del mes. */
-    stadium: { happiness: 4, radius: 12, countsAs: 'sports' as BuildingKind, noise: 30, noiseRadius: 4 },
+    /** Estadio: +4 de felicidad a 12 casillas, cuenta como polideportivo, ruido en el partido del mes (ese día). */
+    stadium: { happiness: 4, radius: 12, countsAs: 'sports' as BuildingKind, noise: 30, noiseRadius: 4, matchDay: 7 },
     /** Catedral: +3 de felicidad en todo el pueblo, atractivo +5. */
     cathedral: { happiness: 3, attract: 5 },
   },
   /** Mantenimiento mensual: esta parte de lo gastado. */
   upkeep: 0.005,
   /** Cofinanciación de la Diputación (`Grant.landmark`): parte de cada fase; con el ayuntamiento 5, `shareTop`. */
-  grant: { shareMin: 0.3, shareMax: 0.5, shareTop: 0.6 },
+  grant: { shareMin: 0.3, shareMax: 0.5, shareTop: 0.6, offerDays: 30 },
   /** IA: voluntarios (la fase sale más barata), polémica (actitud −1 en la facción que paga) y donaciones. */
   volunteersCut: 0.1,
   controversyAttitude: -1,
@@ -1031,6 +1032,8 @@ export const LANDMARKS = {
   donateShare: 0.02,
   donateMaxSaving: 40,
   donateMinAttitude: 1,
+  /** Donaciones de menos de esto no se hacen. */
+  donateMin: 20,
   /** Sin IA: probabilidad mensual de una donación por obra en marcha. */
   donateChance: 0.1,
 } as const;
@@ -1114,8 +1117,16 @@ export const REGION = {
     ibiDiscount: 0.5,
     ibiYears: 5,
     landCost: 8_000,
-    /** Felicidad de los ecologistas y vecinos cercanos cuando abre. */
+    /** Felicidad de los vecinos de alrededor (a `nearRadius` casillas) mientras está abierta; los ecologistas, la mitad. */
     protestMood: -3,
+    nearRadius: 4,
+    /** Sin incentivo viene con menos plantilla. */
+    jobsNoIncentive: 30,
+    /** IBI al mes (de fuera), sueldo respecto al mínimo y obra de la fábrica (la paga la empresa). */
+    ibi: 700,
+    wageFx: 1.1,
+    workers: 8,
+    days: 10,
   },
 } as const;
 

@@ -11,6 +11,7 @@ import { C, PALETTE } from './palette.ts';
 import {
   BH,
   buildingSprite,
+  landmarkSprite,
   constructionSprite,
   grassTile,
   hash,
@@ -477,7 +478,9 @@ export function render(
 
   const sign = signSpot(state, mapSig);
   const byTile = new Map<number, GameState['buildings'][number]>();
-  for (const b of state.buildings) byTile.set(b.y * w + b.x, b);
+  // 2.3: los 2×2 se dibujan al pasar por su fila de abajo (lo de detrás ya está pintado).
+  for (const b of state.buildings) byTile.set((b.y + (b.size ?? 1) - 1) * w + b.x, b);
+  const lmPhase = new Map(state.landmarks.map((l) => [l.buildingId, l]));
   // 2.1: diques en la orilla.
   const dikes = new Set(state.dikes ?? []);
   const projects = new Map(state.projects.map((p) => [p.buildingId, p]));
@@ -511,6 +514,26 @@ export function render(
           // Viento: la copa se mece con un desfase por árbol.
           const frame = still ? 0 : Math.floor(opts.time / 900 + hash(x, y, 4) * 4) % 2;
           ctx.drawImage(treeSprite(Math.floor(hash(x, y, 3) * TREE_VARIANTS), frame, tod, snowing), px, py, ts, BH * z);
+        }
+        continue;
+      }
+      // 2.3: grandes obras (andamios según las fases) y la fábrica de la gran empresa.
+      const lm = lmPhase.get(b.id);
+      if (lm || b.kind === 'bigfactory') {
+        const n = b.size ?? 1;
+        const done = lm ? lm.phase : b.built ? 1 : 0;
+        const phases = lm ? lm.phases : 1;
+        const ter = state.map.terrain ?? [];
+        const horizontal = isWater(ter[(b.y - 1) * w + b.x]) || isWater(ter[(b.y + 1) * w + b.x]);
+        const img = landmarkSprite(b.kind, done, phases, tod, snowing, horizontal);
+        ctx.drawImage(img, b.x * ts - cam.x, (b.y * T - (BH - T)) * z - cam.y, n * ts, (BH + (n - 1) * T) * z);
+        if (b.kind === 'bigfactory' && b.built && !b.damaged) {
+          for (const cx of [10, 20]) {
+            for (let k = 0; k < 3; k++) {
+              const life = still ? (k + 0.5) / 3 : ((opts.time / 2600 + k / 3 + hash(b.id, k, cx) * 0.2) % 1);
+              puffs.push({ x: b.x * T + cx + Math.round(life * 4 + Math.sin(life * 6 + b.id) * 1.5), y: b.y * T - (BH - T) - Math.round(life * 16), size: Math.min(2, Math.floor(life * 3)) });
+            }
+          }
         }
         continue;
       }

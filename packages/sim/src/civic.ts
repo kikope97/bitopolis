@@ -1,4 +1,4 @@
-import { TICKS_PER_DAY, tickToDate } from '@bitopolis/shared';
+import { TICKS_PER_DAY, TICKS_PER_MONTH, tickToDate } from '@bitopolis/shared';
 import {
   BUDGET,
   BUILD,
@@ -9,6 +9,8 @@ import {
   GRANT_EVERY_DAYS,
   GRANT_OFFER_DAYS,
   GRANT_PENALTY,
+  LANDMARKS,
+  REGION,
   SOCIAL_PLACES,
   TERRAIN,
   WAGE_OUTSIDE,
@@ -20,7 +22,7 @@ import { factionOf, politicsActive } from './politics.ts';
 import { type Faction, FACTIONS } from './politics-core.ts';
 import { pick } from './prng.ts';
 import { addMemory } from './social.ts';
-import type { Building, BuildingKind, BudgetPlan, GameState } from './state.ts';
+import type { Building, BuildingKind, BudgetPlan, GameState, Grant } from './state.ts';
 import { pushEvent, terrainAt } from './state.ts';
 import type { BuildKind } from '@bitopolis/shared';
 import { isUnlocked, townLevel } from './townhall.ts';
@@ -179,7 +181,86 @@ export const GRANT_NAME: Partial<Record<BuildingKind, string>> = {
   park: 'un parque',
   library: 'una biblioteca',
   sports: 'un polideportivo',
+  // 2.3: cofinanciación de las grandes obras (y el FEDER).
+  bridge: 'el puente de piedra',
+  station: 'la estación de tren',
+  fair: 'la feria regional',
+  stadium: 'el estadio',
+  cathedral: 'la catedral',
 };
+
+/** 2.3: ¿es una subvención de las de antes (una obra con anticipo y plazo)? Las de las grandes obras y el FEDER van aparte. */
+const classic = (g: Grant) => g.landmark === undefined && !g.feder;
+
+/** 2.3: condiciones de una subvención en palabras (la hoja del ayuntamiento y la ficha de la obra). */
+export function grantTerms(g: Grant): { offer: string; terms: string; accepted: string } {
+  const pct = `${Math.round(g.share * 100)} %`;
+  if (g.feder && g.federFor === 'repair') {
+    return {
+      offer: `Fondos europeos (FEDER) por la crisis: pagan el ${pct} de las reparaciones durante ${REGION.feder.months} meses.`,
+      terms: 'Sin anticipo ni recargo: se cobra al pagar cada reparación.',
+      accepted: `Aceptado el FEDER: ${pct} de las reparaciones hasta el ${dateText(g.deadline)}.`,
+    };
+  }
+  if (g.feder) {
+    return {
+      offer: `Fondos europeos (FEDER) por la crisis: pagan el ${pct} de cada fase de ${GRANT_NAME[g.kind] ?? g.kind} que empiece en ${REGION.feder.months} meses.`,
+      terms: 'Sin anticipo ni recargo: se cobra al pagar cada fase.',
+      accepted: `Aceptado el FEDER: ${pct} de cada fase de ${GRANT_NAME[g.kind] ?? g.kind} hasta el ${dateText(g.deadline)}.`,
+    };
+  }
+  if (g.landmark !== undefined) {
+    return {
+      offer: `La Diputación cofinancia ${GRANT_NAME[g.kind] ?? g.kind}: paga el ${pct} de cada fase.`,
+      terms: 'Sin anticipo ni plazo: se cobra al pagar cada fase, aunque la obra se pare entre fases.',
+      accepted: `Cofinanciación aceptada: la Diputación paga el ${pct} de cada fase de ${GRANT_NAME[g.kind] ?? g.kind}.`,
+    };
+  }
+  return {
+    offer: `Pagan el ${pct} de ${GRANT_NAME[g.kind] ?? g.kind} si se termina en 6 meses.`,
+    terms: 'Al aceptar cobras un anticipo del 30 %. Si no lo terminas a tiempo, lo devuelves con un 10 % de recargo.',
+    accepted: `Aceptada: ${GRANT_NAME[g.kind] ?? g.kind}, ${pct}. Anticipo cobrado: ${g.advance.toLocaleString('es-ES')} €. Plazo hasta el ${dateText(g.deadline)}.`,
+  };
+}
+
+function dateText(t: number): string {
+  const d = tickToDate(t);
+  return `${d.day}/${d.month} del año ${d.year}`;
+}
+
+/**
+ * 2.3: FEDER. Al empezar una crisis comarcal, la Unión Europea ofrece pagar
+ * el 60–70 % de las fases de la estación (si ya se puede hacer o está en
+ * marcha) o, si no, de las reparaciones, durante 12 meses.
+ */
+export function offerFeder(state: GameState): Grant | null {
+  if (state.grants.some((g) => g.feder && (g.status === 'offered' || (g.status === 'accepted' && state.tick <= g.deadline)))) return null;
+  const station = state.landmarks.find((l) => l.kind === 'station' && l.phase < l.phases);
+  const stationReady = !!station || ((state.townhallLevel ?? 1) >= LANDMARKS.specs.station.townhall && state.citizens.length >= LANDMARKS.specs.station.pop);
+  const share = [REGION.feder.shareMin, REGION.feder.shareMax][hash32(state.tick, 23) % 2]!;
+  const g: Grant = {
+    id: state.nextId++,
+    kind: stationReady ? 'station' : 'townhall',
+    share,
+    offeredTick: state.tick,
+    deadline: state.tick + REGION.feder.months * TICKS_PER_MONTH,
+    status: 'offered',
+    advance: 0,
+    minId: 0,
+    feder: true,
+    federFor: stationReady ? 'station' : 'repair',
+  };
+  state.grants.push(g);
+  pushEvent(state, 'business', stationReady ? `Fondos europeos por la crisis: el FEDER pagaría el ${Math.round(share * 100)} % de la estación de tren (Pueblo › Ayuntamiento)` : `Fondos europeos por la crisis: el FEDER pagaría el ${Math.round(share * 100)} % de las reparaciones (Pueblo › Ayuntamiento)`);
+  return g;
+}
+
+/** 2.3: el FEDER paga su parte de una reparación (si hay uno aceptado y en plazo). Devuelve lo pagado. */
+export function federRepair(state: GameState, cost: number): number {
+  const g = state.grants.find((x) => x.feder && x.federFor === 'repair' && x.status === 'accepted' && state.tick <= x.deadline);
+  if (!g) return 0;
+  return transfer(state, OUTSIDE, TREASURY, Math.round(cost * g.share), 'subvenciones');
+}
 
 export function canAnswerGrant(state: GameState, grantId: number): { ok: boolean; error?: string } {
   const g = state.grants.find((x) => x.id === grantId);
@@ -194,6 +275,12 @@ export function answerGrant(state: GameState, grantId: number, accept: boolean):
     return;
   }
   g.status = 'accepted';
+  // 2.3: la de una gran obra no caduca (se cobra por fase); el FEDER, al acabar su plazo, sin recargo.
+  if (!classic(g)) {
+    if (g.landmark !== undefined) g.deadline = Number.MAX_SAFE_INTEGER;
+    pushEvent(state, 'info', grantTerms(g).accepted);
+    return;
+  }
   g.minId = state.nextId;
   g.deadline = state.tick + GRANT_DEADLINE_DAYS * TICKS_PER_DAY;
   g.advance = Math.round(estimatedCost(state, g.kind) * GRANT_ADVANCE);
@@ -204,7 +291,7 @@ export function answerGrant(state: GameState, grantId: number, accept: boolean):
 
 /** Al terminar una obra: si cumple una subvención aceptada y en plazo, se cobra el resto. */
 export function onBuildingDone(state: GameState, b: Building): void {
-  const g = state.grants.find((x) => x.status === 'accepted' && !x.emergency && x.kind === b.kind && b.id >= x.minId && state.tick <= x.deadline);
+  const g = state.grants.find((x) => classic(x) && x.status === 'accepted' && !x.emergency && x.kind === b.kind && b.id >= x.minId && state.tick <= x.deadline);
   if (!g) return;
   const rest = Math.max(0, Math.round(estimatedCost(state, g.kind) * g.share) - g.advance);
   transfer(state, OUTSIDE, TREASURY, rest, 'subvenciones');
@@ -246,6 +333,11 @@ export function civicDay(state: GameState): void {
   // Subvenciones: las ofertas caducan; las aceptadas fuera de plazo se devuelven con recargo.
   for (const g of state.grants) {
     if (g.status === 'offered' && state.tick - g.offeredTick > GRANT_OFFER_DAYS * TICKS_PER_DAY) g.status = 'declined';
+    // 2.3: el FEDER se acaba sin recargo; la cofinanciación de una obra no caduca.
+    if (!classic(g)) {
+      if (g.status === 'accepted' && state.tick > g.deadline) g.status = 'paid';
+      continue;
+    }
     // 2.3: la ayuda de emergencia de la riada la lleva scenarios.ts.
     if (g.status === 'accepted' && !g.emergency && state.tick > g.deadline) {
       g.status = 'expired';
@@ -254,8 +346,9 @@ export function civicDay(state: GameState): void {
       pushEvent(state, 'warning', `No se terminó ${GRANT_NAME[g.kind]} a tiempo: hay que devolver ${back} € a la Diputación`);
     }
   }
-  if (state.grants.length > 20) state.grants = state.grants.slice(-20);
-  const active = state.grants.some((g) => g.status === 'offered' || g.status === 'accepted');
+  // 2.3: las cofinanciaciones aceptadas de las grandes obras se quedan (se cobran por fase).
+  if (state.grants.length > 20) state.grants = state.grants.filter((g, i) => i >= state.grants.length - 20 || (g.landmark !== undefined && g.status === 'accepted'));
+  const active = state.grants.some((g) => classic(g) && (g.status === 'offered' || g.status === 'accepted'));
   const last = Math.max(0, ...state.grants.map((g) => g.offeredTick));
   // Con el Palacio Municipal (nivel 5), la Diputación ofrece más a menudo (v1.8).
   const every = GRANT_EVERY_DAYS * (townLevel(state) >= 5 ? 0.6 : 1);

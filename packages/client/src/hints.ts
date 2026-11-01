@@ -1,4 +1,4 @@
-import { buildingAt, canUpgradeTownhall, coverageSummary, type GameState, NEED_LABEL, TOWNHALL_LEVELS, freeHomes, taxLevels, zonesUnlocked } from '@bitopolis/sim';
+import { buildingAt, canUpgradeTownhall, LANDMARK_KINDS, LANDMARK_NAMES, landmarkReqs, phaseCost, coverageSummary, type GameState, NEED_LABEL, TOWNHALL_LEVELS, freeHomes, taxLevels, zonesUnlocked } from '@bitopolis/sim';
 import type { ToolId } from './tools.ts';
 
 export interface Hint {
@@ -56,6 +56,11 @@ export function nextHint(state: GameState): Hint {
   if (I > 20 && !zoned(3)) return { text: 'Hay gente sin trabajo en el pueblo. Pinta una zona industrial (I), mejor lejos de las casas.', tool: 'zoneI' };
   if (C > 20 && !zoned(2)) return { text: 'Los vecinos quieren tiendas. Pinta una zona comercial (C).', tool: 'zoneC' };
   if (!has('park')) return { text: 'Un parque sube la felicidad de las casas cercanas.', tool: 'park' };
+  // 2.3: el consejero avisa cuando se puede empezar una gran obra (o pagar la fase siguiente).
+  const next = state.landmarks.find((l) => l.phase < l.phases && l.phaseUntil === -1 && !l.paused && landmarkReqs(state, l.kind, phaseCost(state, l)).every((r) => r.ok));
+  if (next) return { text: `Ya puedes pagar la fase ${next.phase + 1} de ${LANDMARK_NAMES[next.kind].toLowerCase()}: toca la obra en el mapa.` };
+  const ready = LANDMARK_KINDS.find((k) => !state.landmarks.some((l) => l.kind === k) && landmarkReqs(state, k).every((r) => r.ok));
+  if (ready) return { text: `Ya puedes empezar una gran obra: ${LANDMARK_NAMES[ready].toLowerCase()} (Construir › Grandes obras).`, tool: ready };
   if (state.demand.R <= 0) return { text: 'La demanda de vivienda está baja: crea empleo (zonas C e I) o servicios para atraer gente.' };
   return { text: 'Todo en orden. Amplía las calles y deja que el pueblo crezca.' };
 }

@@ -1,5 +1,5 @@
-import type { BuildKind, Command, ZoneKind } from '@bitopolis/shared';
-import { BUILD, BUILD_LEVEL, buildCost, CIVIL, FARM, type GameState, TERRAIN, TOWNHALL_LEVELS, townLevel, ZONE_COST_PER_TILE } from '@bitopolis/sim';
+import type { BuildKind, Command, LandmarkKind, ZoneKind } from '@bitopolis/shared';
+import { BUILD, BUILD_LEVEL, buildCost, CIVIL, FARM, type GameState, LANDMARK_LATER, LANDMARKS, landmarkReqs, TERRAIN, TOWNHALL_LEVELS, townLevel, ZONE_COST_PER_TILE } from '@bitopolis/sim';
 import { money } from './i18n.ts';
 
 export type ToolId =
@@ -30,6 +30,12 @@ export type ToolId =
   | 'dike'
   | 'cleanpoint'
   | 'heritage'
+  // 2.3: grandes obras (por fases).
+  | 'bridge'
+  | 'station'
+  | 'fair'
+  | 'stadium'
+  | 'cathedral'
   | 'demolish';
 
 export interface Tool {
@@ -39,6 +45,8 @@ export interface Tool {
   shape: 'tap' | 'line' | 'rect';
   build?: BuildKind;
   zone?: ZoneKind;
+  /** 2.3: gran obra (se empieza con StartLandmark y se paga por fases). */
+  landmark?: LandmarkKind;
   key: string;
   help: string;
 }
@@ -76,6 +84,12 @@ export const TOOLS: Tool[] = [
   { id: 'cleanpoint', label: 'Punto limpio', shape: 'tap', build: 'cleanpoint', key: 'u', help: 'Su camión recoge la basura por las calles de alrededor (60 casillas al día). Solo quien tiene recogida paga la tasa de basuras.' },
   // 2.3: turismo (uno por partida; su forma sale del terreno).
   { id: 'heritage', label: 'Patrimonio', shape: 'tap', build: 'heritage', key: 'o', help: 'Monumento que atrae visitantes (uno por pueblo): faro junto al mar, molino junto al río, castillo en la colina o rollo con plaza porticada en el llano. Turismo, en Pueblo › Ayuntamiento.' },
+  // 2.3: grandes obras por fases (sin atajo de teclado: se eligen en la bandeja).
+  { id: 'bridge', label: 'Puente de piedra', shape: 'tap', landmark: 'bridge', key: '', help: 'Sobre el río, junto a una carretera. 3 fases: riadas a la mitad en la orilla y el suelo de alrededor vale más. Cada fase se paga cuando quieras.' },
+  { id: 'station', label: 'Estación de tren', shape: 'tap', landmark: 'station', key: '', help: 'Ocupa 2×2 casillas. 3 fases: más ganas de vivir aquí, más trabajo fuera y el viaje sale más barato.' },
+  { id: 'fair', label: 'Feria regional', shape: 'tap', landmark: 'fair', key: '', help: 'Ocupa 2×2 casillas. 2 fases: en septiembre, las tiendas venden más y vienen el doble de visitantes.' },
+  { id: 'stadium', label: 'Estadio', shape: 'tap', landmark: 'stadium', key: '', help: 'Ocupa 2×2 casillas. 3 fases: más felicidad a 12 casillas y cuenta como polideportivo; el día de partido, ruido.' },
+  { id: 'cathedral', label: 'Catedral', shape: 'tap', landmark: 'cathedral', key: '', help: 'Llegará más adelante.' },
   { id: 'dezone', label: 'Sin zona', shape: 'rect', zone: 'none', key: 'z', help: 'Quita la zona (no derriba lo construido).' },
   { id: 'demolish', label: 'Derribar', shape: 'tap', key: 'x', help: 'Derriba un edificio o una carretera. Pide confirmación.' },
 ];
@@ -97,6 +111,12 @@ export function toolLevel(tool: Tool): number {
 
 /** Qué falta, en dos palabras («nivel 3», «hito de 50»), o null si está libre. */
 export function lockShort(tool: Tool, state: GameState): string | null {
+  // 2.3: las grandes obras miran nivel, vecinos, felicidad y caja (y la catedral, más adelante).
+  if (tool.landmark) {
+    if (state.landmarks.some((l) => l.kind === tool.landmark)) return 'ya empezada';
+    const miss = landmarkReqs(state, tool.landmark).find((r) => !r.ok);
+    return miss ? miss.short : null;
+  }
   const lv = toolLevel(tool);
   if (townLevel(state) < lv) return `ayto. nivel\u00a0${lv}`;
   if ((tool.build === 'plaza' || tool.build === 'market') && !state.unlocked.includes(tool.build)) return `hito de ${unlockPop(tool)}`;
@@ -108,6 +128,12 @@ export function lockShort(tool: Tool, state: GameState): string | null {
 
 /** Qué falta, explicado (para la bandeja, la franja y los avisos). */
 export function lockLong(tool: Tool, state: GameState): string {
+  if (tool.landmark) {
+    if (LANDMARK_LATER.includes(tool.landmark)) return `${tool.label}: llegará más adelante.`;
+    if (state.landmarks.some((l) => l.kind === tool.landmark)) return `${tool.label}: ya está empezada. Tócala en el mapa para pagar la fase siguiente.`;
+    const miss = landmarkReqs(state, tool.landmark).filter((r) => !r.ok);
+    return `${tool.label}: falta ${miss.map((r) => r.long.charAt(0).toLowerCase() + r.long.slice(1)).join('; ')}.`;
+  }
   const lv = toolLevel(tool);
   if (townLevel(state) < lv) {
     const L = TOWNHALL_LEVELS[lv - 1]!;
@@ -121,11 +147,19 @@ export function lockLong(tool: Tool, state: GameState): string {
 
 /** Coste corto para la barra de confirmación: «hasta 3.500 €». */
 export function shortCost(tool: Tool): string {
+  if (tool.landmark) return landmarkCost(tool.landmark);
   return tool.build && tool.build !== 'road' ? `hasta ${money(buildCost(tool.build))}` : costText(tool);
 }
 
 /** Precio en una línea para la bandeja «Construir» (v1.6). */
+/** 2.3: «3 fases × 14.000 €». */
+export function landmarkCost(kind: LandmarkKind): string {
+  const s = LANDMARKS.specs[kind];
+  return `${s.phases} fases × ${money(s.phaseCost)}`;
+}
+
 export function trayCost(tool: Tool): string {
+  if (tool.landmark) return landmarkCost(tool.landmark);
   if (tool.build && tool.build !== 'road') return money(buildCost(tool.build));
   if (tool.zone && tool.zone !== 'none') return `${money(ZONE_COST_PER_TILE)}/casilla`;
   if (tool.zone === 'none') return 'gratis';
@@ -142,9 +176,15 @@ export const TRAY: { title: string; tools: ToolId[] }[] = [
   { title: 'Emergencias', tools: ['firestation', 'civilprotection', 'dike'] },
   { title: 'Turismo', tools: ['heritage'] },
   { title: 'Premios de los hitos', tools: ['plaza', 'market'] },
+  // 2.3: grandes obras por fases (cada fase se paga desde su ficha).
+  { title: 'Grandes obras', tools: ['bridge', 'station', 'fair', 'stadium', 'cathedral'] },
 ];
 
 export function costText(tool: Tool): string {
+  if (tool.landmark) {
+    const s = LANDMARKS.specs[tool.landmark];
+    return `${landmarkCost(tool.landmark)} + obra de cada fase (${s.workers} obreros × ${s.days} días). Al empezar solo se marca el solar`;
+  }
   if (tool.build === 'road') return `${money(BUILD.road.materials)} por casilla (puente sobre el río: ${money(TERRAIN.bridgePerTile)})`;
   if (tool.build) {
     const s = BUILD[tool.build];
@@ -175,6 +215,7 @@ export function commandFor(tool: Tool, a: { x: number; y: number }, b: { x: numb
     return { type: 'Zone', zone: tool.zone, x, y, w, h };
   }
   if (tool.build) return { type: 'Build', kind: tool.build, x: b.x, y: b.y };
+  if (tool.landmark) return { type: 'StartLandmark', kind: tool.landmark, x: b.x, y: b.y };
   if (tool.id === 'demolish') return { type: 'Demolish', x: b.x, y: b.y };
   if (tool.id === 'dike') return { type: 'BuildDike', x: b.x, y: b.y };
   return null;
@@ -198,6 +239,13 @@ export function tilesOf(cmd: Command): { x: number; y: number }[] {
   if (cmd.type === 'Zone') {
     const out = [];
     for (let y = cmd.y; y < cmd.y + cmd.h; y++) for (let x = cmd.x; x < cmd.x + cmd.w; x++) out.push({ x, y });
+    return out;
+  }
+  // 2.3: las grandes obras 2×2 (el puente, una casilla).
+  if (cmd.type === 'StartLandmark') {
+    const n = LANDMARKS.specs[cmd.kind].size;
+    const out = [];
+    for (let dy = 0; dy < n; dy++) for (let dx = 0; dx < n; dx++) out.push({ x: cmd.x + dx, y: cmd.y + dy });
     return out;
   }
   if ('x' in cmd) return [{ x: cmd.x, y: cmd.y }];
