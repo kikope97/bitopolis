@@ -1,6 +1,7 @@
 /**
  * Evaluación de la IA del pueblo (2.0): simula partidas en Modo IA y, en cada
- * turno del pueblo, pide los lotes de vecinos como lo hace el servidor. Mide el
+ * turno del pueblo, pide los lotes de vecinos como lo hace el servidor (2.5:
+ * y, cada mes, el turno de los alcaldes vecinos, en `alcaldes`). Mide el
  * coste por turno y por hora de juego, la caché, las decisiones válidas, la
  * variedad (acciones, actitudes, gasto, planes) y el dinero que circula.
  *
@@ -15,6 +16,10 @@ import { REAL_MS_PER_DAY_AT_X1, TICKS_PER_DAY } from '@bitopolis/shared';
 import {
   applyCommand,
   buildDirectorRequest,
+  buildNeighborRequest,
+  COMARCA,
+  NEIGHBOR_HEADER,
+  parseNeighbors,
   buildTurnRequest,
   type DirectorChoice,
   createInitialState,
@@ -52,6 +57,19 @@ const tokens = (s: string) => Math.ceil(s.length / 3.5);
 /** Simulador sin red: elige con algo de sentido entre las acciones del menú. */
 const simulated: LLMProvider = {
   async complete(req: LLMRequest): Promise<LLMResult> {
+    // 2.5: alcaldes vecinos: el acuerdo si lo hay; si no, una acción del menú según el mes.
+    if (req.user.startsWith(NEIGHBOR_HEADER)) {
+      const d = JSON.parse(req.user.slice(req.user.indexOf('\n') + 1)) as { mes: number; pueblos: { clave: string; pueblo: string; menu: { accion: string }[] }[] };
+      const alcaldes = Object.fromEntries(
+        d.pueblos.map((p, i) => {
+          const menu = p.menu.map((m) => m.accion);
+          const accion = menu.find((a) => a.startsWith('ofrecer_acuerdo:')) ?? menu[(d.mes + i) % menu.length]!;
+          return [p.clave, { accion, declaracion: `En ${p.pueblo} miramos con atención lo que pasa en la comarca.` }];
+        }),
+      );
+      const text = JSON.stringify({ alcaldes });
+      return { text, usage: { in: tokens(req.system + req.user), cachedIn: 0, out: tokens(text) } };
+    }
     if (req.user.startsWith('Director')) {
       const d = JSON.parse(req.user.slice(req.user.indexOf('\n') + 1)) as { presupuesto_drama: { sucesos_malos_que_caben: number }; menu: { id: string; malo: boolean; avisado: boolean }[] };
       const sucesos = [...d.menu.filter((m) => !m.malo).slice(0, 1), ...d.menu.filter((m) => m.malo && m.avisado).slice(0, d.presupuesto_drama.sucesos_malos_que_caben)];
@@ -130,6 +148,8 @@ const thoughts: string[] = [];
 const notes: string[] = [];
 const dir = { calls: 0, valid: 0, tokensIn: 0, tokensCached: 0, tokensOut: 0, picked: {} as Record<string, number>, warned: {} as Record<string, number>, fired: 0, chronicles: [] as string[] };
 const shopSales: number[] = [];
+/** 2.5: turno mensual de los alcaldes vecinos (una petición al mes). Sin grabación no cuenta como error del turno. */
+const alc = { calls: 0, asked: 0, valid: 0, said: 0, tokensIn: 0, tokensOut: 0, missing: 0, actions: {} as Record<string, number>, samples: [] as string[] };
 
 for (let seed = 1; seed <= Number(values.seeds); seed++) {
   const state: GameState = createInitialState({ seed, aiMode: true, aiShare: share });
@@ -139,6 +159,32 @@ for (let seed = 1; seed <= Number(values.seeds); seed++) {
     for (const cmd of profile.decide(state, prng)) applyCommand(state, cmd);
     for (let h = 0; h < TICKS_PER_DAY; h++) {
       step(state);
+      const nt = state.comarca?.turn;
+      if (nt && nt.due - COMARCA.turnDays * TICKS_PER_DAY === state.tick) {
+        const req = buildNeighborRequest(state);
+        alc.calls++;
+        alc.asked += Object.keys(req.menus).length;
+        try {
+          const r = await llm.complete({ system: req.system, user: req.user, schema: req.schema, model, maxTokens: 900 });
+          if (values.record) recordings.set(ReplayProvider.key({ system: req.system, user: req.user }), r);
+          alc.tokensIn += r.usage.in || tokens(req.system + req.user);
+          alc.tokensOut += r.usage.out || tokens(r.text);
+          const parsed = parseNeighbors(r.text, req);
+          alc.valid += parsed.picks.length;
+          for (const p of parsed.picks) {
+            const v = p.accion.split(':')[0]!;
+            alc.actions[v] = (alc.actions[v] ?? 0) + 1;
+            if (p.declaracion) {
+              alc.said++;
+              if (alc.samples.length < 6) alc.samples.push(p.declaracion);
+            }
+          }
+          applyCommand(state, { type: 'NeighborTurn', month: nt.month, picks: parsed.picks });
+        } catch (e) {
+          alc.missing++;
+          if (alc.missing <= 1) console.error('alcaldes sin respuesta:', (e as Error).message);
+        }
+      }
       const t = state.ai?.turn;
       if (!t || t.opened !== state.tick) continue;
       totals.turns++;
@@ -269,6 +315,17 @@ const report = {
     warned: dir.warned,
     fired: dir.fired,
     sampleChronicles: dir.chronicles.slice(-4),
+  },
+  alcaldes: {
+    model,
+    calls: alc.calls,
+    validPct: pct(alc.valid, alc.asked),
+    saidPct: pct(alc.said, alc.valid),
+    sinGrabacion: alc.missing,
+    perCall: { tokensIn: alc.tokensIn / Math.max(1, alc.calls - alc.missing), tokensOut: alc.tokensOut / Math.max(1, alc.calls - alc.missing) },
+    eurPorMes: +costEur(DEFAULT_PRICES, model, 'anthropic', { in: alc.tokensIn / Math.max(1, alc.calls - alc.missing), cachedIn: 0, out: alc.tokensOut / Math.max(1, alc.calls - alc.missing) }).toFixed(4),
+    actions: alc.actions,
+    sampleSaid: alc.samples,
   },
   avgBusinessMargin: shopSales.length ? Math.round(sum(shopSales) / shopSales.length) : 0,
 };
