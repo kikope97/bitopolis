@@ -66,7 +66,8 @@ export class OpenAICompatProvider implements LLMProvider {
         : { type: 'json_object' },
     };
     // Los modelos de razonamiento de OpenAI no admiten temperatura distinta de la de serie.
-    if (isOpenAI) body.max_completion_tokens = req.maxTokens;
+    // Ronda 18: el mismo margen de razonamiento que con Anthropic.
+    if (isOpenAI) body.max_completion_tokens = req.maxTokens + 1024;
     else {
       body.max_tokens = req.maxTokens;
       body.temperature = 0.3;

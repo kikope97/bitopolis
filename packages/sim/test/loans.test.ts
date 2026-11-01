@@ -196,7 +196,7 @@ describe('préstamos municipales (2.2)', () => {
 
   it('en la oposición no se pide prestado', () => {
     const s = withBooks(5_000);
-    s.politics.mayor = 'rival';
+    s.politics.mayor = 999_999;
     expect(validateCommand(s, { type: 'RequestLoan', amount: 1_000, months: 12 })).toMatchObject({ ok: false, error: expect.stringMatching(/oposición/) });
   });
 
@@ -214,7 +214,7 @@ describe('préstamos municipales (2.2)', () => {
     const fuzz = seedRng(77);
     let ok = 0;
     for (let day = 0; day < 2_000; day++) {
-      for (const cmd of PROFILES.constructor!.decide(s, prng)) applyCommand(s, cmd);
+      for (const cmd of PROFILES['constructor' as string]!.decide(s, prng)) applyCommand(s, cmd);
       const r = nextInt(fuzz, 0, 9);
       let cmd: Command | null = null;
       if (r === 0) cmd = { type: 'RequestLoan', amount: nextInt(fuzz, 1, 8) * 1_000, months: ([12, 24, 48] as const)[nextInt(fuzz, 0, 2)]! };

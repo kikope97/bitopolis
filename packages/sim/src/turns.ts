@@ -179,12 +179,14 @@ function desperate(c: Citizen): boolean {
 export function turnMenu(state: GameState, c: Citizen): MenuItem[] {
   const out: MenuItem[] = [{ accion: 'seguir', detalle: 'seguir con su vida como hasta ahora' }];
   const pol = state.politics;
+  // Ronda 18: quien gobierna no se pide nada a sí mismo, ni se manifiesta contra sí, ni se va (disolvería su gobierno).
+  const governs = pol.mayor === c.id;
   // Elecciones a la vista: decide su voto (secreto).
   if (pol.party !== null && pol.nextElection - state.tick <= 10 * TICKS_PER_DAY && !c.vote) {
     out.push({ accion: 'votar_gobierno' }, { accion: 'votar_oposicion' }, { accion: 'abstenerse' });
   }
   const assoc = protestFor(state, c);
-  if (assoc && c.protest !== assoc.id && c.protest !== -assoc.id) out.push({ accion: 'manifestarse', detalle: `la asociación «${assoc.name}» convoca una manifestación` }, { accion: 'no_ir' });
+  if (assoc && !governs && c.protest !== assoc.id && c.protest !== -assoc.id) out.push({ accion: 'manifestarse', detalle: `la asociación «${assoc.name}» convoca una manifestación` }, { accion: 'no_ir' });
   // Trabajo.
   for (const b of vacantJobs(state, c)) out.push({ accion: `aceptar_trabajo:${b.id}`, detalle: `empleo en ${(b.name ?? BUILD_NAMES[b.kind] ?? b.kind).toString()}` });
   if (c.jobId !== null) out.push({ accion: 'dimitir', detalle: 'dejar su trabajo en el pueblo' });
@@ -207,14 +209,16 @@ export function turnMenu(state: GameState, c: Citizen): MenuItem[] {
   if (mine) out.push({ accion: 'dejar_asociacion', detalle: `dejar «${mine.name}»` });
   else for (const a of (state.associations ?? []).slice(0, 2)) out.push({ accion: `unirse_asociacion:${a.id}`, detalle: `unirse a «${a.name}»` });
   // Pedir y quejarse.
-  for (const n of needsOf(state, c).slice(0, 2)) out.push({ accion: `pedir:${n}`, detalle: `pedir al alcalde ${NEED_TEXT[n]}` });
-  out.push({ accion: 'quejarse', detalle: 'quejarse al ayuntamiento' });
+  if (!governs) {
+    for (const n of needsOf(state, c).slice(0, 2)) out.push({ accion: `pedir:${n}`, detalle: `pedir al alcalde ${NEED_TEXT[n]}` });
+    out.push({ accion: 'quejarse', detalle: 'quejarse al ayuntamiento' });
+  }
   // 2.1: sin camión y con la basura en la puerta, puede tirarla al monte (contamina y está mal visto).
   if (canDump(state, c)) out.push({ accion: 'tirar_al_monte', detalle: 'tirar la basura al monte: no pasa el camión por su calle (contamina cerca y los vecinos lo verán mal)' });
   // Deudas.
   if (totalDebt(c) >= DEBT.noticeable) {
     out.push({ accion: 'apretarse', detalle: 'apretarse el cinturón para pagar lo que debe' });
-    if (c.debt && c.debt.town >= DEBT.noticeable && !c.debt.plan) out.push({ accion: 'pedir_aplazamiento', detalle: 'pedir al alcalde que le aplace la deuda con el ayuntamiento' });
+    if (!governs && c.debt && c.debt.town >= DEBT.noticeable && !c.debt.plan) out.push({ accion: 'pedir_aplazamiento', detalle: 'pedir al alcalde que le aplace la deuda con el ayuntamiento' });
   }
   // Familia.
   const p = partnerOf(state, c);
@@ -243,7 +247,7 @@ export function turnMenu(state: GameState, c: Citizen): MenuItem[] {
   if (canPresent(state, c).ok) out.push({ accion: 'presentarse', detalle: `presentarse a las elecciones con su propia candidatura (le cuesta ${LISTS.cost} €; su facción está descontenta)` });
   // Solo si está desesperado: robar en una casa del pueblo.
   if (desperate(c)) out.push({ accion: 'robar', detalle: 'robar en una casa del pueblo (está sin dinero, sin trabajo y endeudado)' });
-  out.push({ accion: 'irse', detalle: 'irse del pueblo y vender lo que tenga' });
+  if (!governs) out.push({ accion: 'irse', detalle: 'irse del pueblo y vender lo que tenga' });
   return out;
 }
 

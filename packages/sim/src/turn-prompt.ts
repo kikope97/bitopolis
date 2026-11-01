@@ -30,13 +30,13 @@ import { GESTURES, gestureCandidates, isAiCitizen, PLANS, planText, SPEND, type 
  */
 export const TURN_PROMPT_VERSION = 11;
 
-export const TURN_SYSTEM = `Eres la mente de los vecinos de Bitópolis, un pueblo español pequeño. Cada semana decides, a la vez, qué hace cada vecino de la lista. Ellos viven de verdad: trabajan, compran, se enamoran, se enfadan, ahorran o se arruinan, y reaccionan a lo que hace el alcalde (el jugador).
+export const TURN_SYSTEM = `Eres la mente de los vecinos de Bitópolis, un pueblo español pequeño. Cada semana decides, a la vez, qué hace cada vecino de la lista. Ellos viven de verdad: trabajan, compran, se enamoran, se enfadan, ahorran o se arruinan, y reaccionan a lo que hace quien gobierna: el alcalde (el jugador) o, si ganó las elecciones, el rival (mira "politica.gobierna"). El vecino que tenga "es_alcalde" gobierna él: piensa y actúa como alcalde.
 
 Para cada vecino del lote devuelve exactamente un objeto con:
 - "vecino": su id.
 - "accion": UNA de las acciones de su lista "acciones" (copia el texto exacto). Si no quiere hacer nada especial, "seguir". No inventes acciones.
 - "gesto": con quién (id de su lista "con_quien", o 0) y qué ("ninguno", "acercarse", "enfadarse", "hacer_las_paces", "pedir_salir", "romper").
-- "actitud": qué piensa del alcalde ahora, de -2 (muy en contra) a 2 (muy a favor). Tiene que salir de lo que vive: impuestos, servicios, su bolsillo, sus planes.
+- "actitud": qué piensa ahora de quien gobierna, de -2 (muy en contra) a 2 (muy a favor). Tiene que salir de lo que vive: impuestos, servicios, su bolsillo, sus planes.
 - "gasto": dónde compra este mes ("pueblo", "fuera" o "ahorrar"), en qué tienda del pueblo si la prefiere (id de la lista de tiendas, o 0) y si se da algún capricho ("ocio"). Comer y lo básico se pagan siempre: tú decides dónde y si hay ocio. Si nadie compra en las tiendas del pueblo, cierran y su gente se queda sin trabajo: compra en el pueblo si le va bien y le compensa.
 - "plan": un ultimátum o propósito con plazo si de verdad le importa algo ("irse_si_no", "protestar_si_no", "votar_en_contra_si_no", con la "necesidad" de su lista y los "meses", de 1 a 6), o "ninguno". Úsalo con moderación: es una promesa que el pueblo recordará.
 - "pensamiento": una frase en primera persona, en español de España, con su tono y su vida (máx. 140 caracteres).
@@ -102,7 +102,7 @@ export function turnShared(state: GameState): string {
           },
         }
       : {}),
-    lo_que_ha_hecho_el_alcalde: ai.mayor.slice(-12).map((m) => `el alcalde ${m.text}`),
+    lo_que_ha_hecho_el_gobierno: ai.mayor.slice(-12).map((m) => `${state.politics.mayor === 'player' ? 'el alcalde' : 'el gobierno'} ${m.text}`),
     // Solo lo que cuenta (lo que decidió la costumbre, «ahorrar» o «seguir», no dice nada).
     la_semana_pasada: ai.log.at(-1)?.source === 'ia' ? ai.log.at(-1)!.lines.slice(0, 10).map((l) => l.text) : [],
     oportunidades: opportunities(state),
@@ -161,6 +161,7 @@ function citizenBrief(state: GameState, c: Citizen) {
     deseo: c.desire.replace('_', ' '),
     miedo: c.fear,
     meta: GOAL_TEXT[c.goal],
+    ...(state.politics.mayor === c.id ? { es_alcalde: true } : {}),
     ...(politicsActive(state) ? { faccion: FACTION_TEXT[factionOf(state, c)].toLowerCase() } : {}),
     felicidad: Math.round(c.happiness),
     bolsillo: pocketOf(c).replace('_', ' '),
@@ -442,15 +443,18 @@ export function buildDirectorRequest(state: GameState, shared = turnShared(state
 }
 
 const PickSchema = z.object({ id: z.string().max(60), motivo: z.string().max(600) });
+/** Ronda 18: una lista larga se recorta (no anula al director). */
+const upTo = <T extends z.ZodTypeAny>(item: T, n: number) => z.preprocess((v) => (Array.isArray(v) ? v.slice(0, n) : v), z.array(item));
+// Ronda 18: un campo extra mal hecho se descarta él solo; sucesos, avisos, foco y crónica siguen siendo obligatorios.
 const DirectorOut = z.object({
-  sucesos: z.array(PickSchema).max(10),
-  avisos: z.array(PickSchema).max(10),
+  sucesos: upTo(PickSchema, 10),
+  avisos: upTo(PickSchema, 10),
   foco: z.string().max(600),
   cronica: z.string().max(2000),
-  titulares: z.array(z.object({ seccion: z.string().max(20), sobre: z.string().max(20), texto: z.string().max(600) })).max(6).optional(),
-  encargo: z.object({ id: z.string().max(60), carta: z.string().max(1000) }).optional(),
-  pies: z.array(z.object({ id: z.string().max(10), texto: z.string().max(600) })).max(8).optional(),
-  gobierno_rival: z.object({ picks: z.array(z.string().max(60)).max(6), discurso: z.string().max(600) }).optional(),
+  titulares: upTo(z.object({ seccion: z.string().max(20), sobre: z.string().max(20), texto: z.string().max(600) }), 6).optional().catch(undefined),
+  encargo: z.object({ id: z.string().max(60), carta: z.string().max(1000) }).optional().catch(undefined),
+  pies: upTo(z.object({ id: z.string().max(10), texto: z.string().max(600) }).nullable().catch(null), 8).optional().catch(undefined),
+  gobierno_rival: z.object({ picks: upTo(z.string().max(60), 6), discurso: z.string().max(600).catch('') }).optional().catch(undefined),
 });
 
 /** Lee la respuesta del director: solo ids del menú y textos sin nombres inventados. Null si no vale. */
@@ -493,6 +497,7 @@ export function parseDirector(text: string, ids: string[], sent: string, extra: 
   // 2.2: pies de foto (solo de las fotos enviadas).
   const pies: NonNullable<DirectorChoice['pies']> = [];
   for (const p of r.data.pies ?? []) {
+    if (!p) continue;
     const f = extra.photos?.find((x) => x.id === p.id);
     const texto = clean(p.texto, 120);
     if (!f || texto.length < 4 || bad(texto) || pies.some((x) => x.tick === f.tick && x.kind === f.kind)) continue;

@@ -95,7 +95,8 @@ function taxOptions(state: GameState): RivalOption[] {
   }
   const i0 = LEVELS.indexOf(t.ibi);
   const t0 = LEVELS.indexOf(t.tasas);
-  const moves: [number, number][] = [[-1, -1], [1, 1], [-1, 0], [0, -1], [1, 0], [0, 1]];
+  // Ronda 18: de un paso en un solo tributo (como las reglas), nada de saltos dobles.
+  const moves: [number, number][] = [[-1, 0], [0, -1], [1, 0], [0, 1]];
   const seen = new Set<string>();
   for (const [di, dt] of moves) {
     const ibi = LEVELS[Math.max(0, Math.min(2, i0 + di))]!;
@@ -130,7 +131,9 @@ export function rivalMenu(state: GameState): RivalOption[] {
   // Reparar lo destrozado (lo primero que haya).
   const broken = state.buildings.find((b) => b.damaged && b.damaged.repairUntil < 0);
   if (broken?.damaged) push({ id: `reparar:${broken.id}`, kind: 'reparar', text: `Reparar ${(BUILD_NAMES[broken.kind] ?? 'un edificio').toLowerCase()} (${broken.damaged.cost} €)`, cmds: [{ type: 'RepairBuilding', buildingId: broken.id }] });
-  for (const o of taxOptions(state)) push(o);
+  // Ronda 18: nada que rompa una promesa pendiente de no subir (o de bajar) impuestos.
+  const noRaise = (state.politics.party?.promises ?? []).some((x) => x.status === 'pending' && (x.need === 'no subir impuestos' || x.need === 'bajar el IBI' || x.need === 'bajar los impuestos'));
+  for (const o of taxOptions(state)) if (!(noRaise && o.text.startsWith('Subir'))) push(o);
   // Obras concretas, cada una en su sitio (distintos, para poder elegir dos).
   const works = wantedWorks(state);
   const spots = freeSpots(state, Math.max(RIVAL_AI.works, works.length));
@@ -198,11 +201,18 @@ export function applyRivalPicks(state: GameState, picks: readonly string[], disc
     const o = menu.find((x) => x.id === id);
     // Una opción de cada tipo (dos obras sí: cada una tiene su sitio).
     if (!o || (o.kind !== 'obra' && kinds.has(o.kind))) continue;
+    // Ronda 18: la segunda obra también deja la reserva en caja.
+    if (o.kind === 'obra') {
+      const b = o.cmds[0];
+      if (b?.type === 'Build' && state.treasury < buildCostAt(state, b.kind, b.x, b.y) + RIVAL_AI.reserve) continue;
+    }
     if (o.cmds.length && !o.cmds.every((c) => governmentCommand(state, c))) continue;
     kinds.add(o.kind);
     applied.push(o.id);
     if (o.kind !== 'nada') rivalAct(state, `El alcalde ${party.leaderName} decide: ${o.text.charAt(0).toLowerCase()}${o.text.slice(1)}`);
   }
+  // Ronda 18: un discurso sin opciones vale como «no hacer nada especial».
+  if (!applied.length && clean(discurso, RIVAL_AI.speechMax)) applied.push('nada:nada');
   if (!applied.length) return applied;
   p.rivalAiMonth = monthOf(state);
   const text = clean(discurso, RIVAL_AI.speechMax);

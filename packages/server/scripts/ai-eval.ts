@@ -144,7 +144,8 @@ for (let seed = 1; seed <= Number(values.seeds); seed++) {
       totals.turns++;
       const shared = turnShared(state);
       const acts: TurnAct[] = [];
-      const queue = turnBatches(state, batchSize).map((ids) => ({ ids, retry: true }));
+      // Ronda 18: como el servidor, lotes de 8 en el turno mensual.
+      const queue = turnBatches(state, state.ai?.turn?.monthly ? Math.min(batchSize, 8) : batchSize).map((ids) => ({ ids, retry: true }));
       for (let qi = 0; qi < queue.length; qi++) {
         const { ids, retry } = queue[qi]!;
         const req = buildTurnRequest(state, ids, shared);

@@ -78,6 +78,8 @@ export const SAVING_AT = 0.7;
 
 /** 2.0: vecinos por lote y lotes en paralelo (el primero va solo para escribir la caché). */
 export const TURN_BATCH = 15;
+/** Ronda 18: el turno mensual (con biografías) responde más largo: lotes más pequeños, en paralelo. */
+export const TURN_BATCH_MONTHLY = 8;
 const TURN_TIMEOUT_MS = 30_000;
 /** Todo el turno (lotes, director y segunda pregunta) debe caber en la espera del cliente (45 s). */
 const TURN_DEADLINE_MS = 40_000;
@@ -255,7 +257,7 @@ export class AiService {
     if (!state.aiMode || !t) return;
     const g = this.gs(gameId);
     if (g.turns.has(t.n)) return;
-    const batches = turnBatches(state, TURN_BATCH);
+    const batches = turnBatches(state, t.monthly ? TURN_BATCH_MONTHLY : TURN_BATCH);
     const result: TurnResult = { n: t.n, status: 'pending', acts: [], requested: batches.flat().length, answered: 0 };
     g.turns.set(t.n, result);
     // Solo se guardan los últimos turnos.

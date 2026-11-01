@@ -699,7 +699,11 @@ export function politicsDay(state: GameState): void {
     checkRivalPromises(state);
     // 2.2: si el mes pasado gobernó la IA del rival (`applyRivalPicks`), las reglas no lo hacen.
     const month = Math.floor(state.tick / TICKS_PER_MONTH);
-    if (p.rivalAiMonth !== month - 1) rivalGovern(state);
+    // Ronda 18: si gobiernan las reglas, ese mes ya está gobernado (la IA no vuelve a gobernar).
+    if (p.rivalAiMonth !== month - 1) {
+      rivalGovern(state);
+      if (p.mayor !== 'player') p.rivalAiMonth = month;
+    }
   }
   warnings(state);
   if (state.tick >= p.nextElection) holdElection(state);
