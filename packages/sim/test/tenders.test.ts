@@ -127,19 +127,19 @@ describe('licitaciones (2.2)', () => {
     applyCommand(s, { type: 'Build', kind: 'water', ...at, offer: 'primo' });
     const t = s.tenders![0]!;
     t.risk = true;
-    s.politics.campaign.jubilados = 2;
+    s.politics.campaign.jubilados = TENDER.scandalCampaign + 1;
     days(s, TENDER.warnDays);
     expect(t.status).toBe('avisado');
     expect(s.events.some((e) => e.text.startsWith('Se comenta en el bar'))).toBe(true);
     days(s, TENDER.revealDays - TENDER.warnDays);
     expect(t.status).toBe('estallado');
-    expect(s.politics.campaign.jubilados).toBe(1);
+    expect(s.politics.campaign.jubilados).toBe(1); // baja TENDER.scandalCampaign
     expect(s.citizens[0]!.memories.some((m) => m.kind === 'escandalo')).toBe(true);
     expect(s.events.some((e) => e.kind === 'crime' && e.text.startsWith('Escándalo'))).toBe(true);
     expect(checkInvariants(s)).toEqual([]);
   });
 
-  it('«Revisar el contrato» durante el rumor lo anula pagando el 10 %', () => {
+  it('«Revisar el contrato» durante el rumor lo anula pagando una parte (TENDER.cancelFee)', () => {
     const s = createInitialState({ seed: 3 });
     withCrony(s);
     const at = spot(s);
