@@ -53,7 +53,7 @@ export interface DirectorChoice {
   sucesos: { id: string; motivo: string }[];
   avisos: { id: string; motivo: string }[];
   /** 2.1: titulares de El Eco de Bitópolis (sobre = vecino o edificio del que habla). */
-  titulares?: { seccion: 'sucesos' | 'cartas' | 'anuncios'; texto: string; sobre?: number }[];
+  titulares?: { seccion: 'sucesos' | 'cartas' | 'anuncios'; texto: string; sobre?: number; suceso?: string }[];
   /** 2.1: el encargo con historia (id de `errandCandidates`) y la carta con la que lo pide un vecino. */
   encargo?: { id: string; carta: string };
 }
@@ -310,7 +310,9 @@ export function applyDirector(state: GameState, choice: DirectorChoice): TurnLog
     ai.brewing = [...(ai.brewing ?? []), { id: c.id, text: brewingText(c), since: state.tick, bad: c.bad }];
   }
   // 2.1: El Eco de esta semana (lo escribe el director) y el encargo con su carta.
-  if (choice.titulares?.length) publishEdition(state, choice.titulares.map((t) => ({ section: t.seccion, text: t.texto, ...(t.sobre !== undefined ? { ref: t.sobre } : {}) })), 'ia');
+  // Ronda 17: el titular de un suceso que al final no pasó no sale.
+  const heads = (choice.titulares ?? []).filter((t) => !t.suceso || used.has(t.suceso));
+  if (heads.length) publishEdition(state, heads.map((t) => ({ section: t.seccion, text: t.texto, ...(t.sobre !== undefined ? { ref: t.sobre } : {}) })), 'ia');
   if (choice.encargo?.id) {
     const e = offerErrand(state, choice.encargo.id, choice.encargo.carta || undefined);
     if (e) lines.push({ id: e.by, text: `Encargo: ${e.text}`, ...(choice.encargo.carta ? { motivo: choice.encargo.carta } : {}) });

@@ -210,7 +210,9 @@ function openVote(state: GameState, rank: number): void {
   const pieces = pieceOptions(state, rank).slice(0, RANK.pieceChoices);
   const mottos = mottoOptions(state, rank).slice(0, RANK.mottoChoices);
   if (!pieces.length || !mottos.length) return;
-  r.vote = { rank, opened: state.tick, due: state.tick + RANK.voteDays * 24, pieces, mottos };
+  // Ronda 17: la votación dura al menos un turno de la IA entero (a x3 y x10 los turnos se espacian).
+  const days = Math.max(RANK.voteDays, (state.ai?.paceDays ?? 0) + 2);
+  r.vote = { rank, opened: state.tick, due: state.tick + days * 24, pieces, mottos };
   // Modo IA: votan los vecinos en sus turnos; Modo normal: votan ya, por reglas.
   if (!(state.aiMode && state.ai && state.ai.share > 0)) applyCrestVote(state);
 }

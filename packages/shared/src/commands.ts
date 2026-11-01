@@ -90,7 +90,7 @@ export const Command = z.discriminatedUnion('type', [
         sucesos: z.array(z.object({ id: z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(40), motivo: z.string().max(400) })).max(6),
         avisos: z.array(z.object({ id: z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(40), motivo: z.string().max(400) })).max(6),
         /** 2.1: titulares de El Eco y el encargo con historia. */
-        titulares: z.array(z.object({ seccion: z.enum(['sucesos', 'cartas', 'anuncios']), texto: z.string().max(300), sobre: z.number().int().optional() })).max(3).optional(),
+        titulares: z.array(z.object({ seccion: z.enum(['sucesos', 'cartas', 'anuncios']), texto: z.string().max(300), sobre: z.number().int().optional(), suceso: z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(40).optional() })).max(3).optional(),
         encargo: z.object({ id: z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(40), carta: z.string().max(500) }).optional(),
       })
       .optional(),

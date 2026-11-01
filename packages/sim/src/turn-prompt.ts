@@ -51,6 +51,7 @@ Reglas:
 - Mira "oportunidades" del pueblo: quien está en paro, cobra poco o tiene un negocio que pierde dinero debería pensar en aceptar un trabajo, mudarse, despedir o cerrar; quien tiene dinero y ambición alta, en abrir un negocio o contratar.
 - Dinero con cabeza: con deudas, sin trabajo o "no llega", el ocio sobra; con dinero de sobra, puede gastar, invertir o ayudar al negocio del pueblo.
 - "robar" solo existe para quien está desesperado; es una decisión grave y rara.
+- "ayudar_incendio", "acoger" y "hacerse_voluntario" son para quien tiene relación o medios: no todo el pueblo a la vez.
 - "tirar_al_monte" solo aparece si no pasa el camión de la basura y la tiene en la puerta: lo hace quien es terco o está harto; los vecinos lo ven mal. Lo normal es quejarse o pedir "recogida".
 - No menciones a nadie que no esté en los datos, ni cifras inventadas, ni que eres una IA. Sin comillas ni emojis.
 - Responde solo con JSON que cumpla el esquema, con un objeto por cada vecino del lote (no te dejes ninguno). Sé breve en los textos.`;
@@ -307,15 +308,22 @@ export function parseTurn(text: string, ids: number[], sent: string): { acts: Tu
     if (bad(recuerdo)) recuerdo = '';
     acts.push({
       vecino: a.vecino,
-      accion: /^[a-z_]+(:[a-z0-9_]+)?$/.test(accion) ? accion : 'seguir',
-      gesto: { con: a.gesto.con, tipo: a.gesto.tipo },
+      // Ronda 17: cada campo dentro de los límites del comando `TownTurn` (si no, el turno entero se rechazaría).
+      accion: accion.length <= 40 && /^[a-z_]+(:[a-z0-9_]+)?$/.test(accion) ? accion : 'seguir',
+      gesto: { con: a.gesto.con, tipo: a.gesto.tipo.length <= 20 ? a.gesto.tipo : 'ninguno' },
       actitud: Math.max(-2, Math.min(2, Math.round(a.actitud))),
-      gasto: a.gasto,
-      plan: { tipo: a.plan.tipo, necesidad: a.plan.necesidad, meses: Math.max(0, Math.min(12, Math.round(a.plan.meses))) },
+      gasto: { donde: (SPEND as readonly string[]).includes(a.gasto.donde) ? a.gasto.donde : 'pueblo', tienda: a.gasto.tienda, ocio: a.gasto.ocio },
+      plan:
+        a.plan.tipo.length <= 30 && a.plan.necesidad.length <= 20
+          ? { tipo: a.plan.tipo, necesidad: a.plan.necesidad, meses: Math.max(0, Math.min(12, Math.round(a.plan.meses))) }
+          : { tipo: 'ninguno', necesidad: '', meses: 0 },
       pensamiento,
       motivo,
       ...(recuerdo ? { recuerdo } : {}),
-      ...(a.escudo && /^[a-z_]+$/.test(a.escudo.pieza) && /^[a-z_]+$/.test(a.escudo.lema) ? { escudo: { pieza: a.escudo.pieza, lema: a.escudo.lema } } : {}),
+      // El voto del escudo, solo con ids de la votación que se envió.
+      ...(a.escudo && /^[a-z_]{1,20}$/.test(a.escudo.pieza) && /^[a-z_]{1,40}$/.test(a.escudo.lema) && sent.includes(`"id":"${a.escudo.pieza}"`) && sent.includes(`"id":"${a.escudo.lema}"`)
+        ? { escudo: { pieza: a.escudo.pieza, lema: a.escudo.lema } }
+        : {}),
     });
   }
   return { acts, missing: ids.filter((id) => !acts.some((a) => a.vecino === id)) };
@@ -333,7 +341,7 @@ Devuelve:
 - "avisos": sucesos del menú que empiezan a cocerse (0 a 3), para que el alcalde pueda reaccionar a tiempo. Un suceso malo ("malo": true) solo puede pasar si ya estaba avisado ("avisado": true); si no, avísalo primero.
 - "foco": el tema de la semana en una frase corta (máx. 100 caracteres).
 - "cronica": 2 o 3 frases en español de España, como el periódico del pueblo, sobre lo que ha hecho el alcalde, cómo está el pueblo y lo que pasa esta semana (máx. 400 caracteres).
-- "titulares": los 3 titulares de El Eco de Bitópolis, uno por sección ("sucesos", "cartas" al director, "anuncios"), cada uno sobre una de las "noticias" (su id en "sobre", o "" si es de los sucesos que eliges) y con un "texto" de periódico de pueblo (máx. 110 caracteres). En "cartas", la voz de un vecino.
+- "titulares": hasta 3 titulares de El Eco de Bitópolis, uno por sección ("sucesos", "cartas" al director, "anuncios"). Cada titular cuenta solo una de "noticias" o uno de los sucesos que eliges esta semana (su id en "sobre"), con un "texto" de periódico de pueblo (máx. 110 caracteres). No cuentes cómo acaba un suceso: lo decide el juego. Si una sección no tiene noticia, no pongas titular. En "cartas", la voz de un vecino.
 - "encargo": si encaja con la semana, uno de "encargos_posibles" ("id") con la "carta" (máx. 220 caracteres, en primera persona, firmada por quien lo pide) con la que se lo pide al alcalde; si no, id "" y carta "".
 
 Reglas:
@@ -427,7 +435,7 @@ export function parseDirector(text: string, ids: string[], sent: string, extra: 
     const out: { id: string; motivo: string }[] = [];
     for (const p of list) {
       if (!ids.includes(p.id) || out.some((x) => x.id === p.id) || out.length >= 3) continue;
-      const motivo = clean(p.motivo, 160);
+      const motivo = clean(p.motivo, 100);
       out.push({ id: p.id, motivo: inventedName(motivo, sent) || inventedNumber(motivo, sent) ? '' : motivo });
     }
     return out;
@@ -435,19 +443,23 @@ export function parseDirector(text: string, ids: string[], sent: string, extra: 
   const focus = clean(r.data.foco, 120);
   const chronicle = clean(r.data.cronica, 500);
   const bad = (t: string) => !!inventedName(t, sent) || inventedNumber(t, sent);
+  const picked = pick(r.data.sucesos);
   // 2.1: titulares (una por sección, texto filtrado) y el encargo con su carta.
   const titulares: NonNullable<DirectorChoice['titulares']> = [];
   for (const t of r.data.titulares ?? []) {
     if (!['sucesos', 'cartas', 'anuncios'].includes(t.seccion) || titulares.some((x) => x.seccion === t.seccion)) continue;
     const texto = clean(t.texto, 140);
     if (texto.length < 6 || bad(texto)) continue;
-    const ref = extra.news?.find((n) => n.id === t.sobre)?.ref;
-    titulares.push({ seccion: t.seccion as 'sucesos' | 'cartas' | 'anuncios', texto, ...(ref !== undefined ? { sobre: ref } : {}) });
+    // Ronda 17: cada titular cuenta una noticia real o un suceso elegido (si el suceso no pasa, el titular se cae).
+    const news = extra.news?.find((n) => n.id === t.sobre);
+    const suceso = picked.find((x) => x.id === t.sobre);
+    if (!news && !suceso) continue;
+    titulares.push({ seccion: t.seccion as 'sucesos' | 'cartas' | 'anuncios', texto, ...(news?.ref !== undefined ? { sobre: news.ref } : {}), ...(suceso ? { suceso: suceso.id } : {}) });
   }
   const carta = clean(r.data.encargo?.carta ?? '', 260);
   const encargo = r.data.encargo?.id && extra.errands?.includes(r.data.encargo.id) ? { id: r.data.encargo.id, carta: bad(carta) ? '' : carta } : undefined;
   return {
-    director: { sucesos: pick(r.data.sucesos), avisos: pick(r.data.avisos), ...(titulares.length ? { titulares } : {}), ...(encargo ? { encargo } : {}) },
+    director: { sucesos: picked, avisos: pick(r.data.avisos), ...(titulares.length ? { titulares } : {}), ...(encargo ? { encargo } : {}) },
     focus: bad(focus) ? '' : focus,
     chronicle: bad(chronicle) ? '' : chronicle,
   };

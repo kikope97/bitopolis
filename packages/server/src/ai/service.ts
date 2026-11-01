@@ -85,7 +85,7 @@ const TURN_DEADLINE_MS = 40_000;
 const TURN_RETRY_MIN_MS = 8_000;
 const TURN_OUT_PER_CITIZEN = 320;
 /** Tokens de salida del director (sucesos, avisos, foco y crónica). */
-const DIRECTOR_OUT = 900;
+const DIRECTOR_OUT = 1400;
 
 const TIMEOUT_MS = 20_000;
 const MAX_OUT_PER_CITIZEN = 120;
@@ -367,12 +367,13 @@ export class AiService {
         usage.in = r.usage.in;
         usage.cachedIn = r.usage.cachedIn;
         usage.out = r.usage.out;
+        if (r.truncated) status = 'truncated';
         const parsed = parseDirector(r.text, req.ids, `${req.shared}\n${req.user}`, { news: req.news, errands: req.errands });
         if (parsed) {
           result.director = parsed.director;
           if (parsed.focus) result.focus = parsed.focus;
           if (parsed.chronicle) result.chronicle = parsed.chronicle;
-        } else status = 'invalid';
+        } else if (status === 'ok') status = 'invalid';
       } catch (e) {
         status = (e as Error).name === 'TimeoutError' ? 'timeout' : 'error';
       } finally {

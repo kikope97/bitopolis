@@ -1,6 +1,6 @@
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { protestFor, type Association } from './associations.ts';
-import { DEBT, KIDS_MAX, TURN } from './balance.ts';
+import { DEBT, FIRE, KIDS_MAX, TURN } from './balance.ts';
 import { BUILD_NAMES, removeBuilding } from './commands.ts';
 import { homeRobbery } from './crime.ts';
 import { becomeVolunteer, canVolunteer, fireHelpTargets, helpAfterFire, homelessByFire, placeName, shelter } from './fire.ts';
@@ -218,6 +218,11 @@ export function turnMenu(state: GameState, c: Citizen): MenuItem[] {
   // 2.1: emergencias. Ayudar tras un incendio, acoger a quien se ha quedado sin casa, protección civil.
   for (const b of fireHelpTargets(state)) {
     if (b.id === c.homeId) continue;
+    // Ronda 17: ayuda quien tiene relación con los afectados, vive cerca o es sociable y tiene medios.
+    const h = home(state, c);
+    const near = h && Math.abs(h.x - b.x) + Math.abs(h.y - b.y) <= FIRE.helpRadius;
+    const close = state.citizens.some((x) => (x.homeId === b.id || x.jobId === b.id) && c.relations.some((r) => r.id === x.id));
+    if (!near && !close && !(c.traits.social >= 60 && c.money >= 300)) continue;
     out.push({ accion: `ayudar_incendio:${b.id}`, detalle: b.fire ? `ayudar a apagar el fuego en ${placeName(b)}` : `echar una mano a quien se ha quedado sin casa en ${placeName(b)}` });
   }
   if (c.homeId !== null && !homelessByFire(state).includes(c)) {
@@ -412,6 +417,7 @@ export function applyTownTurn(state: GameState, n: number, acts: TurnAct[], extr
   const t = ai.turn!;
   const lines: TurnLog['lines'] = [];
   const done = new Set<number>();
+  const helps = new Map<string, number>();
   for (const a of acts) {
     const c = state.citizens.find((x) => x.id === a.vecino);
     if (!c || done.has(c.id) || !t.ids.includes(c.id) || !isAiCitizen(state, c)) continue;
@@ -419,7 +425,13 @@ export function applyTownTurn(state: GameState, n: number, acts: TurnAct[], extr
     const parts: string[] = [];
     // Acción principal: solo si está en el menú de ahora.
     const menu = turnMenu(state, c).map((m) => m.accion);
-    const accion = menu.includes(a.accion) ? a.accion : 'seguir';
+    let accion = menu.includes(a.accion) ? a.accion : 'seguir';
+    // Ronda 17: como mucho unas pocas ayudas por incendio y turno.
+    if (accion.startsWith('ayudar_incendio:')) {
+      const n = (helps.get(accion) ?? 0) + 1;
+      helps.set(accion, n);
+      if (n > FIRE.maxHelpers) accion = 'seguir';
+    }
     if (accion !== 'seguir') {
       const trigger: Trigger = accion.startsWith('votar') || accion === 'abstenerse' ? 'elecciones' : accion === 'manifestarse' || accion === 'no_ir' ? 'protesta' : 'opinion';
       parts.push(performActionFromTurn(state, c, trigger, accion, a.motivo));

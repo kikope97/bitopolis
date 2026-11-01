@@ -631,6 +631,9 @@ export const PRESS = {
  * edificio queda destrozado (se repara, nunca se pierde). Ver fire.ts.
  */
 export const FIRE = {
+  /** Ronda 17: ayudan tras un incendio quienes viven a esta distancia (o tienen relación o medios), como mucho tantos por turno. */
+  helpRadius: 6,
+  maxHelpers: 4,
   /** Población mínima para que haya incendios. */
   minPop: 20,
   /** Probabilidad diaria de que un edificio entre en riesgo. */
