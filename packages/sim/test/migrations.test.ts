@@ -41,6 +41,22 @@ describe('migración 14 → 15 (2.2, préstamos)', () => {
   });
 });
 
+describe('migración 17 → 18 (2.5, comarca)', () => {
+  it('añade cooperativa, cartas y comarca vacías; una nueva y una migrada quedan iguales', () => {
+    const s = createInitialState({ seed: 8 }) as unknown as Record<string, any>;
+    const old: Record<string, any> = structuredClone({ ...s, formatVersion: 17 });
+    for (const k of ['coop', 'letters', 'comarca']) delete old[k];
+    const m = migrate(old);
+    expect(m.formatVersion).toBe(FORMAT_VERSION);
+    expect(m.coop).toEqual({ members: [], presidentId: null });
+    expect(m.letters).toEqual([]);
+    expect(m.comarca).toEqual({ towns: [], offers: [], fair: null });
+    expect(hashState(m)).toBe(hashState(createInitialState({ seed: 8 })));
+    for (let i = 0; i < 24 * 31; i++) step(m);
+    expect(checkInvariants(m)).toEqual([]);
+  });
+});
+
 describe('migración 16 → 17 (2.4, vida)', () => {
   it('añade cuotas, billete, río limpio, dilemas y fiestas de temporada; una nueva y una migrada quedan iguales', () => {
     const s = createInitialState({ seed: 6 }) as unknown as Record<string, any>;

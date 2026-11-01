@@ -43,6 +43,7 @@ import {
 } from './balance.ts';
 import { hash32 } from './hash.ts';
 import { charge, totalDebt } from './household.ts';
+import { homesOf } from './density.ts';
 import { radiusOf, serviceCapacityOf } from './levels.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance } from './prng.ts';
@@ -426,7 +427,7 @@ export function monthlyHousing(state: GameState, r: MonthRates): void {
       charge(state, c, TREASURY, trashFee(state, r.basuras, served.get(b.id)), 'tasas');
     }
     // Viviendas privadas vacías: el dueño de fuera paga su IBI.
-    const capacity = HOMES[b.kind] ?? 0;
+    const capacity = homesOf(b);
     const privateEmpty = b.kind === 'res' ? capacity - residents.length : Math.max(0, (b.privateUnits ?? 0) - residents.filter((c) => c.owns).length);
     if (privateEmpty > 0) transfer(state, OUTSIDE, TREASURY, ibi * privateEmpty, 'IBI');
   }

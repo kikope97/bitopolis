@@ -21,6 +21,8 @@ import { ASSOCIATIONS, BUILD, CIVIL, STREETS, DEBT_LIMIT, FIRE, MICROCREDIT, MIN
 import { isWater, Terrain } from './terrain.ts';
 import { applyDecision, canApplyDecision } from './decisions.ts';
 import { canSetCareFee, setCareFee } from './care.ts';
+import { answerNeighbor, applyNeighborTurn, canAnswerNeighbor, canApplyNeighborTurn } from './comarca.ts';
+import { canSetZoneDensity, setZoneDensity } from './density.ts';
 import { canResolveDilemma, resolveDilemma } from './dilemmas.ts';
 import { approveFestival, canApproveFestival } from './seasons.ts';
 import { canBuildWaterworks } from './waterworks.ts';
@@ -84,6 +86,9 @@ export const BUILD_NAMES: Record<string, string> = {
   sewage: 'Depuradora',
   solar: 'Placas solares',
   wind: 'Molino de viento',
+  vpo: 'Vivienda protegida',
+  coop: 'Cooperativa agraria',
+  post: 'Correos',
 };
 
 const ZONE_VALUE: Record<ZoneKind, number> = { none: Zone.None, R: Zone.R, C: Zone.C, I: Zone.I, A: Zone.A };
@@ -206,7 +211,7 @@ export function validateAsGovernment(state: GameState, cmd: unknown): CommandRes
 
 /** En la oposición el jugador solo puede hablar con los vecinos (y la IA decidir). */
 // Ronda 17: el turno del pueblo (IA) y los votos no son órdenes del alcalde: valen también en la oposición.
-const OPPOSITION_ALLOWED = new Set(['TalkTo', 'NotifyProject', 'CitizenAct', 'Campaign', 'Motion', 'TownTurn', 'ChooseCrest']);
+const OPPOSITION_ALLOWED = new Set(['TalkTo', 'NotifyProject', 'CitizenAct', 'Campaign', 'Motion', 'TownTurn', 'ChooseCrest', 'NeighborTurn']);
 
 export function validateCommand(state: GameState, raw: unknown): CommandResult {
   const parsed = Command.safeParse(raw);
@@ -253,6 +258,10 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       if (cmd.kind === 'busstation') {
         const h = canBuildBusStation(state);
         if (!h.ok) return h;
+      }
+      // 2.5: una cooperativa y una oficina de correos por pueblo.
+      if ((cmd.kind === 'coop' || cmd.kind === 'post') && state.buildings.some((b) => b.kind === cmd.kind)) {
+        return { ok: false, error: cmd.kind === 'coop' ? 'Ya hay una cooperativa en el pueblo' : 'Ya hay una oficina de correos en el pueblo' };
       }
       // 2.2: licitación (la local es la de siempre: mismo coste y misma validación).
       if (cmd.offer && cmd.offer !== 'local') {
@@ -402,6 +411,13 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       return canResolveDilemma(state, cmd.id, cmd.option);
     case 'ApproveFestival':
       return canApproveFestival(state, cmd.season, cmd.budget);
+    // 2.5: comarca (cada bloque valida en su archivo).
+    case 'SetZoneDensity':
+      return canSetZoneDensity(state, cmd.x, cmd.y, cmd.w, cmd.h, cmd.level);
+    case 'AnswerNeighbor':
+      return canAnswerNeighbor(state, cmd.id, cmd.accept);
+    case 'NeighborTurn':
+      return canApplyNeighborTurn(state, cmd.month);
   }
 }
 
@@ -517,6 +533,8 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
           if (isWater(state.map.terrain?.[i]) || hasDike(state, x, y)) continue;
           if (state.map.zones[i] === value) continue;
           state.map.zones[i] = value;
+          // Ronda 21: al cambiar de zona se olvida la densidad pedida.
+          if (state.map.density) state.map.density[i] = 0;
           changed++;
         }
       }
@@ -671,6 +689,15 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       break;
     case 'ApproveFestival':
       approveFestival(state, cmd.season, cmd.budget);
+      break;
+    case 'SetZoneDensity':
+      setZoneDensity(state, cmd.x, cmd.y, cmd.w, cmd.h, cmd.level);
+      break;
+    case 'AnswerNeighbor':
+      answerNeighbor(state, cmd.id, cmd.accept);
+      break;
+    case 'NeighborTurn':
+      applyNeighborTurn(state, cmd.month, cmd.picks);
       break;
   }
   if (mayor) noteMayor(state, mayor.text, mayor.big);

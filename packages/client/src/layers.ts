@@ -8,7 +8,7 @@ import { T } from './sprites.ts';
  * servicios y contaminación. Cada nivel usa una trama distinta además del
  * color, para que el color nunca sea la única señal.
  */
-export type LayerId = 'none' | 'missing' | 'happiness' | 'pocket' | 'land' | 'services' | 'pollution' | 'clean' | 'rural' | 'river';
+export type LayerId = 'none' | 'missing' | 'happiness' | 'pocket' | 'land' | 'services' | 'pollution' | 'clean' | 'rural' | 'river' | 'density';
 
 interface LayerDef {
   id: LayerId;
@@ -48,6 +48,8 @@ export const LAYERS: LayerDef[] = [
   { id: 'rural', label: 'Casas rurales', colors: GOOD, legend: legend(['Alquiler más caro', 'Vivienda', 'Patrimonio y entorno', 'Casa rural'], 'good') },
   // 2.4: lo que baja por el río (fields.river, waterworks.ts).
   { id: 'river', label: 'Río', colors: RIVER, legend: legend(['Limpio', 'Algo turbio', 'Sucio', 'Muy sucio'], 'river') },
+  // 2.5: densidad de la zona R (map.density) y los bloques que ya han crecido.
+  { id: 'density', label: 'Densidad', colors: GOOD, legend: legend(['Baja', 'Media', 'Alta', 'Bloque crecido'], 'good') },
 ];
 
 function legend(names: string[], kind: string) {
@@ -61,6 +63,12 @@ function values(state: GameState, layer: LayerId): (number | null)[] {
   if (layer === 'pollution') return state.fields.pollution.map((v) => (v < 3 ? null : v));
   // 2.4: solo en las casillas de río (0 limpio … 100 muy sucio; la salida, igual).
   if (layer === 'river') return state.map.terrain.map((t, i) => (t === 1 ? (state.fields.river?.[i] ?? 0) : null));
+  // 2.5: solo en la zona R; el bloque que ya creció, en lo más alto.
+  if (layer === 'density') {
+    const out: (number | null)[] = state.map.zones.map((z, i) => (z === 1 ? [10, 40, 60][state.map.density?.[i] ?? 0]! : null));
+    for (const b of state.buildings) if (b.kind === 'res' && b.dense) out[b.y * w + b.x] = 90;
+    return out;
+  }
   if (layer === 'missing') {
     const out: (number | null)[] = new Array(n).fill(null);
     for (const m of missingMarks(state)) {
@@ -140,10 +148,19 @@ function values(state: GameState, layer: LayerId): (number | null)[] {
 
 let cache: { key: string; canvas: HTMLCanvasElement } | null = null;
 
+/** Ronda 21: firma barata de la densidad pedida y de lo crecido (la capa se rehace al marcar). */
+function densitySig(state: GameState): number {
+  let n = 0;
+  const d = state.map.density ?? [];
+  for (let i = 0; i < d.length; i++) if (d[i]) n = (n * 31 + i * 3 + d[i]!) | 0;
+  for (const b of state.buildings) if (b.dense) n = (n * 31 + b.id * 7 + b.dense) | 0;
+  return n;
+}
+
 /** Capa a escala 1 (una trama por casilla); se rehace cada día de juego. */
 export function layerCanvas(state: GameState, layer: LayerId): HTMLCanvasElement | null {
   if (layer === 'none') return null;
-  const key = `${layer}:${Math.floor(state.tick / 24)}:${state.buildings.length}:${layer === 'rural' ? `${state.buildings.filter((b) => b.rural).length}:${state.tourism?.protectedId ?? ''}:` : ''}${prefs().colorblind}`;
+  const key = `${layer}:${Math.floor(state.tick / 24)}:${state.buildings.length}:${layer === 'rural' ? `${state.buildings.filter((b) => b.rural).length}:${state.tourism?.protectedId ?? ''}:` : ''}${layer === 'density' ? `${densitySig(state)}:` : ''}${prefs().colorblind}`;
   if (cache?.key === key) return cache.canvas;
   const def = LAYERS.find((l) => l.id === layer)!;
   const { w, h } = state.map;

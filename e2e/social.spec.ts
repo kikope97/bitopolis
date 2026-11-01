@@ -26,7 +26,7 @@ test('v0.4: ficha y hablar, pleno con promesa, consejero, diario y objetivos', a
 
   // Vecinos → ficha → hablar.
   await page.locator('#menu').click();
-  await page.getByRole('button', { name: 'Vecinos' }).click();
+  await page.getByRole('button', { name: 'Vecinos', exact: true }).click();
   await page.locator('.person-row').first().click();
   await expect(page.locator('.sheet h2')).toContainText('★');
   await expect(page.locator('.sheet')).toContainText('Relaciones');

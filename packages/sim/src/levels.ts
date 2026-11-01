@@ -1,5 +1,5 @@
 import { TICKS_PER_DAY } from '@bitopolis/shared';
-import { BUILD, CRIME, JOBS, MAINTENANCE, PLANT_CAPACITY, SERVICE, SERVICE_CAPACITY, SERVICE_LEVELS as L, TRASH, WATERWORKS } from './balance.ts';
+import { BUILD, COOP, CRIME, JOBS, MAINTENANCE, PLANT_CAPACITY, SERVICE, SERVICE_CAPACITY, SERVICE_LEVELS as L, TRASH, WATERWORKS } from './balance.ts';
 import { truckRoutes } from './trash-core.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import type { Building, BuildingKind, GameState } from './state.ts';
@@ -9,7 +9,10 @@ import type { Building, BuildingKind, GameState } from './state.ts';
  * radio, más capacidad (vecinos, casas con agua o luz, calabozos, plazas de
  * cárcel), algo más de felicidad y un empleo más; cuesta más mantenerlo.
  */
-export const UPGRADABLE: BuildingKind[] = ['water', 'power', 'school', 'clinic', 'police', 'jail', 'park', 'library', 'sports', 'firestation', 'cleanpoint'];
+export const UPGRADABLE: BuildingKind[] = ['water', 'power', 'school', 'clinic', 'police', 'jail', 'park', 'library', 'sports', 'firestation', 'cleanpoint', 'coop'];
+
+/** Nivel más alto de cada edificio (2.5: la cooperativa tiene dos: el 2 es la almazara o la bodega). */
+export const maxLevelOf = (b: Building): number => (b.kind === 'coop' ? COOP.maxLevel : L.maxLevel);
 
 export const levelOf = (b: Building): number => b.level ?? 1;
 const mult = (b: Building) => L.capacity[levelOf(b) - 1] ?? 1;
@@ -72,6 +75,8 @@ export function usageOf(state: GameState, b: Building, served?: number): { used:
     const cap = state.buildings.filter((p) => p.kind === 'jail' && p.built).reduce((a, p) => a + jailPlacesOf(p), 0);
     return { used: state.justice?.jail.length ?? 0, of: cap };
   }
+  // 2.5: la cooperativa, por socios.
+  if (b.kind === 'coop') return { used: state.coop?.members.length ?? 0, of: COOP.level2Members };
   if (b.kind === 'cleanpoint') {
     // 2.1: calles que recorre el camión frente a las que podría recorrer.
     const r = truckRoutes(state).find((x) => x.id === b.id);
@@ -98,8 +103,9 @@ export function upgradeReqs(state: GameState, b: Building, served?: number): Upg
   const pop = L.pop[next] ?? 0;
   reqs.push({ label: `${pop} vecinos en el pueblo`, ok: state.citizens.length >= pop });
   const u = usageOf(state, b, served);
-  const residentsKind = !SERVICE_CAPACITY[b.kind] && b.kind !== 'water' && b.kind !== 'power' && b.kind !== 'jail' && b.kind !== 'cleanpoint';
-  if (residentsKind) reqs.push({ label: `${u.of} vecinos viviendo cerca (hay ${u.used})`, ok: u.used >= u.of });
+  const residentsKind = !SERVICE_CAPACITY[b.kind] && b.kind !== 'water' && b.kind !== 'power' && b.kind !== 'jail' && b.kind !== 'cleanpoint' && b.kind !== 'coop';
+  if (b.kind === 'coop') reqs.push({ label: `${u.of} socios en la cooperativa (hay ${u.used})`, ok: u.used >= u.of });
+  else if (residentsKind) reqs.push({ label: `${u.of} vecinos viviendo cerca (hay ${u.used})`, ok: u.used >= u.of });
   else {
     const need = Math.ceil(u.of * L.usage);
     const what =
@@ -114,7 +120,7 @@ export function upgradeReqs(state: GameState, b: Building, served?: number): Upg
 export function canUpgradeBuilding(state: GameState, b: Building | undefined, served?: number): { ok: true } | { ok: false; error: string } {
   if (!b || !UPGRADABLE.includes(b.kind)) return { ok: false, error: 'Este edificio no se puede mejorar' };
   if (!b.built) return { ok: false, error: 'Aún está en obras' };
-  if (levelOf(b) >= L.maxLevel) return { ok: false, error: 'Ya está en su nivel más alto' };
+  if (levelOf(b) >= maxLevelOf(b)) return { ok: false, error: 'Ya está en su nivel más alto' };
   if (b.upgradeUntil !== undefined) return { ok: false, error: 'Ya se está mejorando' };
   if (b.damaged) return { ok: false, error: 'Primero hay que repararlo' };
   const miss = upgradeReqs(state, b, served).find((r) => !r.ok);

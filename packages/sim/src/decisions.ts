@@ -16,7 +16,9 @@ import { complainCandidates, ruralCandidates, ruralDemand } from './tourism.ts';
 import { hireForBigCompany } from './region.ts';
 import { chance } from './prng.ts';
 import { attended, careRuleAction } from './care.ts';
+import { vpoRuleAction } from './density.ts';
 import { transitRuleAction } from './transit.ts';
+import { coopRuleAction } from './coop.ts';
 import { LANDMARKS, TOURISM, TURN } from './balance.ts';
 import {
   type Citizen,
@@ -203,7 +205,8 @@ export function ruleTurn(state: GameState, ids: number[]): { id: number; text: s
     if (!trigger) {
       // 2.3: por costumbre también, con moderación y dados: donar a la obra, abrir casa rural o quejarse de los turistas.
       // 2.4: cuidados (residencia o en casa) y buscar trabajo fuera en autobús, por rasgos.
-      const extra = careRuleAction(state, c) ?? transitRuleAction(state, c) ?? ruleExtra(state, c);
+      // 2.5: cooperativa (por rasgos) y vivienda protegida.
+      const extra = careRuleAction(state, c) ?? transitRuleAction(state, c) ?? coopRuleAction(state, c) ?? vpoRuleAction(state, c) ?? ruleExtra(state, c);
       if (extra) {
         const motivo = ruleMotivo(state, c, extra);
         lines.push({ id: c.id, text: `${c.name} ${performAction(state, c, 'opinion', extra, motivo, 'rule')}`, motivo });
@@ -400,7 +403,10 @@ const TEMPLATES: Record<string, string[]> = {
   pedir_aplazamiento: ['Alcalde, deme unos meses: lo pagaré, pero ahora no llego.', 'No es que no quiera pagar, es que no puedo. Necesito tiempo.', 'Con un aplazamiento lo devuelvo poco a poco.'],
   llevar_a_residencia: ['En la residencia estará mejor atendido que conmigo.', 'Me duele, pero allí lo cuidarán de verdad.', 'Iré a verle cada semana.'],
   cuidar_en_casa: ['A los míos los cuido yo.', 'Trabajaré menos, pero en casa no le faltará de nada.', 'Me cuidó toda la vida; ahora me toca a mí.'],
+  pedir_vpo: ['Con lo que gano, un piso protegido sería un respiro.', 'Me apunto al sorteo de la vivienda protegida, a ver si hay suerte.', 'Pagar menos de alquiler me cambiaría la vida.'],
   buscar_trabajo_fuera: ['Con el autobús, buscaré trabajo en la comarca.', 'Si aquí no hay, cogeré el autobús cada mañana.', 'No me quedo de brazos cruzados: a buscar fuera.'],
+  hacerse_socio: ['Juntos vendemos mejor la cosecha.', 'En la cooperativa no me torean los intermediarios.', 'Una cuota pequeña y un reparto a fin de año: me apunto.'],
+  darse_de_baja: ['La cuota no me compensa.', 'Prefiero vender la cosecha por mi cuenta.', 'Ahora mismo no puedo pagar la cooperativa.'],
 };
 
 /** Coletillas según el rasgo dominante: la misma decisión suena distinta en cada vecino. */

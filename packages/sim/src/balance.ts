@@ -46,6 +46,10 @@ export const BUILD: Record<BuildKind, BuildSpec> = {
   sewage: { materials: 8_000, workers: 4, days: 5, unlockPop: 40 },
   solar: { materials: 2_500, workers: 2, days: 2, unlockPop: 25 },
   wind: { materials: 3_500, workers: 3, days: 3, unlockPop: 25 },
+  // 2.5 (provisional): vivienda protegida, cooperativa y correos.
+  vpo: { materials: 9_000, workers: 5, days: 5, unlockPop: 60 },
+  coop: { materials: 5_000, workers: 4, days: 4, unlockPop: 40 },
+  post: { materials: 2_000, workers: 2, days: 2, unlockPop: 30 },
 };
 
 /** Obras que crecen solas sobre zonas (las paga un inversor de fuera). */
@@ -103,6 +107,9 @@ export const JOBS: Record<BuildingKind, number> = {
   sewage: 1,
   solar: 0,
   wind: 0,
+  vpo: 0,
+  coop: 0,
+  post: 1,
 };
 
 export const HOMES: Partial<Record<BuildingKind, number>> = { house: 3, res: 4 };
@@ -148,6 +155,9 @@ export const MAINTENANCE: Record<BuildingKind, number> = {
   // Ronda 20: unos 8–10 € por edificio con luz (antes salían mucho más baratas que la central).
   solar: 120,
   wind: 300,
+  vpo: 150,
+  coop: 80,
+  post: 120,
 };
 
 /** Radio de cobertura de los servicios (tiles) y su efecto en la felicidad. */
@@ -1414,4 +1424,165 @@ export const SEASONS = {
   noiseRadius: 5,
   /** Fiesta popular reducida (sin dinero para ningún acto). */
   popularMood: 1,
+};
+
+/* ---------------- 2.5 «Comarca» (cada bloque afina sus números) ---------------- */
+
+/** Bloque F: densidad de las zonas R (viviendas por edificio `res` según el nivel) y VPO. */
+export const DENSITY = {
+  /** Viviendas de un bloque `res` según la densidad a la que ha crecido (baja, media, alta). */
+  homes: [4, 8, 12],
+  /**
+   * Crece si el suelo de su casilla vale más de `minLand` y la demanda R pasa de `minDemandR`.
+   * Medido con pnpm sim (constructor, semillas 1–4, 4 años): con 40 la demanda R casi nunca
+   * llegaba con pocas viviendas libres (con el pueblo ya grande ronda 20–35) y no crecía ningún bloque.
+   */
+  minLand: 60,
+  minDemandR: 25,
+  /** Ruido en la casilla del bloque por cada nivel crecido (radio 1). */
+  noisePerLevel: 10,
+  noiseRadius: 1,
+  /** Nivel de ayuntamiento que pide cada densidad (la baja no pide nada). */
+  townhall: [1, 2, 3],
+  /** Cada cuántos días se mira si algún bloque crece, y cuántos como mucho. */
+  everyDays: 7,
+  perCheck: 1,
+  /** No crece si ya sobran tantas viviendas libres (como las zonas). */
+  maxFree: 6,
+};
+/**
+ * Vivienda protegida: 6 pisos a 120 €/mes (con `charge`), adjudicados cada mes
+ * por sorteo (hash, sin dados) entre quienes la pidieron y los `pool` que menos ganan.
+ */
+export const VPO = {
+  /** Ronda 21: solo pide (y entra en el sorteo por pedirla) quien gana menos de esto al mes. */
+  maxIncome: 1_400,
+  homes: 6,
+  rent: 120,
+  pool: 6,
+  /** Meses que vale una petición (`pedir_vpo`). */
+  askMonths: 3,
+  /** Por reglas: pide quien ganó menos de esto el mes pasado (€) y no tiene casa en propiedad. */
+  askIncome: 700,
+  /** Ánimo de quien recibe el piso y recuerdo. */
+  winMood: 6,
+  /** Dilema «la última VPO»: ánimo de quien se queda fuera y su rencor. */
+  leftOutMood: -5,
+  leftOutGrudge: 2,
+};
+
+/**
+ * Bloque G: cooperativa agraria (coop.ts). Los socios son vecinos con finca (dueños o
+ * quien la trabaja). La cooperativa vende su cosecha más cara (la diferencia entra en su
+ * caja), cobra una cuota al mes y lo reparte todo a partes iguales al cerrar el año.
+ */
+export const COOP = {
+  /** Sobre el precio de la cosecha de cada socio (nivel 1; nivel 2, almazara o bodega). */
+  // Ronda 21: algo menos para los socios (cobraban 10 veces su cuota).
+  priceFx: 0.1,
+  priceFxLevel2: 0.18,
+  /** Cuota mensual de cada socio (con `charge()`: lo impagado queda como deuda). */
+  fee: 20,
+  /** Meses seguidos sin pagar la cuota hasta que la cooperativa le da de baja. */
+  dropAfter: 3,
+  /** Meses como socio antes de poder darse de baja (para que nadie entre y salga cada semana). */
+  minMonths: 3,
+  /** Excedente: esta parte de la cosecha de los socios no la compra el mercado de siempre. */
+  surplusShare: 0.1,
+  /** Lo que no compre la comarca se vende fuera al cerrar el año, a esta parte de su valor. */
+  surplusOutsideFx: 0.5,
+  /** Nivel 2 (almazara o bodega): hacen falta estos socios. */
+  maxLevel: 2,
+  level2Members: 4,
+  /** Reglas (sin IA): se apunta quien es sociable o ahorrador y tiene para unas cuantas cuotas. */
+  joinSocial: 45,
+  joinSaver: 55,
+  joinMoneyFees: 3,
+  /** Reglas: se da de baja el muy terco sin reparto el año pasado, o quien no llega a la cuota. */
+  leaveTerco: 80,
+};
+
+/** Bloque H: correos y cartas (post.ts). */
+export const POST = {
+  /** Días para responder a una subvención de la Diputación sin oficina de correos y con ella. */
+  grantDaysWithout: 20,
+  grantDaysWith: 30,
+  lettersPerMonth: 1,
+  /** Felicidad de quien recibe una carta (y un recuerdo bueno). */
+  letterMood: 3,
+  /** Con el pueblo contento (felicidad media > `returnHappiness`) y casa libre, a veces vuelve quien escribe. */
+  returnChance: 0.1,
+  returnHappiness: 60,
+  /** Ahorros con los que vuelve (de fuera). */
+  returnSavings: 1_500,
+  /** Se escribe a partir de un mes fuera y hasta 6 años después; una carta por persona cada año como mucho. */
+  minDays: 30,
+  maxYears: 6,
+  everyDays: 360,
+  /** Cartas que se guardan (las más viejas se olvidan). */
+  keep: 24,
+  /** Texto de la carta con IA (fuera del estado). */
+  maxText: 400,
+};
+
+/** Bloques I y J: la comarca (pueblos vecinos), alcaldes y feria comarcal. */
+export const COMARCA = {
+  towns: 3,
+  /** Diferencia de atractivo que hace que se vayan vecinos (2 % al mes). */
+  pullGap: 10,
+  /** Ronda 21: lo que atrae un pueblo vecino además de su felicidad. */
+  attractBase: 12,
+  /** Ronda 21: meses sin repetir una oferta rechazada o caducada; las relaciones vuelven 1 hacia 0 cada tantos meses. */
+  offerCooldownMonths: 6,
+  relationDriftMonths: 6,
+  pullShare: 0.02,
+  grantMonths: 6,
+  fairMonth: 9,
+  offerDays: 30,
+  /** Población inicial de los pueblos vecinos (entre min y max) y sus límites. */
+  startPop: { min: 60, max: 220 },
+  popLimits: { min: 30, max: 3_000 },
+  /** Felicidad base de los vecinos y lo que la mueve la fase de la comarca según su especialidad. */
+  baseHappiness: 55,
+  phaseHappiness: {
+    campo: { bonanza: 2, normal: 0, crisis: -3 },
+    industria: { bonanza: 8, normal: 0, crisis: -10 },
+    turismo: { bonanza: 5, normal: 0, crisis: -5 },
+    servicios: { bonanza: 3, normal: 0, crisis: -3 },
+  },
+  /** Cuánto se acerca la felicidad del vecino a su objetivo cada mes. */
+  happinessPull: 0.2,
+  /** Crecimiento mensual: (felicidad − 50) × growth × población. */
+  growth: 0.002,
+  /** Caja de los vecinos (resumen, no es dinero del juego): ingresos por vecino y mes. */
+  incomePerPop: 3,
+  /** Atractivo: impuestos bajos/altos del pueblo y bajada de impuestos de un vecino. */
+  taxAttract: { low: 5, medium: 0, high: -6 },
+  taxCut: { attract: 8, months: 6, happiness: 3, costPerPop: 1, minTreasury: 2_000 },
+  /** Con menos de estos vecinos no se va nadie a otro pueblo (pueblo recién empezado). */
+  pullMinPop: 20,
+  /** Bolsa semestral de la Diputación (se reparte por puntuación). */
+  grantPool: 6_000,
+  grantClaimScore: 4,
+  /** Acuerdos: duran `months`; luz y agua, € por edificio sobrante al mes; autobús, cuota al mes y felicidad; cosecha, % sobre la venta. */
+  deals: {
+    months: 12,
+    luz: { perBuilding: 8 },
+    agua: { perBuilding: 6 },
+    autobus: { fee: 120, happiness: 2 },
+    cosecha: { bonus: 0.1 },
+  },
+  /** Responder a una oferta mueve la relación; ignorarla, también. */
+  acceptRelation: 1,
+  // Ronda 21: rechazar es mejor que dejarla caducar.
+  rejectRelation: 0,
+  expireRelation: -2,
+  /** Río a la salida por encima de esto: el pueblo de abajo se enfada (cada mes, −1 de relación cada 3). */
+  riverAngry: 45,
+  /** Feria comarcal: gasto de los forasteros (por pueblo que va) y premio del motor. */
+  fair: { spendPerTown: 600, prize: 2_000, prizeHappiness: 3 },
+  /** Turno de los alcaldes (Modo IA): días que espera a la IA antes de que decidan las reglas. */
+  turnDays: 5,
+  /** Declaración de un alcalde, como mucho. */
+  maxSaid: 140,
 };

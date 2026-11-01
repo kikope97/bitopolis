@@ -1,9 +1,11 @@
 import { loansMonth } from './loans.ts';
+import { densityDay, homesOf, vpoMonth, vpoRentMonth } from './density.ts';
 import { attended, careMonth, careMood, childcareMonth, isRetired, pensionsMonth } from './care.ts';
 import { busDemandR, transitMonth, transitMood } from './transit.ts';
 import { fairMonth, isLandmarkKind, landmarkMood, landmarksDay, landmarksMonth, stationCommuterBonus, stationDemandR } from './landmarks.ts';
 import { tourismMonth, tourismMood } from './tourism.ts';
 import { regionFx, regionMonth, regionMood } from './region.ts';
+import { comarcaDay, comarcaFair, comarcaHarvest, comarcaMonth, comarcaMood } from './comarca.ts';
 import { scenarioFx, scenariosMonth } from './scenarios.ts';
 import { newResident } from './resident.ts';
 import { achievementsMonth, historyMonth } from './achievements.ts';
@@ -19,7 +21,6 @@ import {
   DEBT_LIMIT,
   FACTORY_REVENUE_PER_WORKER,
   GROWTH,
-  HOMES,
   PIE_PER_CITIZEN,
   DEBT,
   JOBS_OUTSIDE,
@@ -40,6 +41,8 @@ import {
   FIRE,
 } from './balance.ts';
 import { farmMonth, growFarms } from './farm.ts';
+import { coopFees, coopMonth } from './coop.ts';
+import { postMonth } from './post.ts';
 import { applyCommand, BUILD_NAMES, removeBuilding } from './commands.ts';
 import { OUTSIDE, ownIncome, TREASURY, transfer } from './money.ts';
 import { chance, nextInt, pick } from './prng.ts';
@@ -104,7 +107,8 @@ export function isBusiness(b: Building): boolean {
 export function homeCapacity(b: Building): number {
   // 2.1: una casa destrozada por el fuego no admite a nadie nuevo hasta repararla.
   // 2.3: tampoco lo que destrozó la riada del escenario.
-  return b.built && !burntDown(b) && b.damaged?.cause !== 'riada' ? (HOMES[b.kind] ?? 0) : 0;
+  // 2.5: los bloques según su densidad (homesOf); la VPO no se reparte así, sino por sorteo (density.ts).
+  return b.built && !burntDown(b) && b.damaged?.cause !== 'riada' && b.kind !== 'vpo' ? homesOf(b) : 0;
 }
 
 export function jobCapacity(b: Building): number {
@@ -341,6 +345,8 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
   // 2.4: jubilados, mayores atendidos (o solos), quien cuida en casa y quien va en autobús.
   f.push(...careMood(state, c));
   f.push(...transitMood(state, c));
+  // 2.5: la línea de autobús compartida con un pueblo vecino.
+  f.push(...comarcaMood(state));
   return f;
 }
 
@@ -561,6 +567,7 @@ function endOfDay(state: GameState): void {
   }
   state.demand = computeDemand(state);
   growZones(state, served);
+  densityDay(state, freeHomes(state));
   arrivals(state);
   departures(state);
   maybeSplitTaxes(state);
@@ -597,6 +604,8 @@ function endOfDay(state: GameState): void {
   pressDay(state);
   // 2.4: dilemas (vencen, se cierran o se abren por reglas).
   dilemmasDay(state);
+  // 2.5: ofertas de los pueblos vecinos que caducan y el turno de los alcaldes que vence.
+  comarcaDay(state);
   accumulateRates(state);
 }
 
@@ -665,6 +674,8 @@ function payBusinesses(state: GameState): void {
 function endOfMonth(state: GameState): void {
   // 2.3: ciclo comarcal y gran empresa (antes de las nóminas: sus efectos valen para este mes).
   regionMonth(state);
+  // 2.5: los pueblos vecinos (con la fase recién cambiada), competencia por vecinos, acuerdos y alcaldes.
+  comarcaMonth(state, (c) => leaveVoluntarily(state, c));
   associationsMonth(state);
   const r = monthRates(state);
   // Nóminas municipales (los sueldos no pagan impuesto municipal).
@@ -677,6 +688,10 @@ function endOfMonth(state: GameState): void {
   // tributos (lo que no pueda, como deuda), devuelve deudas y, si le sobra, ocio.
   // 2.2: las fincas que cosechan este mes venden (y pagan a los temporeros) antes de las nóminas.
   farmMonth(state);
+  // 2.5: la cooperativa cobra el sobreprecio de las cosechas de sus socios (y reparte en diciembre).
+  coopMonth(state);
+  // 2.5: con acuerdo de cosecha, el pueblo vecino paga un extra a las fincas que acaban de vender.
+  comarcaHarvest(state);
   businessPayroll(state, r);
   outsideJobsMonth(state);
   // 2.4: pensión mínima de los jubilados y padres que dejan el trabajo sin plaza de guardería.
@@ -686,12 +701,18 @@ function endOfMonth(state: GameState): void {
   const shops = state.buildings.filter((b) => b.kind === 'shop' && b.built && !b.damaged);
   basicLiving(state, shops);
   monthlyHousing(state, r);
+  vpoRentMonth(state);
   // 2.4: residencia y guardería (cuotas con charge: lo impagado queda como deuda).
   careMonth(state);
+  // 2.5: cuota de los socios de la cooperativa (charge: lo impagado queda como deuda).
+  coopFees(state);
   settleMonth(state, shops);
   // 2.3: en septiembre, la feria regional trae compradores de fuera.
   fairMonth(state, shops);
+  // 2.5: en septiembre, la feria comarcal (en un pueblo distinto cada año).
+  comarcaFair(state, shops);
   housingTroubles(state);
+  vpoMonth(state);
   payBusinesses(state);
   // 2.3: visitantes, casas rurales y tasa turística.
   tourismMonth(state);
@@ -707,6 +728,9 @@ function endOfMonth(state: GameState): void {
   // 2.3: mantenimiento y cofinanciación de las grandes obras.
   landmarksMonth(state);
   lifeMonth(state);
+  // 2.5: cartas de los que se fueron (con correos); a veces quien escribe vuelve.
+  const back = postMonth(state, freeHomes(state) > 0);
+  if (back?.named) onNamedArrival(state, back);
   // 2.1: voluntarios de protección civil (por reglas).
   volunteersMonth(state);
   monthlyMarket(state);

@@ -36,7 +36,7 @@ import {
   levelOf,
   plantCapacityOf,
   radiusOf,
-  SERVICE_LEVELS,
+  maxLevelOf,
   serviceCapacityOf,
   serviceCounts,
   UPGRADABLE,
@@ -85,6 +85,9 @@ import { openNeighbours, openReport, openTaxes as openTaxesSheet } from './econo
 import { heavyLoad, loadPct, openLoans } from './loans-ui.ts';
 import { LAYERS, type LayerId, NEED_ICON } from './layers.ts';
 import { vidaBox } from './vida-ui.ts';
+import { coopPostBox } from './coop-ui.ts';
+import { openMailbox, unreadLetters } from './mail-ui.ts';
+import { viviendaBox } from './vivienda-ui.ts';
 import { openTownHall } from './civic-ui.ts';
 import { openAlbum, snapMoments } from './album-ui.ts';
 import { openAway } from './away-ui.ts';
@@ -101,8 +104,9 @@ import { formatDate, money, MONTHS, plural, shortDate, t } from './i18n.ts';
 import { busTrips, type Camera, type Preview, render, restartAnimations, signSpot } from './render.ts';
 import type { FromWorker, SaveBatch, ToWorker } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
-import { buildingSprite, landmarkSprite, letterSprite, T, ZONE_COLOR } from './sprites.ts';
+import { buildingSprite, landmarkSprite, letterSprite, resSprite, T, ZONE_COLOR } from './sprites.ts';
 import { bigCompanyContent, landmarkContent, openRegion, regionAttention, regionSummary } from './landmarks-ui.ts';
+import { comarcaPending, comarcaSummary, openComarca } from './comarca-ui.ts';
 import { commandFor, costText, isLocked, lockLong, lockShort, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayCost } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
 import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, h, isSheetOpen, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack } from './ui.ts';
@@ -289,6 +293,9 @@ export function startGame(opts: GameOptions): void {
       dust(cmd.x, cmd.y);
       shake(3, 250);
       say('Derribado.');
+    } else if (cmd.type === 'SetZoneDensity') {
+      sfx.tap();
+      say(`Densidad ${['baja', 'media', 'alta'][cmd.level]} marcada en la zona R.`);
     } else if (cmd.type === 'Zone') {
       sfx.tap();
       say(cmd.zone === 'none' ? 'Zona quitada.' : `Zona ${cmd.zone} pintada: ${plural(cmd.w * cmd.h, 'casilla', 'casillas')}.`);
@@ -734,6 +741,11 @@ export function startGame(opts: GameOptions): void {
         vibrate(150);
         calmPause();
         openElectionNight(social);
+      } else if (e.kind === 'info' && /ofrece un acuerdo de/.test(e.text)) {
+        // 2.5: oferta de un pueblo vecino con plazo: aviso fijo que lleva a «Comarca», y se frena.
+        toast(e.text, { kind: 'warn', sticky: true, onClick: () => withBack('Pueblo', openHub, openComarcaSheet) });
+        slowDown();
+        calmPause();
       } else if (/quiere montar|Fondos europeos|ofrece pagar el/.test(e.text)) {
         // Ronda 19: la gran empresa, el FEDER y la cofinanciación son decisiones con plazo: aviso fijo y se frena.
         toast(e.text, { kind: 'warn', sticky: true, onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
@@ -813,6 +825,9 @@ export function startGame(opts: GameOptions): void {
         const decide = e.text.startsWith('Toca presentar');
         if (decide) slowDown();
         toast(e.text, { kind: e.text.includes('rechaza') ? 'warn' : 'info', sticky: decide, onClick: () => openTownHall(social, 'budget') });
+      } else if (e.kind === 'politics' && /, alcalde de |baja los impuestos: atraerá/.test(e.text)) {
+        // 2.5: lo que dicen los alcaldes vecinos (lleva a «Comarca»; a x10, nada).
+        if (!quiet) toast(e.text, { kind: 'info', onClick: () => withBack('Pueblo', openHub, openComarcaSheet) });
       } else if (e.kind === 'politics') {
         // Lo que responde a una acción tuya (moción, campaña) se avisa siempre.
         if (quiet && !e.text.startsWith('Faltan') && !/moción|campaña/i.test(e.text)) continue;
@@ -821,7 +836,9 @@ export function startGame(opts: GameOptions): void {
       } else if (e.kind === 'departure' || e.kind === 'business') {
         // Ronda 15: una apertura es buena noticia; los cierres van además agrupados a fin de mes.
         const opens = e.kind === 'business' && / abre /.test(e.text);
-        if (!quiet) toast(e.text, { kind: opens ? 'good' : 'warn', onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+        // Ronda 21: los que se van a un pueblo vecino llevan a la Comarca (por qué se van), también a x10.
+        const toTown = /se van? a .*: (allí se vive|ha bajado los impuestos)/.test(e.text);
+        if (!quiet || toTown) toast(e.text, { kind: opens ? 'good' : 'warn', onClick: toTown ? () => withBack('Pueblo', openHub, openComarcaSheet) : e.ref ? () => focusBuilding(e.ref!) : undefined });
         if (!opens) calmPause();
       }
     }
@@ -964,6 +981,24 @@ export function startGame(opts: GameOptions): void {
     }
   }
   const turnTimer = setInterval(() => void pollTurn(), 1500);
+  /* ---------- 2.5: turno mensual de los alcaldes vecinos (IA del servidor) ---------- */
+  let neighborBusy = false;
+  async function pollNeighbors() {
+    const t = state.comarca?.turn;
+    if (!state.aiMode || !t || lost || neighborBusy || document.hidden) return;
+    neighborBusy = true;
+    try {
+      const r = await api.neighbors(token, t.month);
+      const res = r.neighbors;
+      // Si no llega a tiempo, deciden las reglas al vencer (el reloj no espera).
+      if (res && res.status === 'ready' && state.comarca?.turn?.month === t.month) await command({ type: 'NeighborTurn', month: t.month, picks: res.picks }, true);
+    } catch {
+      /* sin conexión: reglas */
+    } finally {
+      neighborBusy = false;
+    }
+  }
+  const neighborTimer = setInterval(() => void pollNeighbors(), 3000);
   /** Ritmo de los turnos según la velocidad: a x3 y x10, turnos más espaciados (menos esperas y menos gasto). */
   function syncTurnPace(s: number) {
     if (!state.aiMode || !state.ai || s <= 0) return;
@@ -1379,6 +1414,10 @@ export function startGame(opts: GameOptions): void {
   function lineText(a: { x: number; y: number }, b: { x: number; y: number }): string {
     const cmd = commandFor(tool, a, b);
     if (!cmd) return '';
+    if (cmd.type === 'SetZoneDensity') {
+      const r = tilesOf(cmd).filter((t) => t.x < state.map.w && t.y < state.map.h && state.map.zones[t.y * state.map.w + t.x] === 1).length;
+      return r ? `${plural(r, 'casilla R', 'casillas R')}, gratis` : 'aquí no hay zona R';
+    }
     if (cmd.type === 'Zone') {
       const { changed, skipped } = zoneChanges(state, cmd);
       if (cmd.zone === 'none') return `${plural(changed, 'casilla', 'casillas')}, gratis`;
@@ -1438,7 +1477,7 @@ export function startGame(opts: GameOptions): void {
     $('#confirm-text').replaceChildren(h('span', { class: 'cc-what' }, what), demolishText || !cost ? '' : h('span', { class: 'cc-cost' }, v.ok ? cost : `Cuesta ${cost}`), warn);
     $('#confirm-bar').classList.toggle('warn', after < 0);
     const yes = $('#confirm-yes') as HTMLButtonElement;
-    yes.textContent = demolishText ? 'Derribar' : tool.zone ? (tool.zone === 'none' ? 'Quitar zona' : 'Marcar zona') : tool.landmark ? 'Marcar el solar' : 'Construir';
+    yes.textContent = demolishText ? 'Derribar' : tool.zone ? (tool.zone === 'none' ? 'Quitar zona' : 'Marcar zona') : tool.density !== undefined ? 'Marcar densidad' : tool.landmark ? 'Marcar el solar' : 'Construir';
     yes.className = demolishText ? 'btn danger' : 'btn primary';
     yes.disabled = !v.ok;
     // Si no se puede, no se ofrece «Construir»: solo el motivo y ✕ (ronda 11).
@@ -1599,6 +1638,14 @@ export function startGame(opts: GameOptions): void {
       img.getContext('2d')!.drawImage(letterSprite(tl.zone, color), 0, 0);
       img.classList.add('letter');
       wrap.append(img);
+    } else if (tl.density !== undefined) {
+      // 2.5: el bloque tal como crecería con esa densidad.
+      const c = resSprite(tl.density, 7);
+      const img = document.createElement('canvas');
+      img.width = c.width;
+      img.height = c.height;
+      img.getContext('2d')!.drawImage(c, 0, 0);
+      wrap.append(img);
     } else {
       wrap.append(pixelIcon(tl.id === 'dezone' ? 'demolish' : tl.id));
     }
@@ -1696,7 +1743,7 @@ export function startGame(opts: GameOptions): void {
   }
   function toolHelp(tl: Tool): string {
     if (tl.id === 'road') return coarse ? 'toca el inicio y luego el final (o arrastra desde el inicio).' : 'arrastra en línea recta. Por debajo van el agua y la luz.';
-    if (tl.zone && tl.zone !== 'none') return coarse ? `${tl.help} Toca una esquina y luego la otra.` : tl.help;
+    if ((tl.zone && tl.zone !== 'none') || tl.density !== undefined) return coarse ? `Toca una esquina y luego la otra. ${tl.help}` : tl.help;
     if (tl.id === 'demolish') return 'toca lo que quieras derribar. Te pedirá confirmación.';
     return tl.help;
   }
@@ -1729,6 +1776,8 @@ export function startGame(opts: GameOptions): void {
     if (pendingPlace) cancelPlace();
     showBar(false);
     closeTray();
+    // 2.5: con la densidad en la mano, se ve la capa «Densidad» (si no había otra).
+    if (tl.density !== undefined && layer === 'none') setLayer('density');
     // Ronda 12: una hoja abierta tapaba la barra de confirmar (no se podía ni confirmar ni cancelar).
     if (isSheetOpen() && id !== 'inspect') closeSheet();
     tutorial.update(state, tool.id);
@@ -1765,7 +1814,7 @@ export function startGame(opts: GameOptions): void {
   function levelBox(b: Building): HTMLElement {
     const lv = levelOf(b);
     const served = serviceCounts(state).get(b.id);
-    const box = h('section', { class: 'level-box' }, h('h3', {}, pixelIcon('upgrade'), ` Nivel ${lv} de ${SERVICE_LEVELS.maxLevel}`));
+    const box = h('section', { class: 'level-box' }, h('h3', {}, pixelIcon('upgrade'), ` Nivel ${lv} de ${maxLevelOf(b)}`));
     const gives: string[] = [];
     if (radiusOf(b)) gives.push(`llega a ${radiusOf(b)} casillas`);
     if (serviceCapacityOf(b)) gives.push(`atiende a ${serviceCapacityOf(b)} vecinos${served !== undefined ? ` (ahora ${served})` : ''}`);
@@ -1778,7 +1827,7 @@ export function startGame(opts: GameOptions): void {
       box.append(h('p', {}, `Mejorando a nivel ${lv + 1}: termina el ${formatDate(tickToDate(b.upgradeUntil))}. Sigue abierto mientras tanto.`));
       return box;
     }
-    if (lv >= SERVICE_LEVELS.maxLevel) {
+    if (lv >= maxLevelOf(b)) {
       box.append(h('p', { class: 'muted small' }, 'Está en su nivel más alto.'));
       return box;
     }
@@ -1979,6 +2028,12 @@ export function startGame(opts: GameOptions): void {
       // 2.4 «Vida»: estación (billete), guardería y residencia (cuota), depuradora (el río) y renovables (la luz).
       const vida = vidaBox(state, b, command, citizenList);
       if (vida) content.push(vida);
+      // 2.5: cooperativa agraria (socios, presidente y reparto) y correos (plazo de las subvenciones y buzón).
+      const coopPost = coopPostBox(state, b, citizenList, () => withBack('Ficha', () => focusBuilding(b.id), openMail));
+      if (coopPost) content.push(coopPost);
+      // 2.5: vivienda protegida (quién vive y el alquiler) y bloques con densidad.
+      const viv = viviendaBox(state, b, citizenList);
+      if (viv) content.push(viv);
       // v1.8 (petición del creador): los servicios suben de nivel.
       if (UPGRADABLE.includes(b.kind)) content.push(levelBox(b));
       const res = occupants(state, b);
@@ -1994,7 +2049,7 @@ export function startGame(opts: GameOptions): void {
           broke ? h('p', { class: 'pocket-warn' }, `€ ${broke === 1 ? 'Uno debe' : `${broke} deben`} dinero: ${money(res.reduce((t, c) => t + totalDebt(c), 0))} en total.`) : '',
           citizenList(res),
         );
-      } else if (res.length) content.push(h('h3', {}, 'Viven aquí'), citizenList(res));
+      } else if (res.length && b.kind !== 'vpo') content.push(h('h3', {}, 'Viven aquí'), citizenList(res));
       if (workers.length) content.push(h('h3', {}, 'Trabajan aquí'), citizenList(workers));
       if (b.kind === 'house') {
         const sale = !!b.forSale;
@@ -2154,6 +2209,7 @@ export function startGame(opts: GameOptions): void {
       closeSheet();
       focusBuilding(b.id);
     }, () => withBack('Pueblo', openHub, openRegionSheet));
+  const openComarcaSheet = () => openComarca({ state: () => state, command: (c) => command(c) });
   const openErrandsSheet = () => openErrands(social, (id) => withBack('Encargos del pueblo', openErrandsSheet, () => openCitizen(social, id)));
   const openPressSheet = () =>
     openPress(social, (ref) => {
@@ -2170,6 +2226,11 @@ export function startGame(opts: GameOptions): void {
     const hall = state.buildings.find((b) => b.kind === 'townhall' && b.built);
     if (hall) focusBuilding(hall.id);
   }
+  /** 2.5: el buzón del pueblo (hoja `.half`). */
+  function openMail() {
+    openMailbox({ token, state: () => state, openCitizen: (id) => openCitizen(social, id) });
+  }
+
   function openHub() {
     closeTray();
     const go = (fn: () => void) => () => withBack('Pueblo', openHub, fn);
@@ -2231,11 +2292,20 @@ export function startGame(opts: GameOptions): void {
         item('Felicidad', go(openHappiness)),
         item('Diario del pueblo', go(() => openDiary(social))),
         item('Álbum del pueblo', go(() => openAlbum(social))),
+        // 2.5: el buzón (cartas de los que se fueron), con correos o si ya llegó alguna.
+        ...(state.letters.length || state.buildings.some((x) => x.kind === 'post') ? [item(`Buzón · ${plural(state.letters.length, 'carta', 'cartas')}`, go(openMail), unreadLetters(state, token) > 0)] : []),
         // 2.3: gráficas por años y récords.
         item('Historia', go(() => openHistory(state))),
       ),
       // 2.3: la comarca (bonanza o crisis), la gran empresa y las grandes obras.
-      card('town', 'Comarca', [regionSummary(state)], item('Comarca y grandes obras', go(openRegionSheet), regionAttention(state))),
+      // 2.5: los pueblos vecinos y sus alcaldes (ofertas con plazo).
+      card(
+        'town',
+        'Comarca',
+        [regionSummary(state), ' · ', comarcaSummary(state)],
+        item('Comarca y grandes obras', go(openRegionSheet), regionAttention(state)),
+        item('Pueblos vecinos', go(openComarcaSheet), comarcaPending(state) > 0),
+      ),
       // 2.1: encargos del pueblo y El Eco de Bitópolis.
       card(
         'inspect',
@@ -2515,6 +2585,7 @@ export function startGame(opts: GameOptions): void {
         clearInterval(heartbeat);
         clearInterval(decisionTimer);
         clearInterval(turnTimer);
+        clearInterval(neighborTimer);
         document.removeEventListener('visibilitychange', onVisibility);
         window.removeEventListener('pagehide', onPageHide);
         window.removeEventListener('popstate', onBack);

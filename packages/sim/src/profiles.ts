@@ -1,12 +1,13 @@
 import type { BuildKind, Command, LandmarkKind, TaxLevel } from '@bitopolis/shared';
-import { CARE, JOBS, LANDMARKS, LOANS, MAINTENANCE, PLANT_CAPACITY, PUBLIC_SALARY, REGION, SERVICE, SERVICE_SALARY, TRANSIT, TRASH, WAGE_OUTSIDE } from './balance.ts';
+import { CARE, DENSITY, JOBS, LANDMARKS, LOANS, MAINTENANCE, PLANT_CAPACITY, PUBLIC_SALARY, REGION, SERVICE, SERVICE_SALARY, TRANSIT, TRASH, WAGE_OUTSIDE } from './balance.ts';
 import { bigFactorySpot } from './region.ts';
 import { ownIncome, TREASURY } from './money.ts';
 import { jobsOf, maintenanceOf } from './levels.ts';
 import { LANDMARK_KINDS, landmarkReqs, phaseCost } from './landmarks.ts';
 import { isWater, Terrain } from './terrain.ts';
 import { averageIncome, canRequestLoan, loanCapacity, loanOffer } from './loans.ts';
-import { canUpgradeTownhall, isUnlocked, nextLevel, zonesUnlocked } from './townhall.ts';
+import { canUpgradeTownhall, isUnlocked, nextLevel, townLevel, zonesUnlocked } from './townhall.ts';
+import { densityAt } from './density.ts';
 import { buildCost, validateCommand } from './commands.ts';
 import { chance, type RngState, seedRng } from './prng.ts';
 import { hash32 } from './hash.ts';
@@ -62,6 +63,11 @@ interface PlannerOpts {
    * `CARE_ELDERS` mayores de 70); las cuotas, normales.
    */
   care?: boolean;
+  /**
+   * 2.5: densidad y VPO. Sube la densidad de la zona R donde ya hay bloques y el suelo vale (la más alta que
+   * le deje el ayuntamiento) y, con el mes en positivo, levanta una vivienda protegida.
+   */
+  density?: boolean;
 }
 
 const TRANSIT_RIDERS = 20;
@@ -155,7 +161,19 @@ function roadNetworkOf(state: GameState, b: { x: number; y: number }): Set<numbe
 }
 
 /** 2.4: lo que elige un jugador razonable en un dilema (por orden, la primera que pueda). */
-const DILEMMA_PREFERENCE = ['ampliar', 'microcredito', 'mirar_otro_lado', 'que_cumpla', 'plaza_primero', 'perdonar', 'desahuciar', 'multar', 'pedir_indulto'];
+const DILEMMA_PREFERENCE = ['ampliar', 'microcredito', 'mirar_otro_lado', 'que_cumpla', 'plaza_primero', 'perdonar', 'desahuciar', 'multar', 'pedir_indulto', 'vpo_sorteo'];
+
+/** 2.5: una orden de densidad para un bloque que aún puede crecer (el de más suelo; sin dados). */
+function densityPlan(state: GameState): Command | null {
+  const level = DENSITY.townhall.reduce((best, need, k) => (townLevel(state) >= need ? k : best), 0);
+  if (level === 0) return null;
+  const w = state.map.w;
+  const b = state.buildings
+    .filter((x) => x.kind === 'res' && x.built && densityAt(state, x.x, x.y) < level && (state.fields.land[x.y * w + x.x] ?? 0) > DENSITY.minLand)
+    .sort((a, c) => (state.fields.land[c.y * w + c.x] ?? 0) - (state.fields.land[a.y * w + a.x] ?? 0) || a.id - c.id)[0];
+  return b ? { type: 'SetZoneDensity', x: b.x, y: b.y, w: 1, h: 1, level: level as 1 | 2 } : null;
+}
+
 
 /** 2.3: fases que quiere tener en caja para empezar una gran obra. */
 const START_PHASES = 1;
@@ -433,6 +451,8 @@ function planner(name: string, o: PlannerOpts): Profile {
         // Con holgura: que el superávit pague dos veces lo que cuesta al mes.
         for (const [kind, ok] of wants) if (ok && !has(kind) && isUnlocked(state, kind) && room >= 3 * cost(kind) && tryBuild(kind)) return out;
       }
+      // 2.5: una vivienda protegida, con el mes en positivo y holgura para su mantenimiento.
+      if (o.density && zonesOn && last && ownIncome(last) - last.expenses >= 3 * MAINTENANCE.vpo && !has('vpo') && isUnlocked(state, 'vpo') && tryBuild('vpo')) return out;
       // Vivienda municipal al principio (o siempre, según el perfil).
       if ((!zonesOn || o.municipalHousing) && freeHomes(state) + state.projects.filter((p) => p.payer === 0).length * 3 < 3 && state.demand.R > 0) {
         if (tryBuild('house')) return out;
@@ -447,6 +467,11 @@ function planner(name: string, o: PlannerOpts): Profile {
           [Zone.I, 'I', state.demand.I],
         ];
         const taken = new Set<string>();
+        // 2.5: más densidad donde ya hay bloques y hay demanda.
+        if (o.density && state.demand.R > DENSITY.minDemandR) {
+          const d = densityPlan(state);
+          if (d) out.push(d);
+        }
         // 2.2: el campo, lejos del centro (de dos en dos, según crecen las fincas).
         if (o.farms && farmZoneUnlocked(state).ok) {
           const farms = state.buildings.filter((b) => b.kind === 'farm').length;
@@ -513,6 +538,7 @@ export const PROFILES: Record<string, Profile> = {
     landmarks: true,
     bigCompany: true,
     care: true,
+    density: true,
   }),
   // 2.2: como el constructor, pero pidiendo prestado todo lo que le dejen (equilibrio de los préstamos).
   endeudado: planner('endeudado', {

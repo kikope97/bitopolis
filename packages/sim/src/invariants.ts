@@ -1,6 +1,9 @@
-import { HOMES, LISTS } from './balance.ts';
+import { LISTS } from './balance.ts';
+import { homesOf } from './density.ts';
 import { isLandmarkKind } from './landmarks.ts';
 import { farmInvariants } from './farm.ts';
+import { coopInvariants } from './coop.ts';
+import { postInvariants } from './post.ts';
 import { loanInvariants } from './invariants-loans.ts';
 import { totalInternalMoney } from './money.ts';
 import type { GameState } from './state.ts';
@@ -29,7 +32,7 @@ export function checkInvariants(state: GameState): string[] {
   for (const c of state.citizens) if (c.homeId !== null) homeUse.set(c.homeId, (homeUse.get(c.homeId) ?? 0) + 1);
   for (const [id, n] of homeUse) {
     const b = state.buildings.find((x) => x.id === id);
-    if (b && n > (HOMES[b.kind] ?? 0)) errors.push(`casa ${id} sobreocupada`);
+    if (b && n > homesOf(b)) errors.push(`casa ${id} sobreocupada`);
   }
   const ids = new Set<number>();
   for (const x of [...state.citizens, ...state.buildings]) {
@@ -58,6 +61,7 @@ export function checkInvariants(state: GameState): string[] {
   errors.push(...tenderErrors(state), ...streetErrors(state));
   // 2.2: fincas solo en zona agraria y con el cultivo de su terreno.
   errors.push(...farmInvariants(state));
+  errors.push(...coopInvariants(state), ...postInvariants(state));
   // 2.2: préstamos municipales.
   errors.push(...loanInvariants(state));
   errors.push(...listInvariants(state));

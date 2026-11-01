@@ -368,6 +368,70 @@ function apartment(seed: number, rank = VILLA_RANK): Pix {
   return p;
 }
 
+/**
+ * 2.5: bloque de la zona R que creció con la densidad: 1 (media) cuatro plantas,
+ * 2 (alta) cinco, con azotea, antenas y balcones corridos. Mismo muro que el bloque bajo.
+ */
+function denseBlock(seed: number, level: number): Pix {
+  const p = new Pix(T, BH);
+  const [wall, tex] = WALLS[seed % WALLS.length]!;
+  const floors = level >= 2 ? 5 : 4;
+  const fh = level >= 2 ? 8 : 9;
+  const top = 46 - floors * fh - 1;
+  castShadow(p, 2, top, 28, 46 - top);
+  facade(p, 2, top, 28, 46 - top, wall, tex, seed);
+  flatRoof(p, 1, top - 4, 30, 5, wall, seed);
+  // Azotea: caseta de la escalera y antenas (la alta, además, el depósito).
+  p.rect(4, top - 7, 6, 3, wall[2]);
+  p.hline(4, top - 7, 6, wall[0]);
+  p.vline(24, top - 9, 5, MAT.metal[3]);
+  p.hline(22, top - 8, 5, MAT.metal[2]);
+  if (level >= 2) {
+    p.rect(14, top - 8, 6, 4, MAT.metal[1]);
+    p.frame(14, top - 8, 6, 4, MAT.metal[3]);
+  }
+  const shutters = (seed >> 4) % 3 === 0 ? SHUTTERS[seed % SHUTTERS.length] : undefined;
+  for (let f = 0; f < floors; f++) {
+    const y = top + 2 + f * fh;
+    if (f === floors - 1) {
+      windowAt(p, 6, y + 1, 4, 4, { shutters });
+      doorAt(p, 14, y - 1, 5, 46 - y);
+      windowAt(p, 23, y + 1, 4, 4, { shutters });
+    } else {
+      for (const wx of [6, 14, 23]) windowAt(p, wx, y, 4, 4, { shutters, flowers: hash(wx, f, seed) > 0.75, lit: hash(f, wx, seed) > 0.9 });
+      // Balcón corrido cada dos plantas.
+      if ((f + seed) % 2 === 0) {
+        p.hline(4, y + 5, 24, MAT.metal[3]);
+        for (let i = 4; i < 28; i += 3) p.set(i, y + 4, MAT.metal[2]);
+      }
+    }
+  }
+  bush(p, 3, 45, 2, seed);
+  bush(p, 28, 45, 2, seed + 1);
+  return p;
+}
+
+/** 2.5: vivienda protegida, tres plantas de ladrillo con la placa municipal azul y el escudo. */
+function vpoPix(seed: number): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 2, 14, 28, 32);
+  facade(p, 2, 16, 28, 30, MAT.brick, 'brick', seed);
+  flatRoof(p, 1, 11, 30, 6, MAT.brick, seed);
+  // Franja clara entre plantas (forjados).
+  for (const y of [25, 34]) p.hline(2, y, 28, MAT.cream[1]);
+  for (const y of [18, 27]) for (const x of [5, 11, 18, 24]) windowAt(p, x, y, 3, 5, { frame: 12, flowers: hash(x, y, seed) > 0.7 });
+  windowAt(p, 5, 37, 3, 5, { frame: 12 });
+  windowAt(p, 24, 37, 3, 5, { frame: 12 });
+  doorAt(p, 13, 36, 6, 10, MAT.glass, MAT.wood[3]);
+  // Placa azul con el escudo encima de la puerta.
+  p.rect(12, 30, 8, 4, MAT.blue[1]);
+  p.frame(12, 30, 8, 4, MAT.blue[3]);
+  p.rect(15, 31, 2, 2, MAT.yellow[1]);
+  bush(p, 3, 45, 2, seed, true);
+  bush(p, 28, 45, 2, seed + 2, true);
+  return p;
+}
+
 function shop(seed: number): Pix {
   const p = new Pix(T, BH);
   const [wall, tex] = WALLS[seed % 4]!;
@@ -2320,6 +2384,8 @@ const UPGRADES: Record<string, readonly [() => Pix, () => Pix]> = {
   sports: [() => sports2(16), () => sports3(16)],
   firestation: [() => fireStation(18, 2), () => fireStation(18, 3)],
   cleanpoint: [() => cleanPoint2(18), () => cleanPoint3(18)],
+  // 2.5: la cooperativa con su almazara o bodega (solo tiene nivel 2).
+  coop: [() => coopPix(33, 2), () => coopPix(33, 2)],
 };
 
 /**
@@ -3068,12 +3134,20 @@ function buildingSpec(kind: string, id: number, rank = VILLA_RANK): [string, () 
       return ['residence', () => residencePix(28)];
     case 'busstation':
       return ['busstation', () => busStationPix(29)];
+    // 2.5: vivienda protegida.
+    case 'vpo':
+      return ['vpo', () => vpoPix(32)];
     case 'sewage':
       return ['sewage', () => sewagePix(30)];
     case 'solar':
       return ['solar', () => solarPix(31)];
     case 'wind':
       return ['wind-0', () => windPix(0)];
+    // 2.5 «Comarca».
+    case 'coop':
+      return ['coop', () => coopPix(33, 1)];
+    case 'post':
+      return ['post', () => postPix(34)];
     case 'factory':
       return [`factory${id % 4}`, () => factory(id % 4)];
     // 2.2: sin saber el cultivo, una finca de cereal (el render usa farmSprite con el suyo).
@@ -3096,6 +3170,19 @@ export function buildingSprite(kind: string, id: number, tod: TimeOfDay = 'day',
   if (!spec) return constructionSprite(0, id, tod);
   const [key, make] = spec;
   // v1.7: en invierno con nieve, tejados nevados (otra entrada de la caché).
+  return snow ? sprite(`snow-${key}`, () => snowify(make()), tod) : sprite(key, make, tod);
+}
+
+/**
+ * 2.5: bloque de la zona R según la densidad a la que ha crecido (0 el de siempre,
+ * 1 media, 2 alta). El muro varía con el id como el bloque bajo.
+ */
+export function resSprite(level: number, id: number, tod: TimeOfDay = 'day', snow = false, rank = VILLA_RANK): HTMLCanvasElement {
+  const lv = Math.max(0, Math.min(2, Math.floor(level) || 0));
+  if (lv === 0) return buildingSprite('res', id, tod, snow, rank);
+  const seed = Math.floor(hash(id, 77) * 256);
+  const key = `res-d${lv}-${seed}`;
+  const make = () => denseBlock(seed, lv);
   return snow ? sprite(`snow-${key}`, () => snowify(make()), tod) : sprite(key, make, tod);
 }
 
@@ -4675,3 +4762,70 @@ export function bonfirePix(frame: number): Pix {
   return p;
 }
 export const bonfireSprite = (frame: number, tod: TimeOfDay = 'day') => sprite(`hoguera-${frame % 2}`, () => bonfirePix(frame), tod);
+
+/* ---------------- 2.5 «Comarca» ---------------- */
+
+/** Cooperativa agraria: nave con portalón, sacos y una báscula; en el nivel 2, los depósitos de la almazara o la bodega. */
+function coopPix(seed: number, level: number): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 2, 24, 22, 22);
+  facade(p, 2, 28, 22, 17, MAT.cream, 'plaster', seed);
+  gableRoof(p, 1, 20, 24, 4, 8, MAT.terracotta);
+  // Portalón de madera y rótulo verde.
+  doorAt(p, 9, 34, 8, 11, MAT.wood, 12);
+  p.rect(6, 30, 14, 3, MAT.moss[1]);
+  p.hline(8, 31, 10, 12);
+  windowAt(p, 4, 35, 2, 3, { frame: 12 });
+  windowAt(p, 20, 35, 2, 3, { frame: 12 });
+  // Sacos de grano junto a la puerta.
+  for (const [x, y] of [[25, 42], [28, 42], [26, 39]] as const) {
+    p.ellipse(x + 1, y + 2, 2, 2, MAT.wood[0]);
+    p.set(x + 1, y, MAT.wood[2]);
+  }
+  if (level >= 2) {
+    // Depósitos de acero de la almazara o la bodega.
+    for (const x of [25, 29]) {
+      p.rect(x, 24, 3, 14, MAT.metal[1]);
+      p.vline(x, 24, 14, MAT.metal[0]);
+      p.vline(x + 2, 24, 14, MAT.metal[2]);
+      p.hline(x, 23, 3, MAT.metal[2]);
+    }
+    p.hline(25, 30, 7, MAT.metal[3]);
+  } else {
+    // Remolque con paja.
+    p.rect(24, 32, 7, 4, MAT.yellow[1]);
+    p.dither(24, 32, 7, 4, MAT.yellow[2], seed % 2);
+    p.hline(24, 36, 7, MAT.wood[2]);
+    p.set(25, 37, MAT.metal[3]);
+    p.set(29, 37, MAT.metal[3]);
+  }
+  return p;
+}
+
+/** Oficina de correos: fachada amarilla, rótulo, buzón en la acera y una bici de reparto. */
+function postPix(seed: number): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 4, 22, 22, 24);
+  facade(p, 4, 26, 22, 19, MAT.yellow, 'plaster', seed);
+  flatRoof(p, 3, 22, 24, 5, MAT.yellow, seed);
+  // Rótulo azul con el sobre.
+  p.rect(7, 28, 16, 4, MAT.blue[1]);
+  p.rect(13, 29, 4, 2, 12);
+  p.set(14, 29, MAT.blue[2]);
+  p.set(15, 29, MAT.blue[2]);
+  windowAt(p, 7, 35, 4, 4, { frame: 12 });
+  windowAt(p, 19, 35, 4, 4, { frame: 12 });
+  doorAt(p, 13, 36, 4, 9, MAT.blue, 12);
+  // Buzón amarillo en su poste.
+  p.vline(28, 40, 6, MAT.metal[2]);
+  p.rect(26, 36, 5, 5, MAT.yellow[1]);
+  p.hline(26, 36, 5, MAT.yellow[2]);
+  p.hline(27, 38, 3, MAT.yellow[3]);
+  // Bici de reparto apoyada.
+  p.ellipse(2, 44, 1, 1, MAT.metal[3]);
+  p.ellipse(6, 44, 1, 1, MAT.metal[3]);
+  line(p, 2, 44, 4, 41, MAT.red[1]);
+  line(p, 4, 41, 6, 44, MAT.red[1]);
+  p.rect(4, 40, 3, 2, MAT.yellow[1]);
+  return p;
+}

@@ -696,6 +696,41 @@ const ICONS: Record<string, { rows: string[]; colors: Record<string, number> }> 
     ],
     colors: { w: 12, g: 10, b: 9, y: 4, s: 13, k: 0 },
   },
+  // 2.5: sobre (correos y cartas) y gavilla (cooperativa agraria).
+  letter: {
+    rows: [
+      '............',
+      '............',
+      'oooooooooooo',
+      'oo########oo',
+      'o#o######o#o',
+      'o##o####o##o',
+      'o###o##o###o',
+      'o####oo####o',
+      'o##########o',
+      'oooooooooooo',
+      '............',
+      '............',
+    ],
+    colors: { o: 27, '#': 30 },
+  },
+  sheaf: {
+    rows: [
+      '..y..y..y...',
+      '.yy.yyy.yy..',
+      '..yyyyyyy...',
+      '...yyyyy....',
+      '....yyy.....',
+      '...bbbbb....',
+      '....yyy.....',
+      '...yyyyy....',
+      '..yy.y.yy...',
+      '.yy..y..yy..',
+      '.y...y...y..',
+      '............',
+    ],
+    colors: { y: 4, b: 17 },
+  },
   cradle: {
     rows: [
       '............',

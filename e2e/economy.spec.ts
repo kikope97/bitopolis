@@ -71,7 +71,7 @@ test('v0.3: tributos separados, capas, venta de vivienda, parte y vecinos', asyn
   await shot('5-parte');
   await page.locator('.sheet-close').click();
   await page.locator('#menu').click();
-  await page.getByRole('button', { name: 'Vecinos' }).click();
+  await page.getByRole('button', { name: 'Vecinos', exact: true }).click();
   await expect(page.locator('.sheet')).toContainText('población estadística');
   await shot('6-vecinos');
   expect(errors).toEqual([]);

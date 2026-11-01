@@ -59,6 +59,10 @@ export const BUILD_LEVEL: Record<BuildKind, number> = {
   sewage: 3,
   solar: 2,
   wind: 2,
+  // 2.5
+  vpo: 3,
+  coop: 2,
+  post: 2,
 };
 
 export const townLevel = (state: GameState): number => state.townhallLevel ?? 1;

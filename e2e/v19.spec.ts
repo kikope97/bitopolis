@@ -31,7 +31,7 @@ test('v1.9: ficha con el bolsillo del vecino; aplazar su deuda; sueldo mínimo; 
 
   // Vecinos › Con deudas › ficha con su bolsillo.
   await page.locator('#menu').click();
-  await page.getByRole('button', { name: 'Vecinos' }).click();
+  await page.getByRole('button', { name: 'Vecinos', exact: true }).click();
   await page.getByRole('button', { name: /Con deudas/ }).click();
   await expect(page.locator('.sheet')).toContainText('deben dinero');
   await page.locator('.sheet .person-row').filter({ hasText: c.name }).first().click();

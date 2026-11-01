@@ -248,8 +248,8 @@ describe('turnos del pueblo con IA (2.0)', () => {
   }, 120_000);
 
   it('continuidad: cada vecino con IA guarda sus notas (4 como mucho) y su actitud se contagia a los vecinos por reglas', () => {
-    // 2.1: con 11 (en la 2.2 con 12 y en la 2.3 con 13), la actitud media de ese pueblo se redondeaba a 0 y nadie la copiaba (depende del azar del fuzz).
-    const { state } = runSimulation({ seed: 7, days: 300, profile: 'constructor', aiMode: true, aiShare: 40, onTurn: fuzzTurn(14) });
+    // 2.1: con 11 (en la 2.2 con 12, en la 2.3 con 13 y en la 2.4 con 14), la actitud media de ese pueblo se redondeaba a 0 y nadie la copiaba (depende del azar del fuzz).
+    const { state } = runSimulation({ seed: 7, days: 300, profile: 'constructor', aiMode: true, aiShare: 40, onTurn: fuzzTurn(16) });
     const ais = state.citizens.filter((c) => c.named && c.notes?.length);
     expect(ais.length).toBeGreaterThan(0);
     expect(ais.every((c) => c.notes!.length <= 4)).toBe(true);

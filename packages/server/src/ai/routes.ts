@@ -5,6 +5,7 @@ import {
   buildAdvisorRequest,
   buildChronicleRequest,
   buildDecisionRequest,
+  buildLetterRequest,
   buildPlenoRequest,
   buildTalkRequest,
   createInitialState,
@@ -12,6 +13,7 @@ import {
   type GameState,
   migrate,
   NEEDS,
+  parseLetter,
   parsePleno,
   PLENO_ROLES,
   PLENO_STANCES,
@@ -257,6 +259,21 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
     return { turn: ai.turn(row.id, n), ...ai.status(row.id) };
   });
 
+  /** 2.5: el turno de los alcaldes vecinos de un mes (el cliente lo aplica con `NeighborTurn`). */
+  app.get('/api/games/:token/neighbors/:month', async (req, reply) => {
+    const t = tokenOf(req.params);
+    const m = Number((req.params as { month?: string }).month);
+    if (!t.success || !Number.isInteger(m) || m < 0) return bad(reply, 'petición no válida');
+    const row = await load(t.data);
+    if (!row) return bad(reply, 'no existe', 404);
+    // Como con los turnos: si el servidor no lo conoce y sigue abierto, lo pide ahora.
+    if (!ai.neighborTurn(row.id, m) && row.mode === 'ai') {
+      const st = migrate(JSON.parse(row.state)) as GameState;
+      if (st.comarca?.turn?.month === m) void ai.onSaved(row.id, st);
+    }
+    return { neighbors: ai.neighborTurn(row.id, m) };
+  });
+
   app.get('/api/games/:token/ai-usage', async (req, reply) => {
     const t = tokenOf(req.params);
     if (!t.success) return bad(reply, 'enlace no válido');
@@ -389,6 +406,44 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
       return r.text ? { lines: JSON.parse(r.text) } : { lines: null, reason: r.reason };
     } finally {
       plenoAsking.delete(key);
+    }
+  });
+
+  /**
+   * 2.5: el texto de una carta de alguien que se fue. El motor ya decidió quién
+   * escribe, a quién y si vuelve (la carta está en el estado guardado: si no,
+   * 404); la IA solo redacta. Una llamada por carta, en caché; no entra en el
+   * estado ni en el hash. Si falla, el cliente lee la plantilla del motor.
+   */
+  const letters = new Map<string, string>();
+  const letterAsking = new Map<string, Promise<{ text: string | null; reason?: string }>>();
+  const LetterId = z.coerce.number().int().min(1).max(1e9);
+  app.post('/api/games/:token/letter/:id', async (req, reply) => {
+    const g = await aiGame(req.params);
+    const id = LetterId.safeParse((req.params as { id?: unknown }).id);
+    if (!g || !id.success) return bad(reply, 'petición no válida');
+    const letter = g.state.letters?.find((l) => l.id === id.data);
+    if (!letter) return bad(reply, 'esa carta no está', 404);
+    const key = `${g.row.id}:${letter.id}`;
+    const cached = letters.get(key);
+    if (cached !== undefined) return cached ? { text: cached } : { text: null, reason: 'no disponible para esta carta' };
+    const request = buildLetterRequest(g.state, letter);
+    if (!request) return { text: null, reason: 'quien la recibió ya no está' };
+    let run = letterAsking.get(key);
+    if (!run) {
+      run = ai.text(g.row.id, 'carta', request, true, (raw) => parseLetter(raw, request));
+      letterAsking.set(key, run);
+    }
+    try {
+      const r = await run;
+      // Un texto no válido se recuerda como fallo; si fue por tope o por red, se puede reintentar.
+      if (r.text || r.reason === 'invalid') {
+        letters.set(key, r.text ?? '');
+        if (letters.size > 2000) letters.delete(letters.keys().next().value!);
+      }
+      return r;
+    } finally {
+      letterAsking.delete(key);
     }
   });
 

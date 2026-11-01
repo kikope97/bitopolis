@@ -42,6 +42,20 @@ createServer((req, res) => {
     }
     // 2.0: turno del pueblo (bloque común + «Lote de vecinos»).
     const whole = data.messages?.[1]?.content ?? '';
+    // 2.5: alcaldes vecinos: si pueden, ofrecen un acuerdo; si no, lo primero del menú.
+    const alc = whole.indexOf('Alcaldes de la comarca');
+    if (alc >= 0) {
+      const d = JSON.parse(whole.slice(whole.indexOf('\n', alc) + 1));
+      const alcaldes = {};
+      for (const p of d.pueblos) {
+        const menu = p.menu.map((m) => m.accion);
+        const accion = menu.find((a) => a.startsWith('ofrecer_acuerdo:')) ?? menu.find((a) => a === 'felicitar') ?? menu[0];
+        alcaldes[p.clave] = { accion, declaracion: `Desde ${p.pueblo} tendemos la mano a nuestros vecinos de la comarca.` };
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ alcaldes }) } }], usage: { prompt_tokens: 2000, completion_tokens: 300 } }));
+      return;
+    }
     // 2.0: director del pueblo: avisa de lo primero del menú y hace pasar lo bueno que haya.
     const dir = whole.indexOf('Director de la semana');
     if (dir >= 0) {
@@ -99,6 +113,13 @@ createServer((req, res) => {
       const intervenciones = parsed.intervenciones.map((v) => ({ vecino: v.vecino, postura: v.postura, linea: `${LINES[v.postura] ?? LINES.matiz} Palabra de ${v.nombre.split(' ')[0]}.` }));
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ intervenciones }) } }], usage: { prompt_tokens: 1500, completion_tokens: 200 } }));
+      return;
+    }
+    // 2.5: carta de alguien que se fue (solo con los nombres de los datos).
+    if (parsed.escribe && parsed.para) {
+      const texto = `Hola, ${parsed.para.nombre.split(' ')[0]}: te escribo desde lejos con mucho cariño. Dale recuerdos a todos. Un abrazo, ${parsed.escribe.nombre.split(' ')[0]}.`;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ texto }) } }], usage: { prompt_tokens: 600, completion_tokens: 80 } }));
       return;
     }
     const isText = !Array.isArray(parsed.vecinos);

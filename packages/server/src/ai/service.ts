@@ -1,6 +1,9 @@
 import {
   buildDecisionRequest,
   buildDirectorRequest,
+  buildNeighborRequest,
+  type NeighborPick,
+  parseNeighbors,
   buildTurnRequest,
   type DirectorChoice,
   type GameState,
@@ -54,7 +57,20 @@ interface GameAiState {
   lastError?: string;
   /** 2.0: turnos del pueblo pedidos (número) y su resultado. */
   turns: Map<number, TurnResult>;
+  /** 2.5: turnos de los alcaldes vecinos pedidos (mes de juego) y su resultado. */
+  neighbors: Map<number, NeighborResult>;
 }
+
+/** 2.5: lo que decidieron los alcaldes vecinos un mes (el cliente lo aplica con `NeighborTurn`). */
+export interface NeighborResult {
+  month: number;
+  status: 'pending' | 'ready' | 'failed';
+  picks: NeighborPick[];
+  reason?: string;
+}
+
+/** 2.5: tokens de salida del turno de los alcaldes (~300 por respuesta y margen para razonar). */
+const NEIGHBOR_OUT = 900;
 
 /** 2.0: resultado de un turno del pueblo para el cliente. */
 export interface TurnResult {
@@ -240,7 +256,7 @@ export class AiService {
 
   private gs(gameId: number): GameAiState {
     let g = this.games.get(gameId);
-    if (!g) this.games.set(gameId, (g = { inflight: false, requested: new Set(), ready: [], capped: false, turns: new Map() }));
+    if (!g) this.games.set(gameId, (g = { inflight: false, requested: new Set(), ready: [], capped: false, turns: new Map(), neighbors: new Map() }));
     return g;
   }
 
@@ -248,7 +264,78 @@ export class AiService {
   onSaved(gameId: number, state: GameState): Promise<void> | void {
     const turn = this.onTurn(gameId, state);
     const dec = this.onPending(gameId, state);
-    if (turn || dec) return Promise.all([turn, dec]).then(() => undefined);
+    const nb = this.onNeighbors(gameId, state);
+    if (turn || dec || nb) return Promise.all([turn, dec, nb]).then(() => undefined);
+  }
+
+  /**
+   * 2.5: el turno mensual de los alcaldes vecinos (una petición para todos). En
+   * ahorro o cerca de un tope no se pide: deciden las reglas por personalidad.
+   */
+  private onNeighbors(gameId: number, state: GameState): Promise<void> | void {
+    const t = state.comarca?.turn;
+    if (!state.aiMode || !t || !state.comarca.towns.length) return;
+    const g = this.gs(gameId);
+    if (g.neighbors.has(t.month)) return;
+    const result: NeighborResult = { month: t.month, status: 'pending', picks: [] };
+    g.neighbors.set(t.month, result);
+    for (const k of [...g.neighbors.keys()]) if (k < t.month - 3) g.neighbors.delete(k);
+    return this.requestNeighbors(gameId, state, result).catch((e) => {
+      result.status = 'failed';
+      result.reason = (e as Error).message;
+    });
+  }
+
+  private async requestNeighbors(gameId: number, state: GameState, result: NeighborResult): Promise<void> {
+    const s = await this.settings(gameId);
+    if (!s.configured) {
+      result.status = 'failed';
+      result.reason = 'IA sin configurar';
+      return;
+    }
+    const { model, rung } = await this.turnModel(gameId, s);
+    if (s.turnQuality === 'ahorro' || rung === 'cerca del tope') {
+      result.status = 'failed';
+      result.reason = 'ahorro: deciden las reglas';
+      return;
+    }
+    const req = buildNeighborRequest(state);
+    const est = costEur(this.prices, model, s.provider, { in: Math.ceil((req.system.length + req.user.length) / 3.2), cachedIn: 0, out: NEIGHBOR_OUT }) * 1.5;
+    const blocked = await this.reserve(gameId, s, est);
+    if (blocked) {
+      result.status = 'failed';
+      result.reason = blocked;
+      return;
+    }
+    const usage = { in: 0, cachedIn: 0, out: 0 };
+    let status = 'ok';
+    try {
+      const provider = this.providerOverride ? this.providerOverride(s) : makeProvider(s.provider, s.key, s.baseUrl);
+      const r = await provider.complete({ system: req.system, user: req.user, schema: req.schema, model, maxTokens: NEIGHBOR_OUT }, AbortSignal.timeout(TURN_TIMEOUT_MS));
+      usage.in = r.usage.in;
+      usage.cachedIn = r.usage.cachedIn;
+      usage.out = r.usage.out;
+      if (r.truncated) status = 'truncated';
+      const parsed = parseNeighbors(r.text, req);
+      result.picks = parsed.picks;
+      if (parsed.invalid.length && status === 'ok') status = parsed.picks.length ? 'partial' : 'invalid';
+    } catch (e) {
+      status = (e as Error).name === 'TimeoutError' ? 'timeout' : 'error';
+      result.reason = (e as Error).message;
+    } finally {
+      this.reserved.set(gameId, Math.max(0, (this.reserved.get(gameId) ?? 0) - est));
+      const now = new Date();
+      await this.db
+        .insertInto('ai_usage')
+        .values({ game_id: gameId, ts: now.getTime(), day: day(now), month: month(now), kind: 'alcaldes', model, tokens_in: usage.in, tokens_cached: usage.cachedIn, tokens_out: usage.out, eur: costEur(this.prices, model, s.provider, usage), requested: Object.keys(req.menus).length, valid: result.picks.length, retried: 0, status })
+        .execute();
+    }
+    result.status = result.picks.length ? 'ready' : 'failed';
+  }
+
+  /** 2.5: el turno de los alcaldes de un mes (null si no se pidió). */
+  neighborTurn(gameId: number, month: number): NeighborResult | null {
+    return this.gs(gameId).neighbors.get(month) ?? null;
   }
 
   /** 2.0: si hay un turno abierto que aún no se ha pedido, se piden sus lotes. */
@@ -507,7 +594,7 @@ export class AiService {
    */
   async text(
     gameId: number,
-    kind: 'consejero' | 'diario' | 'conversacion' | 'pleno',
+    kind: 'consejero' | 'diario' | 'conversacion' | 'pleno' | 'carta',
     req: TextRequest,
     premium: boolean,
     /** 2.4: validación propia (p. ej. el pleno, varias líneas); por defecto `parseText`. */

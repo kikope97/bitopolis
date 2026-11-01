@@ -1,4 +1,4 @@
-import type { TurnAct } from '@bitopolis/sim';
+import type { NeighborPick, TurnAct } from '@bitopolis/sim';
 import type { GameState, ViewSnapshot } from '@bitopolis/sim';
 import type { ScenarioId, TerrainShape } from '@bitopolis/shared';
 import type { ListedModel } from './model-picker.ts';
@@ -71,8 +71,12 @@ export const api = {
   talk: (token: string, citizenId: number, question: string) => call<{ text: string | null; reason?: string }>('POST', `/api/games/${token}/talk`, { citizenId, question }),
   /** 2.0: resultado del turno del pueblo `n`. */
   turn: (token: string, n: number) => call<{ turn: TurnResult | null; capped: boolean; notice?: string }>('GET', `/api/games/${token}/turn/${n}`),
+  /** 2.5: lo que decidieron los alcaldes vecinos el mes `month` (si la IA respondió). */
+  neighbors: (token: string, month: number) => call<{ neighbors: { month: number; status: 'pending' | 'ready' | 'failed'; picks: NeighborPick[] } | null }>('GET', `/api/games/${token}/neighbors/${month}`),
   advisor: (token: string, question: string) => call<{ text: string | null; reason?: string }>('POST', `/api/games/${token}/advisor`, { question }),
   chronicle: (token: string) => call<{ text: string | null; reason?: string }>('POST', `/api/games/${token}/chronicle`),
+  /** 2.5: texto con IA de una carta (fuera del estado; si no llega, la plantilla del motor). */
+  letter: (token: string, id: number) => call<{ text: string | null; reason?: string }>('POST', `/api/games/${token}/letter/${id}`),
   /** 2.4: intervenciones del pleno (texto fuera del estado; si no llega, plantillas). */
   pleno: (token: string, body: { tick: number; petitions: { id: number; citizenId: number; need: string; yes: number; no: number; opposition?: boolean }[]; speakers: { id: number; role: string; postura: string; petitionId: number }[] }) =>
     call<{ lines: { id: number; linea: string }[] | null; reason?: string }>('POST', `/api/games/${token}/pleno`, body),
