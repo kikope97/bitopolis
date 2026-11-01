@@ -236,7 +236,8 @@ function bigCompanyMonth(state: GameState): void {
   for (const x of state.citizens) if (x.jobId === b.id) transfer(state, OUTSIDE, x.id, wage, 'sueldos');
   transfer(state, OUTSIDE, TREASURY, bigCompanyIbi(state), 'IBI');
   // 2.3: sin director (Modo normal o IA caída), contrata cada mes a unos pocos vecinos en paro; con él, `contrata_vecinos`.
-  if (!directorOwns(state)) hireBatch(state, REGION.bigCompany.hirePerMonth);
+  // F3: no contrata con un ERE o un cierre anunciado (contrataba a gente para despedirla a los tres meses).
+  if (!directorOwns(state) && bc.warnUntil === undefined && bc.status !== 'se_va') hireBatch(state, REGION.bigCompany.hirePerMonth);
 }
 
 /** Contrata de golpe hasta `n` vecinos en paro (un solo aviso). Devuelve cuántos entraron. */
