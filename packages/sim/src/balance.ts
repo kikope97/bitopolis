@@ -96,9 +96,10 @@ export const JOBS: Record<BuildingKind, number> = {
   cathedral: 0,
   heritage: 0,
   bigfactory: 0,
-  nursery: 2,
-  residence: 4,
-  busstation: 2,
+  // 2.4 (bloque A/B): con 2/4/2 empleos, un pueblo de 70 vecinos gastaba la mitad de lo que ingresaba en ellos.
+  nursery: 1,
+  residence: 2,
+  busstation: 1,
   sewage: 1,
   solar: 0,
   wind: 0,
@@ -139,9 +140,10 @@ export const MAINTENANCE: Record<BuildingKind, number> = {
   cathedral: 0,
   heritage: 60,
   bigfactory: 0,
-  nursery: 250,
-  residence: 400,
-  busstation: 300,
+  // 2.4: medido con pnpm sim (casual y constructor, 21 semillas, 4 años): con 250/400/300 la caja del casual caía un 25 %.
+  nursery: 100,
+  residence: 250,
+  busstation: 150,
   sewage: 350,
   solar: 40,
   wind: 80,
@@ -1256,7 +1258,12 @@ export const ACHIEVEMENTS = {
 /** Bloque A: guardería y residencia (care.ts). Cuotas en €/mes por nivel gratis/reducida/normal. */
 export const CARE = {
   nursery: { places: 20, radius: 8, maxAgeYears: 3, fee: { gratis: 0, reducida: 30, normal: 60 } },
-  residence: { places: 12, fee: { gratis: 0, reducida: 200, normal: 400 } },
+  /**
+   * Los mayores que viven solos y sin hijos en el pueblo entran solos si hay plaza: desde 75 años o, desde
+   * 70, si están tristes (felicidad < unhappyEnter). Con una cuota mayor que la pensión, solo con ahorros
+   * para `savingsMonths` meses. En la residencia, de lo básico solo gastan `livingShare` (la comida va incluida).
+   */
+  residence: { places: 12, fee: { gratis: 0, reducida: 200, normal: 400 }, unhappyEnter: 45, savingsMonths: 12, livingShare: 0.3 },
   /** Pareja con plaza de guardería: natalidad ×1,5. Sin plaza, prob. al mes de que deje el trabajo de fuera. */
   birthWithPlace: 1.5,
   quitWithoutPlace: 0.15,
@@ -1287,6 +1294,10 @@ export const TRANSIT = {
   /** Con turismo, visitantes ×1,25; sin él, gasto de forasteros en las tiendas (€/día por cada 10 vecinos). */
   visitorsFx: 1.25,
   daytripPer10: 4,
+  /** Por reglas, el parado con ambición desde este nivel busca trabajo fuera en autobús. */
+  searchAmbition: 50,
+  /** Excursión de jubilados (director, `excursion`): mínimo y máximo de jubilados, cada cuántos días, ánimo, lo que paga cada uno y, sin director, probabilidad al mes. */
+  excursion: { min: 3, max: 8, everyDays: 90, mood: 3, cost: 15, ruleChance: 0.2 },
 };
 
 /** Bloque C: el río, la depuradora y las renovables (waterworks.ts). */
