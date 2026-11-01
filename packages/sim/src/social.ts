@@ -1133,8 +1133,7 @@ const has = (s: GameState, k: string) => s.buildings.some((b) => b.kind === k &&
 export const OBJECTIVES: ObjectiveDef[] = [
   { id: 'carretera', text: 'Alarga la calle del ayuntamiento', reward: 300, done: (s) => s.map.tiles.filter((t) => t === 1).length > 7 },
   { id: 'agua_luz', text: 'Pon agua y luz', reward: 500, done: (s) => has(s, 'water') && has(s, 'power') },
-  // Pruebas 2.5: 1.500 € (antes 1.000): tras ampliar a nivel 2 (3.000 €), la caja quedaba en ~100 € antes del mantenimiento.
-  { id: 'diez', text: 'Llega a 10 vecinos', reward: 1_500, done: (s) => s.citizens.length >= 10 },
+  { id: 'diez', text: 'Llega a 10 vecinos', reward: 1_000, done: (s) => s.citizens.length >= 10 },
   { id: 'zonas', text: 'Crea zonas R, C e I', reward: 1_000, done: (s) => [1, 2, 3].every((z) => s.map.zones.includes(z)) },
   { id: 'parque', text: 'Construye un parque', reward: 800, done: (s) => has(s, 'park') },
   { id: 'pleno', text: 'Celebra un pleno (Pueblo › Pleno municipal; llega con el ayuntamiento de nivel 2)', reward: 500, done: (s) => s.lastPlenoTick >= 0 },
