@@ -99,6 +99,8 @@ export const Command = z.discriminatedUnion('type', [
           recuerdo: z.string().max(300).optional(),
           escudo: z.object({ pieza: z.string().max(20), lema: z.string().max(40) }).optional(),
           biografia: z.string().max(400).optional(),
+          /** 2.4: el programa de la comisión de festejos (si la encabeza). */
+          programa: z.array(z.string().regex(/^[a-z_]+$/).max(20)).max(3).optional(),
         }),
       )
       .max(300),

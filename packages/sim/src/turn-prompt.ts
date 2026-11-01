@@ -21,6 +21,7 @@ import { LANDMARK_EFFECT, LANDMARK_NAMES } from './landmarks.ts';
 import { ruralHomes, touristified } from './tourism.ts';
 import { bigFactory, PHASE_NAME } from './region.ts';
 import { scenarioStatus } from './scenarios.ts';
+import { committeeBrief, FESTIVAL_ACTS } from './seasons.ts';
 import { newRecordLine } from './achievements.ts';
 import { averageHappiness } from './tick.ts';
 import { GESTURES, gestureCandidates, isAiCitizen, PLANS, planText, SPEND, type TurnAct, turnMenu } from './turns.ts';
@@ -33,7 +34,7 @@ import { GESTURES, gestureCandidates, isAiCitizen, PLANS, planText, SPEND, type 
  * La salida tiene un esquema fijo (sin uniones por vecino); cada parte se valida
  * en el motor con el menú del vecino. Nunca va texto libre del jugador.
  */
-export const TURN_PROMPT_VERSION = 12;
+export const TURN_PROMPT_VERSION = 13;
 
 export const TURN_SYSTEM = `Eres la mente de los vecinos de Bitópolis, un pueblo español pequeño. Cada semana decides, a la vez, qué hace cada vecino de la lista. Ellos viven de verdad: trabajan, compran, se enamoran, se enfadan, ahorran o se arruinan, y reaccionan a lo que hace quien gobierna: el alcalde (el jugador) o, si ganó las elecciones, el rival (mira "politica.gobierna"). El vecino que tenga "es_alcalde" gobierna él: piensa y actúa como alcalde.
 
@@ -48,6 +49,7 @@ Para cada vecino del lote devuelve exactamente un objeto con:
 - "motivo": por qué hace lo que hace esta semana, en una frase corta en primera persona (máx. 160 caracteres).
 - "escudo": solo si en el pueblo hay "votacion_escudo", su voto: una "pieza" y un "lema" (ids de esa votación), según lo que le importa; si no, "" y "".
 - "biografia": solo si el turno es "mensual": su vida en 2 o 3 frases en tercera persona (máx. 280 caracteres), reescribiendo "su_biografia" con lo que ha pasado (sus notas y recuerdos); si no es mensual, "".
+- "programa": solo si en sus datos aparece "comision_fiestas" y encabeza la comisión (o se apunta ahora con "apuntarse_comision" y no hay nadie más), 2 o 3 actos de "actos_posibles" a su gusto; si no, [].
 - "recuerdo": lo que apunta de esta semana para acordarse (un hecho, no un sentimiento; máx. 120 caracteres), o "" si no pasó nada. Sus notas anteriores están en "sus_notas".
 
 Reglas:
@@ -216,6 +218,7 @@ function citizenBrief(state: GameState, c: Citizen) {
     ...(c.notes?.length ? { sus_notas: c.notes.map((n) => n.text) } : {}),
     ...(state.ai?.turn?.monthly ? { su_biografia: c.bio?.text ?? narrativeSummary(state, c) } : {}),
     ...(lastLine ? { la_semana_pasada: lastLine.text } : {}),
+    ...(committeeBrief(state, c) ? { comision_fiestas: committeeBrief(state, c) } : {}),
     ...(c.plan ? { su_plan: planText(c.plan) } : {}),
     actitud_anterior: c.attitude ?? 0,
     necesidades: needsOf(state, c).slice(0, 3),
@@ -264,8 +267,9 @@ export const TURN_SCHEMA = {
           recuerdo: { type: 'string' },
           escudo: { type: 'object', properties: { pieza: { type: 'string' }, lema: { type: 'string' } }, required: ['pieza', 'lema'], additionalProperties: false },
           biografia: { type: 'string' },
+          programa: { type: 'array', items: { type: 'string', enum: [...FESTIVAL_ACTS] } },
         },
-        required: ['vecino', 'accion', 'gesto', 'actitud', 'gasto', 'plan', 'pensamiento', 'motivo', 'recuerdo', 'escudo', 'biografia'],
+        required: ['vecino', 'accion', 'gesto', 'actitud', 'gasto', 'plan', 'pensamiento', 'motivo', 'recuerdo', 'escudo', 'biografia', 'programa'],
         additionalProperties: false,
       },
     },
@@ -313,6 +317,7 @@ const ActSchema = z.object({
   recuerdo: z.string().max(600).optional(),
   escudo: z.object({ pieza: z.string().max(40), lema: z.string().max(60) }).optional(),
   biografia: z.string().max(1200).optional(),
+  programa: z.array(z.string().max(40)).max(10).optional(),
 });
 
 const clean = (s: string, max: number) =>
@@ -354,6 +359,7 @@ export function parseTurn(text: string, ids: number[], sent: string): { acts: Tu
     if (bad(recuerdo)) recuerdo = '';
     let biografia = clean(a.biografia ?? '', 280);
     if (bad(biografia)) biografia = '';
+    const programa = [...new Set(a.programa ?? [])].filter((x) => (FESTIVAL_ACTS as readonly string[]).includes(x) && sent.includes(`"${x}"`)).slice(0, 3);
     acts.push({
       vecino: a.vecino,
       // Ronda 17: cada campo dentro de los límites del comando `TownTurn` (si no, el turno entero se rechazaría).
@@ -370,6 +376,8 @@ export function parseTurn(text: string, ids: number[], sent: string): { acts: Tu
       motivo,
       ...(recuerdo ? { recuerdo } : {}),
       ...(biografia ? { biografia } : {}),
+      // 2.4: el programa de la comisión, solo con actos que se enviaron (el motor vuelve a validarlo).
+      ...(programa.length ? { programa } : {}),
       // El voto del escudo, solo con ids de la votación que se envió.
       ...(a.escudo && /^[a-z_]{1,20}$/.test(a.escudo.pieza) && /^[a-z_]{1,40}$/.test(a.escudo.lema) && sent.includes(`"id":"${a.escudo.pieza}"`) && sent.includes(`"id":"${a.escudo.lema}"`)
         ? { escudo: { pieza: a.escudo.pieza, lema: a.escudo.lema } }

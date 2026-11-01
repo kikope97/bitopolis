@@ -1,6 +1,6 @@
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { protestFor, type Association } from './associations.ts';
-import { DEBT, FIRE, KIDS_MAX, LISTS, TOURISM, TURN } from './balance.ts';
+import { DEBT, FIRE, KIDS_MAX, LISTS, SEASONS, TOURISM, TURN } from './balance.ts';
 import { canPresent, presentCandidacy } from './politics.ts';
 import { BUILD_NAMES, removeBuilding } from './commands.ts';
 import { homeRobbery } from './crime.ts';
@@ -18,6 +18,7 @@ import { canSignTemporero, HARVEST_NAME, signTemporero } from './farm.ts';
 import { applyDonation, donorCandidates, LANDMARK_NAMES, landmarksInProgress } from './landmarks.ts';
 import { complainCandidates, complainTourists, openRural, ruralCandidates, ruralDemand } from './tourism.ts';
 import { bigFactory, hireCandidates } from './region.ts';
+import { canJoinCommittee, joinCommittee, proposeProgram, seasonName } from './seasons.ts';
 import { type Building, buildingAt, type Citizen, DESIRES, FEARS, type GameState, pushEvent, type Trigger } from './state.ts';
 
 /**
@@ -98,6 +99,8 @@ export interface TurnAct {
   escudo?: { pieza: string; lema: string };
   /** 2.2: en el turno mensual, su biografía reescrita. */
   biografia?: string;
+  /** 2.4: si encabeza la comisión de festejos, el programa (ids de `actos_posibles`). */
+  programa?: string[];
 }
 
 export function emptyTownAi(share = TURN.defaultShare): TownAi {
@@ -278,7 +281,15 @@ export function turnMenu(state: GameState, c: Citizen): MenuItem[] {
   // Solo si está desesperado: robar en una casa del pueblo.
   if (desperate(c)) out.push({ accion: 'robar', detalle: 'robar en una casa del pueblo (está sin dinero, sin trabajo y endeudado)' });
   if (!governs) out.push({ accion: 'irse', detalle: 'irse del pueblo y vender lo que tenga' });
+  out.push(...committeeMenu(state, c));
   return out;
+}
+
+/** 2.4: apuntarse a la comisión de festejos mientras se forma (al final del menú). */
+function committeeMenu(state: GameState, c: Citizen): MenuItem[] {
+  if (!canJoinCommittee(state, c)) return [];
+  const f = state.seasons.current!;
+  return [{ accion: 'apuntarse_comision', detalle: `apuntarse a la comisión de festejos de ${seasonName(state, f.season)} (${SEASONS.committee - f.committee.length === 1 ? 'queda 1 sitio' : `quedan ${SEASONS.committee - f.committee.length} sitios`}${f.committee.length === 0 ? '; el primero la encabeza y elige el programa' : ''})` }];
 }
 
 /** Con quién puede tener un gesto: sus relaciones, compañeros de casa o trabajo y algún vecino cercano. */
@@ -396,6 +407,8 @@ export function extraAction(state: GameState, c: Citizen, verb: string, arg: str
       return complainTourists(state, c) ? 'se queja de los turistas' : 'al final no se queja de los turistas';
     case 'tirar_al_monte':
       return canDump(state, c) ? dumpTrash(state, c) : 'al final no tira la basura al monte';
+    case 'apuntarse_comision':
+      return joinCommittee(state, c);
     case 'robar': {
       if (!desperate(c)) return 'se lo piensa mejor y no roba';
       const targets = state.buildings.filter((b) => (b.kind === 'house' || b.kind === 'res') && b.built && b.id !== c.homeId);
@@ -500,6 +513,9 @@ export function applyTownTurn(state: GameState, n: number, acts: TurnAct[], extr
       lines.push({ id: c.id, text: `${c.name} ${parts.join('; ')}`, motivo: a.motivo });
       continue;
     }
+    // 2.4: el líder de la comisión de festejos propone el programa.
+    const prog = proposeProgram(state, c, a.programa);
+    if (prog) parts.push(prog);
     const g = applyGesture(state, c, state.citizens.find((x) => x.id === a.gesto?.con && gestureCandidates(state, c).includes(x)), a.gesto?.tipo ?? 'ninguno');
     if (g) parts.push(g);
     c.attitude = clamp(a.actitud ?? 0, -2, 2);
@@ -779,6 +795,8 @@ export function mayorText(state: GameState, cmd: { type: string } & Record<strin
       return { text: `presenta un presupuesto ${cmd.plan}`, big: false };
     case 'HoldFestival':
       return { text: `organiza unas fiestas ${cmd.size === 'grande' ? 'grandes' : 'pequeñas'}`, big: false };
+    case 'ApproveFestival':
+      return { text: cmd.budget === 'todo' ? 'paga entero el programa de la comisión de festejos' : cmd.budget === 'poco' ? 'paga la mitad del programa de la comisión de festejos' : 'no pone dinero para las fiestas de la comisión', big: false };
     case 'ConvenePleno':
       return { text: 'convoca un pleno', big: false };
     case 'Campaign':

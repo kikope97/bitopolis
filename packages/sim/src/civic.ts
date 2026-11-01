@@ -28,6 +28,7 @@ import { pushEvent, terrainAt } from './state.ts';
 import type { BuildKind } from '@bitopolis/shared';
 import { isUnlocked, townLevel } from './townhall.ts';
 import { Terrain } from './terrain.ts';
+import { patronalesByTownhall, seasonMood } from './seasons.ts';
 
 /**
  * v1.5: el ayuntamiento por dentro.
@@ -129,6 +130,8 @@ export function holdFestival(state: GameState, size: 'pequena' | 'grande' | 'pop
   state.festival.year = d.year;
   state.festival.size = size;
   state.festival.until = state.tick + f.days * TICKS_PER_DAY;
+  // 2.4: si el alcalde las organiza por su cuenta, la comisión de festejos se disuelve.
+  if (size !== 'popular') patronalesByTownhall(state);
   // Las tiendas del pueblo venden más esos días (gasto de forasteros y vecinos).
   for (const b of state.buildings) if (b.kind === 'shop' && b.built) transfer(state, OUTSIDE, b.id, f.spend * Math.max(1, state.citizens.length / 10));
   for (const c of state.citizens) if (c.named) addMemory(state, c, 'fue_a_las_fiestas', size === 'grande' ? 3 : 2, size === 'grande' ? 3 : 2);
@@ -142,6 +145,9 @@ export function holdFestival(state: GameState, size: 'pequena' | 'grande' | 'pop
 
 /** Felicidad de las fiestas mientras dura su recuerdo. */
 export function festivalMood(state: GameState): { label: string; value: number } | null {
+  // 2.4: la fiesta de temporada que se acaba de celebrar (también las patronales de la comisión).
+  const season = seasonMood(state);
+  if (season) return season;
   if (!festivalActive(state) || state.festival.size === 'none') return null;
   // v1.7: con ermita, las fiestas patronales alegran más.
   const chapel = state.buildings.some((b) => b.kind === 'chapel' && b.built) ? SOCIAL_PLACES.chapelFestivalMood : 0;

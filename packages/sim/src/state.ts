@@ -957,6 +957,21 @@ export interface SeasonFestival {
   committee: number[];
   program: string[];
   budget: FestivalBudget | null;
+  /** Bloque E: cuándo se abrió la comisión, hasta cuándo pueden apuntarse los vecinos con IA y el día de la fiesta (ticks). */
+  opened?: number;
+  joinUntil?: number;
+  day?: number;
+  /** Quién eligió el programa (la IA del líder o las reglas) y si ya se pidió el presupuesto. */
+  programBy?: 'ia' | 'reglas';
+  asked?: boolean;
+  /** Al celebrarse: actos que se hicieron, ánimo y ruido, hasta cuándo se nota, y quién pagó. */
+  held?: string[];
+  mood?: number;
+  noise?: number;
+  until?: number;
+  paid?: { town: number; collected: number };
+  /** Sin respuesta del alcalde a tiempo. */
+  silent?: boolean;
 }
 export interface SeasonsState {
   current: SeasonFestival | null;

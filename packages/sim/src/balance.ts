@@ -1320,11 +1320,56 @@ export const DILEMMA = {
   expandCost: 3_000,
 };
 
-/** Bloque E: fiestas de temporada (seasons.ts). Mes de cada una (1–12). */
+/**
+ * Bloque E: fiestas de temporada (seasons.ts). Cada fiesta tiene su mes y su día;
+ * la comisión de festejos se forma el mismo día del mes anterior.
+ */
 export const SEASONS = {
   month: { romeria: 5, sanjuan: 6, patronales: 8, navidad: 12 } as Record<string, number>,
+  day: { romeria: 15, sanjuan: 23, patronales: 15, navidad: 24 } as Record<string, number>,
+  /** Vecinos en la comisión; días que tienen los vecinos con IA para apuntarse (luego, reglas). */
   committee: 3,
+  joinDays: 10,
+  /** Mínimo de vecinos para que haya fiesta de temporada. */
+  minPop: 5,
+  /** Lo que pone cada vecino con nombre si la comisión tiene que recaudar (solo quien lo tiene). */
   collectPerNamed: 10,
   budgetShare: { nada: 0, poco: 0.5, todo: 1 } as Record<string, number>,
   nadaGrudge: 1,
+  /** Actos del programa: entre 2 y 3. */
+  programMin: 2,
+  programMax: 3,
+  /**
+   * Cada acto: coste (€), ánimo (felicidad mientras dura el recuerdo), gasto en
+   * cada tienda (€ por cada 10 vecinos) y ruido (felicidad que resta cerca de la plaza).
+   */
+  acts: {
+    verbena: { cost: 500, mood: 2, spend: 6, noise: 3 },
+    procesion: { cost: 150, mood: 2, spend: 2, noise: 0 },
+    concurso_paellas: { cost: 250, mood: 2, spend: 5, noise: 1 },
+    hoguera: { cost: 200, mood: 2, spend: 3, noise: 1 },
+    belen_viviente: { cost: 300, mood: 2, spend: 3, noise: 0 },
+    mercadillo: { cost: 200, mood: 1, spend: 12, noise: 1 },
+    fuegos: { cost: 800, mood: 3, spend: 4, noise: 2 },
+    cabalgata: { cost: 450, mood: 2, spend: 5, noise: 1 },
+  } as Record<string, { cost: number; mood: number; spend: number; noise: number }>,
+  /** Qué actos caben en cada fiesta (el primero de San Juan es siempre la hoguera). */
+  menu: {
+    romeria: ['procesion', 'concurso_paellas', 'verbena', 'mercadillo'],
+    sanjuan: ['hoguera', 'verbena', 'fuegos', 'concurso_paellas'],
+    patronales: ['verbena', 'procesion', 'concurso_paellas', 'fuegos', 'mercadillo', 'cabalgata'],
+    navidad: ['belen_viviente', 'mercadillo', 'cabalgata', 'verbena'],
+  } as Record<string, string[]>,
+  /** Navidad: las luces van siempre (antes que los actos). */
+  lights: { cost: 150, mood: 1 },
+  /** San Juan con río o mar: la hoguera junto al agua alegra más. */
+  waterBonus: 2,
+  /** Probabilidad de que la hoguera deje un riesgo de incendio (con bomberos, la mitad). */
+  bonfireRisk: 0.3,
+  /** Días que dura el recuerdo (ánimo) y el ruido de cada fiesta. */
+  moodDays: { romeria: 7, sanjuan: 7, patronales: 20, navidad: 15 } as Record<string, number>,
+  noiseDays: 3,
+  noiseRadius: 5,
+  /** Fiesta popular reducida (sin dinero para ningún acto). */
+  popularMood: 1,
 };

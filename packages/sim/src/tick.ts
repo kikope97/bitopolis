@@ -56,6 +56,7 @@ import {
   serviceSaturation,
 } from './economy.ts';
 import { budgetFx, civicDay, festivalMood, onBuildingDone } from './civic.ts';
+import { seasonNoise, seasonsDay } from './seasons.ts';
 import { updateFields } from './fields.ts';
 import { trashDay, trashMood } from './trash.ts';
 import { Terrain } from './terrain.ts';
@@ -322,6 +323,9 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
   if (townLevel(state) >= 5) f.push({ label: 'Orgullo de su ayuntamiento', value: 2 });
   // 2.3: grandes obras (estadio, catedral) y la fábrica de la gran empresa.
   f.push(...landmarkMood(state, home), ...regionMood(state, c, home));
+  // 2.4: ruido de la verbena y los fuegos cerca del ayuntamiento.
+  const fiestaNoise = seasonNoise(state, home);
+  if (fiestaNoise) f.push(fiestaNoise);
   // v1.7: el calor sin sombra cerca.
   const heat = weatherMood(state, home);
   if (heat) f.push(heat);
@@ -552,6 +556,8 @@ function endOfDay(state: GameState): void {
   socialDay(state);
   politicsDay(state);
   civicDay(state);
+  // 2.4: fiestas de temporada (comisión, presupuesto y fiesta).
+  seasonsDay(state);
   // 1 de enero: cumpleaños, hijos que se independizan y fallecimientos (v1.5).
   const d = tickToDate(state.tick);
   if (d.month === 1 && d.day === 1 && state.tick > 0) lifeYear(state);
