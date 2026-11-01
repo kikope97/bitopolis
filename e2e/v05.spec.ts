@@ -18,7 +18,7 @@ test('v0.5: ajustes de accesibilidad, teclado y carretera con dos toques', async
   await tap(page, cx + 3, cy);
   await expect(page.locator('#tool-info')).toContainText('toca dónde termina');
   await tap(page, cx + 3, cy + 3);
-  await expect(page.locator('#tool-info')).toContainText('Toca otra vez el final para confirmar');
+  await expect(page.locator('#tool-info')).toContainText('Haz clic otra vez en el final para confirmar');
   await tap(page, cx + 3, cy + 3);
   await expect.poll(async () => (await state(page)).map.tiles.filter((t: number) => t === 1).length).toBeGreaterThan(s0.map.tiles.filter((t: number) => t === 1).length + 2);
 

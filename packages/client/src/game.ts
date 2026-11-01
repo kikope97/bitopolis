@@ -1309,7 +1309,7 @@ export function startGame(opts: GameOptions): void {
         preview = previewFor(anchor, tile);
         const v = validateCommand(state, line);
         const msg = v.ok
-          ? `${tool.label}: ${lineText(anchor, tile)}. Toca otra vez el final para confirmar.`
+          ? `${tool.label}: ${lineText(anchor, tile)}. Haz clic otra vez en el final para confirmar.`
           : `${tool.label}: no se puede (${v.error}). Elige otro final o pulsa Esc.`;
         $('#tool-info').textContent = msg;
         refreshStrip();
