@@ -3,6 +3,7 @@ import { pocketBox } from './money-ui.ts';
 import { mindBox } from './ai-town-ui.ts';
 import {
   activeObjectives,
+  scenarioStatus,
   type Citizen,
   diary,
   FACTION_TEXT,
@@ -343,8 +344,13 @@ export function renderObjectives(state: GameState): void {
 
 export function objectivesNode(state: GameState): HTMLElement {
   const list = activeObjectives(state);
-  if (!list.length) return h('p', { class: 'muted' }, 'Todos los objetivos cumplidos.');
-  return h('ul', { class: 'obj-list' }, ...list.map((o) => h('li', {}, `○ ${o.text}`, h('small', {}, ` +${money(o.reward)}${o.unlock ? ' y un edificio' : ''}`))));
+  // 2.3: la meta del escenario (mientras dura), antes que los objetivos de siempre.
+  const sc = scenarioStatus(state);
+  const goal = sc
+    ? h('p', { class: 'scenario-goal', 'data-scenario': sc.id }, h('strong', {}, `${sc.name}: `), sc.goal, h('br', {}), h('small', {}, `${sc.progress}. ${sc.monthsLeft === 1 ? 'Queda 1 mes' : `Quedan ${sc.monthsLeft} meses`}.`))
+    : '';
+  if (!list.length) return h('div', {}, goal, h('p', { class: 'muted' }, 'Todos los objetivos cumplidos.'));
+  return h('div', {}, goal, h('ul', { class: 'obj-list' }, ...list.map((o) => h('li', {}, `○ ${o.text}`, h('small', {}, ` +${money(o.reward)}${o.unlock ? ' y un edificio' : ''}`)))));
 }
 
 /** Retrato de un vecino (12×18 píxeles) a la escala pedida. */

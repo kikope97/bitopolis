@@ -1111,13 +1111,59 @@ export const REGION = {
 /** 2.3: escenarios al empezar (scenarios.ts). Cumplir = medalla y momento del álbum; no cumplir pasa a Libre. */
 export const SCENARIOS = {
   libre: {},
-  /** Pueblo en quiebra: caja −8.000, 25 vecinos resentidos. Meta: caja positiva y 6 meses de superávit antes de 24. */
-  quiebra: { treasury: -8_000, citizens: 25, grudge: 15, debtMonths: 2, surplusMonths: 6, deadlineMonths: 24 },
+  /**
+   * Pueblo en quiebra: caja −8.000, 25 vecinos resentidos. Meta: cuentas en positivo
+   * (caja menos lo que se debe al banco) y 6 meses seguidos de superávit antes de 24.
+   */
+  quiebra: {
+    treasury: -8_000,
+    citizens: 25,
+    grudge: 15,
+    debtMonths: 2,
+    rating: 'C',
+    surplusMonths: 6,
+    deadlineMonths: 24,
+    /** Pueblo de partida (además del ayuntamiento, de nivel 2): casas municipales, bloques, tiendas, talleres y parque. */
+    village: { house: 2, res: 6, shop: 2, factory: 1, park: 1 },
+    money: [300, 1_500],
+    age: [22, 70],
+  },
   /** El pueblo que se vacía: 30 vecinos de 60–80 años, 8 casas vacías, demanda R −30 un año. Meta: 50 vecinos en 36 meses. */
-  vaciado: { citizens: 30, ageMin: 60, ageMax: 80, emptyHouses: 8, demandR: -30, demandMonths: 12, goalPop: 50, deadlineMonths: 36 },
+  vaciado: {
+    citizens: 30,
+    ageMin: 60,
+    ageMax: 80,
+    emptyHouses: 8,
+    /** Plan: −30; con −30 los empleos de los talleres traían gente igual y la meta caía al 4.º mes. */
+    demandR: -60,
+    demandMonths: 12,
+    goalPop: 50,
+    deadlineMonths: 36,
+    treasury: 30_000,
+    village: { house: 2, res: 8, shop: 1, factory: 1, park: 1 },
+    money: [2_000, 6_000],
+  },
   /** Tras la riada: río obligatorio, 6 edificios dañados, 20.000 € de emergencia a 12 meses, riadas ×1,5 el primer año. Meta: reparar todo y 40 vecinos. */
-  riada: { damaged: 6, grant: 20_000, grantMonths: 12, floodFx: 1.5, floodMonths: 12, goalPop: 40, deadlineMonths: 36 },
-} satisfies Record<ScenarioId, object>;
+  riada: {
+    damaged: 6,
+    grant: 20_000,
+    grantMonths: 12,
+    /** Anticipo de la subvención al empezar (el resto, al terminar de reparar en plazo; si no, se devuelve con recargo). */
+    grantAdvance: 0.3,
+    floodFx: 1.5,
+    floodMonths: 12,
+    goalPop: 40,
+    deadlineMonths: 36,
+    citizens: 22,
+    treasury: 12_000,
+    /** Reparar lo de la riada: parte de los materiales del edificio (mínimo `repairMin`). */
+    repair: 1,
+    repairMin: 4_000,
+    village: { house: 2, res: 7, shop: 2, factory: 2, park: 1 },
+    money: [400, 2_000],
+    age: [20, 72],
+  },
+} as const satisfies Record<ScenarioId, object>;
 
 /** 2.3: umbrales de los logros y medallas (achievements.ts). No dan dinero. */
 export const ACHIEVEMENTS = {

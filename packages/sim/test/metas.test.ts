@@ -23,7 +23,7 @@ describe('metas grandes (2.3): estado y comandos', () => {
     expect(s.history).toEqual([]);
     expect(s.records).toEqual({});
     expect(s.medals).toEqual([]);
-    expect(createInitialState({ seed: 9, scenario: 'quiebra' }).scenario).toEqual({ id: 'quiebra', done: false });
+    expect(createInitialState({ seed: 9, scenario: 'quiebra' }).scenario).toMatchObject({ id: 'quiebra', done: false });
   });
   it('los comandos nuevos están bien formados pero aún no están disponibles', () => {
     const s = createInitialState({ seed: 9 });

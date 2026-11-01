@@ -6,6 +6,7 @@ import { addMemory } from './social.ts';
 import { type Citizen, type GameState, inBounds, pushEvent, terrainAt } from './state.ts';
 import { Terrain } from './terrain.ts';
 import { floodChanceAt, floodRepairFactor, snowRoads } from './fire.ts';
+import { scenarioFx } from './scenarios.ts';
 import { farmWeatherDay, floodFarm } from './farm.ts';
 
 /**
@@ -116,7 +117,8 @@ export function flood(state: GameState): void {
   const hit: GameState['buildings'] = [];
   let avoided = 0;
   for (const b of near) {
-    if (!chance(state.rng, WEATHER.floodChance)) continue;
+    // 2.3: «Tras la riada», el primer año el río se desborda más (scenarioFx).
+    if (!chance(state.rng, Math.min(1, WEATHER.floodChance * scenarioFx(state).flood))) continue;
     // El dado ya salió: lo que lo evita es la protección (determinista con el mismo dado del motor).
     if (floodChanceAt(state, b, 1) < 1 && !chance(state.rng, floodChanceAt(state, b, 1))) avoided++;
     else hit.push(b);

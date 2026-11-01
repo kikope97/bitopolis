@@ -6,6 +6,100 @@ import { startGame } from './game.ts';
 import { formatDate, money, plural, t } from './i18n.ts';
 import { sessionId } from './session.ts';
 import { $, confirmDialog, h, sheet, toast } from './ui.ts';
+import { SCENARIO_INFO } from '@bitopolis/sim';
+import type { ScenarioId, TerrainShape } from '@bitopolis/shared';
+
+/**
+ * 2.3: escenario y terreno de la partida nueva. Fuera de `showStart` para que no
+ * se pierdan al volver de configurar la IA. Por defecto, Libre y aleatorio: lo de siempre.
+ */
+let pickedScenario: ScenarioId = 'libre';
+let pickedTerrain: TerrainShape = 'aleatorio';
+const SCENARIOS_SHOWN: ScenarioId[] = ['libre', 'quiebra', 'vaciado', 'riada'];
+const TERRAINS: [TerrainShape, string][] = [
+  ['aleatorio', 'Al azar'],
+  ['rio', 'Con río'],
+  ['costa', 'Costa'],
+  ['colina', 'Colinas'],
+  ['llano', 'Llano'],
+];
+
+/** Grupo de radio accesible: flechas para moverse, Inicio/Fin, un solo tabulador (roving tabindex). */
+function radioKeys(group: HTMLElement, items: HTMLElement[]): void {
+  group.addEventListener('keydown', (e) => {
+    const i = items.indexOf(document.activeElement as HTMLElement);
+    if (i < 0) return;
+    const next = { ArrowDown: i + 1, ArrowRight: i + 1, ArrowUp: i - 1, ArrowLeft: i - 1, Home: 0, End: items.length - 1 }[e.key];
+    if (next === undefined) return;
+    e.preventDefault();
+    const b = items[(next + items.length) % items.length]!;
+    b.focus();
+    b.click();
+  });
+}
+
+function setChecked(items: HTMLElement[], on: HTMLElement): void {
+  for (const r of items) {
+    r.setAttribute('aria-checked', String(r === on));
+    r.tabIndex = r === on ? 0 : -1;
+  }
+}
+
+/** Bloque plegado «Escenario: Libre ▾» con 4 tarjetas y 5 chips de terreno (solo en partidas nuevas). */
+function scenarioPicker(): HTMLElement {
+  const summaryText = h('span', {}, '');
+  const terrainNote = h('p', { class: 'muted small', id: 'terrain-note' }, '');
+  const refresh = () => {
+    const terr = TERRAINS.find(([k]) => k === pickedTerrain)![1].toLowerCase();
+    summaryText.textContent = `Escenario: ${SCENARIO_INFO[pickedScenario].name}${pickedTerrain === 'aleatorio' ? '' : ` · ${terr}`}`;
+    terrainNote.textContent = pickedScenario === 'riada' ? 'Tras la riada el mapa siempre tiene río.' : '';
+  };
+  const cards: HTMLElement[] = [];
+  const cardList = h('div', { class: 'radio-list compact', role: 'radiogroup', 'aria-label': 'Escenario' });
+  for (const id of SCENARIOS_SHOWN) {
+    const info = SCENARIO_INFO[id];
+    const b = h('button', { class: 'btn choice', type: 'button', role: 'radio', 'aria-checked': String(id === pickedScenario), 'data-scenario': id }, h('strong', {}, info.name), h('span', {}, info.goal));
+    b.tabIndex = id === pickedScenario ? 0 : -1;
+    b.title = info.story;
+    b.addEventListener('click', () => {
+      pickedScenario = id;
+      setChecked(cards, b);
+      refresh();
+    });
+    cards.push(b);
+    cardList.append(b);
+  }
+  radioKeys(cardList, cards);
+  const chips: HTMLElement[] = [];
+  const chipList = h('div', { class: 'terrain-chips', role: 'radiogroup', 'aria-label': 'Terreno', 'aria-describedby': 'terrain-note' });
+  for (const [id, label] of TERRAINS) {
+    const c = h('button', { class: 'terrain-chip', type: 'button', role: 'radio', 'aria-checked': String(id === pickedTerrain), 'data-terrain': id }, label);
+    c.tabIndex = id === pickedTerrain ? 0 : -1;
+    c.addEventListener('click', () => {
+      pickedTerrain = id;
+      setChecked(chips, c);
+      refresh();
+    });
+    chips.push(c);
+    chipList.append(c);
+  }
+  radioKeys(chipList, chips);
+  refresh();
+  const story = h('p', { class: 'muted small' }, 'Un escenario empieza con un pueblo ya hecho y una meta con plazo. Si no llegas, no pierdes: sigue como partida libre.');
+  const details = h(
+    'details',
+    { class: 'scenario-picker' },
+    h('summary', {}, summaryText, h('span', { class: 'chev', 'aria-hidden': 'true' }, '▾')),
+    story,
+    cardList,
+    h('h3', { class: 'small-title', id: 'terrain-title' }, 'Terreno'),
+    chipList,
+    terrainNote,
+  ) as HTMLDetailsElement;
+  // Abierto si ya se había elegido algo (al volver de configurar la IA).
+  details.open = pickedScenario !== 'libre' || pickedTerrain !== 'aleatorio';
+  return details;
+}
 
 /** Pantalla de inicio de /p/<token>. */
 export async function showStart(token: string): Promise<void> {
@@ -35,7 +129,7 @@ export async function showStart(token: string): Promise<void> {
   } else if (closed) {
     body.append(h('p', { class: 'notice closed' }, 'Ahora mismo no se pueden empezar partidas nuevas (lo decide quien gestiona este servidor). Si ya jugabas, abre el enlace que guardaste; si lo perdiste, pídeselo a esa persona.'));
   } else {
-    body.append(modePicker());
+    body.append(modePicker(), scenarioPicker());
   }
 
   const playBtn = $('#play') as HTMLButtonElement;
@@ -50,7 +144,8 @@ export async function showStart(token: string): Promise<void> {
           await openAiConfig(token, sid, () => void showStart(token));
           return;
         }
-        const r = await api.create(token, mode, sid);
+        const start = { ...(pickedScenario !== 'libre' ? { scenario: pickedScenario } : {}), ...(pickedTerrain !== 'aleatorio' ? { terrain: pickedTerrain } : {}) };
+        const r = await api.create(token, mode, sid, start);
         startGame({ token, sessionId: sid, state: r.state, onExit: () => location.reload() });
       } else {
         await claimAndPlay(false);

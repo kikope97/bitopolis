@@ -86,6 +86,15 @@ const migrations: Record<string, Migration> = {
       await db.schema.dropTable('settings').execute();
     },
   },
+  // 2.3: escenario de la partida (para la lista de /admin).
+  '0005_scenario': {
+    async up(db: Kysely<unknown>) {
+      await db.schema.alterTable('games').addColumn('scenario', 'varchar(16)').execute();
+    },
+    async down(db: Kysely<unknown>) {
+      await db.schema.alterTable('games').dropColumn('scenario').execute();
+    },
+  },
   // 2.3: enlace de solo lectura (/v/<token>), independiente del token de juego. SQLite no admite
   // UNIQUE en ADD COLUMN: va en un índice único (admite varios NULL).
   '0006_view': {

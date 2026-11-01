@@ -9,6 +9,7 @@ import { chance, nextInt, type RngState, seedRng } from './prng.ts';
 import type { Goal, Hook, Memory, Pleno, PromiseRecord, Relation } from './social.ts';
 import { emptyPolitics, type Politics } from './politics-core.ts';
 import { generateTerrain, isWater, Terrain } from './terrain.ts';
+import { applyScenario } from './scenarios.ts';
 import type { Weather } from './weather.ts';
 import type { Association } from './associations.ts';
 import type { Moment } from './album.ts';
@@ -92,7 +93,7 @@ export interface Building {
   dryDays?: number;
   darkDays?: number;
   /** v1.8: dañado en unos disturbios (o, en la 2.1, por el fuego): no funciona hasta que se repara. */
-  damaged?: { cost: number; repairUntil: number; cause?: 'fuego' };
+  damaged?: { cost: number; repairUntil: number; cause?: 'fuego' | 'riada' };
   /** 2.1: en riesgo de incendio (desde cuándo y por qué) y ardiendo (hasta cuándo; con bomberos en su radio o no). */
   risk?: { since: number; why: string };
   fire?: { since: number; until: number; covered: boolean };
@@ -528,6 +529,8 @@ export interface Grant {
   landmark?: number;
   /** 2.3: fondos europeos (FEDER) en tiempo de crisis comarcal. */
   feder?: boolean;
+  /** 2.3: ayuda de emergencia del escenario «Tras la riada» (total en €; la cobra y la reintegra scenarios.ts). */
+  emergency?: number;
 }
 
 /**
@@ -660,12 +663,12 @@ export interface NewGameOptions {
 
 export const INITIAL_SUBSIDY = 30_000;
 
-export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiShare = 50, scenario = 'libre' }: NewGameOptions): GameState {
+export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiShare = 50, scenario = 'libre', terrain: shape = 'aleatorio' }: NewGameOptions): GameState {
   const rng = seedRng(seed);
   const tiles = new Array<number>(MAP_W * MAP_H).fill(Tile.Grass);
   const zones = new Array<number>(MAP_W * MAP_H).fill(Zone.None);
-  // v1.7: río, costa y colinas (el centro queda en llano).
-  const terrain = generateTerrain(rng, MAP_W, MAP_H);
+  // v1.7: río, costa y colinas (el centro queda en llano). 2.3: con forma elegida; tras la riada, siempre con río.
+  const terrain = generateTerrain(rng, MAP_W, MAP_H, shape, { river: scenario === 'riada' });
   const state: GameState = {
     formatVersion: FORMAT_VERSION,
     seed,
@@ -727,7 +730,7 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiSh
     loans: [],
     rating: 'B',
     loanLedger: { lent: 0, repaid: 0, interest: 0, treasuryTicks: [] },
-    // 2.3: metas grandes. `scenario`/`terrain` aún no cambian la partida (lo hace scenarios.ts/terrain.ts).
+    // 2.3: metas grandes (el escenario lo prepara `applyScenario` al final).
     landmarks: [],
     tourism: { visitors: 0, lastIncome: 0, tax: 0 },
     scenario: { id: scenario, done: scenario === 'libre' },
@@ -778,6 +781,8 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiSh
   state.treasury = INITIAL_SUBSIDY;
   state.ledger.initialTotal = INITIAL_SUBSIDY + first.money;
   pushEvent(state, 'info', 'La región aporta una subvención inicial de 30.000 €');
+  // 2.3: escenario (Libre no cambia nada).
+  applyScenario(state);
   return state;
 }
 

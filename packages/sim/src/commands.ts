@@ -547,7 +547,9 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       const b = buildingById(state, cmd.buildingId)!;
       const fire = b.damaged!.cause === 'fuego';
       const days = fire ? FIRE.repairDays : ASSOCIATIONS.repairDays;
-      transfer(state, TREASURY, OUTSIDE, b.damaged!.cost, fire ? 'reparaciones (incendio)' : 'reparaciones (disturbios)');
+      // 2.3: lo que destrozó la riada del escenario.
+      const why = fire ? 'reparaciones (incendio)' : b.damaged!.cause === 'riada' ? 'reparaciones (riada)' : 'reparaciones (disturbios)';
+      transfer(state, TREASURY, OUTSIDE, b.damaged!.cost, why);
       b.damaged!.repairUntil = state.tick + days * TICKS_PER_DAY;
       pushEvent(state, 'info', `Empieza la reparación de ${b.name ?? BUILD_NAMES[b.kind]?.toLowerCase()}: abrirá en ${days} días`, { ref: b.id });
       break;

@@ -26,7 +26,7 @@ export interface ViewBuilding {
   rural?: boolean;
   crop?: Building['crop'];
   name?: string;
-  damaged?: { cause?: 'fuego' };
+  damaged?: { cause?: 'fuego' | 'riada' };
   fire?: boolean;
   trash?: number;
 }

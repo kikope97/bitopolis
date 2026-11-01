@@ -213,7 +213,7 @@ describe('partidas y copias', () => {
   it('lista y borra partidas', async () => {
     const list = (await app.inject({ method: 'GET', url: '/api/admin/games', ...as() })).json();
     expect(list.length).toBeGreaterThanOrEqual(3);
-    expect(list[0]).toMatchObject({ token: expect.any(String), mode: expect.any(String), population: expect.any(Number) });
+    expect(list[0]).toMatchObject({ token: expect.any(String), mode: expect.any(String), population: expect.any(Number), scenario: expect.any(String) });
     const t = list[0].token;
     expect((await app.inject({ method: 'DELETE', url: `/api/admin/games/${t}`, ...as() })).statusCode).toBe(200);
     expect((await app.inject({ method: 'GET', url: `/api/games/${t}` })).json().exists).toBe(false);

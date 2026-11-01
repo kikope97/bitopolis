@@ -15,6 +15,7 @@ import { chance, pick } from './prng.ts';
 import type { Building, Citizen, GameState } from './state.ts';
 import type { Faction } from './politics-core.ts';
 import { pushEvent } from './state.ts';
+import type { Goal } from './social-core.ts';
 
 /**
  * Vida social (v0.4): relaciones, memoria en 3 capas, director de historias,
@@ -123,9 +124,8 @@ export interface Memory {
   names?: string[];
 }
 
-export const PROFESSIONS = [
-  'panadera', 'maestro', 'fontanera', 'enfermero', 'informática', 'camarero', 'agricultora', 'electricista', 'estudiante', 'jubilado',
-] as const;
+// 2.3: en social-core.ts (sin dependencias) para crear vecinos desde createInitialState.
+export { GOALS, goalFor, PROFESSIONS, type Goal } from './social-core.ts';
 
 /** Oficios en masculino y femenino (v1.9.1: «Rosa, enfermero»). Se guarda una forma; se dice la que toca. */
 const PROFESSION_FORMS: [string, string][] = [
@@ -163,8 +163,6 @@ export function joinNames(first: string[], full: (string | undefined)[] = []): s
   return out.length > 1 ? `${out.slice(0, -1).join(', ')} y ${out.at(-1)}` : (out[0] ?? '');
 }
 
-export const GOALS = ['comprar_casa', 'trabajo_en_el_pueblo', 'parque_cerca', 'tienda_cerca', 'ahorrar', 'vivir_tranquilo'] as const;
-export type Goal = (typeof GOALS)[number];
 
 export const HOOK_KINDS = ['mismo_local', 'despido_con_hipoteca', 'promesa_incumplida', 'amigo_se_va', 'rival_politico'] as const;
 export type HookKind = (typeof HOOK_KINDS)[number];
@@ -421,14 +419,6 @@ export const GOAL_TEXT: Record<Goal, string> = {
   ahorrar: 'ahorrar un buen colchón',
   vivir_tranquilo: 'vivir sin ruido',
 };
-
-export function goalFor(desire: string): Goal {
-  return (
-    ({ casa_propia: 'comprar_casa', trabajo_cerca: 'trabajo_en_el_pueblo', parque: 'parque_cerca', tienda: 'tienda_cerca', tranquilidad: 'vivir_tranquilo', prosperar: 'ahorrar' } as const)[
-      desire as 'parque'
-    ] ?? 'ahorrar'
-  );
-}
 
 export function goalDone(state: GameState, c: Citizen): boolean {
   const home = state.buildings.find((b) => b.id === c.homeId);
