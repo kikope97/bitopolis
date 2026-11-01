@@ -134,10 +134,11 @@ export function bigFactorySpot(state: GameState): { x: number; y: number } | nul
   return null;
 }
 
-/** ¿Se dan las condiciones para que llegue la oferta? (vecinos, zona I y luz). */
+/** ¿Se dan las condiciones para que llegue la oferta? (vecinos, zona I con sitio para 2×2 y luz). */
 export function bigCompanyReady(state: GameState): boolean {
   const c = REGION.bigCompany;
-  return state.citizens.length >= c.pop && industrialTiles(state) >= c.industrialTiles && state.buildings.some((b) => b.kind === 'power' && b.built && !b.damaged);
+  // Y que quepa la fábrica: 2×2 de zona I libre junto a una carretera (si no, la oferta llegaría para decir que no).
+  return state.citizens.length >= c.pop && industrialTiles(state) >= c.industrialTiles && state.buildings.some((b) => b.kind === 'power' && b.built && !b.damaged) && bigFactorySpot(state) !== null;
 }
 
 export function bigFactory(state: GameState): Building | undefined {

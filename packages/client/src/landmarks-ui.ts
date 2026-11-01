@@ -165,7 +165,7 @@ export function openRegion(state: GameState, send: Send, focus: (b: Building) =>
 export function bigCompanyContent(state: GameState, send: Send, reopen: () => void): (Node | string)[] {
   const bc = state.bigCompany;
   const c = REGION.bigCompany;
-  if (!bc) return [h('p', { class: 'muted' }, `Llega una oferta con ${c.pop} vecinos, ${c.industrialTiles} casillas libres de zona industrial y luz.`)];
+  if (!bc) return [h('p', { class: 'muted' }, `Llega una oferta con ${c.pop} vecinos, ${c.industrialTiles} casillas libres de zona industrial (con sitio para una fábrica de 2×2 junto a una carretera) y luz.`)];
   const after = async (cmd: Command) => {
     if (await send(cmd)) reopen();
   };
