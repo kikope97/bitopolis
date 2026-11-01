@@ -42,7 +42,7 @@ export function townCenter(state: GameState): { x: number; y: number } {
 /** Las 3 líneas de récords (si los hay). */
 export function postcardRecords(state: GameState): string[] {
   const rec = state.records ?? {};
-  return RECORD_ORDER.filter((k) => rec[k]).slice(0, 3).map((k) => `${RECORD_TEXT[k](rec[k]!.v)} (${formatDate(tickToDate(rec[k]!.tick))})`);
+  return RECORD_ORDER.filter((k) => rec[k]).slice(0, 3).map((k) => `${RECORD_TEXT[k](rec[k]!.v)} (${formatDate(tickToDate(Math.max(0, rec[k]!.tick - 1)))})`);
 }
 
 /** Las 4 últimas medallas, con su texto. */

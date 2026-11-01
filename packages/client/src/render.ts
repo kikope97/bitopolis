@@ -1,5 +1,5 @@
 import { ambulanceFor, buildingAt, type GameState, heritageVariant, isWater, streetSegment, Terrain, Tile, trashStateOf, truckRoutes, Zone } from '@bitopolis/sim';
-import { happinessMarks, type LayerId, layerCanvas, missingMarks, NEED_ICON } from './layers.ts';
+import { happinessMarks, type LayerId, layerCanvas, missingMarks, NEED_ICON, ruralMarks } from './layers.ts';
 import { pixelIcon } from './icons.ts';
 
 /** Iconos de la capa «Qué falta», creados una vez. */
@@ -643,6 +643,26 @@ export function render(
     }
   }
 
+  if (layer === 'rural') {
+    // Ronda 19: casa rural = cuadro azul lleno con tejado; alquiler caro = rayas naranjas (forma y color distintos).
+    for (const m of ruralMarks(state)) {
+      const px = m.x * ts - cam.x + 11 * z;
+      const py = (m.y * T - (BH - T)) * z - cam.y + 2 * z;
+      ctx.fillStyle = P(0);
+      ctx.fillRect(px - z, py - z, 12 * z, 12 * z);
+      if (m.kind === 'rural') {
+        ctx.fillStyle = P(10);
+        ctx.fillRect(px, py + 4 * z, 10 * z, 6 * z);
+        for (let k = 0; k < 5; k++) ctx.fillRect(px + k * z, py + (4 - k) * z, (10 - 2 * k) * z, z);
+        ctx.fillStyle = P(12);
+        ctx.fillRect(px + 4 * z, py + 6 * z, 2 * z, 4 * z);
+      } else {
+        ctx.fillStyle = P(3);
+        for (let y = 0; y < 10; y++) for (let x = 0; x < 10; x++) if ((x + y) % 4 < 2) ctx.fillRect(px + x * z, py + y * z, z, z);
+      }
+    }
+  }
+
   if (layer === 'missing') {
     // Ronda 13: sobre cada vivienda (o solar R), UN icono: lo que más falta, con marco rojo
     // (falta) o amarillo a trazos (llega, pero lleno), y «+N» si hay más. Muy alejado, solo un punto.
@@ -865,6 +885,8 @@ function roadPath(state: GameState, from: { x: number; y: number }, to: { x: num
 
 /** Punto (en píxeles de sprite) a `d` casillas del inicio del camino, y hacia dónde mira. */
 function along(path: { x: number; y: number }[], d: number): { fx: number; fy: number; dir: 1 | -1 } {
+  if (!path.length) return { fx: -999, fy: -999, dir: 1 };
+  if (!Number.isFinite(d)) d = 0;
   const k = Math.max(0, Math.min(path.length - 1, d));
   const i = Math.floor(k);
   const a = path[i]!;
@@ -1016,7 +1038,8 @@ export function truckPaths(state: GameState): { x: number; y: number }[][] {
         if (stack.length) walk.push(stack[stack.length - 1]!);
       }
     }
-    paths.push(walk.map((i) => ({ x: i % w, y: Math.floor(i / w) })));
+    // Un recorrido de una sola casilla no se anima (con nieve salía vacío y rompía el dibujo).
+    if (walk.length >= 2) paths.push(walk.map((i) => ({ x: i % w, y: Math.floor(i / w) })));
   }
   truckCache = { key, paths };
   return paths;

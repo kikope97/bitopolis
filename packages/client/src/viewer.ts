@@ -74,7 +74,8 @@ export async function showViewer(viewToken: string): Promise<void> {
       'header',
       { class: 'viewer-top' },
       h('p', { class: 'viewer-title' }, h('strong', {}, sum.name), ` · ${sum.rank} · ${plural(sum.population, 'vecino', 'vecinos')} · ☺ ${sum.happiness}`),
-      h('a', { class: 'viewer-cta', href: '/', id: 'view-cta' }, 'Solo lectura · Haz tu pueblo'),
+      h('span', { class: 'viewer-ro muted small' }, 'Solo lectura'),
+      h('a', { class: 'viewer-cta', href: '/', id: 'view-cta' }, 'Haz tu pueblo'),
     ),
     h('div', { class: 'viewer-map' }, canvas, h('div', { class: 'viewer-btns' }, zin, zout)),
   );

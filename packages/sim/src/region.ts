@@ -1,3 +1,4 @@
+import { fmt } from './loans.ts';
 import { type BigCompanyIncentive, TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { MIN_WAGE, REGION } from './balance.ts';
 import { offerFeder } from './civic.ts';
@@ -26,6 +27,7 @@ import {
   Zone,
 } from './state.ts';
 import { isWater } from './terrain.ts';
+import { protectedAt } from './tourism.ts';
 
 /**
  * 2.3: ciclo comarcal (bonanza, normal, crisis), FEDER y la gran empresa.
@@ -128,7 +130,7 @@ export function bigFactorySpot(state: GameState): { x: number; y: number } | nul
       const cells = footprint({ x, y, size: 2 });
       const ok = cells.every(([cx, cy]) => {
         const i = tileIndex(state, cx, cy);
-        return inBounds(state, cx, cy) && state.map.zones[i] === Zone.I && state.map.tiles[i] !== Tile.Road && !buildingAt(state, cx, cy) && !isWater(terrainAt(state, cx, cy));
+        return inBounds(state, cx, cy) && state.map.zones[i] === Zone.I && state.map.tiles[i] !== Tile.Road && !buildingAt(state, cx, cy) && !isWater(terrainAt(state, cx, cy)) && !protectedAt(state, cx, cy);
       });
       if (ok && cells.some(([cx, cy]) => hasAdjacentRoad(state, cx, cy))) return { x, y };
     }
@@ -167,7 +169,7 @@ export function canAnswerBigCompany(state: GameState, accept: boolean, incentive
   if (!bc || bc.status !== 'oferta') return { ok: false, error: 'No hay ninguna oferta de la gran empresa' };
   if (!accept) return { ok: true };
   if (!bigFactorySpot(state)) return { ok: false, error: 'No hay sitio: hacen falta 2×2 casillas libres de zona I junto a una carretera' };
-  if (incentive === 'suelo_gratis' && state.treasury < REGION.bigCompany.landCost) return { ok: false, error: `Para regalar el suelo hacen falta ${REGION.bigCompany.landCost.toLocaleString('es-ES')} € en caja` };
+  if (incentive === 'suelo_gratis' && state.treasury < REGION.bigCompany.landCost) return { ok: false, error: `Para regalar el suelo hacen falta ${fmt(REGION.bigCompany.landCost)} € en caja` };
   return { ok: true };
 }
 

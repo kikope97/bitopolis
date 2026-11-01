@@ -129,7 +129,7 @@ function bigGoals(state: GameState) {
   if (r) out.comarca = `${PHASE_NAME[r.phase]}${r.warned && r.next && r.next !== r.phase ? `; en unos 2 meses, ${PHASE_NAME[r.next]}` : ''}`;
   const works = state.landmarks
     .filter((l) => state.buildings.some((b) => b.id === l.buildingId))
-    .map((l) => `${LANDMARK_NAMES[l.kind]}: ${l.phase >= l.phases ? 'terminada' : `fase ${l.phase} de ${l.phases}${l.phaseUntil !== -1 ? (l.paused ? ', parada' : ', en obra') : ''}`} (${LANDMARK_EFFECT[l.kind].toLowerCase()})`);
+    .map((l) => `${LANDMARK_NAMES[l.kind]}: ${l.phase >= l.phases ? 'terminada' : (l.phaseUntil !== -1 ? `fase ${l.phase + 1} de ${l.phases}${l.paused ? ', parada' : ', en obra'}` : `${l.phase} de ${l.phases} fases hechas`)} (${LANDMARK_EFFECT[l.kind].toLowerCase()})`);
   if (works.length) out.grandes_obras = works;
   const sc = scenarioStatus(state);
   if (sc) out.escenario = `${sc.name}: ${sc.goal} (${sc.progress}; quedan ${sc.monthsLeft} meses)`;

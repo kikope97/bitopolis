@@ -16,12 +16,12 @@ type SeriesId = 'population' | 'treasury' | 'happiness' | 'jobless' | 'businesse
 type RangeId = '12' | '60' | 'todo';
 
 const SERIES: { id: SeriesId; label: string; color: number; band: number }[] = [
-  { id: 'population', label: 'Vecinos', color: 10, band: 8 },
-  { id: 'treasury', label: 'Caja', color: 4, band: 17 },
+  { id: 'population', label: 'Vecinos', color: 10, band: 14 },
+  { id: 'treasury', label: 'Caja', color: 4, band: 18 },
   { id: 'happiness', label: 'Felicidad', color: 5, band: 24 },
-  { id: 'jobless', label: 'Paro', color: 3, band: 16 },
-  { id: 'businesses', label: 'Empresas', color: 61, band: 1 },
-  { id: 'visitors', label: 'Visitantes', color: 63, band: 25 },
+  { id: 'jobless', label: 'Paro', color: 3, band: 14 },
+  { id: 'businesses', label: 'Empresas', color: 61, band: 53 },
+  { id: 'visitors', label: 'Visitantes', color: 63, band: 18 },
 ];
 const RANGES: { id: RangeId; label: string; months: number }[] = [
   { id: '12', label: '12 meses', months: 12 },
@@ -101,7 +101,9 @@ function draw(canvas: HTMLCanvasElement, series: SeriesId, points: ChartPoint[],
   g.fillRect(0, 0, W, H);
   const iw = W - PAD.l - PAD.r;
   const ih = H - PAD.t - PAD.b;
-  g.font = '11px system-ui, sans-serif';
+  // Ronda 19: el texto de la gráfica crece con la escala de la interfaz (--ui), hasta 1,6×.
+  const ui = Math.min(1.6, parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui')) || 1);
+  g.font = `${Math.round(11 * ui)}px system-ui, sans-serif`;
   if (!points.length) {
     g.fillStyle = PALETTE[13];
     g.fillText('Aún no hay datos: se apuntan al cerrar cada mes', PAD.l, H / 2);
@@ -143,6 +145,8 @@ function draw(canvas: HTMLCanvasElement, series: SeriesId, points: ChartPoint[],
   g.textBaseline = 'top';
   g.fillText(formatValue(series, hi), PAD.l, 4);
   g.textBaseline = 'bottom';
+  // Y el valor de abajo de la escala, sobre su línea (con una serie plana se entiende la escala).
+  g.fillText(formatValue(series, lo), PAD.l, Math.round(y(lo)) - 2);
   g.fillText(points[0]!.label, PAD.l, H - 2);
   const endLabel = points.at(-1)!.label;
   g.fillText(endLabel, W - PAD.r - g.measureText(endLabel).width, H - 2);

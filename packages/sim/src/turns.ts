@@ -16,7 +16,7 @@ import { transfer } from './money.ts';
 import { canDump, dumpTrash } from './trash.ts';
 import { canSignTemporero, HARVEST_NAME, signTemporero } from './farm.ts';
 import { applyDonation, donorCandidates, LANDMARK_NAMES, landmarksInProgress } from './landmarks.ts';
-import { complainCandidates, complainTourists, openRural, ruralCandidates } from './tourism.ts';
+import { complainCandidates, complainTourists, openRural, ruralCandidates, ruralDemand } from './tourism.ts';
 import { bigFactory, hireCandidates } from './region.ts';
 import { type Building, buildingAt, type Citizen, DESIRES, FEARS, type GameState, pushEvent, type Trigger } from './state.ts';
 
@@ -241,7 +241,7 @@ export function turnMenu(state: GameState, c: Citizen): MenuItem[] {
       if (donorCandidates(state, lm.id).some((d) => d.citizenId === c.id)) out.push({ accion: `donar_obra:${lm.id}`, detalle: `donar una pequeña parte de sus ahorros para ${LANDMARK_NAMES[lm.kind].toLowerCase()} (va por la fase ${Math.min(lm.phase + 1, lm.phases)} de ${lm.phases})` });
     }
   }
-  if (ruralCandidates(state).includes(c)) out.push({ accion: 'abrir_casa_rural', detalle: `convertir su casa en casa rural para los visitantes (la reforma cuesta ${TOURISM.rural.openCost} €)` });
+  if (ruralDemand(state) && ruralCandidates(state).includes(c)) out.push({ accion: 'abrir_casa_rural', detalle: `convertir su casa en casa rural para los visitantes (la reforma cuesta ${TOURISM.rural.openCost} €)` });
   if (!governs && !didLately(state, c, 'quejarse_turistas') && complainCandidates(state).includes(c)) out.push({ accion: 'quejarse_turistas', detalle: 'quejarse de los turistas (ruido de las casas rurales o alquileres más caros)' });
   // 2.1: sin camión y con la basura en la puerta, puede tirarla al monte (contamina y está mal visto).
   if (canDump(state, c)) out.push({ accion: 'tirar_al_monte', detalle: 'tirar la basura al monte: no pasa el camión por su calle (contamina cerca y los vecinos lo verán mal)' });
@@ -785,6 +785,23 @@ export function mayorText(state: GameState, cmd: { type: string } & Record<strin
       return { text: `hace campaña con los ${cmd.faction}`, big: false };
     case 'TalkTo':
       return { text: `habla con ${cname(cmd.citizenId)}`, big: false };
+    // 2.3 (ronda 19): las metas grandes también se cuentan a los vecinos.
+    case 'StartLandmark':
+      return { text: `empieza la obra de ${(LANDMARK_NAMES[cmd.kind as keyof typeof LANDMARK_NAMES] ?? String(cmd.kind)).toLowerCase()}`, big: true };
+    case 'FundLandmarkPhase': {
+      const lm = state.landmarks.find((l) => l.id === cmd.id);
+      return lm ? { text: `paga la fase ${lm.phase + 1} de ${LANDMARK_NAMES[lm.kind].toLowerCase()}`, big: false } : null;
+    }
+    case 'PauseLandmark':
+      return { text: 'para una gran obra', big: false };
+    case 'AnswerBigCompany':
+      return { text: cmd.accept ? 'acepta que venga la gran empresa' : 'dice que no a la gran empresa', big: true };
+    case 'SetTouristTax':
+      return { text: cmd.level === 0 ? 'quita la tasa turística' : `pone la tasa turística ${cmd.level === 2 ? 'alta' : 'baja'}`, big: Number(cmd.level) > 0 };
+    case 'ProtectArea':
+      return { text: 'protege el entorno del patrimonio (sin industria nueva)', big: true };
+    case 'RequestLoan':
+      return { text: 'pide un préstamo al banco', big: false };
   }
   return null;
 }

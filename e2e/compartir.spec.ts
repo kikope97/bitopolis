@@ -71,7 +71,7 @@ test('2.3: se comparte el pueblo con un enlace de solo lectura y se deja de comp
   const res = await viewer.goto(url.replace(/^https?:\/\/[^/]+/, ''));
   expect(res!.headers()['referrer-policy']).toBe('no-referrer');
   await expect(viewer.locator('#view-map')).toBeVisible();
-  await expect(viewer.locator('#view-cta')).toHaveText('Solo lectura · Haz tu pueblo');
+  await expect(viewer.locator('#view-cta')).toHaveText('Haz tu pueblo');
   await expect(viewer.locator('#view-cta')).toHaveAttribute('href', '/');
   await expect.poll(() => viewer.evaluate(() => (window as any).__bitopolisView?.population)).toBe(state.citizens.length);
   expect(await viewer.evaluate(() => (window as any).__bitopolisView.buildings)).toBe(state.buildings.length);

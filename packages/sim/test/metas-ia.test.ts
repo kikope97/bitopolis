@@ -149,6 +149,7 @@ describe('metas grandes con IA (2.3): lo que puede hacer cada vecino', () => {
     expect(ids(s, c)).not.toContain(`donar_obra:${lm.id}`);
     s.politics.mayor = 'player';
     c.attitude = 0;
+    c.happiness = 50; // con la IA caída, decide la felicidad (≥ 65)
     expect(ids(s, c)).not.toContain(`donar_obra:${lm.id}`);
     c.attitude = 1;
     // Aplicar: el 2 % de sus ahorros va a la caja (y no repite en un mes).
@@ -381,7 +382,7 @@ describe('metas grandes con IA (2.3): el prompt', () => {
     const t = openTurn(s, [c.id]);
     const shared = turnShared(s);
     expect(shared).toContain('"metas"');
-    expect(shared).toContain('Estación de tren: fase 0 de 3');
+    expect(shared).toContain('Estación de tren: 0 de 3 fases hechas');
     expect(shared).toContain('"comarca":"normal"');
     expect(shared).toContain('visitantes al mes: algunos');
     expect(shared).toContain('trabajan en su fábrica');
@@ -470,7 +471,10 @@ describe('metas grandes con IA (2.3): fuzz', () => {
       expect(checkInvariants(s)).toEqual([]);
       const start = structuredClone(s);
       const log: { tick: number; cmd: Command }[] = [];
+      let hiredEver = false;
       for (let day = 0; day < 240; day++) {
+        const fab = bigFactory(s);
+        if (fab && s.citizens.some((c) => c.jobId === fab.id)) hiredEver = true;
         for (let h = 0; h < TICKS_PER_DAY; h++) {
           step(s);
           if (s.ai?.turn && s.ai.turn.opened === s.tick) {
@@ -488,7 +492,7 @@ describe('metas grandes con IA (2.3): fuzz', () => {
       // Que de verdad se usó lo nuevo.
       const actions = s.decisionLog.map((d) => d.action.split(':')[0]);
       expect(actions.some((a) => a === 'donar_obra' || a === 'abrir_casa_rural' || a === 'quejarse_turistas')).toBe(true);
-      expect(s.citizens.some((c) => c.jobId === bigFactory(s)?.id)).toBe(true);
+      expect(hiredEver).toBe(true); // en algún momento (un ERE puede vaciarla al final)
       expect(s.ai!.log.some((l) => l.lines.some((x) => x.text.startsWith('✦')))).toBe(true);
       // Reproducir: mismos comandos desde el mismo estado dan el mismo hash.
       const r = start;

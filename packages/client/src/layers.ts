@@ -182,6 +182,19 @@ export function happinessMarks(state: GameState): { x: number; y: number; lv: nu
   return out;
 }
 
+/** Ronda 19: la capa «Casas rurales» se marca encima de los tejados (bajo los edificios no se veía). */
+export function ruralMarks(state: GameState): { x: number; y: number; kind: 'rural' | 'caro' }[] {
+  const out: { x: number; y: number; kind: 'rural' | 'caro' }[] = [];
+  const dear = touristified(state);
+  const renters = new Set(state.citizens.filter((c) => !c.owns && c.homeId !== null).map((c) => c.homeId));
+  for (const b of state.buildings) {
+    if (!b.built || (b.kind !== 'house' && b.kind !== 'res')) continue;
+    if (b.rural) out.push({ x: b.x, y: b.y, kind: 'rural' });
+    else if (dear && b.kind === 'res' && renters.has(b.id)) out.push({ x: b.x, y: b.y, kind: 'caro' });
+  }
+  return out;
+}
+
 /** Icono de cada necesidad (icons.ts). */
 export const NEED_ICON: Record<NeedKey, string> = { agua: 'drop', luz: 'bolt', colegio: 'school', salud: 'health', policia: 'police', ocio: 'leaf', bomberos: 'fire', basuras: 'trash' };
 

@@ -57,7 +57,15 @@ export async function registerShareRoutes(app: FastifyInstance, db: Db): Promise
   // «Dejar de compartir»: el enlace deja de valer al momento (uno nuevo tendría otro token).
   app.delete('/api/games/:token/share', async (req, reply) => {
     const p = TokenParams.safeParse(req.params);
-    const b = ShareBody.safeParse(typeof req.body === 'string' ? JSON.parse(req.body) : req.body);
+    let body: unknown = req.body;
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch {
+        return bad(reply, 'petición no válida');
+      }
+    }
+    const b = ShareBody.safeParse(body);
     if (!p.success || !b.success) return bad(reply, 'petición no válida');
     const row = await load(p.data.token);
     if (!row) return bad(reply, 'no existe', 404);

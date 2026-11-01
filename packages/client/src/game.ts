@@ -721,6 +721,10 @@ export function startGame(opts: GameOptions): void {
         vibrate(150);
         calmPause();
         openElectionNight(social);
+      } else if (/quiere montar|Fondos europeos|ofrece pagar el/.test(e.text)) {
+        // Ronda 19: la gran empresa, el FEDER y la cofinanciación son decisiones con plazo: aviso fijo y se frena.
+        toast(e.text, { kind: 'warn', sticky: true, onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+        calmPause();
       } else if (e.kind === 'info' && /Diputación|fiestas|Subvención/.test(e.text)) {
         // v1.5: ofertas de subvención y fiestas: llevan a su sección del Ayuntamiento.
         // Si hay que decidir algo con plazo, el juego baja a x1 para que dé tiempo (ronda 11).

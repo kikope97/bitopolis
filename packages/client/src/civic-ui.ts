@@ -145,7 +145,7 @@ function tourismSection(ctx: SocialCtx, s: GameState, reopen: () => void): (Node
     out.push(h('p', {}, her.built ? `Patrimonio: ${name}.` : `Patrimonio: ${name} (en obras).`));
   }
   out.push(
-    h('p', { 'data-test': 'tourism-month' }, `El mes pasado: ${t.visitors} ${t.visitors === 1 ? 'visitante' : 'visitantes'}; dejaron ${money(t.lastIncome)} (${money(t.lastTax ?? 0)} de tasa para el ayuntamiento y ${money(t.lastRural ?? 0)} para las casas rurales).`),
+    h('p', { 'data-test': 'tourism-month' }, t.visitors === 0 && a.total >= TOURISM.minAttract ? 'Aún sin datos: los primeros visitantes llegan al cerrar el mes.' : `El mes pasado: ${t.visitors} ${t.visitors === 1 ? 'visitante' : 'visitantes'}; dejaron ${money(t.lastIncome)} (${money(t.lastTax ?? 0)} de tasa para el ayuntamiento y ${money(t.lastRural ?? 0)} para las casas rurales).`),
     h('p', { class: 'muted small' }, `Atractivo ${dec(a.total)}: patrimonio ${dec(a.heritage)}, grandes obras ${dec(a.landmarks)}, fiestas ${dec(a.festival)}, parques y árboles ${dec(a.green)}, contaminación −${dec(a.pollution)}${a.protect > 1 ? `, entorno protegido ×${dec(a.protect)}` : ''}. Por debajo de ${TOURISM.minAttract} no viene nadie.`),
   );
   // Tasa turística: tres botones.

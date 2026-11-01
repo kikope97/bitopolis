@@ -982,7 +982,7 @@ html[data-text='200'] .tray-grid { grid-template-columns: repeat(auto-fill, minm
 .level-box h3 { display: flex; align-items: center; gap: 6px; margin-top: 0; }
 .reqs { list-style: none; padding: 0; margin: 4px 0 8px; }
 .reqs li { padding: 2px 0; }
-.reqs li.ok { color: var(--good); }
+.reqs li.ok { color: #a7f070; } /* ronda 19: 8:1 sobre el panel */
 .reqs li.no { color: var(--bad); }
 
 /* Ronda 14: con texto grande o pantalla estrecha, el dibujo del ayuntamiento va arriba y nada se sale. */

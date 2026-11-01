@@ -1070,10 +1070,10 @@ export const TOURISM = {
   pollution: 0.1,
   perAttract: 8,
   /** Casas rurales (vivienda en propiedad con `rural`): plazas, lo que gana el dueño por visitante y tope al mes. */
-  rural: { beds: 3, perVisitor: 40, maxMonth: 600, openCost: 1_500, minVisitors: 50 },
+  rural: { beds: 3, perVisitor: 40, maxMonth: 600, openCost: 1_500, minVisitors: 20 },
   /** Noches por visitante; la tasa (€/noche por nivel) quita esta parte de visitantes por nivel. */
   nights: 3,
-  taxDrop: 0.12,
+  taxDrop: 0.2,
   /** Entorno protegido: radio sin zona I ni fábricas, atractivo ×1,3 y −8 de felicidad a los empresarios. */
   protect: { radius: 6, attract: 1.3, ownerMood: -8 },
   /** Turistificación: con casas rurales por encima de esta parte de las viviendas, alquiler +20 % e inquilinos −4. */
@@ -1124,7 +1124,7 @@ export const REGION = {
     leaveChance: 0.3,
     /** Incentivos: IBI bonificado (parte que no paga, durante unos años) o suelo gratis (lo pone el ayuntamiento). */
     ibiDiscount: 0.5,
-    ibiYears: 5,
+    ibiYears: 2,
     landCost: 8_000,
     /** Felicidad de los vecinos de alrededor (a `nearRadius` casillas) mientras está abierta; los ecologistas, la mitad. */
     protestMood: -3,
@@ -1207,7 +1207,7 @@ export const ACHIEVEMENTS = {
   treasury: 100_000,
   /** Gente: generaciones nacidas en el pueblo, parejas, propietarios. */
   generations: 3,
-  couples: 10,
+  couples: 6,
   owners: 20,
   /** Política: reelecciones, promesas cumplidas, presupuestos aprobados seguidos. */
   reelected: 3,
@@ -1216,7 +1216,7 @@ export const ACHIEVEMENTS = {
   /** Desgracias: riadas superadas. */
   floods: 3,
   /** Turismo: visitantes en un mes. */
-  visitors: 500,
+  visitors: 250,
   /** Récord nuevo: como mucho un aviso al mes. */
   recordEveryMonths: 1,
   /** Récords: no se avisan el primer año (todo es récord) ni si no mejoran al menos esta parte (o 1). */
@@ -1227,7 +1227,7 @@ export const ACHIEVEMENTS = {
   /** Entorno protegido sin turistificar durante estos meses seguidos. */
   protectedMonths: 12,
   /** Crisis superada sin cierres: con al menos estas empresas al acabar. */
-  crisisMinBusinesses: 8,
+  crisisMinBusinesses: 15,
   /** Encargos cumplidos (los cuenta `errands.medals`, 2.1): bronce, plata y oro. */
   errands: [1, 5, 15],
 } as const;

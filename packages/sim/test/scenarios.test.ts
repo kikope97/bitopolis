@@ -130,12 +130,12 @@ describe('escenarios', () => {
   it('cumplir da medalla y foto; sin hacer nada vence el plazo y sigue como Libre', () => {
     const won = runSimulation({ seed: 1, days: 30 * 24, profile: 'casual', scenario: 'vaciado' });
     expect(won.state.scenario).toMatchObject({ done: true, won: true });
-    expect(won.state.medals.map((m) => m.id)).toContain('escenario:vaciado');
-    expect(won.state.album.some((m) => m.kind === 'escenario_vaciado')).toBe(true);
+    expect(won.state.medals.map((m) => m.id)).toContain('escenario_vaciado');
+    expect(won.state.album.some((m) => m.kind === 'medalla_escenario_vaciado')).toBe(true);
     expect(scenarioStatus(won.state)).toBeNull();
     const lost = runSimulation({ seed: 1, days: 30 * 25, profile: 'pasivo', scenario: 'quiebra' });
     expect(lost.state.scenario).toMatchObject({ done: true, won: false });
-    expect(lost.state.medals.some((m) => m.id === 'escenario:quiebra')).toBe(false);
+    expect(lost.state.medals.some((m) => m.id === 'escenario_quiebra')).toBe(false);
     expect(lost.report.invariantErrors).toEqual([]);
   });
   it('la ayuda de la riada se cobra al reparar a tiempo y se devuelve con recargo si no', () => {

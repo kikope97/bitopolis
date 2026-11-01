@@ -1,5 +1,4 @@
 import { type ScenarioId, TICKS_PER_MONTH } from '@bitopolis/shared';
-import { addMoment } from './album.ts';
 import { BUILD, BUSINESS_SEED_CASH, GRANT_PENALTY, SCENARIOS } from './balance.ts';
 import { ownIncome, OUTSIDE, totalInternalMoney, TREASURY, transfer } from './money.ts';
 import { nextInt } from './prng.ts';
@@ -24,7 +23,7 @@ export const SCENARIO_INFO: Record<ScenarioId, { name: string; story: string; go
   quiebra: {
     name: 'Pueblo en quiebra',
     story: `La caja está en ${fmtEur(SCENARIOS.quiebra.treasury)} y ${SCENARIOS.quiebra.citizens} vecinos recuerdan las últimas subidas.`,
-    goal: `Cuentas en positivo y ${SCENARIOS.quiebra.surplusMonths} meses seguidos de superávit antes de ${SCENARIOS.quiebra.deadlineMonths} meses.`,
+    goal: `Salir de números rojos y cerrar ${SCENARIOS.quiebra.surplusMonths} meses seguidos con superávit. Plazo: ${SCENARIOS.quiebra.deadlineMonths} meses.`,
   },
   vaciado: {
     name: 'El pueblo que se vacía',
@@ -278,7 +277,8 @@ export function scenariosMonth(state: GameState): void {
   emergencyGrant(state);
   if (sc.done) return;
   if (sc.goal) {
-    if (sc.goal.kind === 'superavit') sc.goal.progress = ownIncome(state.month) > state.month.expenses ? (sc.goal.progress ?? 0) + 1 : 0;
+    // Ronda 19: el superávit corriente no cuenta las obras (si no, ganar era no construir nada en 13 meses).
+    if (sc.goal.kind === 'superavit') sc.goal.progress = ownIncome(state.month) > state.month.expenses + (state.month.breakdown['obras'] ?? 0) ? (sc.goal.progress ?? 0) + 1 : 0;
     else if (sc.goal.kind === 'vecinos') sc.goal.progress = state.citizens.length;
     else sc.goal.progress = floodWrecks(state).length;
   }
@@ -286,10 +286,7 @@ export function scenariosMonth(state: GameState): void {
   if (scenarioProgress(state).met) {
     sc.done = true;
     sc.won = true;
-    const medal = `escenario:${sc.id}`;
-    if (!state.medals.some((m) => m.id === medal)) state.medals.push({ id: medal, tick: state.tick });
-    const hall = state.buildings.find((b) => b.kind === 'townhall') ?? { x: Math.floor(state.map.w / 2), y: Math.floor(state.map.h / 2) };
-    addMoment(state, `escenario_${sc.id}`, `Meta cumplida: «${info.name}»`, hall);
+    // La medalla y su foto las pone achievementsMonth (escenario_<id>), justo después.
     pushEvent(state, 'milestone', `¡Meta cumplida en «${info.name}»! Medalla nueva. El pueblo sigue, ya sin plazo`, { notify: true });
     return;
   }

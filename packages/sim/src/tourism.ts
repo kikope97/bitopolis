@@ -4,7 +4,7 @@ import { LANDMARKS, REGION, TOURISM } from './balance.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance } from './prng.ts';
 import { addMemory } from './social.ts';
-import { type Building, type Citizen, type GameState, pushEvent, Tile, Zone } from './state.ts';
+import { type Building, buildingAt, type Citizen, type GameState, pushEvent, Tile, Zone } from './state.ts';
 import { Terrain } from './terrain.ts';
 
 /**
@@ -114,7 +114,7 @@ export function protectArea(state: GameState, heritageId: number): void {
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = y * w + x;
-      if (zones[i] === Zone.I && protectedAt(state, x, y) && !state.buildings.some((b) => b.x === x && b.y === y)) zones[i] = Zone.None;
+      if (zones[i] === Zone.I && protectedAt(state, x, y) && !buildingAt(state, x, y)) zones[i] = Zone.None;
     }
   }
   pushEvent(state, 'politics', `Entorno protegido alrededor ${HERITAGE_NAMES[heritageVariant(state, hb.x, hb.y)].replace(/^el /, 'del ')}: más visitantes, pero sin industria nueva. A los empresarios no les gusta`, { ref: hb.id });
@@ -148,6 +148,8 @@ export function attraction(state: GameState): Attraction {
   // Grandes obras: cada fase terminada da su parte del atractivo (puente y catedral).
   let lm = 0;
   for (const l of state.landmarks ?? []) {
+    const site = state.buildings.find((b) => b.id === l.buildingId);
+    if (!site || site.damaged) continue; // una obra destrozada no atrae (ronda 19)
     const fx = LANDMARKS.effects[l.kind] as { attract?: number };
     if (fx.attract && l.phases > 0) lm += (fx.attract * Math.min(l.phase, l.phases)) / l.phases;
   }
@@ -246,6 +248,8 @@ export function complainCandidates(state: GameState): Citizen[] {
   const rural = ruralHomes(state);
   if (!rural.length) return [];
   const crowded = touristified(state);
+  // Sin ruido ni alquileres disparados no hay de qué quejarse (ronda 19).
+  if (!crowded && (state.tourism?.noiseUntil ?? -1) < state.tick) return [];
   return state.citizens.filter((c) => {
     if (c.homeId === null) return false;
     const home = state.buildings.find((b) => b.id === c.homeId);

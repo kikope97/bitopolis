@@ -278,7 +278,10 @@ export function directorMenu(state: GameState): DirectorCandidate[] {
   }
 
   // 2.3: metas grandes (obras, turismo y la gran empresa).
-  out.push(...bigGoalCandidates(state).slice(0, DIRECTOR.perKind * 3));
+  // La comarca y la gran empresa van primero: con varias obras en marcha no se quedan sin hueco (ronda 19).
+  const goals = bigGoalCandidates(state);
+  const works = (c: DirectorCandidate) => c.kind === 'voluntarios_obra' || c.kind === 'polemica_obra';
+  out.push(...[...goals.filter((c) => !works(c)), ...goals.filter(works)].slice(0, DIRECTOR.perKind * 3));
 
   // Una historia: dos vecinos quieren el único local libre.
   const founders = named.filter((c) => canFound(state, c));

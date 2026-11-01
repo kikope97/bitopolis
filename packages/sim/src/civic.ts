@@ -1,3 +1,4 @@
+import { fmt } from './loans.ts';
 import { TICKS_PER_DAY, TICKS_PER_MONTH, tickToDate } from '@bitopolis/shared';
 import {
   BUDGET,
@@ -219,7 +220,7 @@ export function grantTerms(g: Grant): { offer: string; terms: string; accepted: 
   return {
     offer: `Pagan el ${pct} de ${GRANT_NAME[g.kind] ?? g.kind} si se termina en 6 meses.`,
     terms: 'Al aceptar cobras un anticipo del 30 %. Si no lo terminas a tiempo, lo devuelves con un 10 % de recargo.',
-    accepted: `Aceptada: ${GRANT_NAME[g.kind] ?? g.kind}, ${pct}. Anticipo cobrado: ${g.advance.toLocaleString('es-ES')} €. Plazo hasta el ${dateText(g.deadline)}.`,
+    accepted: `Aceptada: ${GRANT_NAME[g.kind] ?? g.kind}, ${pct}. Anticipo cobrado: ${fmt(g.advance)} €. Plazo hasta el ${dateText(g.deadline)}.`,
   };
 }
 

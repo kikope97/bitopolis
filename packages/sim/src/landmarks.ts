@@ -1,3 +1,5 @@
+import { addMoment } from './album.ts';
+import { fmt } from './loans.ts';
 import { type LandmarkKind, TICKS_PER_DAY, tickToDate } from '@bitopolis/shared';
 import { BUDGET, LANDMARKS, type LandmarkSpec, TERRAIN } from './balance.ts';
 import type { CommandResult } from './commands.ts';
@@ -102,7 +104,7 @@ export function landmarkReqs(state: GameState, kind: LandmarkKind, cost = phaseC
     const has = state.buildings.some((b) => b.kind === s.needs && b.built);
     out.push({ key: 'needs', ok: has, short: 'ermita', long: 'Una ermita en el pueblo' });
   }
-  out.push({ key: 'cash', ok: state.treasury >= cost, short: `${cost.toLocaleString('es-ES')}\u00a0€`, long: `${cost.toLocaleString('es-ES')} € en caja para la fase (tienes ${Math.max(0, state.treasury).toLocaleString('es-ES')} €)` });
+  out.push({ key: 'cash', ok: state.treasury >= cost, short: `${fmt(cost)}\u00a0€`, long: `${fmt(cost)} € en caja para la fase (tienes ${fmt(Math.max(0, state.treasury))} €)` });
   return out;
 }
 
@@ -158,7 +160,7 @@ export function startLandmark(state: GameState, kind: LandmarkKind, x: number, y
   }
   const lm: Landmark = { id: state.nextId++, kind, buildingId: b.id, phase: 0, phases: s.phases, phaseUntil: -1, spent: 0 };
   state.landmarks.push(lm);
-  pushEvent(state, 'project', `Se marca el solar de ${LANDMARK_NAMES[kind].toLowerCase()}: ${s.phases} fases de ${phaseCost(state, lm).toLocaleString('es-ES')} €. Toca la obra para pagar la primera`, { ref: b.id });
+  pushEvent(state, 'project', `Se marca el solar de ${LANDMARK_NAMES[kind].toLowerCase()}: ${s.phases} fases de ${fmt(phaseCost(state, lm))} €. Toca la obra para pagar la primera`, { ref: b.id });
   offerLandmarkGrant(state, lm);
 }
 
@@ -200,7 +202,7 @@ export function fundLandmarkPhase(state: GameState, id: number): void {
     outsideToday: 0,
     notify: false,
   });
-  pushEvent(state, 'project', `Empieza la fase ${lm.phase + 1} de ${lm.phases} de ${LANDMARK_NAMES[lm.kind].toLowerCase()} (${cost.toLocaleString('es-ES')} €${help ? `; la ${g!.feder ? 'Unión Europea (FEDER)' : 'Diputación'} pone ${help.toLocaleString('es-ES')} €` : ''})`, { ref: lm.buildingId });
+  pushEvent(state, 'project', `Empieza la fase ${lm.phase + 1} de ${lm.phases} de ${LANDMARK_NAMES[lm.kind].toLowerCase()} (${fmt(cost)} €${help ? `; la ${g!.feder ? 'Unión Europea (FEDER)' : 'Diputación'} pone ${fmt(help)} €` : ''})`, { ref: lm.buildingId });
 }
 
 export function canPauseLandmark(state: GameState, id: number): CommandResult {
@@ -285,7 +287,7 @@ export function fairMonth(state: GameState, shops: Building[]): void {
   let total = 0;
   for (const b of shops) total += transfer(state, OUTSIDE, b.id, Math.round((b.sales ?? 0) * fx));
   for (const b of shops) b.sales = Math.round((b.sales ?? 0) * (1 + fx));
-  if (total > 0) pushEvent(state, 'business', `La feria regional llena el pueblo de forasteros: las tiendas venden ${total.toLocaleString('es-ES')} € más`);
+  if (total > 0) pushEvent(state, 'business', `La feria regional llena el pueblo de forasteros: las tiendas venden ${fmt(total)} € más`);
 }
 
 /** Atractivo que suman las grandes obras (para el turismo): puente +2, catedral +5. */
@@ -340,6 +342,8 @@ export function landmarksDay(state: GameState): void {
     lm.phaseUntil = -1;
     const name = LANDMARK_NAMES[lm.kind];
     if (lm.phase >= lm.phases) {
+      const site = buildingById(state, lm.buildingId);
+      if (site) addMoment(state, `obra_${lm.kind}`, `Terminada la obra: ${name.toLowerCase()}`, site);
       pushEvent(state, 'milestone', `¡Terminada ${lm.kind === 'bridge' || lm.kind === 'stadium' ? 'la obra del' : 'la obra de la'} ${name.toLowerCase()}! ${LANDMARK_EFFECT[lm.kind]}`, { ref: lm.buildingId });
       for (const g of state.grants) if (g.landmark === lm.id && g.status === 'accepted') g.status = 'paid';
     } else {
@@ -384,7 +388,8 @@ export function donorCandidates(state: GameState, id: number): { citizenId: numb
 function canDonate(state: GameState, c: Citizen): boolean {
   if (c.traits.ahorro > LANDMARKS.donateMaxSaving) return false;
   if ((c.debt?.town ?? 0) + (c.debt?.bank ?? 0) > 0) return false;
-  return state.aiMode ? (c.attitude ?? 0) >= LANDMARKS.donateMinAttitude : c.happiness >= 65;
+  // Con la IA, la actitud; si la IA no responde, decide la felicidad (ronda 19: si no, nadie donaba por reglas).
+  return (state.aiMode && (c.attitude ?? 0) >= LANDMARKS.donateMinAttitude) || c.happiness >= 65;
 }
 
 /** Aplica una donación (el motor fija la cantidad). Devuelve lo donado (0 si ya no puede). */
@@ -395,7 +400,7 @@ export function applyDonation(state: GameState, citizenId: number, id: number): 
   const amount = Math.floor(c.money * LANDMARKS.donateShare);
   if (amount < LANDMARKS.donateMin) return 0;
   const paid = transfer(state, c.id, TREASURY, amount, 'donaciones');
-  if (paid) pushEvent(state, 'info', `${c.name} dona ${paid.toLocaleString('es-ES')} € para ${LANDMARK_NAMES[lm.kind].toLowerCase()}`, { ref: c.id });
+  if (paid) pushEvent(state, 'info', `${c.name} dona ${fmt(paid)} € para ${LANDMARK_NAMES[lm.kind].toLowerCase()}`, { ref: c.id });
   return paid;
 }
 
@@ -450,5 +455,5 @@ function offerLandmarkGrant(state: GameState, lm: Landmark): void {
     landmark: lm.id,
   });
   lm.grantId = state.grants.at(-1)!.id;
-  pushEvent(state, 'info', `La Diputación ofrece pagar el ${Math.round(share * 100)} % de cada fase de ${LANDMARK_NAMES[lm.kind].toLowerCase()} (toca la obra para aceptarlo)`, { ref: lm.buildingId });
+  pushEvent(state, 'info', `La Diputación ofrece pagar el ${Math.round(share * 100)} % de cada fase de ${LANDMARK_NAMES[lm.kind].toLowerCase()}. Acéptalo en su ficha`, { ref: lm.buildingId });
 }
