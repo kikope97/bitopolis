@@ -2,6 +2,7 @@ import { type BigCompanyIncentive, TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitop
 import { MIN_WAGE, REGION } from './balance.ts';
 import { offerFeder } from './civic.ts';
 import type { CommandResult } from './commands.ts';
+import { directorOwns } from './director-core.ts';
 import { hash32 } from './hash.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { factionOf, politicsActive } from './politics.ts';
@@ -91,12 +92,13 @@ export function regionMonth(state: GameState): void {
       r.until = state.tick + nextInt(state.rng, REGION.minMonths, REGION.maxMonths) * TICKS_PER_MONTH;
       if (r.phase !== prev) {
         pushEvent(state, r.phase === 'crisis' ? 'warning' : 'business', PHASE_NEWS[r.phase].start);
-        if (r.phase === 'crisis') {
-          offerFeder(state);
-          crisisHitsBigCompany(state);
-        } else if (prev === 'crisis') crisisEnds(state);
+        if (r.phase === 'crisis') offerFeder(state);
+        else if (prev === 'crisis') crisisEnds(state);
       }
     }
+    // 2.3: en crisis, la gran empresa avisa de un ERE o de que se va. Con el director (Modo IA),
+    // lo elige él (`ere_gran_empresa`); sin él, las reglas, al empezar la crisis o al mes siguiente.
+    if (r.phase === 'crisis' && !directorOwns(state)) crisisHitsBigCompany(state);
   }
   bigCompanyMonth(state);
 }
@@ -233,6 +235,17 @@ function bigCompanyMonth(state: GameState): void {
   const wage = Math.round(MIN_WAGE[state.minWage ?? 'none'] * c.wageFx);
   for (const x of state.citizens) if (x.jobId === b.id) transfer(state, OUTSIDE, x.id, wage, 'sueldos');
   transfer(state, OUTSIDE, TREASURY, bigCompanyIbi(state), 'IBI');
+  // 2.3: sin director (Modo normal o IA caída), contrata cada mes a unos pocos vecinos en paro; con él, `contrata_vecinos`.
+  if (!directorOwns(state)) hireBatch(state, REGION.bigCompany.hirePerMonth);
+}
+
+/** Contrata de golpe hasta `n` vecinos en paro (un solo aviso). Devuelve cuántos entraron. */
+export function hireBatch(state: GameState, n: number): number {
+  const { citizenIds, free } = hireCandidates(state);
+  let hired = 0;
+  for (const id of citizenIds.slice(0, Math.min(free, n))) if (hireForBigCompany(state, id, true)) hired++;
+  if (hired) pushEvent(state, 'business', `${state.bigCompany!.name} contrata a ${hired === 1 ? 'un vecino en paro' : `${hired} vecinos en paro`}`, { ref: state.bigCompany!.buildingId });
+  return hired;
 }
 
 function applyEre(state: GameState, b: Building): void {
@@ -326,7 +339,7 @@ export function hireCandidates(state: GameState): { citizenIds: number[]; free: 
 }
 
 /** Contrata a un vecino en la gran empresa (`contrata_vecinos`). Devuelve si pudo. */
-export function hireForBigCompany(state: GameState, citizenId: number): boolean {
+export function hireForBigCompany(state: GameState, citizenId: number, quiet = false): boolean {
   const b = bigFactory(state);
   const x = state.citizens.find((c) => c.id === citizenId);
   const { citizenIds, free } = hireCandidates(state);
@@ -334,6 +347,6 @@ export function hireForBigCompany(state: GameState, citizenId: number): boolean 
   x.jobId = b.id;
   delete x.unemployedSince;
   delete x.benefitLeft;
-  pushEvent(state, 'business', `${x.name} entra a trabajar en ${state.bigCompany!.name}`, { ref: x.id });
+  if (!quiet) pushEvent(state, 'business', `${x.name} entra a trabajar en ${state.bigCompany!.name}`, { ref: x.id });
   return true;
 }
