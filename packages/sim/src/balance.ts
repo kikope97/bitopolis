@@ -1,4 +1,4 @@
-import type { BuildKind } from '@bitopolis/shared';
+import type { BuildKind, LandmarkKind, ScenarioId } from '@bitopolis/shared';
 import type { BuildingKind } from './state.ts';
 
 /** Todos los números de equilibrio en un solo sitio (euros enteros). */
@@ -79,6 +79,14 @@ export const JOBS: Record<BuildingKind, number> = {
   factory: 5,
   // 2.2: un empleo fijo (los temporeros van aparte, en el mes de cosecha).
   farm: 1,
+  // 2.3: las grandes obras y el patrimonio no tienen plantilla; la gran empresa, sus empleos (REGION.bigCompany).
+  bridge: 0,
+  station: 0,
+  fair: 0,
+  stadium: 0,
+  cathedral: 0,
+  heritage: 0,
+  bigfactory: 0,
 };
 
 export const HOMES: Partial<Record<BuildingKind, number>> = { house: 3, res: 4 };
@@ -108,6 +116,14 @@ export const MAINTENANCE: Record<BuildingKind, number> = {
   shop: 0,
   factory: 0,
   farm: 0,
+  // 2.3: las grandes obras pagan un % de lo gastado (LANDMARKS.upkeep, landmarks.ts); el patrimonio, TOURISM.heritage.upkeep.
+  bridge: 0,
+  station: 0,
+  fair: 0,
+  stadium: 0,
+  cathedral: 0,
+  heritage: 0,
+  bigfactory: 0,
 };
 
 /** Radio de cobertura de los servicios (tiles) y su efecto en la felicidad. */
@@ -953,4 +969,175 @@ export const FARM = {
   cashCap: 12_000,
   /** No cierra por un mes malo: solo tras tantos meses seguidos sin pagar el sueldo. */
   closeAfter: 6,
+} as const;
+
+/* ---------- 2.3: metas grandes (ver docs/propuestas/v2.3-metas-grandes.md) ---------- */
+
+export interface LandmarkSpec {
+  /** Requisitos que se miran en el momento de pagar cada fase (no solo al empezar). */
+  pop: number;
+  happiness: number;
+  townhall: number;
+  /** Otro edificio que tiene que existir (la catedral pide ermita). */
+  needs?: BuildingKind;
+  /** Solo sobre el río (el puente de piedra). */
+  onRiver?: boolean;
+  /** Lado en casillas: 2 (2×2) salvo el puente. */
+  size: 1 | 2;
+  phases: number;
+  /** Lo que paga el ayuntamiento al empezar cada fase (materiales). */
+  phaseCost: number;
+  /** Obra de cada fase (un `Project`, cuenta en `serviceSaturation`). */
+  workers: number;
+  days: number;
+}
+
+/**
+ * 2.3: grandes obras por fases. Los números buscan la primera gran obra entre
+ * los meses 30–42 de una partida casual. Cada fase terminada da su parte del
+ * efecto (fases hechas ÷ fases); nunca se empieza una fase con descubierto.
+ */
+export const LANDMARKS = {
+  specs: {
+    bridge: { pop: 30, happiness: 50, townhall: 2, onRiver: true, size: 1, phases: 3, phaseCost: 6_000, workers: 4, days: 5 },
+    station: { pop: 60, happiness: 55, townhall: 3, size: 2, phases: 3, phaseCost: 14_000, workers: 6, days: 6 },
+    fair: { pop: 80, happiness: 55, townhall: 3, size: 2, phases: 2, phaseCost: 12_000, workers: 6, days: 6 },
+    stadium: { pop: 120, happiness: 60, townhall: 4, size: 2, phases: 3, phaseCost: 25_000, workers: 8, days: 8 },
+    cathedral: { pop: 150, happiness: 60, townhall: 4, needs: 'chapel', size: 2, phases: 4, phaseCost: 30_000, workers: 8, days: 10 },
+  } satisfies Record<LandmarkKind, LandmarkSpec>,
+  /** Efectos con todas las fases hechas. */
+  effects: {
+    /** Puente de piedra: riadas −50 % en la orilla, suelo +10 a 6 casillas, atractivo +2. */
+    bridge: { floodCut: 0.5, land: 10, landRadius: 6, attract: 2 },
+    /** Estación: demanda R +15, plazas de trabajo fuera +25 %, coste de ir a trabajar fuera −30 %. */
+    station: { demandR: 15, jobsOutside: 1.25, commuter: 0.7 },
+    /** Feria regional: en septiembre, ventas +15 % y visitantes ×2. */
+    fair: { month: 9, sales: 0.15, visitors: 2 },
+    /** Estadio: +4 de felicidad a 12 casillas, cuenta como polideportivo, ruido en el partido del mes. */
+    stadium: { happiness: 4, radius: 12, countsAs: 'sports' as BuildingKind, noise: 30, noiseRadius: 4 },
+    /** Catedral: +3 de felicidad en todo el pueblo, atractivo +5. */
+    cathedral: { happiness: 3, attract: 5 },
+  },
+  /** Mantenimiento mensual: esta parte de lo gastado. */
+  upkeep: 0.005,
+  /** Cofinanciación de la Diputación (`Grant.landmark`): parte de cada fase; con el ayuntamiento 5, `shareTop`. */
+  grant: { shareMin: 0.3, shareMax: 0.5, shareTop: 0.6 },
+  /** IA: voluntarios (la fase sale más barata), polémica (actitud −1 en la facción que paga) y donaciones. */
+  volunteersCut: 0.1,
+  controversyAttitude: -1,
+  /** Donación de un vecino: esta parte de sus ahorros (solo `traits.ahorro` bajo y actitud ≥ 1). */
+  donateShare: 0.02,
+  donateMaxSaving: 40,
+  donateMinAttitude: 1,
+  /** Sin IA: probabilidad mensual de una donación por obra en marcha. */
+  donateChance: 0.1,
+} as const;
+
+/**
+ * 2.3: turismo y patrimonio. Atractivo = patrimonio + obras + fiestas activas
+ * + árboles − contaminación media; visitantes/mes = atractivo × `perAttract`
+ * × el factor de la comarca (`REGION.fx[fase].visitors`).
+ */
+export const TOURISM = {
+  /** Patrimonio (uno por partida; su forma sale del terreno). */
+  heritage: { pop: 40, townhall: 3, cost: 9_000, workers: 5, days: 5, attract: 10, upkeep: 60 },
+  festivalAttract: 5,
+  /** Atractivo por cada árbol del mapa, con tope. */
+  perTree: 0.02,
+  treesMax: 6,
+  /** Lo que resta la contaminación media (0–100). */
+  pollution: 0.3,
+  perAttract: 6,
+  /** Casas rurales (vivienda en propiedad con `rural`): plazas, lo que gana el dueño por visitante y tope al mes. */
+  rural: { beds: 3, perVisitor: 40, maxMonth: 600 },
+  /** Noches por visitante; la tasa (€/noche por nivel) quita esta parte de visitantes por nivel. */
+  nights: 2,
+  taxDrop: 0.12,
+  /** Entorno protegido: radio sin zona I ni fábricas, atractivo ×1,3 y −8 de felicidad a los empresarios. */
+  protect: { radius: 6, attract: 1.3, ownerMood: -8 },
+  /** Turistificación: con casas rurales por encima de esta parte de las viviendas, alquiler +20 % e inquilinos −4. */
+  touristified: { share: 0.15, rent: 0.2, renterMood: -4 },
+  /** IA: reportaje de la tele (×1,5 un mes). Sin IA: ambición alta + casa propia → casa rural con esta probabilidad mensual. */
+  tvReport: 1.5,
+  ruralChance: 0.05,
+  ruralAmbition: 60,
+} as const;
+
+/**
+ * 2.3: ciclo comarcal (cadena de Markov sobre `state.rng`): cada fase dura
+ * entre `minMonths` y `maxMonths`; se avisa `warnMonths` antes (brewing y El Eco).
+ */
+export const REGION = {
+  /** La primera fase normal dura esto (también en las partidas migradas). */
+  firstMonths: 18,
+  minMonths: 18,
+  maxMonths: 36,
+  warnMonths: 2,
+  /** Probabilidad de pasar a otra fase al acabar la actual (si no, normal). */
+  next: {
+    normal: { bonanza: 0.3, crisis: 0.25 },
+    bonanza: { crisis: 0.35 },
+    crisis: { normal: 0.7 },
+  },
+  /** Efectos por fase: ventas de los talleres, plazas de trabajo fuera, demanda I, valor de la vivienda y visitantes. */
+  fx: {
+    bonanza: { factoryRevenue: 1.2, jobsOutside: 1.3, demandI: 20, propertyValue: 1.1, visitors: 1.2 },
+    normal: { factoryRevenue: 1, jobsOutside: 1, demandI: 0, propertyValue: 1, visitors: 1 },
+    crisis: { factoryRevenue: 0.75, jobsOutside: 0.6, demandI: -25, propertyValue: 0.9, visitors: 0.8 },
+  },
+  /** FEDER: en crisis, subvención para estación, polígono o reparación. */
+  feder: { shareMin: 0.6, shareMax: 0.7, months: 12 },
+  /** Gran empresa: requisitos, fábrica 2×2, empleos, contaminación, ERE y deslocalización. */
+  bigCompany: {
+    pop: 80,
+    industrialTiles: 6,
+    offerDays: 60,
+    materials: 0,
+    jobs: 40,
+    pollution: 2,
+    /** En crisis: ERE (se queda esta parte de la plantilla) o se va; aviso con estos meses. */
+    ereKeep: 0.5,
+    warnMonths: 3,
+    leaveChance: 0.3,
+    /** Incentivos: IBI bonificado (parte que no paga, durante unos años) o suelo gratis (lo pone el ayuntamiento). */
+    ibiDiscount: 0.5,
+    ibiYears: 5,
+    landCost: 8_000,
+    /** Felicidad de los ecologistas y vecinos cercanos cuando abre. */
+    protestMood: -3,
+  },
+} as const;
+
+/** 2.3: escenarios al empezar (scenarios.ts). Cumplir = medalla y momento del álbum; no cumplir pasa a Libre. */
+export const SCENARIOS = {
+  libre: {},
+  /** Pueblo en quiebra: caja −8.000, 25 vecinos resentidos. Meta: caja positiva y 6 meses de superávit antes de 24. */
+  quiebra: { treasury: -8_000, citizens: 25, grudge: 15, debtMonths: 2, surplusMonths: 6, deadlineMonths: 24 },
+  /** El pueblo que se vacía: 30 vecinos de 60–80 años, 8 casas vacías, demanda R −30 un año. Meta: 50 vecinos en 36 meses. */
+  vaciado: { citizens: 30, ageMin: 60, ageMax: 80, emptyHouses: 8, demandR: -30, demandMonths: 12, goalPop: 50, deadlineMonths: 36 },
+  /** Tras la riada: río obligatorio, 6 edificios dañados, 20.000 € de emergencia a 12 meses, riadas ×1,5 el primer año. Meta: reparar todo y 40 vecinos. */
+  riada: { damaged: 6, grant: 20_000, grantMonths: 12, floodFx: 1.5, floodMonths: 12, goalPop: 40, deadlineMonths: 36 },
+} satisfies Record<ScenarioId, object>;
+
+/** 2.3: umbrales de los logros y medallas (achievements.ts). No dan dinero. */
+export const ACHIEVEMENTS = {
+  /** Crecimiento. */
+  population: [25, 100, 250, 500],
+  /** Dinero: años sin préstamos ni descubierto, caja y nota. */
+  noDebtYears: 2,
+  treasury: 100_000,
+  /** Gente: generaciones nacidas en el pueblo, parejas, propietarios. */
+  generations: 3,
+  couples: 10,
+  owners: 20,
+  /** Política: reelecciones, promesas cumplidas, presupuestos aprobados seguidos. */
+  reelected: 2,
+  promises: 10,
+  budgetYears: 5,
+  /** Desgracias: riadas superadas. */
+  floods: 3,
+  /** Turismo: visitantes en un mes. */
+  visitors: 500,
+  /** Récord nuevo: como mucho un aviso al mes. */
+  recordEveryMonths: 1,
 } as const;

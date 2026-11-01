@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TICKS_PER_MONTH } from '@bitopolis/shared';
-import { checkInvariants, createInitialState, FORMAT_VERSION, MIGRATIONS, migrate, migrate14Trash, migrate15Loans, OUTSIDE, step, transfer, TREASURY } from '../src/index.ts';
+import { checkInvariants, createInitialState, FORMAT_VERSION, hashState, MIGRATIONS, migrate, migrate14Trash, migrate15Loans, migrate16History, migrate16Landmarks, migrate16Medals, migrate16Region, migrate16Scenario, migrate16Tourism, OUTSIDE, REGION, step, transfer, TREASURY } from '../src/index.ts';
 
 describe('migración 13 → 14 (2.1)', () => {
   it('basura: campo de suciedad vacío y 60 días de gracia (migrate14Trash)', () => {
@@ -38,6 +38,59 @@ describe('migración 14 → 15 (2.2, préstamos)', () => {
     expect(checkInvariants(m)).toEqual([]);
     // Lo que ya tenía no se toca.
     expect(migrate15Loans({ loans: [{ id: 1 }], rating: 'C', loanLedger: { lent: 5 } })).toMatchObject({ loans: [{ id: 1 }], rating: 'C', loanLedger: { lent: 5 } });
+  });
+});
+
+describe('migración 15 → 16 (2.3, metas grandes)', () => {
+  const v15 = (tick: number) => {
+    const s = createInitialState({ seed: 4 }) as unknown as Record<string, any>;
+    const old: Record<string, any> = structuredClone({ ...s, formatVersion: 15, tick });
+    for (const k of ['landmarks', 'tourism', 'scenario', 'region', 'bigCompany', 'history', 'records', 'medals']) delete old[k];
+    return old;
+  };
+  it('añade obras, turismo, escenario Libre, comarca normal 18 meses y medallas vacías', () => {
+    const m = migrate(v15(5_000));
+    expect(m.formatVersion).toBe(FORMAT_VERSION);
+    expect(m.landmarks).toEqual([]);
+    expect(m.tourism).toEqual({ visitors: 0, lastIncome: 0, tax: 0 });
+    expect(m.scenario).toEqual({ id: 'libre', done: true });
+    expect(m.region).toEqual({ phase: 'normal', until: 5_000 + REGION.firstMonths * TICKS_PER_MONTH, warned: false });
+    expect(m.bigCompany).toBeNull();
+    expect(m.history).toEqual([]);
+    expect(m.records).toEqual({});
+    expect(m.medals).toEqual([]);
+    expect(checkInvariants(m)).toEqual([]);
+    // Una partida nueva y una migrada desde el mismo estado inicial quedan iguales.
+    expect(hashState(migrate(v15(0)))).toBe(hashState(createInitialState({ seed: 4 })));
+    // Y sigue jugándose.
+    for (let i = 0; i < 24 * 31; i++) step(m);
+    expect(checkInvariants(m)).toEqual([]);
+  });
+  it('reconstruye la historia por años y los récords desde stats (migrate16History)', () => {
+    const stat = (month: number, population: number, treasury: number, extra: Record<string, number> = {}) => ({ month, population, treasury, happiness: 50 + month, income: 100 * month, expenses: 0, breakdown: {}, ...extra });
+    const stats = [stat(1, 5, 1_000, { jobless: 1, businesses: 0 }), stat(6, 9, 4_000, { jobless: 3, businesses: 2 }), stat(12, 7, 2_000, { jobless: 2, businesses: 1 }), stat(13, 12, -500)];
+    const m = migrate16History({ stats });
+    expect(m.history).toEqual([
+      { year: 1, months: 3, population: { min: 5, avg: 7, max: 9 }, treasury: { min: 1_000, avg: 2_333, max: 4_000 }, happiness: { min: 51, avg: 56, max: 62 }, jobless: { min: 1, avg: 2, max: 3 }, businesses: { min: 0, avg: 1, max: 2 }, visitors: { min: 0, avg: 0, max: 0 } },
+      { year: 2, months: 1, population: { min: 12, avg: 12, max: 12 }, treasury: { min: -500, avg: -500, max: -500 }, happiness: { min: 63, avg: 63, max: 63 }, jobless: { min: 0, avg: 0, max: 0 }, businesses: { min: 0, avg: 0, max: 0 }, visitors: { min: 0, avg: 0, max: 0 } },
+    ]);
+    expect(m.records).toEqual({
+      population: { v: 12, tick: 13 * TICKS_PER_MONTH },
+      treasury: { v: 4_000, tick: 6 * TICKS_PER_MONTH },
+      happiness: { v: 63, tick: 13 * TICKS_PER_MONTH },
+      businesses: { v: 2, tick: 6 * TICKS_PER_MONTH },
+      income: { v: 1_300, tick: 13 * TICKS_PER_MONTH },
+    });
+    // Sin stats, vacío; lo que ya tenía no se toca.
+    expect(migrate16History({})).toMatchObject({ history: [], records: {} });
+    expect(migrate16History({ history: [{ year: 9 }], records: { population: { v: 1, tick: 2 } }, stats })).toMatchObject({ history: [{ year: 9 }], records: { population: { v: 1, tick: 2 } } });
+  });
+  it('cada parte respeta lo que ya había', () => {
+    expect(migrate16Landmarks({ landmarks: [{ id: 3 }] }).landmarks).toEqual([{ id: 3 }]);
+    expect(migrate16Tourism({ tourism: { visitors: 9, lastIncome: 1, tax: 2 } }).tourism).toEqual({ visitors: 9, lastIncome: 1, tax: 2 });
+    expect(migrate16Scenario({ scenario: { id: 'quiebra', done: false } }).scenario).toEqual({ id: 'quiebra', done: false });
+    expect(migrate16Region({ region: { phase: 'crisis', until: 7, warned: true }, bigCompany: { name: 'X' } })).toMatchObject({ region: { phase: 'crisis', until: 7, warned: true }, bigCompany: { name: 'X' } });
+    expect(migrate16Medals({ medals: [{ id: 'a', tick: 1 }] }).medals).toEqual([{ id: 'a', tick: 1 }]);
   });
 });
 

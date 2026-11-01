@@ -2,7 +2,8 @@ import type { MinWageLevel } from './balance.ts';
 import type { TownAi } from './turns.ts';
 import type { ErrandsState } from './errands.ts';
 import type { PressState } from './press.ts';
-import { TICKS_PER_DAY, type TaxLevel } from '@bitopolis/shared';
+import { type BigCompanyIncentive, type LandmarkKind, type ScenarioId, type TerrainShape, TICKS_PER_DAY, TICKS_PER_MONTH, type TaxLevel } from '@bitopolis/shared';
+import { REGION } from './balance.ts';
 import { emptyFields, type Fields } from './fields.ts';
 import { chance, nextInt, type RngState, seedRng } from './prng.ts';
 import type { Goal, Hook, Memory, Pleno, PromiseRecord, Relation } from './social.ts';
@@ -19,7 +20,7 @@ import type { Tender } from './tenders.ts';
 import type { StreetName } from './streets.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
-export const FORMAT_VERSION = 15;
+export const FORMAT_VERSION = 16;
 
 export const MAP_W = 48;
 export const MAP_H = 48;
@@ -60,7 +61,13 @@ export type BuildingKind =
   | 'shop'
   | 'factory'
   /** 2.2: finca (crece sola sobre zona agraria). */
-  | 'farm';
+  | 'farm'
+  /** 2.3: grandes obras por fases (landmarks.ts; todas 2×2 salvo el puente). */
+  | LandmarkKind
+  /** 2.3: patrimonio (uno por partida; su forma sale del terreno, tourism.ts). */
+  | 'heritage'
+  /** 2.3: fábrica 2×2 de la gran empresa (region.ts). */
+  | 'bigfactory';
 
 export interface Building {
   id: number;
@@ -431,6 +438,16 @@ export interface GameState {
   loans: Loan[];
   rating: Rating;
   loanLedger: LoanLedger;
+  /** 2.3: grandes obras, turismo, escenario, ciclo comarcal y gran empresa. */
+  landmarks: Landmark[];
+  tourism: Tourism;
+  scenario: Scenario;
+  region: Region;
+  bigCompany: BigCompany | null;
+  /** 2.3: historia por años, récords y medallas. */
+  history: YearStat[];
+  records: Records;
+  medals: Medal[];
 }
 
 /** 2.2: nota de las cuentas del ayuntamiento (A la mejor). */
@@ -503,6 +520,110 @@ export interface Grant {
   advance: number;
   /** Solo cuentan las obras empezadas después de aceptar (ids desde aquí). */
   minId: number;
+  /** 2.3: cofinanciación de una gran obra (id del `Landmark`; se paga por fase). */
+  landmark?: number;
+  /** 2.3: fondos europeos (FEDER) en tiempo de crisis comarcal. */
+  feder?: boolean;
+}
+
+/**
+ * 2.3: gran obra por fases (landmarks.ts). Cada fase es un `Project` del
+ * edificio `buildingId`; entre fases puede quedarse parada sin perder nada.
+ */
+export interface Landmark {
+  id: number;
+  kind: LandmarkKind;
+  buildingId: number;
+  /** Fases terminadas (0…phases); cada una ya da su parte del efecto. */
+  phase: number;
+  phases: number;
+  /** Fin previsto de la fase en obra (tick), o −1 si no hay ninguna en marcha. */
+  phaseUntil: number;
+  /** Lo que lleva gastado el ayuntamiento (el mantenimiento es un % de esto). */
+  spent: number;
+  /** Subvención que la cofinancia (`Grant.landmark`). */
+  grantId?: number;
+  /** Parada por el alcalde entre fases. */
+  paused?: boolean;
+}
+
+/** 2.3: turismo (tourism.ts). `tax` en € por noche; `protectedId`: patrimonio con entorno protegido. */
+export interface Tourism {
+  /** Visitantes del mes pasado y lo que dejaron (casas rurales y tasa). */
+  visitors: number;
+  lastIncome: number;
+  tax: 0 | 1 | 2;
+  protectedId?: number;
+}
+
+/** 2.3: escenario de la partida (scenarios.ts). Al cumplirse (o al vencer) queda `done` y sigue como Libre. */
+export interface Scenario {
+  id: ScenarioId;
+  /** Meta medible: superávit (meses seguidos), vecinos o reparar lo destrozado (y llegar a `target` vecinos). */
+  goal?: { kind: 'superavit' | 'vecinos' | 'reparar'; target: number; progress?: number };
+  /** Tick límite para cumplirla. */
+  deadline?: number;
+  done: boolean;
+  /** Se cumplió (si no, venció sin cumplirse). */
+  won?: boolean;
+}
+
+/** 2.3: ciclo comarcal (region.ts): bonanza, normal o crisis hasta `until`; `warned`: ya se avisó del cambio. */
+export interface Region {
+  phase: 'normal' | 'bonanza' | 'crisis';
+  until: number;
+  warned: boolean;
+  /** Fase que viene (se decide al avisar, 2 meses antes). */
+  next?: 'normal' | 'bonanza' | 'crisis';
+}
+
+/** 2.3: la gran empresa (region.ts): primero una oferta; si se acepta, su fábrica 2×2. */
+export interface BigCompany {
+  /** Nombre generado por el motor («Conservas del Norte»). */
+  name: string;
+  status: 'oferta' | 'abierta' | 'rechazada' | 'ere' | 'se_va' | 'cerrada';
+  offeredTick: number;
+  /** Hasta cuándo vale la oferta (tick). */
+  deadline: number;
+  incentive?: BigCompanyIncentive;
+  /** Fábrica (`bigfactory`) cuando ya está. */
+  buildingId?: number;
+  jobs: number;
+  /** Aviso de ERE o deslocalización: pasa en este tick. */
+  warnUntil?: number;
+}
+
+/** 2.3: mínimo, media y máximo de una serie a lo largo de un año. */
+export interface MinAvgMax {
+  min: number;
+  avg: number;
+  max: number;
+}
+
+/**
+ * 2.3: resumen anual (sin tope, a diferencia de `stats`). Un elemento por año
+ * con algún mes cerrado; el del año en curso se actualiza al cerrar cada mes.
+ */
+export interface YearStat {
+  year: number;
+  /** Meses que resume (12 en los años cerrados). */
+  months: number;
+  population: MinAvgMax;
+  treasury: MinAvgMax;
+  happiness: MinAvgMax;
+  jobless: MinAvgMax;
+  businesses: MinAvgMax;
+  visitors: MinAvgMax;
+}
+
+export type RecordKey = 'population' | 'treasury' | 'happiness' | 'businesses' | 'visitors' | 'income';
+/** 2.3: récords del pueblo (máximo y cuándo). */
+export type Records = Partial<Record<RecordKey, { v: number; tick: number }>>;
+
+/** 2.3: medalla conseguida (achievements.ts). */
+export interface Medal {
+  id: string;
+  tick: number;
 }
 
 export interface NewGameOptions {
@@ -511,11 +632,14 @@ export interface NewGameOptions {
   namedLimit?: number;
   /** 2.0: % de vecinos con IA (Modo IA). */
   aiShare?: number;
+  /** 2.3: escenario (por defecto, Libre) y forma del terreno (por defecto, aleatorio: lo de siempre). */
+  scenario?: ScenarioId;
+  terrain?: TerrainShape;
 }
 
 export const INITIAL_SUBSIDY = 30_000;
 
-export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiShare = 50 }: NewGameOptions): GameState {
+export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiShare = 50, scenario = 'libre' }: NewGameOptions): GameState {
   const rng = seedRng(seed);
   const tiles = new Array<number>(MAP_W * MAP_H).fill(Tile.Grass);
   const zones = new Array<number>(MAP_W * MAP_H).fill(Zone.None);
@@ -582,6 +706,15 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiSh
     loans: [],
     rating: 'B',
     loanLedger: { lent: 0, repaid: 0, interest: 0, treasuryTicks: [] },
+    // 2.3: metas grandes. `scenario`/`terrain` aún no cambian la partida (lo hace scenarios.ts/terrain.ts).
+    landmarks: [],
+    tourism: { visitors: 0, lastIncome: 0, tax: 0 },
+    scenario: { id: scenario, done: scenario === 'libre' },
+    region: { phase: 'normal', until: REGION.firstMonths * TICKS_PER_MONTH, warned: false },
+    bigCompany: null,
+    history: [],
+    records: {},
+    medals: [],
   };
   // Árboles dispersos (se talan gratis al construir encima).
   for (let i = 0; i < tiles.length; i++) {
