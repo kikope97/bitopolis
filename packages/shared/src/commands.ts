@@ -156,6 +156,14 @@ export const Command = z.discriminatedUnion('type', [
   /** 2.5: densidad de zona R, y responder a una oferta de un pueblo vecino. */
   z.object({ type: z.literal('SetZoneDensity'), x: Coord, y: Coord, w: Size, h: Size, level: z.union([z.literal(0), z.literal(1), z.literal(2)]) }),
   z.object({ type: z.literal('AnswerNeighbor'), id: z.number().int().min(1), accept: z.boolean() }),
+  /** 2.5 (bloque J): lo que decidieron los alcaldes vecinos este mes (IA del servidor; el motor valida cada uno contra su menú). */
+  z.object({
+    type: z.literal('NeighborTurn'),
+    month: z.number().int().min(0),
+    picks: z
+      .array(z.object({ pueblo: z.number().int().min(1), accion: z.string().regex(/^[a-z_]+(:[a-z]+)?$/).max(40), declaracion: z.string().max(200) }))
+      .max(5),
+  }),
   /** 2.0: % de vecinos con IA (solo sube: nadie deja de pensar con IA). */
   z.object({ type: z.literal('SetAiShare'), share: z.number().int().min(0).max(100) }),
   /** 2.0: días de juego entre turnos de la IA (el cliente los alarga a x3/x10). */

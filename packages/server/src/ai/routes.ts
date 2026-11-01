@@ -259,6 +259,21 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
     return { turn: ai.turn(row.id, n), ...ai.status(row.id) };
   });
 
+  /** 2.5: el turno de los alcaldes vecinos de un mes (el cliente lo aplica con `NeighborTurn`). */
+  app.get('/api/games/:token/neighbors/:month', async (req, reply) => {
+    const t = tokenOf(req.params);
+    const m = Number((req.params as { month?: string }).month);
+    if (!t.success || !Number.isInteger(m) || m < 0) return bad(reply, 'petición no válida');
+    const row = await load(t.data);
+    if (!row) return bad(reply, 'no existe', 404);
+    // Como con los turnos: si el servidor no lo conoce y sigue abierto, lo pide ahora.
+    if (!ai.neighborTurn(row.id, m) && row.mode === 'ai') {
+      const st = migrate(JSON.parse(row.state)) as GameState;
+      if (st.comarca?.turn?.month === m) void ai.onSaved(row.id, st);
+    }
+    return { neighbors: ai.neighborTurn(row.id, m) };
+  });
+
   app.get('/api/games/:token/ai-usage', async (req, reply) => {
     const t = tokenOf(req.params);
     if (!t.success) return bad(reply, 'enlace no válido');

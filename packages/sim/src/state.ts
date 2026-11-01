@@ -1055,6 +1055,17 @@ export interface NeighborTown {
   relation: number;
   /** Última declaración (validada o por plantilla). */
   said?: string;
+  /** Quién la escribió (la IA del alcalde o las plantillas) y cuándo. */
+  saidBy?: 'ia' | 'reglas';
+  saidTick?: number;
+  /** Lo último que hizo el alcalde (acción del menú). */
+  lastAct?: string;
+  /** Bajada de impuestos en vigor hasta este tick (más atractivo). */
+  taxCutUntil?: number;
+  /** Veces que ha pedido a la Diputación desde el último reparto. */
+  grantClaims?: number;
+  /** Está río abajo (le llega el río del pueblo). */
+  downstream?: boolean;
 }
 export type NeighborOfferKind = 'agua' | 'luz' | 'autobus' | 'cosecha';
 export interface NeighborOffer {
@@ -1064,10 +1075,18 @@ export interface NeighborOffer {
   tick: number;
   until: number;
   resolved?: 'accepted' | 'rejected' | 'expired';
+  /** Acuerdo aceptado: en vigor hasta este tick. */
+  dealUntil?: number;
 }
 export interface ComarcaState {
   towns: NeighborTown[];
   offers: NeighborOffer[];
   /** Feria comarcal de este año (en qué pueblo, 0 = el nuestro). */
   fair: { year: number; host: number } | null;
+  /** Modo IA: turno mensual de los alcaldes abierto (mes de juego y vencimiento). */
+  turn?: { month: number; due: number };
+  /** El pueblo de abajo ya se quejó del río (se avisa una vez hasta que mejora). */
+  riverAngry?: boolean;
+  /** Último ganador del premio de la feria (0 = el nuestro). */
+  lastPrize?: { year: number; town: number };
 }

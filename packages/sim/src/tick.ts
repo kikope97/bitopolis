@@ -5,6 +5,7 @@ import { busDemandR, transitMonth, transitMood } from './transit.ts';
 import { fairMonth, isLandmarkKind, landmarkMood, landmarksDay, landmarksMonth, stationCommuterBonus, stationDemandR } from './landmarks.ts';
 import { tourismMonth, tourismMood } from './tourism.ts';
 import { regionFx, regionMonth, regionMood } from './region.ts';
+import { comarcaDay, comarcaFair, comarcaHarvest, comarcaMonth, comarcaMood } from './comarca.ts';
 import { scenarioFx, scenariosMonth } from './scenarios.ts';
 import { newResident } from './resident.ts';
 import { achievementsMonth, historyMonth } from './achievements.ts';
@@ -344,6 +345,8 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
   // 2.4: jubilados, mayores atendidos (o solos), quien cuida en casa y quien va en autobús.
   f.push(...careMood(state, c));
   f.push(...transitMood(state, c));
+  // 2.5: la línea de autobús compartida con un pueblo vecino.
+  f.push(...comarcaMood(state));
   return f;
 }
 
@@ -601,6 +604,8 @@ function endOfDay(state: GameState): void {
   pressDay(state);
   // 2.4: dilemas (vencen, se cierran o se abren por reglas).
   dilemmasDay(state);
+  // 2.5: ofertas de los pueblos vecinos que caducan y el turno de los alcaldes que vence.
+  comarcaDay(state);
   accumulateRates(state);
 }
 
@@ -669,6 +674,8 @@ function payBusinesses(state: GameState): void {
 function endOfMonth(state: GameState): void {
   // 2.3: ciclo comarcal y gran empresa (antes de las nóminas: sus efectos valen para este mes).
   regionMonth(state);
+  // 2.5: los pueblos vecinos (con la fase recién cambiada), competencia por vecinos, acuerdos y alcaldes.
+  comarcaMonth(state, (c) => leaveVoluntarily(state, c));
   associationsMonth(state);
   const r = monthRates(state);
   // Nóminas municipales (los sueldos no pagan impuesto municipal).
@@ -683,6 +690,8 @@ function endOfMonth(state: GameState): void {
   farmMonth(state);
   // 2.5: la cooperativa cobra el sobreprecio de las cosechas de sus socios (y reparte en diciembre).
   coopMonth(state);
+  // 2.5: con acuerdo de cosecha, el pueblo vecino paga un extra a las fincas que acaban de vender.
+  comarcaHarvest(state);
   businessPayroll(state, r);
   outsideJobsMonth(state);
   // 2.4: pensión mínima de los jubilados y padres que dejan el trabajo sin plaza de guardería.
@@ -700,6 +709,8 @@ function endOfMonth(state: GameState): void {
   settleMonth(state, shops);
   // 2.3: en septiembre, la feria regional trae compradores de fuera.
   fairMonth(state, shops);
+  // 2.5: en septiembre, la feria comarcal (en un pueblo distinto cada año).
+  comarcaFair(state, shops);
   housingTroubles(state);
   vpoMonth(state);
   payBusinesses(state);

@@ -1255,3 +1255,12 @@ html[data-text='150'] .vida-seg .seg-btn, html[data-text='200'] .vida-seg .seg-b
 .letter-text { padding: 4px 0 10px 20px; }
 .letter-body { font-style: italic; line-height: 1.45; }
 .letter-text.thinking .letter-body { opacity: 0.7; }
+/* 2.5: la comarca (una tarjeta por pueblo vecino; Aceptar/Rechazar a lo ancho, 44 px). */
+.comarca-town p { margin: 4px 0; }
+.comarca-rel.rel-good { color: var(--good); }
+.comarca-rel.rel-bad { color: var(--bad); }
+.comarca-said { margin: 6px 0; padding: 4px 8px; border-left: 3px solid var(--line); font-style: italic; }
+.comarca-offer { margin-top: 8px; padding: 6px 8px; border: 2px solid var(--accent); }
+.comarca-answer { display: flex; gap: 8px; }
+.comarca-answer .btn { flex: 1 1 0; min-height: 44px; }
+.comarca-warn { color: var(--bad); }

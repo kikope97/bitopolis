@@ -60,5 +60,6 @@ export * from './density.ts';
 export * from './coop.ts';
 export * from './post.ts';
 export * from './comarca.ts';
+export * from './neighbor-prompt.ts';
 export * from './pleno-prompt.ts';
 export * from './letter-prompt.ts';
