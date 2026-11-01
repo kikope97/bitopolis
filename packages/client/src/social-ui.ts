@@ -40,7 +40,8 @@ import { portraitSprite } from './sprites.ts';
 import { $, confirmDialog, h, sheet, toast, withBack } from './ui.ts';
 import { openFamily } from './album-ui.ts';
 import type { AwaySince } from './away-ui.ts';
-import { drawPixelIcons } from './icons.ts';
+import { drawPixelIcons, pixelIcon } from './icons.ts';
+import { lettersTo, openMailbox } from './mail-ui.ts';
 
 type Cmd = (c: Command) => Promise<boolean>;
 
@@ -136,6 +137,8 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
     ask,
     answer,
     familyButton(ctx, c.id),
+    // 2.5: cartas de los que se fueron.
+    lettersButton(ctx, c.id),
     h('h3', {}, 'Relaciones'),
     c.relations.length ? h('ul', { class: 'people' }, ...c.relations.map((r) => h('li', {}, `${nameOf(r.id)}: ${RELATION_TEXT[r.kind]}`))) : h('p', { class: 'muted' }, 'Aún no tiene relaciones en el pueblo.'),
     h('h3', {}, 'Recuerdos'),
@@ -145,6 +148,18 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
     ...last.map((d) => h('p', { class: 'quote' }, `«${d.motivo}» `, d.source === 'ai' ? h('span', { class: 'ai-badge' }, 'IA') : '')),
     h('details', { class: 'advanced' }, h('summary', {}, 'Personalidad'), traits, c.summary ? h('p', {}, c.summary) : ''),
   );
+}
+
+/** 2.5: las cartas que ha recibido (buzón filtrado), si tiene alguna. */
+function lettersButton(ctx: SocialCtx, id: number): HTMLElement | string {
+  const n = lettersTo(ctx.state(), id).length;
+  if (!n) return '';
+  const b = h('button', { class: 'btn small', id: 'citizen-letters' }, pixelIcon('letter'), n === 1 ? 'Una carta' : `${n} cartas`);
+  b.addEventListener('click', () => {
+    const name = ctx.state().citizens.find((x) => x.id === id)?.name.split(' ')[0] ?? 'la ficha';
+    withBack(name, () => openCitizen(ctx, id), () => openMailbox({ token: ctx.token, state: ctx.state, openCitizen: (k) => openCitizen(ctx, k) }, id));
+  });
+  return b;
 }
 
 /** v1.7: acceso al árbol genealógico desde la ficha. */

@@ -36,7 +36,7 @@ import {
   levelOf,
   plantCapacityOf,
   radiusOf,
-  SERVICE_LEVELS,
+  maxLevelOf,
   serviceCapacityOf,
   serviceCounts,
   UPGRADABLE,
@@ -85,6 +85,8 @@ import { openNeighbours, openReport, openTaxes as openTaxesSheet } from './econo
 import { heavyLoad, loadPct, openLoans } from './loans-ui.ts';
 import { LAYERS, type LayerId, NEED_ICON } from './layers.ts';
 import { vidaBox } from './vida-ui.ts';
+import { coopPostBox } from './coop-ui.ts';
+import { openMailbox, unreadLetters } from './mail-ui.ts';
 import { openTownHall } from './civic-ui.ts';
 import { openAlbum, snapMoments } from './album-ui.ts';
 import { openAway } from './away-ui.ts';
@@ -1765,7 +1767,7 @@ export function startGame(opts: GameOptions): void {
   function levelBox(b: Building): HTMLElement {
     const lv = levelOf(b);
     const served = serviceCounts(state).get(b.id);
-    const box = h('section', { class: 'level-box' }, h('h3', {}, pixelIcon('upgrade'), ` Nivel ${lv} de ${SERVICE_LEVELS.maxLevel}`));
+    const box = h('section', { class: 'level-box' }, h('h3', {}, pixelIcon('upgrade'), ` Nivel ${lv} de ${maxLevelOf(b)}`));
     const gives: string[] = [];
     if (radiusOf(b)) gives.push(`llega a ${radiusOf(b)} casillas`);
     if (serviceCapacityOf(b)) gives.push(`atiende a ${serviceCapacityOf(b)} vecinos${served !== undefined ? ` (ahora ${served})` : ''}`);
@@ -1778,7 +1780,7 @@ export function startGame(opts: GameOptions): void {
       box.append(h('p', {}, `Mejorando a nivel ${lv + 1}: termina el ${formatDate(tickToDate(b.upgradeUntil))}. Sigue abierto mientras tanto.`));
       return box;
     }
-    if (lv >= SERVICE_LEVELS.maxLevel) {
+    if (lv >= maxLevelOf(b)) {
       box.append(h('p', { class: 'muted small' }, 'Está en su nivel más alto.'));
       return box;
     }
@@ -1979,6 +1981,9 @@ export function startGame(opts: GameOptions): void {
       // 2.4 «Vida»: estación (billete), guardería y residencia (cuota), depuradora (el río) y renovables (la luz).
       const vida = vidaBox(state, b, command, citizenList);
       if (vida) content.push(vida);
+      // 2.5: cooperativa agraria (socios, presidente y reparto) y correos (plazo de las subvenciones y buzón).
+      const coopPost = coopPostBox(state, b, citizenList, () => withBack('Ficha', () => focusBuilding(b.id), openMail));
+      if (coopPost) content.push(coopPost);
       // v1.8 (petición del creador): los servicios suben de nivel.
       if (UPGRADABLE.includes(b.kind)) content.push(levelBox(b));
       const res = occupants(state, b);
@@ -2170,6 +2175,11 @@ export function startGame(opts: GameOptions): void {
     const hall = state.buildings.find((b) => b.kind === 'townhall' && b.built);
     if (hall) focusBuilding(hall.id);
   }
+  /** 2.5: el buzón del pueblo (hoja `.half`). */
+  function openMail() {
+    openMailbox({ token, state: () => state, openCitizen: (id) => openCitizen(social, id) });
+  }
+
   function openHub() {
     closeTray();
     const go = (fn: () => void) => () => withBack('Pueblo', openHub, fn);
@@ -2231,6 +2241,8 @@ export function startGame(opts: GameOptions): void {
         item('Felicidad', go(openHappiness)),
         item('Diario del pueblo', go(() => openDiary(social))),
         item('Álbum del pueblo', go(() => openAlbum(social))),
+        // 2.5: el buzón (cartas de los que se fueron), con correos o si ya llegó alguna.
+        ...(state.letters.length || state.buildings.some((x) => x.kind === 'post') ? [item(`Buzón · ${plural(state.letters.length, 'carta', 'cartas')}`, go(openMail), unreadLetters(state, token) > 0)] : []),
         // 2.3: gráficas por años y récords.
         item('Historia', go(() => openHistory(state))),
       ),

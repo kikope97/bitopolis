@@ -1,5 +1,5 @@
 import type { BuildKind, Command, LandmarkKind, ZoneKind } from '@bitopolis/shared';
-import { BUILD, BUILD_LEVEL, buildCost, CARE, CIVIL, FARM, type GameState, hasRiver, LANDMARK_LATER, LANDMARKS, landmarkReqs, Terrain, TERRAIN, TOWNHALL_LEVELS, townLevel, WATERWORKS, ZONE_COST_PER_TILE } from '@bitopolis/sim';
+import { BUILD, BUILD_LEVEL, buildCost, CARE, CIVIL, COOP, FARM, type GameState, hasRiver, LANDMARK_LATER, LANDMARKS, landmarkReqs, POST, Terrain, TERRAIN, TOWNHALL_LEVELS, townLevel, WATERWORKS, ZONE_COST_PER_TILE } from '@bitopolis/sim';
 import { money } from './i18n.ts';
 
 export type ToolId =
@@ -43,6 +43,9 @@ export type ToolId =
   | 'solar'
   | 'wind'
   | 'busstation'
+  // 2.5 «Comarca»: cooperativa agraria y correos.
+  | 'coop'
+  | 'post'
   | 'demolish';
 
 export interface Tool {
@@ -104,6 +107,8 @@ export const TOOLS: Tool[] = [
   { id: 'solar', label: 'Placas solares', shape: 'tap', build: 'solar', key: '', help: `Luz para ${WATERWORKS.solar.buildings} edificios por la red, sin humo. En invierno dan menos y con nieve, casi nada.` },
   { id: 'wind', label: 'Molino de viento', shape: 'tap', build: 'wind', key: '', help: `Solo en la colina: luz para ${WATERWORKS.wind.buildings} edificios (más con tormenta). Hace ruido a ${WATERWORKS.wind.noiseRadius} casillas.` },
   { id: 'busstation', label: 'Estación de autobuses', shape: 'tap', build: 'busstation', key: '', help: 'Una por pueblo: llega a todos. Quien trabaja fuera va en autobús, viene más gente y el Consorcio paga la mitad. El billete, en su ficha.' },
+  { id: 'coop', label: 'Cooperativa', shape: 'tap', build: 'coop', key: '', help: `Una por pueblo. Quien tiene finca puede hacerse socio: vende la cosecha un ${Math.round(COOP.priceFx * 100)} % más cara, paga ${COOP.fee} € al mes y en diciembre se reparte todo. Con la almazara o la bodega (nivel 2), un ${Math.round(COOP.priceFxLevel2 * 100)} %.` },
+  { id: 'post', label: 'Correos', shape: 'tap', build: 'post', key: '', help: `Una por pueblo. Las subvenciones de la Diputación dan ${POST.grantDaysWith} días para responder (sin correos, ${POST.grantDaysWithout}) y los que se fueron escriben a su familia y amigos.` },
   { id: 'dezone', label: 'Sin zona', shape: 'rect', zone: 'none', key: 'z', help: 'Quita la zona (no derriba lo construido).' },
   { id: 'demolish', label: 'Derribar', shape: 'tap', key: 'x', help: 'Derriba un edificio o una carretera. Pide confirmación.' },
 ];
@@ -139,6 +144,8 @@ export function lockShort(tool: Tool, state: GameState): string | null {
   if (tool.build === 'heritage' && state.buildings.some((b) => b.kind === 'heritage')) return 'ya lo tienes';
   // 2.4: una sola estación; la depuradora pide río y el molino, colina.
   if (tool.build === 'busstation' && state.buildings.some((b) => b.kind === 'busstation')) return 'ya la tienes';
+  // 2.5: una cooperativa y una oficina de correos por pueblo.
+  if ((tool.build === 'coop' || tool.build === 'post') && state.buildings.some((b) => b.kind === tool.build)) return 'ya la tienes';
   if (tool.build === 'sewage' && !hasRiver(state)) return 'sin río';
   if (tool.build === 'wind' && !(state.map.terrain ?? []).includes(Terrain.Hill)) return 'sin colina';
   return null;
@@ -161,6 +168,8 @@ export function lockLong(tool: Tool, state: GameState): string {
   if (tool.id === 'dike' && lockShort(tool, state) === 'protección civil') return 'Dique: primero construye una caseta de protección civil.';
   if (tool.build === 'heritage' && lockShort(tool, state) === 'ya lo tienes') return 'Patrimonio: solo hay uno por pueblo y ya lo tienes.';
   const short = lockShort(tool, state);
+  if (short === 'ya la tienes' && tool.build === 'coop') return 'Cooperativa: solo hay una por pueblo y ya la tienes. Tócala en el mapa para ver sus socios y el reparto.';
+  if (short === 'ya la tienes' && tool.build === 'post') return 'Correos: solo hay una oficina por pueblo y ya la tienes. Tócala en el mapa para abrir el buzón.';
   if (short === 'ya la tienes') return 'Estación de autobuses: solo hay una por pueblo y llega a todos. Tócala en el mapa para cambiar el billete.';
   if (short === 'sin río') return 'Depuradora: el pueblo no tiene río, así que no hay dónde verter ni nada que limpiar.';
   if (short === 'sin colina') return 'Molino de viento: va en la colina, donde sopla el viento, y este pueblo no tiene. Prueba con placas solares.';
@@ -197,9 +206,10 @@ export const TRAY: { title: string; tools: ToolId[] }[] = [
   { title: 'Vida social', tools: ['bar', 'chapel', 'cemetery', 'library', 'sports'] },
   { title: 'Emergencias', tools: ['firestation', 'civilprotection', 'dike'] },
   // 2.4 «Vida».
-  { title: 'Cuidados', tools: ['nursery', 'residence'] },
+  { title: 'Cuidados', tools: ['nursery', 'residence', 'post'] },
   { title: 'Agua y energía', tools: ['sewage', 'solar', 'wind'] },
   { title: 'Transporte', tools: ['busstation'] },
+  { title: 'Campo', tools: ['coop'] },
   { title: 'Turismo', tools: ['heritage'] },
   { title: 'Premios de los hitos', tools: ['plaza', 'market'] },
   // 2.3: grandes obras por fases (cada fase se paga desde su ficha).

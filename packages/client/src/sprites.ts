@@ -2320,6 +2320,8 @@ const UPGRADES: Record<string, readonly [() => Pix, () => Pix]> = {
   sports: [() => sports2(16), () => sports3(16)],
   firestation: [() => fireStation(18, 2), () => fireStation(18, 3)],
   cleanpoint: [() => cleanPoint2(18), () => cleanPoint3(18)],
+  // 2.5: la cooperativa con su almazara o bodega (solo tiene nivel 2).
+  coop: [() => coopPix(33, 2), () => coopPix(33, 2)],
 };
 
 /**
@@ -3074,6 +3076,11 @@ function buildingSpec(kind: string, id: number, rank = VILLA_RANK): [string, () 
       return ['solar', () => solarPix(31)];
     case 'wind':
       return ['wind-0', () => windPix(0)];
+    // 2.5 «Comarca».
+    case 'coop':
+      return ['coop', () => coopPix(33, 1)];
+    case 'post':
+      return ['post', () => postPix(34)];
     case 'factory':
       return [`factory${id % 4}`, () => factory(id % 4)];
     // 2.2: sin saber el cultivo, una finca de cereal (el render usa farmSprite con el suyo).
@@ -4675,3 +4682,70 @@ export function bonfirePix(frame: number): Pix {
   return p;
 }
 export const bonfireSprite = (frame: number, tod: TimeOfDay = 'day') => sprite(`hoguera-${frame % 2}`, () => bonfirePix(frame), tod);
+
+/* ---------------- 2.5 «Comarca» ---------------- */
+
+/** Cooperativa agraria: nave con portalón, sacos y una báscula; en el nivel 2, los depósitos de la almazara o la bodega. */
+function coopPix(seed: number, level: number): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 2, 24, 22, 22);
+  facade(p, 2, 28, 22, 17, MAT.cream, 'plaster', seed);
+  gableRoof(p, 1, 20, 24, 4, 8, MAT.terracotta);
+  // Portalón de madera y rótulo verde.
+  doorAt(p, 9, 34, 8, 11, MAT.wood, 12);
+  p.rect(6, 30, 14, 3, MAT.moss[1]);
+  p.hline(8, 31, 10, 12);
+  windowAt(p, 4, 35, 2, 3, { frame: 12 });
+  windowAt(p, 20, 35, 2, 3, { frame: 12 });
+  // Sacos de grano junto a la puerta.
+  for (const [x, y] of [[25, 42], [28, 42], [26, 39]] as const) {
+    p.ellipse(x + 1, y + 2, 2, 2, MAT.wood[0]);
+    p.set(x + 1, y, MAT.wood[2]);
+  }
+  if (level >= 2) {
+    // Depósitos de acero de la almazara o la bodega.
+    for (const x of [25, 29]) {
+      p.rect(x, 24, 3, 14, MAT.metal[1]);
+      p.vline(x, 24, 14, MAT.metal[0]);
+      p.vline(x + 2, 24, 14, MAT.metal[2]);
+      p.hline(x, 23, 3, MAT.metal[2]);
+    }
+    p.hline(25, 30, 7, MAT.metal[3]);
+  } else {
+    // Remolque con paja.
+    p.rect(24, 32, 7, 4, MAT.yellow[1]);
+    p.dither(24, 32, 7, 4, MAT.yellow[2], seed % 2);
+    p.hline(24, 36, 7, MAT.wood[2]);
+    p.set(25, 37, MAT.metal[3]);
+    p.set(29, 37, MAT.metal[3]);
+  }
+  return p;
+}
+
+/** Oficina de correos: fachada amarilla, rótulo, buzón en la acera y una bici de reparto. */
+function postPix(seed: number): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 4, 22, 22, 24);
+  facade(p, 4, 26, 22, 19, MAT.yellow, 'plaster', seed);
+  flatRoof(p, 3, 22, 24, 5, MAT.yellow, seed);
+  // Rótulo azul con el sobre.
+  p.rect(7, 28, 16, 4, MAT.blue[1]);
+  p.rect(13, 29, 4, 2, 12);
+  p.set(14, 29, MAT.blue[2]);
+  p.set(15, 29, MAT.blue[2]);
+  windowAt(p, 7, 35, 4, 4, { frame: 12 });
+  windowAt(p, 19, 35, 4, 4, { frame: 12 });
+  doorAt(p, 13, 36, 4, 9, MAT.blue, 12);
+  // Buzón amarillo en su poste.
+  p.vline(28, 40, 6, MAT.metal[2]);
+  p.rect(26, 36, 5, 5, MAT.yellow[1]);
+  p.hline(26, 36, 5, MAT.yellow[2]);
+  p.hline(27, 38, 3, MAT.yellow[3]);
+  // Bici de reparto apoyada.
+  p.ellipse(2, 44, 1, 1, MAT.metal[3]);
+  p.ellipse(6, 44, 1, 1, MAT.metal[3]);
+  line(p, 2, 44, 4, 41, MAT.red[1]);
+  line(p, 4, 41, 6, 44, MAT.red[1]);
+  p.rect(4, 40, 3, 2, MAT.yellow[1]);
+  return p;
+}
