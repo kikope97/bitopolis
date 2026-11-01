@@ -26,8 +26,12 @@ export interface Unsaved {
 }
 
 export type FromWorker =
-  /** `unsaved` va con cada estado: si la página se cierra, el hilo principal monta con él el último lote. */
-  | { type: 'state'; state: GameState; unsaved: Unsaved }
+  /**
+   * El estado va en JSON (2.5.1): JSON.parse en el hilo principal cuesta la mitad que deshacer el clon
+   * estructurado de un objeto grande, y el stringify se paga aquí, fuera del hilo de la interfaz.
+   * `unsaved` va con cada estado: si la página se cierra, el hilo principal monta con él el último lote.
+   */
+  | { type: 'state'; json: string; unsaved: Unsaved }
   | { type: 'result'; id: number; ok: boolean; error?: string }
   | { type: 'save'; batch: SaveBatch; flush: boolean }
   /** 2.0: el reloj espera a la IA (turno `n`). */
@@ -46,7 +50,7 @@ const released = new Set<number>();
 let waiting: number | null = null;
 
 const post = (m: FromWorker) => postMessage(m);
-const postState = () => state && post({ type: 'state', state, unsaved: { from: batchFrom, commands: pending } });
+const postState = () => state && post({ type: 'state', json: JSON.stringify(state), unsaved: { from: batchFrom, commands: pending } });
 
 /**
  * Emite un lote con lo que haya desde el último. Solo el del cierre del día va `live` (el servidor

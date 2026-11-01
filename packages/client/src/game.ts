@@ -299,7 +299,7 @@ export function startGame(opts: GameOptions): void {
   worker.onmessage = (e: MessageEvent<FromWorker>) => {
     const m = e.data;
     if (m.type === 'state') {
-      state = m.state;
+      state = JSON.parse(m.json) as GameState;
       unsaved = m.unsaved;
       onState();
       paintSaved();
