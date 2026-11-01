@@ -1,4 +1,9 @@
 import { loansMonth } from './loans.ts';
+import { landmarksDay, landmarksMonth } from './landmarks.ts';
+import { tourismMonth } from './tourism.ts';
+import { regionMonth } from './region.ts';
+import { scenariosMonth } from './scenarios.ts';
+import { achievementsMonth, historyMonth } from './achievements.ts';
 import { errandsDay } from './errands.ts';
 import { pressDay } from './press.ts';
 import { TICKS_PER_DAY, TICKS_PER_MONTH, tickToDate } from '@bitopolis/shared';
@@ -608,6 +613,8 @@ function endOfDay(state: GameState): void {
   for (const b of finishUpgrades(state)) {
     pushEvent(state, 'built', `${b.name ?? BUILD_NAMES[b.kind] ?? b.kind} sube a nivel ${b.level}: llega más lejos y atiende a más gente`, { ref: b.id });
   }
+  // 2.3: fases de las grandes obras que terminan.
+  landmarksDay(state);
   // 2.1: de aldea a ciudad (antes del álbum: la subida sale en la foto del día).
   rankDay(state);
   albumDay(state);
@@ -679,6 +686,8 @@ function payBusinesses(state: GameState): void {
 }
 
 function endOfMonth(state: GameState): void {
+  // 2.3: ciclo comarcal y gran empresa (antes de las nóminas: sus efectos valen para este mes).
+  regionMonth(state);
   associationsMonth(state);
   const r = monthRates(state);
   // Nóminas municipales (los sueldos no pagan impuesto municipal).
@@ -699,11 +708,15 @@ function endOfMonth(state: GameState): void {
   settleMonth(state, shops);
   housingTroubles(state);
   payBusinesses(state);
+  // 2.3: visitantes, casas rurales y tasa turística.
+  tourismMonth(state);
   // PIE: el Estado paga por vecino empadronado, más si el pueblo está contento.
   const pie = Math.round(PIE_PER_CITIZEN * state.citizens.length * Math.max(0.6, Math.min(1.2, averageHappiness(state) / 60)));
   transfer(state, OUTSIDE, TREASURY, pie, 'PIE');
   // El ayuntamiento cuesta más de mantener cuanto más grande (v1.8).
   for (const b of state.buildings) if (b.built) transfer(state, TREASURY, OUTSIDE, Math.round(maintenanceOf(b) * (b.kind === 'townhall' ? townLevel(state) : 1) * budgetFx(state).maintenance), 'mantenimiento');
+  // 2.3: mantenimiento y cofinanciación de las grandes obras.
+  landmarksMonth(state);
   lifeMonth(state);
   // 2.1: voluntarios de protección civil (por reglas).
   volunteersMonth(state);
@@ -738,6 +751,10 @@ function endOfMonth(state: GameState): void {
     ...economyStats(state),
   });
   if (state.stats.length > 120) state.stats.splice(0, state.stats.length - 120);
+  // 2.3: historia por años y récords, escenario y medallas (con el mes ya en `stats`).
+  historyMonth(state);
+  scenariosMonth(state);
+  achievementsMonth(state);
   state.month = { income: 0, expenses: 0, breakdown: {}, rateSums: { ibi: 0, tasas: 0, plusvalia: 0 }, taxDays: 0 };
 }
 
