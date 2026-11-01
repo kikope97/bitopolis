@@ -74,21 +74,23 @@ test('2.4: Modo IA: el servidor escribe el pleno con el LLM falso (una llamada, 
   const token = new URL(page.url()).pathname.split('/').pop()!;
   await setSpeed(page, 3);
   // Hacen falta vecinos con nombre guardados en el servidor.
-  await expect.poll(async () => (await state(page)).citizens.filter((c: { named: boolean }) => c.named).length, { timeout: 180_000, intervals: [3000] }).toBeGreaterThanOrEqual(2);
+  await expect.poll(async () => (await state(page)).citizens.filter((c: { named: boolean }) => c.named).length, { timeout: 180_000, intervals: [3000] }).toBeGreaterThanOrEqual(1);
   await page.waitForTimeout(25_000);
   await setSpeed(page, 0);
   const st = await state(page);
-  const [a, b] = st.citizens.filter((c: { named: boolean }) => c.named);
+  const [a] = st.citizens.filter((c: { named: boolean }) => c.named);
   const body = {
     tick: st.tick,
     petitions: [{ id: 1, citizenId: a.id, need: 'parque', yes: 3, no: 1 }],
     speakers: [
       { id: a.id, role: 'pide', postura: 'a_favor', petitionId: 1 },
-      { id: b.id, role: 'en_contra', postura: 'en_contra', petitionId: 1 },
+      // Alguien que no existe no habla (el servidor lo quita).
+      { id: 999_999, role: 'en_contra', postura: 'en_contra', petitionId: 1 },
     ],
   };
   const first = await (await request.post(`/api/games/${token}/pleno`, { data: body })).json();
   expect(first.lines?.length, JSON.stringify(first)).toBeGreaterThan(0);
+  expect(first.lines.map((l: { id: number }) => l.id)).toEqual([a.id]);
   expect(first.lines[0].linea).toContain('Palabra de');
   // Misma petición: la misma respuesta (caché del servidor, sin otra llamada).
   const again = await (await request.post(`/api/games/${token}/pleno`, { data: body })).json();
