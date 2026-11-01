@@ -19,6 +19,7 @@ import { hash32 } from './hash.ts';
 import { addMemory } from './social.ts';
 import { type Building, type BuildingKind, type Citizen, type GameState, pushEvent } from './state.ts';
 import { Terrain } from './terrain.ts';
+import { isUnlocked } from './townhall.ts';
 import { seasonOf } from './weather.ts';
 
 const N8 = [
@@ -326,9 +327,12 @@ export const riverDirty = (state: GameState) => riverWorst(state) > W.dirtyPump;
 
 const nameOf = (b: Building) => b.name ?? 'un taller';
 
-/** Talleres a la orilla que podrían verter sin depurar (sin depuradora en el pueblo). */
+/**
+ * Talleres a la orilla que podrían verter sin depurar (sin depuradora en el
+ * pueblo). Solo cuando la depuradora ya se puede construir: nada malo sin remedio.
+ */
 export function spillCandidates(state: GameState): Building[] {
-  if (!hasRiver(state) || state.buildings.some((b) => b.kind === 'sewage' && b.built && !b.damaged)) return [];
+  if (!hasRiver(state) || !isUnlocked(state, 'sewage') || state.buildings.some((b) => b.kind === 'sewage' && b.built && !b.damaged)) return [];
   return state.buildings.filter((b) => b.kind === 'factory' && b.built && !b.damaged && !spilling(state, b) && nearestRiverTile(state, b.x, b.y) >= 0).sort((a, b) => a.id - b.id);
 }
 
