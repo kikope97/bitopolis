@@ -286,6 +286,11 @@ progress { width: 100%; height: 16px; accent-color: #38b764; }
 .legend-item.lv1.bad::before { background: radial-gradient(#ffcd75 35%, transparent 36%) 0 0 / 4px 4px; }
 .legend-item.lv2.bad::before { background: repeating-conic-gradient(#ef7d57 0 25%, transparent 0 50%) 0 0 / 4px 4px; }
 .legend-item.lv3.bad::before { background: repeating-linear-gradient(90deg, #5d275d 0 6px, transparent 6px 8px); }
+/* 2.4: capa «Río» (azul limpio → marrón sucio). */
+.legend-item.lv0.river::before { background: radial-gradient(#9fe4ff 30%, transparent 31%) 0 0 / 8px 8px; }
+.legend-item.lv1.river::before { background: radial-gradient(#2a8fd6 35%, transparent 36%) 0 0 / 4px 4px; }
+.legend-item.lv2.river::before { background: repeating-conic-gradient(#c9a46a 0 25%, transparent 0 50%) 0 0 / 4px 4px; }
+.legend-item.lv3.river::before { background: repeating-linear-gradient(90deg, #94714a 0 6px, transparent 6px 8px); }
 .radio-list.compact .btn.choice { min-height: 48px; padding: 6px 12px; }
 .affects { color: var(--accent); margin: 4px 0; }
 .gloss summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--muted); }
