@@ -50,3 +50,4 @@ export * from './tourism.ts';
 export * from './region.ts';
 export * from './scenarios.ts';
 export * from './achievements.ts';
+export * from './view.ts';
