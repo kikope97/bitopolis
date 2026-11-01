@@ -435,9 +435,9 @@ export function startGame(opts: GameOptions): void {
     cal.querySelector('.cal-m')!.textContent = `${MONTHS[d.month - 1]!.toLowerCase()} A${d.year}`;
     cal.querySelector('.cal-d')!.textContent = String(d.day);
     if (!reducedMotion()) {
-      cal.classList.remove('flip');
-      void cal.offsetWidth;
-      cal.classList.add('flip');
+      const a = cal.classList.contains('flip-a');
+      cal.classList.toggle('flip-a', !a);
+      cal.classList.toggle('flip-b', a);
     }
   }
   /** Desliza la cámara de `from` al destino que calcula `to` (en 1 s). */
@@ -652,7 +652,8 @@ export function startGame(opts: GameOptions): void {
     renderPollChip(state, () => openPolitics(social));
     $('#game').classList.toggle('opposition', state.politics.mayor !== 'player');
     updateDemand();
-    updateToolLocks();
+    // La bandeja solo se ve abierta (al abrirla se pone al día): cerrada, recalcularla en cada estado costaba a x10.
+    if (!$('#tray').hidden) updateToolLocks();
     renderObjectives(state);
     announceEvents();
     tutorial.update(state, tool.id);
