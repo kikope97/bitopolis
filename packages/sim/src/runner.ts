@@ -7,6 +7,7 @@ import { loanLoad, RATINGS, totalOwed } from './loans.ts';
 import { createInitialState, type GameState, type Rating } from './state.ts';
 import { ownIncome } from './money.ts';
 import { CARE } from './balance.ts';
+import { homesOf } from './density.ts';
 import { averageHappiness, step } from './tick.ts';
 import { ruralHomes, ruralShare } from './tourism.ts';
 import { hasRiver, riverExit } from './waterworks.ts';
@@ -56,6 +57,8 @@ export interface SimReport {
   river: { hasRiver: boolean; years: { year: number; exitAvg: number; exitMax: number; sewage: number; renewables: number; fines: number }[] };
   /** 2.4: vida (cuidados y autobús). */
   life: LifeMetrics;
+  /** 2.5: vivienda al final: viviendas (capacidad), bloques crecidos por nivel, inquilinos de la VPO y su deuda con el ayuntamiento. */
+  housing: { homes: number; dense: [number, number]; vpo: number; vpoTenants: number; vpoDebt: number };
 }
 
 /** 2.4: nacimientos, mayores que se van (sin contar fallecidos), pensiones, billete e ingresos propios del ayuntamiento. */
@@ -241,7 +244,20 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
       tourism,
       river,
       life,
+      housing: housingMetrics(state),
     },
+  };
+}
+
+function housingMetrics(state: GameState): SimReport['housing'] {
+  const vpo = new Set(state.buildings.filter((b) => b.kind === 'vpo' && b.built).map((b) => b.id));
+  const tenants = state.citizens.filter((c) => c.homeId !== null && vpo.has(c.homeId));
+  return {
+    homes: state.buildings.reduce((a, b) => a + (b.built ? homesOf(b) : 0), 0),
+    dense: [state.buildings.filter((b) => b.dense === 1).length, state.buildings.filter((b) => b.dense === 2).length],
+    vpo: vpo.size,
+    vpoTenants: tenants.length,
+    vpoDebt: tenants.reduce((a, c) => a + (c.debt?.town ?? 0), 0),
   };
 }
 

@@ -1,6 +1,7 @@
 import { loadBand, loanLoad } from './loans.ts';
 import { TICKS_PER_MONTH, tickToDate } from '@bitopolis/shared';
 import { z } from 'zod';
+import { homesOf } from './density.ts';
 import { CAUSE_ASK } from './associations.ts';
 import { DILEMMA, MIN_WAGE } from './balance.ts';
 import { dilemmaBrief } from './dilemmas.ts';
@@ -47,6 +48,7 @@ Para cada vecino del lote devuelve exactamente un objeto con:
 - "accion": UNA de las acciones de su lista "acciones" (copia el texto exacto). Si no quiere hacer nada especial, "seguir". No inventes acciones.
   Vida (2.4): "llevar_a_residencia"/"cuidar_en_casa" pesan el cariño, la cuota y lo que gana; "buscar_trabajo_fuera" solo si de verdad quiere trabajar fuera; "apuntarse_comision" si le gustan las fiestas. "vida" cuenta cómo están las fiestas, el autobús, las cuotas y el río.
   Comarca (2.5): "hacerse_socio"/"darse_de_baja" de la cooperativa agraria (solo quien tiene finca) pesan la cuota, el sobreprecio de la cosecha y el reparto.
+  Vivienda (2.5): "pedir_vpo" si le cuesta pagar el alquiler o gana poco (entra en el sorteo de la vivienda protegida).
 - "gesto": con quién (id de su lista "con_quien", o 0) y qué ("ninguno", "acercarse", "enfadarse", "hacer_las_paces", "pedir_salir", "romper").
 - "actitud": qué piensa ahora de quien gobierna, de -2 (muy en contra) a 2 (muy a favor). Tiene que salir de lo que vive: impuestos, servicios, su bolsillo, sus planes.
 - "gasto": dónde compra este mes ("pueblo", "fuera" o "ahorrar"), en qué tienda del pueblo si la prefiere (id de la lista de tiendas, o 0) y si se da algún capricho ("ocio"). Comer y lo básico se pagan siempre: tú decides dónde y si hay ocio. Si nadie compra en las tiendas del pueblo, cierran y su gente se queda sin trabajo: compra en el pueblo si le va bien y le compensa.
@@ -188,7 +190,7 @@ function opportunities(state: GameState) {
   return {
     puestos_libres: jobs.reduce((a, b) => a + Math.min(jobsOf(b), b.staff ?? Infinity) - (used.get(b.id) ?? 0), 0),
     donde_se_contrata: jobs.slice(0, 5).map((b) => b.name ?? BUILD_NAMES[b.kind] ?? b.kind),
-    viviendas_libres: state.buildings.filter((b) => b.built && (b.kind === 'house' || b.kind === 'res') && (homes.get(b.id) ?? 0) < (b.kind === 'house' ? 3 : 4)).length,
+    viviendas_libres: state.buildings.filter((b) => b.built && (b.kind === 'house' || b.kind === 'res') && (homes.get(b.id) ?? 0) < homesOf(b)).length,
     local_comercial_libre: freeShopLot(state) !== null,
     tiendas_que_ganan_dinero: state.buildings.filter((b) => b.kind === 'shop' && b.built && (b.books?.sales ?? 0) > (b.books?.wages ?? 0) + (b.books?.taxes ?? 0)).length,
   };

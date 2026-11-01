@@ -1430,12 +1430,44 @@ export const SEASONS = {
 
 /** Bloque F: densidad de las zonas R (viviendas por edificio `res` según el nivel) y VPO. */
 export const DENSITY = {
+  /** Viviendas de un bloque `res` según la densidad a la que ha crecido (baja, media, alta). */
   homes: [4, 8, 12],
+  /**
+   * Crece si el suelo de su casilla vale más de `minLand` y la demanda R pasa de `minDemandR`.
+   * Medido con pnpm sim (constructor, semillas 1–4, 4 años): con 40 la demanda R casi nunca
+   * llegaba con pocas viviendas libres (con el pueblo ya grande ronda 20–35) y no crecía ningún bloque.
+   */
   minLand: 60,
-  minDemandR: 40,
+  minDemandR: 25,
+  /** Ruido en la casilla del bloque por cada nivel crecido (radio 1). */
   noisePerLevel: 10,
+  noiseRadius: 1,
+  /** Nivel de ayuntamiento que pide cada densidad (la baja no pide nada). */
+  townhall: [1, 2, 3],
+  /** Cada cuántos días se mira si algún bloque crece, y cuántos como mucho. */
+  everyDays: 7,
+  perCheck: 1,
+  /** No crece si ya sobran tantas viviendas libres (como las zonas). */
+  maxFree: 6,
 };
-export const VPO = { homes: 6, rent: 120 };
+/**
+ * Vivienda protegida: 6 pisos a 120 €/mes (con `charge`), adjudicados cada mes
+ * por sorteo (hash, sin dados) entre quienes la pidieron y los `pool` que menos ganan.
+ */
+export const VPO = {
+  homes: 6,
+  rent: 120,
+  pool: 6,
+  /** Meses que vale una petición (`pedir_vpo`). */
+  askMonths: 3,
+  /** Por reglas: pide quien ganó menos de esto el mes pasado (€) y no tiene casa en propiedad. */
+  askIncome: 700,
+  /** Ánimo de quien recibe el piso y recuerdo. */
+  winMood: 6,
+  /** Dilema «la última VPO»: ánimo de quien se queda fuera y su rencor. */
+  leftOutMood: -5,
+  leftOutGrudge: 2,
+};
 
 /**
  * Bloque G: cooperativa agraria (coop.ts). Los socios son vecinos con finca (dueños o

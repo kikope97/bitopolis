@@ -37,6 +37,7 @@ import {
   ratSprite,
   trashBagsSprite,
   truckSprite,
+  resSprite,
   serviceSprite,
   sparkleSprite,
   thiefSprite,
@@ -327,6 +328,8 @@ function bSprite(b: GameState['buildings'][number], tod: TimeOfDay, snowing: boo
   if (b.kind === 'farm' && b.crop) return farmSprite(b.crop, b.id, tod, snowing);
   // 2.3: el patrimonio, con la forma que le da el terreno.
   if (b.kind === 'heritage') return heritageSprite(heritageVariant(state, b.x, b.y), tod, snowing);
+  // 2.5: el bloque que creció con la densidad de su zona.
+  if (b.kind === 'res' && b.dense) return resSprite(b.dense, b.id, tod, snowing, state.rank?.level ?? 2);
   // 2.1: los tejados de las viviendas cambian con el rango del pueblo.
   return buildingSprite(b.kind, b.id, tod, snowing, state.rank?.level ?? 2);
 }

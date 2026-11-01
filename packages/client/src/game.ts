@@ -87,6 +87,7 @@ import { LAYERS, type LayerId, NEED_ICON } from './layers.ts';
 import { vidaBox } from './vida-ui.ts';
 import { coopPostBox } from './coop-ui.ts';
 import { openMailbox, unreadLetters } from './mail-ui.ts';
+import { viviendaBox } from './vivienda-ui.ts';
 import { openTownHall } from './civic-ui.ts';
 import { openAlbum, snapMoments } from './album-ui.ts';
 import { openAway } from './away-ui.ts';
@@ -103,7 +104,7 @@ import { formatDate, money, MONTHS, plural, shortDate, t } from './i18n.ts';
 import { busTrips, type Camera, type Preview, render, restartAnimations, signSpot } from './render.ts';
 import type { FromWorker, SaveBatch, ToWorker } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
-import { buildingSprite, landmarkSprite, letterSprite, T, ZONE_COLOR } from './sprites.ts';
+import { buildingSprite, landmarkSprite, letterSprite, resSprite, T, ZONE_COLOR } from './sprites.ts';
 import { bigCompanyContent, landmarkContent, openRegion, regionAttention, regionSummary } from './landmarks-ui.ts';
 import { commandFor, costText, isLocked, lockLong, lockShort, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayCost } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
@@ -291,6 +292,9 @@ export function startGame(opts: GameOptions): void {
       dust(cmd.x, cmd.y);
       shake(3, 250);
       say('Derribado.');
+    } else if (cmd.type === 'SetZoneDensity') {
+      sfx.tap();
+      say(`Densidad ${['baja', 'media', 'alta'][cmd.level]} marcada en la zona R.`);
     } else if (cmd.type === 'Zone') {
       sfx.tap();
       say(cmd.zone === 'none' ? 'Zona quitada.' : `Zona ${cmd.zone} pintada: ${plural(cmd.w * cmd.h, 'casilla', 'casillas')}.`);
@@ -1381,6 +1385,10 @@ export function startGame(opts: GameOptions): void {
   function lineText(a: { x: number; y: number }, b: { x: number; y: number }): string {
     const cmd = commandFor(tool, a, b);
     if (!cmd) return '';
+    if (cmd.type === 'SetZoneDensity') {
+      const r = tilesOf(cmd).filter((t) => t.x < state.map.w && t.y < state.map.h && state.map.zones[t.y * state.map.w + t.x] === 1).length;
+      return r ? `${plural(r, 'casilla R', 'casillas R')}, gratis` : 'aquí no hay zona R';
+    }
     if (cmd.type === 'Zone') {
       const { changed, skipped } = zoneChanges(state, cmd);
       if (cmd.zone === 'none') return `${plural(changed, 'casilla', 'casillas')}, gratis`;
@@ -1440,7 +1448,7 @@ export function startGame(opts: GameOptions): void {
     $('#confirm-text').replaceChildren(h('span', { class: 'cc-what' }, what), demolishText || !cost ? '' : h('span', { class: 'cc-cost' }, v.ok ? cost : `Cuesta ${cost}`), warn);
     $('#confirm-bar').classList.toggle('warn', after < 0);
     const yes = $('#confirm-yes') as HTMLButtonElement;
-    yes.textContent = demolishText ? 'Derribar' : tool.zone ? (tool.zone === 'none' ? 'Quitar zona' : 'Marcar zona') : tool.landmark ? 'Marcar el solar' : 'Construir';
+    yes.textContent = demolishText ? 'Derribar' : tool.zone ? (tool.zone === 'none' ? 'Quitar zona' : 'Marcar zona') : tool.density !== undefined ? 'Marcar densidad' : tool.landmark ? 'Marcar el solar' : 'Construir';
     yes.className = demolishText ? 'btn danger' : 'btn primary';
     yes.disabled = !v.ok;
     // Si no se puede, no se ofrece «Construir»: solo el motivo y ✕ (ronda 11).
@@ -1601,6 +1609,14 @@ export function startGame(opts: GameOptions): void {
       img.getContext('2d')!.drawImage(letterSprite(tl.zone, color), 0, 0);
       img.classList.add('letter');
       wrap.append(img);
+    } else if (tl.density !== undefined) {
+      // 2.5: el bloque tal como crecería con esa densidad.
+      const c = resSprite(tl.density, 7);
+      const img = document.createElement('canvas');
+      img.width = c.width;
+      img.height = c.height;
+      img.getContext('2d')!.drawImage(c, 0, 0);
+      wrap.append(img);
     } else {
       wrap.append(pixelIcon(tl.id === 'dezone' ? 'demolish' : tl.id));
     }
@@ -1698,7 +1714,7 @@ export function startGame(opts: GameOptions): void {
   }
   function toolHelp(tl: Tool): string {
     if (tl.id === 'road') return coarse ? 'toca el inicio y luego el final (o arrastra desde el inicio).' : 'arrastra en línea recta. Por debajo van el agua y la luz.';
-    if (tl.zone && tl.zone !== 'none') return coarse ? `${tl.help} Toca una esquina y luego la otra.` : tl.help;
+    if ((tl.zone && tl.zone !== 'none') || tl.density !== undefined) return coarse ? `${tl.help} Toca una esquina y luego la otra.` : tl.help;
     if (tl.id === 'demolish') return 'toca lo que quieras derribar. Te pedirá confirmación.';
     return tl.help;
   }
@@ -1731,6 +1747,8 @@ export function startGame(opts: GameOptions): void {
     if (pendingPlace) cancelPlace();
     showBar(false);
     closeTray();
+    // 2.5: con la densidad en la mano, se ve la capa «Densidad» (si no había otra).
+    if (tl.density !== undefined && layer === 'none') setLayer('density');
     // Ronda 12: una hoja abierta tapaba la barra de confirmar (no se podía ni confirmar ni cancelar).
     if (isSheetOpen() && id !== 'inspect') closeSheet();
     tutorial.update(state, tool.id);
@@ -1984,6 +2002,9 @@ export function startGame(opts: GameOptions): void {
       // 2.5: cooperativa agraria (socios, presidente y reparto) y correos (plazo de las subvenciones y buzón).
       const coopPost = coopPostBox(state, b, citizenList, () => withBack('Ficha', () => focusBuilding(b.id), openMail));
       if (coopPost) content.push(coopPost);
+      // 2.5: vivienda protegida (quién vive y el alquiler) y bloques con densidad.
+      const viv = viviendaBox(state, b, citizenList);
+      if (viv) content.push(viv);
       // v1.8 (petición del creador): los servicios suben de nivel.
       if (UPGRADABLE.includes(b.kind)) content.push(levelBox(b));
       const res = occupants(state, b);
@@ -1999,7 +2020,7 @@ export function startGame(opts: GameOptions): void {
           broke ? h('p', { class: 'pocket-warn' }, `€ ${broke === 1 ? 'Uno debe' : `${broke} deben`} dinero: ${money(res.reduce((t, c) => t + totalDebt(c), 0))} en total.`) : '',
           citizenList(res),
         );
-      } else if (res.length) content.push(h('h3', {}, 'Viven aquí'), citizenList(res));
+      } else if (res.length && b.kind !== 'vpo') content.push(h('h3', {}, 'Viven aquí'), citizenList(res));
       if (workers.length) content.push(h('h3', {}, 'Trabajan aquí'), citizenList(workers));
       if (b.kind === 'house') {
         const sale = !!b.forSale;

@@ -125,6 +125,8 @@ export const MEMORY_KINDS = [
   // 2.5: correos.
   'carta',
   'volvio',
+  // 2.5 (bloque F): vivienda protegida.
+  'piso_protegido',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -419,6 +421,8 @@ export function memoryText(state: GameState, m: Memory): string {
       return `Recibió carta de ${who}`;
     case 'volvio':
       return 'Volvió al pueblo';
+    case 'piso_protegido':
+      return 'Le tocó un piso de la vivienda protegida';
   }
 }
 

@@ -135,6 +135,8 @@ export interface Building {
   spill?: number;
   /** Ronda 20: multada por verter (dilema): echa la mitad hasta este tick. */
   cleanUntil?: number;
+  /** 2.5: bloque `res` que ya creció con la densidad de su zona (1 media, 2 alta; density.ts). */
+  dense?: number;
 }
 
 /** 2.2: cultivos de las fincas (ver farm.ts). */
@@ -162,6 +164,8 @@ export interface Citizen {
   care?: 'residencia' | 'casa';
   /** Ronda 20: última vez que buscó trabajo fuera en autobús (una vez al mes). */
   busSearch?: number;
+  /** 2.5: última vez que pidió una vivienda protegida (`pedir_vpo`, density.ts). */
+  vpoAsk?: number;
   id: number;
   name: string;
   age: number;
@@ -952,7 +956,7 @@ export interface TransitState {
   riders?: number;
 }
 
-export type DilemmaKind = 'ultima_plaza_residencia' | 'familia_con_deudas' | 'fabrica_vierte' | 'preso_arrepentido';
+export type DilemmaKind = 'ultima_plaza_residencia' | 'familia_con_deudas' | 'fabrica_vierte' | 'preso_arrepentido' | 'ultima_vpo';
 export interface Dilemma {
   id: number;
   kind: DilemmaKind;

@@ -9,7 +9,8 @@
  * (`careRuleAction`).
  */
 import { DAYS_PER_YEAR, TICKS_PER_DAY } from '@bitopolis/shared';
-import { CARE, HOMES } from './balance.ts';
+import { CARE } from './balance.ts';
+import { homesOf } from './density.ts';
 import type { CommandResult } from './commands.ts';
 import { charge } from './household.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
@@ -215,7 +216,7 @@ export function careParent(state: GameState, c: Citizen): Citizen | undefined {
 function roomAt(state: GameState, homeId: number | null): boolean {
   if (homeId === null) return false;
   const h = state.buildings.find((b) => b.id === homeId);
-  return !!h && h.built && !h.damaged && (HOMES[h.kind] ?? 0) > state.citizens.filter((x) => x.homeId === homeId).length;
+  return !!h && h.built && !h.damaged && homesOf(h) > state.citizens.filter((x) => x.homeId === homeId).length;
 }
 
 /** Acciones del menú de la IA (al final del menú): plazas y cuota reales. */
