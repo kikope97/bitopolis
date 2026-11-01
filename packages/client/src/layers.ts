@@ -8,7 +8,7 @@ import { T } from './sprites.ts';
  * servicios y contaminación. Cada nivel usa una trama distinta además del
  * color, para que el color nunca sea la única señal.
  */
-export type LayerId = 'none' | 'missing' | 'happiness' | 'pocket' | 'land' | 'services' | 'pollution' | 'clean' | 'rural' | 'river';
+export type LayerId = 'none' | 'missing' | 'happiness' | 'pocket' | 'land' | 'services' | 'pollution' | 'clean' | 'rural' | 'river' | 'density';
 
 interface LayerDef {
   id: LayerId;
@@ -48,6 +48,8 @@ export const LAYERS: LayerDef[] = [
   { id: 'rural', label: 'Casas rurales', colors: GOOD, legend: legend(['Alquiler más caro', 'Vivienda', 'Patrimonio y entorno', 'Casa rural'], 'good') },
   // 2.4: lo que baja por el río (fields.river, waterworks.ts).
   { id: 'river', label: 'Río', colors: RIVER, legend: legend(['Limpio', 'Algo turbio', 'Sucio', 'Muy sucio'], 'river') },
+  // 2.5: densidad de la zona R (map.density) y los bloques que ya han crecido.
+  { id: 'density', label: 'Densidad', colors: GOOD, legend: legend(['Baja', 'Media', 'Alta', 'Bloque crecido'], 'good') },
 ];
 
 function legend(names: string[], kind: string) {
@@ -61,6 +63,12 @@ function values(state: GameState, layer: LayerId): (number | null)[] {
   if (layer === 'pollution') return state.fields.pollution.map((v) => (v < 3 ? null : v));
   // 2.4: solo en las casillas de río (0 limpio … 100 muy sucio; la salida, igual).
   if (layer === 'river') return state.map.terrain.map((t, i) => (t === 1 ? (state.fields.river?.[i] ?? 0) : null));
+  // 2.5: solo en la zona R; el bloque que ya creció, en lo más alto.
+  if (layer === 'density') {
+    const out: (number | null)[] = state.map.zones.map((z, i) => (z === 1 ? [10, 40, 60][state.map.density?.[i] ?? 0]! : null));
+    for (const b of state.buildings) if (b.kind === 'res' && b.dense) out[b.y * w + b.x] = 90;
+    return out;
+  }
   if (layer === 'missing') {
     const out: (number | null)[] = new Array(n).fill(null);
     for (const m of missingMarks(state)) {

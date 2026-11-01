@@ -1432,9 +1432,13 @@ export const SEASONS = {
 export const DENSITY = {
   /** Viviendas de un bloque `res` según la densidad a la que ha crecido (baja, media, alta). */
   homes: [4, 8, 12],
-  /** Crece si el suelo de su casilla vale más de `minLand` y la demanda R pasa de `minDemandR`. */
+  /**
+   * Crece si el suelo de su casilla vale más de `minLand` y la demanda R pasa de `minDemandR`.
+   * Medido con pnpm sim (constructor, semillas 1–4, 4 años): con 40 la demanda R casi nunca
+   * llegaba con pocas viviendas libres (con el pueblo ya grande ronda 20–35) y no crecía ningún bloque.
+   */
   minLand: 60,
-  minDemandR: 40,
+  minDemandR: 25,
   /** Ruido en la casilla del bloque por cada nivel crecido (radio 1). */
   noisePerLevel: 10,
   noiseRadius: 1,

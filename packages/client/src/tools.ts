@@ -1,5 +1,5 @@
 import type { BuildKind, Command, LandmarkKind, ZoneKind } from '@bitopolis/shared';
-import { BUILD, BUILD_LEVEL, buildCost, CARE, CIVIL, FARM, type GameState, hasRiver, LANDMARK_LATER, LANDMARKS, landmarkReqs, Terrain, TERRAIN, TOWNHALL_LEVELS, townLevel, WATERWORKS, ZONE_COST_PER_TILE } from '@bitopolis/sim';
+import { BUILD, BUILD_LEVEL, buildCost, CARE, CIVIL, DENSITY, VPO, FARM, type GameState, hasRiver, LANDMARK_LATER, LANDMARKS, landmarkReqs, Terrain, TERRAIN, TOWNHALL_LEVELS, townLevel, WATERWORKS, ZONE_COST_PER_TILE } from '@bitopolis/sim';
 import { money } from './i18n.ts';
 
 export type ToolId =
@@ -43,6 +43,11 @@ export type ToolId =
   | 'solar'
   | 'wind'
   | 'busstation'
+  // 2.5: densidad de la zona R y vivienda protegida.
+  | 'densityLow'
+  | 'densityMid'
+  | 'densityHigh'
+  | 'vpo'
   | 'demolish';
 
 export interface Tool {
@@ -54,6 +59,8 @@ export interface Tool {
   zone?: ZoneKind;
   /** 2.3: gran obra (se empieza con StartLandmark y se paga por fases). */
   landmark?: LandmarkKind;
+  /** 2.5: densidad que marca en la zona R (`SetZoneDensity`). */
+  density?: 0 | 1 | 2;
   key: string;
   help: string;
 }
@@ -104,6 +111,11 @@ export const TOOLS: Tool[] = [
   { id: 'solar', label: 'Placas solares', shape: 'tap', build: 'solar', key: '', help: `Luz para ${WATERWORKS.solar.buildings} edificios por la red, sin humo. En invierno dan menos y con nieve, casi nada.` },
   { id: 'wind', label: 'Molino de viento', shape: 'tap', build: 'wind', key: '', help: `Solo en la colina: luz para ${WATERWORKS.wind.buildings} edificios (más con tormenta). Hace ruido a ${WATERWORKS.wind.noiseRadius} casillas.` },
   { id: 'busstation', label: 'Estación de autobuses', shape: 'tap', build: 'busstation', key: '', help: 'Una por pueblo: llega a todos. Quien trabaja fuera va en autobús, viene más gente y el Consorcio paga la mitad. El billete, en su ficha.' },
+  // 2.5: se traza como las zonas, solo cambia la zona R.
+  { id: 'densityMid', label: 'Densidad media', shape: 'rect', density: 1, key: '', help: `Marca zona R: sus bloques crecen a ${DENSITY.homes[1]} viviendas si el suelo vale más de ${DENSITY.minLand} y hay demanda (R > ${DENSITY.minDemandR}). Hacen algo más de ruido.` },
+  { id: 'densityHigh', label: 'Densidad alta', shape: 'rect', density: 2, key: '', help: `Marca zona R: sus bloques crecen hasta ${DENSITY.homes[2]} viviendas (con suelo de más de ${DENSITY.minLand} y demanda R > ${DENSITY.minDemandR}). Más gente, más ruido.` },
+  { id: 'densityLow', label: 'Densidad baja', shape: 'rect', density: 0, key: '', help: `Vuelve a casas bajas de ${DENSITY.homes[0]} viviendas. Lo que ya ha crecido se queda como está.` },
+  { id: 'vpo', label: 'Vivienda protegida', shape: 'tap', build: 'vpo', key: '', help: `${VPO.homes} pisos a ${money(VPO.rent)} al mes. Se sortean cada mes entre quienes los piden y los que menos ganan.` },
   { id: 'dezone', label: 'Sin zona', shape: 'rect', zone: 'none', key: 'z', help: 'Quita la zona (no derriba lo construido).' },
   { id: 'demolish', label: 'Derribar', shape: 'tap', key: 'x', help: 'Derriba un edificio o una carretera. Pide confirmación.' },
 ];
@@ -120,6 +132,7 @@ export function toolLevel(tool: Tool): number {
   if (tool.id === 'dike') return BUILD_LEVEL.civilprotection;
   if (tool.zone === 'A') return FARM.level;
   if (tool.zone && tool.zone !== 'none') return 2;
+  if (tool.density !== undefined) return Math.max(2, DENSITY.townhall[tool.density]!);
   return 1;
 }
 
@@ -184,7 +197,7 @@ export function trayCost(tool: Tool): string {
   if (tool.landmark) return landmarkCost(tool.landmark);
   if (tool.build && tool.build !== 'road') return money(buildCost(tool.build));
   if (tool.zone && tool.zone !== 'none') return `${money(ZONE_COST_PER_TILE)}/casilla`;
-  if (tool.zone === 'none') return 'gratis';
+  if (tool.zone === 'none' || tool.density !== undefined) return 'gratis';
   if (tool.id === 'dike') return `${money(CIVIL.dikeCost)}/casilla`;
   return '';
 }
@@ -197,6 +210,8 @@ export const TRAY: { title: string; tools: ToolId[] }[] = [
   { title: 'Vida social', tools: ['bar', 'chapel', 'cemetery', 'library', 'sports'] },
   { title: 'Emergencias', tools: ['firestation', 'civilprotection', 'dike'] },
   // 2.4 «Vida».
+  // 2.5: vivienda (la densidad se traza como las zonas).
+  { title: 'Vivienda', tools: ['vpo', 'densityMid', 'densityHigh', 'densityLow'] },
   { title: 'Cuidados', tools: ['nursery', 'residence'] },
   { title: 'Agua y energía', tools: ['sewage', 'solar', 'wind'] },
   { title: 'Transporte', tools: ['busstation'] },
@@ -218,6 +233,7 @@ export function costText(tool: Tool): string {
   }
   if (tool.zone && tool.zone !== 'none') return `${money(ZONE_COST_PER_TILE)} por casilla`;
   if (tool.id === 'dike') return `${money(CIVIL.dikeCost)} por casilla de orilla`;
+  if (tool.density !== undefined) return 'gratis (solo cambia la zona R)';
   return '';
 }
 
@@ -239,6 +255,11 @@ export function commandFor(tool: Tool, a: { x: number; y: number }, b: { x: numb
     const w = Math.min(16, Math.abs(b.x - a.x) + 1);
     const h = Math.min(16, Math.abs(b.y - a.y) + 1);
     return { type: 'Zone', zone: tool.zone, x, y, w, h };
+  }
+  if (tool.shape === 'rect' && tool.density !== undefined) {
+    const x = Math.min(a.x, b.x);
+    const y = Math.min(a.y, b.y);
+    return { type: 'SetZoneDensity', level: tool.density, x, y, w: Math.min(16, Math.abs(b.x - a.x) + 1), h: Math.min(16, Math.abs(b.y - a.y) + 1) };
   }
   if (tool.build) return { type: 'Build', kind: tool.build, x: b.x, y: b.y };
   if (tool.landmark) return { type: 'StartLandmark', kind: tool.landmark, x: b.x, y: b.y };
@@ -262,7 +283,7 @@ export function tilesOf(cmd: Command): { x: number; y: number }[] {
     }
     return out;
   }
-  if (cmd.type === 'Zone') {
+  if (cmd.type === 'Zone' || cmd.type === 'SetZoneDensity') {
     const out = [];
     for (let y = cmd.y; y < cmd.y + cmd.h; y++) for (let x = cmd.x; x < cmd.x + cmd.w; x++) out.push({ x, y });
     return out;
