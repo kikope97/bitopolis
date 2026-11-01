@@ -294,6 +294,8 @@ El alcance está congelado hasta la v1.0. Todo lo de la sección 15 solo entra s
 
 - **v2.0 — La superIA del pueblo** (ronda 16, pedido por el creador): turnos semanales con IA para un % de vecinos, decisiones económicas por lotes, director del pueblo con presupuesto de drama, notas y contagio de actitud, modelos desde la API key y escalera de gasto. Ver §9.6.
 
+- **v2.1 — Emergencias y encargos** (ronda 17, pedido por el creador): bomberos e incendios con aviso previo, protección civil y diques, ambulancia, basura y punto limpio, encargos del pueblo, El Eco de Bitópolis, rangos de aldea a capital comarcal con escudo, «Mientras no estabas». Siguientes versiones: `docs/propuestas/hoja-de-ruta-2.x.md`.
+
 ## 15. Después de la v1.0 (backlog, no implementar antes)
 
 Deuda municipal con límites reales y calificación crediticia; presupuesto anual votado; subvenciones con plazo y cofinanciación; funcionarios y externalización; PGOU y licitaciones; dificultad "Interventor" con toda la burocracia; sindicatos, asociaciones (hechas en la v1.7) y huelgas; ciclo vital (nacimientos, herencias, muertes); cultura y fiestas inventadas por los vecinos; ciudades vecinas con alcalde IA y migración entre ellas; presidencia de varias ciudades; contenido nuevo propuesto por los agentes (como JSON validado y probado con `pnpm sim`); tarjetas compartibles y álbum del pueblo; visitar pueblos de amigos en solo lectura; árbol genealógico; mapas con terreno; modo acuario (el alcalde también es una IA); apps nativas de iOS y Android.
