@@ -792,6 +792,10 @@ export function startGame(opts: GameOptions): void {
           attention(a?.x !== undefined && a.y !== undefined ? { x: a.x, y: a.y } : hallSpot());
         }
         toast(e.text, { kind: urgent ? 'warn' : 'info', sticky: urgent || e.text.startsWith('Nace'), onClick: () => openTownHall(social, 'associations') });
+      } else if (e.kind === 'politics' && /comisión de festejos/.test(e.text)) {
+        // 2.4: la comisión de festejos pide presupuesto: aviso fijo que lleva a su sección.
+        slowDown();
+        toast(e.text, { kind: 'info', sticky: true, onClick: () => openTownHall(social, 'seasons') });
       } else if (e.kind === 'politics' && /presupuesto/i.test(e.text)) {
         const decide = e.text.startsWith('Toca presentar');
         if (decide) slowDown();
@@ -2160,6 +2164,10 @@ export function startGame(opts: GameOptions): void {
     const assocs = state.associations ?? [];
     const protest = assocs.some((a) => a.protestDay >= 0);
     if (assocs.length) townSum.push(protest ? 'manifestación convocada' : plural(assocs.length, 'asociación vecinal', 'asociaciones vecinales'));
+    // 2.4: la comisión de festejos espera presupuesto.
+    const fiesta = state.seasons?.current;
+    const fiestaAsks = !!fiesta && fiesta.status === 'comision' && !!fiesta.asked;
+    if (fiestaAsks) townSum.push('la comisión de festejos pide presupuesto');
     sheet(
       'Pueblo',
       // 2.1: el rango y el escudo del pueblo, arriba del todo.
@@ -2179,7 +2187,7 @@ export function startGame(opts: GameOptions): void {
         [townSum.join(' · ')],
         // v1.9.1: el ayuntamiento cuesta de encontrar en el mapa; desde aquí se llega a «Gestión del pueblo».
         item(`Nivel ${townLevel(state)} · ${townLevel(state) >= TOWNHALL_LEVELS.length ? 'Gestión' : 'Ampliar'}`, go(openHall), canUpgradeTownhall(state).ok),
-        item('Presupuesto y fiestas', go(() => openTownHall(social)), budgetOpen || offers > 0 || protest),
+        item('Presupuesto y fiestas', go(() => openTownHall(social, fiestaAsks ? 'seasons' : undefined)), budgetOpen || offers > 0 || protest || fiestaAsks),
         // 2.3: turismo (desde el nivel 3 o en cuanto hay visitantes).
         ...(townLevel(state) >= 3 || state.tourism.visitors > 0 ? [item(`Turismo · ${plural(state.tourism.visitors, 'visitante', 'visitantes')}`, go(() => openTownHall(social, 'tourism')), touristified(state))] : []),
         item('Pleno municipal', go(() => openPleno(social))),
