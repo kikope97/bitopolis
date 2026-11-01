@@ -87,7 +87,7 @@ describe('guardería (2.4)', () => {
 
   it('con plaza de guardería cerca, la natalidad sube ×1,5; sin sitio libre, no', () => {
     const s = blank();
-    const [[a]] = couples(s, 1);
+    const [a] = couples(s, 1)[0]!;
     expect(birthFx(s, a!, nurseryUse(s)).fx).toBe(1);
     const n = built(s, 'nursery', 12, 12);
     expect(birthFx(s, a!, nurseryUse(s)).fx).toBe(CARE.birthWithPlace);
@@ -123,7 +123,7 @@ describe('guardería (2.4)', () => {
 
   it('sin plaza, el que menos cobra de la pareja deja su trabajo de fuera (una vez) y no busca otro mientras', () => {
     const s = blank(3);
-    const [[a, b]] = couples(s, 1);
+    const [a, b] = couples(s, 1)[0]!;
     a!.kids = [s.tick];
     a!.last = { in: 1_200, out: 0, repaid: 0, owed: 0, grew: 0 };
     b!.last = { in: 700, out: 0, repaid: 0, owed: 0, grew: 0 };
@@ -143,7 +143,7 @@ describe('guardería (2.4)', () => {
 
   it('con plaza de guardería nadie deja el trabajo', () => {
     const s = blank(3);
-    const [[a, b]] = couples(s, 1);
+    const [a, b] = couples(s, 1)[0]!;
     built(s, 'nursery', 11, 11);
     a!.kids = [s.tick];
     for (let i = 0; i < 100; i++) childcareMonth(s);
@@ -153,7 +153,7 @@ describe('guardería (2.4)', () => {
 
   it('la cuota se cobra con charge: lo que no se paga queda como deuda con el ayuntamiento', () => {
     const s = blank();
-    const [[a]] = couples(s, 1);
+    const [a] = couples(s, 1)[0]!;
     built(s, 'nursery', 11, 11);
     a!.kids = [s.tick];
     transfer(s, a!.id, OUTSIDE, a!.money);

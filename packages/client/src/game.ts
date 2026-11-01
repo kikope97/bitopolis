@@ -84,6 +84,7 @@ import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
 import { openNeighbours, openReport, openTaxes as openTaxesSheet } from './economy-ui.ts';
 import { heavyLoad, loadPct, openLoans } from './loans-ui.ts';
 import { LAYERS, type LayerId, NEED_ICON } from './layers.ts';
+import { vidaBox } from './vida-ui.ts';
 import { openTownHall } from './civic-ui.ts';
 import { openAlbum, snapMoments } from './album-ui.ts';
 import { openAway } from './away-ui.ts';
@@ -97,7 +98,7 @@ import { errandsSummary, openErrands, openPress } from './town-news-ui.ts';
 import { openWhatsHappening, turnHeadline } from './ai-town-ui.ts';
 import { pocketMark } from './money-ui.ts';
 import { formatDate, money, MONTHS, plural, shortDate, t } from './i18n.ts';
-import { type Camera, type Preview, render, restartAnimations, signSpot } from './render.ts';
+import { busTrips, type Camera, type Preview, render, restartAnimations, signSpot } from './render.ts';
 import type { FromWorker, SaveBatch, ToWorker } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
 import { buildingSprite, landmarkSprite, letterSprite, T, ZONE_COLOR } from './sprites.ts';
@@ -1973,6 +1974,9 @@ export function startGame(opts: GameOptions): void {
         content.push(go);
       }
       if (b.rural && (b.kind === 'house' || b.kind === 'res')) content.push(h('p', { class: 'muted small' }, 'Casa rural: su dueño alquila plazas a los visitantes.'));
+      // 2.4 «Vida»: estación (billete), guardería y residencia (cuota), depuradora (el río) y renovables (la luz).
+      const vida = vidaBox(state, b, command, citizenList);
+      if (vida) content.push(vida);
       // v1.8 (petición del creador): los servicios suben de nivel.
       if (UPGRADABLE.includes(b.kind)) content.push(levelBox(b));
       const res = occupants(state, b);
@@ -2557,6 +2561,10 @@ export function startGame(opts: GameOptions): void {
     get highlight() {
       return highlight ? { x: highlight.x, y: highlight.y } : null;
     },
+    /** 2.4: viajes del autobús que han empezado en el mapa. */
+    get busTrips() {
+      return busTrips;
+    },
     /** Para las pruebas: centra la cámara en una casilla (no toca el estado). */
     centerOn(tx: number, ty: number) {
       centerOn(tx, ty);
@@ -2574,7 +2582,7 @@ export function startGame(opts: GameOptions): void {
     // La sacudida se aplica a una copia de la cámara: no cambia dónde mira el jugador.
     const [sx, sy] = shakeOffset(time);
     const view = sx || sy ? { ...cam, x: cam.x + sx * dpr(), y: cam.y + sy * dpr() } : cam;
-    render(ctx, state, view, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer, highlight, labels: cam.zoom >= touchZoom() });
+    render(ctx, state, view, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer, highlight, labels: cam.zoom >= touchZoom(), fast: speed >= 10 });
     placeBubbles();
     requestAnimationFrame(frame);
   }

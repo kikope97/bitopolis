@@ -1,4 +1,5 @@
-import { ambulanceFor, buildingAt, type GameState, heritageVariant, isWater, streetSegment, Terrain, Tile, trashStateOf, truckRoutes, Zone } from '@bitopolis/sim';
+import { tickToDate } from '@bitopolis/shared';
+import { ambulanceFor, busStation, buildingAt, type GameState, heritageVariant, isWater, streetSegment, Terrain, Tile, trashStateOf, truckRoutes, Zone } from '@bitopolis/sim';
 import { happinessMarks, type LayerId, layerCanvas, missingMarks, NEED_ICON, ruralMarks } from './layers.ts';
 import { pixelIcon } from './icons.ts';
 
@@ -49,6 +50,9 @@ import {
   farmSprite,
   heritageSprite,
   riskSprite,
+  busSprite,
+  bonfireSprite,
+  windSprite,
 } from './sprites.ts';
 
 export interface Camera {
@@ -417,7 +421,7 @@ export function render(
   ctx: CanvasRenderingContext2D,
   state: GameState,
   cam: Camera,
-  opts: { preview?: Preview | null; selected?: { x: number; y: number } | null; cursor?: { x: number; y: number } | null; time: number; reducedMotion: boolean; layer?: LayerId; highlight?: { x: number; y: number; since: number } | null; labels?: boolean },
+  opts: { preview?: Preview | null; selected?: { x: number; y: number } | null; cursor?: { x: number; y: number } | null; time: number; reducedMotion: boolean; layer?: LayerId; highlight?: { x: number; y: number; since: number } | null; labels?: boolean; fast?: boolean },
 ): void {
   const z = cam.zoom;
   const ts = T * z;
@@ -485,6 +489,9 @@ export function render(
   const dikes = new Set(state.dikes ?? []);
   const projects = new Map(state.projects.map((p) => [p.buildingId, p]));
   const blink = opts.reducedMotion || Math.floor(opts.time / 600) % 2 === 0;
+  // 2.4: fiestas de temporada: luces de Navidad en las farolas y la hoguera de San Juan.
+  const xmas = xmasTime(state);
+  const bonfire = bonfireSpot(state, mapSig);
 
   const drawWalkers = (row: number) => {
     for (const p of byRow.get(row) ?? []) {
@@ -500,7 +507,14 @@ export function render(
       const px = x * ts - cam.x;
       const py = (y * T - (BH - T)) * z - cam.y;
       const b = byTile.get(y * w + x);
-      if (!b && tiles[y * w + x] === Tile.Road && lampAt(state, byTile, x, y)) drawLamp(ctx, px, y * ts - cam.y, z, tod);
+      if (!b && tiles[y * w + x] === Tile.Road && lampAt(state, byTile, x, y)) {
+        drawLamp(ctx, px, y * ts - cam.y, z, tod);
+        if (xmas) drawXmasLights(ctx, px, y * ts - cam.y, z, still ? 0 : Math.floor(opts.time / 700 + x + y) % 2);
+      }
+      if (bonfire && bonfire.x === x && bonfire.y === y) {
+        ctx.drawImage(bonfireSprite(still ? 0 : Math.floor(opts.time / 260) % 2, tod), px + 8 * z, y * ts - cam.y + 8 * z, 16 * z, 16 * z);
+        continue;
+      }
       if (!b && dikes.has(y * w + x)) {
         ctx.drawImage(dikeSprite(tod), px, y * ts - cam.y, ts, ts);
         continue;
@@ -551,11 +565,13 @@ export function render(
       }
       // Squash & stretch al terminarse (anclado abajo, en el centro).
       const [sx, sy] = squash(b.id, opts.time);
-      if (sx === 1 && sy === 1) ctx.drawImage(bSprite(b, tod, snowing, state), px, py, ts, BH * z);
+      // 2.4: las aspas del molino giran (quietas con movimiento reducido).
+      const img = b.kind === 'wind' && !b.damaged ? windSprite(still ? 0 : Math.floor(opts.time / 260 + b.id) % 3, tod, snowing) : bSprite(b, tod, snowing, state);
+      if (sx === 1 && sy === 1) ctx.drawImage(img, px, py, ts, BH * z);
       else {
         const dw = Math.round(ts * sx);
         const dh = Math.round(BH * z * sy);
-        ctx.drawImage(bSprite(b, tod, snowing, state), px + Math.round((ts - dw) / 2), py + BH * z - dh, dw, dh);
+        ctx.drawImage(img, px + Math.round((ts - dw) / 2), py + BH * z - dh, dw, dh);
       }
       // 2.1: llamas (2 fotogramas, sin destellos) y aviso de riesgo encima.
       if (b.fire) {
@@ -717,6 +733,7 @@ export function render(
   drawThief(ctx, state, cam, opts.time, opts.reducedMotion, tod);
   drawFireTrucks(ctx, state, cam, opts.time, opts.reducedMotion, tod);
   drawAmbulance(ctx, state, cam, opts.time, opts.reducedMotion, tod);
+  drawBus(ctx, state, cam, opts.time, opts.reducedMotion || !!opts.fast, tod, mapSig);
   if (opts.highlight) drawHighlight(ctx, cam, opts.highlight, opts.time, opts.reducedMotion);
   // 2.2: rótulos de las calles con nombre (solo con el mapa lo bastante cerca para leerlos).
   if (opts.labels) drawStreetNames(ctx, state, cam, mapSig);
@@ -1143,4 +1160,145 @@ function drawHighlight(ctx: CanvasRenderingContext2D, cam: Camera, hl: { x: numb
   ctx.strokeRect(Math.round(cx - r), Math.round(cy - r), Math.round(r * 2), Math.round(r * 2.4));
   const img = sparkleSprite(frame);
   ctx.drawImage(img, cx - 8 * z, cy - 26 * z, 16 * z, 16 * z);
+}
+
+/* ---------- 2.4 «Vida»: el autobús y las fiestas ---------- */
+
+/**
+ * Por dónde llega el autobús: de la calle conectada con la estación que está
+ * más cerca del borde del mapa (de fuera) hasta la estación. Se rehace si
+ * cambia el mapa.
+ */
+let busRouteCache: { key: string; path: { x: number; y: number }[] } | null = null;
+export function busRoute(state: GameState, mapSig = mapSignature(state)): { x: number; y: number }[] {
+  const st = busStation(state);
+  if (!st) return [];
+  const key = `${mapSig}:${st.id}`;
+  if (busRouteCache?.key === key) return busRouteCache.path;
+  const { w, h, tiles } = state.map;
+  // Las calles conectadas con la de la estación (BFS).
+  let start = -1;
+  let bd = Infinity;
+  for (let i = 0; i < tiles.length; i++) {
+    if (tiles[i] !== Tile.Road) continue;
+    const d = Math.abs((i % w) - st.x) + Math.abs(Math.floor(i / w) - st.y);
+    if (d < bd) {
+      bd = d;
+      start = i;
+    }
+  }
+  let path: { x: number; y: number }[] = [];
+  if (start >= 0) {
+    const seen = new Set([start]);
+    const queue = [start];
+    let best = start;
+    let bestEdge = Infinity;
+    let bestFar = -1;
+    while (queue.length) {
+      const i = queue.shift()!;
+      const x = i % w;
+      const y = Math.floor(i / w);
+      const edge = Math.min(x, y, w - 1 - x, h - 1 - y);
+      const far = Math.abs(x - st.x) + Math.abs(y - st.y);
+      if (edge < bestEdge || (edge === bestEdge && far > bestFar)) {
+        best = i;
+        bestEdge = edge;
+        bestFar = far;
+      }
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const j = ny * w + nx;
+        if (tiles[j] !== Tile.Road || seen.has(j)) continue;
+        seen.add(j);
+        queue.push(j);
+      }
+    }
+    path = roadPath(state, { x: best % w, y: Math.floor(best / w) }, st);
+  }
+  busRouteCache = { key, path };
+  return path;
+}
+
+/** Un viaje cada 3 horas de juego, de 6 a 22 h. El autobús va en tiempo real a 2,5 casillas por segundo y espera 2 s en la estación. */
+const BUS_EVERY = 3;
+const BUS_SPEED = 2.5;
+const BUS_DWELL = 2000;
+let busTrip: { since: number; tick: number } | null = null;
+/** Para los e2e: cuántos viajes ha empezado el autobús. */
+export let busTrips = 0;
+function drawBus(ctx: CanvasRenderingContext2D, state: GameState, cam: Camera, time: number, still: boolean, tod: TimeOfDay, mapSig: string): void {
+  const path = busRoute(state, mapSig);
+  if (path.length < 2) {
+    busTrip = null;
+    return;
+  }
+  // A x10 o con movimiento reducido no circula: se ve parado en la estación (el sprite de la estación ya lo lleva).
+  if (still) return;
+  const len = path.length - 1;
+  const hour = tickToDate(state.tick).hour;
+  const trip = Math.floor(state.tick / BUS_EVERY);
+  const done = busTrip ? time - busTrip.since > (len / BUS_SPEED) * 1000 + BUS_DWELL : true;
+  if (done && (!busTrip || trip !== busTrip.tick) && hour >= 6 && hour <= 22) {
+    busTrip = { since: time, tick: trip };
+    busTrips++;
+  }
+  if (!busTrip) return;
+  const t = time - busTrip.since;
+  if (t > (len / BUS_SPEED) * 1000 + BUS_DWELL) return;
+  const d = Math.min(len, (t / 1000) * BUS_SPEED);
+  const p = along(path, d);
+  const z = cam.zoom;
+  const img = busSprite(d >= len ? 0 : Math.floor(time / 140) % 2, p.dir, tod);
+  ctx.drawImage(img, (p.fx - 8) * z - cam.x, (p.fy - 9) * z - cam.y, 16 * z, 8 * z);
+}
+
+/** Luces de Navidad: del 20 de diciembre a Reyes, si el pueblo celebra la Navidad este año. */
+function xmasTime(state: GameState): boolean {
+  const f = state.seasons?.current;
+  if (!f || f.season !== 'navidad' || (f.status !== 'aprobada' && f.status !== 'celebrada')) return false;
+  const d = tickToDate(state.tick);
+  return (d.month === 12 && d.day >= 20) || (d.month === 1 && d.day <= 6);
+}
+
+/** Guirnalda de bombillas de colores que cuelga de la farola (dos fotogramas: se alternan, sin destellos). */
+function drawXmasLights(ctx: CanvasRenderingContext2D, px: number, py: number, z: number, frame: number): void {
+  const colors = [2, 4, 6, 10];
+  for (let k = 0; k < 6; k++) {
+    const x = px + (27 - 4 - k * 4) * z;
+    const y = py + (6 + (k % 2 ? 3 : 1)) * z;
+    ctx.fillStyle = P(colors[(k + frame) % colors.length]!);
+    ctx.fillRect(x, y, z, z);
+  }
+}
+
+/** La hoguera de San Juan: la noche de la fiesta, si el programa la lleva, en una casilla libre junto al ayuntamiento. */
+let bonfireCache: { key: string; at: { x: number; y: number } | null } | null = null;
+export function bonfireSpot(state: GameState, mapSig = mapSignature(state)): { x: number; y: number } | null {
+  const f = state.seasons?.current;
+  if (!f || f.season !== 'sanjuan' || f.status !== 'celebrada' || !f.held?.includes('hoguera') || f.day === undefined) return null;
+  if (state.tick < f.day || state.tick - f.day > 30) return null;
+  const hall = state.buildings.find((b) => b.kind === 'townhall');
+  if (!hall) return null;
+  const key = `${mapSig}:${hall.x},${hall.y}`;
+  if (bonfireCache?.key === key) return bonfireCache.at;
+  const { w, h, tiles } = state.map;
+  let at: { x: number; y: number } | null = null;
+  outer: for (let r = 1; r <= 5; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = hall.x + dx;
+        const y = hall.y + dy;
+        if (x < 0 || y < 0 || x >= w || y >= h) continue;
+        const i = y * w + x;
+        if (tiles[i] === Tile.Road || tiles[i] === Tile.Tree || buildingAt(state, x, y) || isWater(state.map.terrain?.[i]) || (state.map.zones[i] ?? 0) !== Zone.None) continue;
+        at = { x, y };
+        break outer;
+      }
+    }
+  }
+  bonfireCache = { key, at };
+  return at;
 }

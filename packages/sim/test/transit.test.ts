@@ -28,6 +28,8 @@ import {
   turnMenu,
   validateCommand,
   CARE,
+  BUILD,
+  BUILD_NAMES,
 } from '../src/index.ts';
 
 function blank(seed = 5): GameState {
@@ -154,5 +156,14 @@ describe('estación de autobuses (2.4)', () => {
     s.tick += (TRANSIT.excursion.everyDays + 1) * TICKS_PER_DAY;
     expect(excursionCandidate(s)).not.toBeNull();
     expect(checkInvariants(s)).toEqual([]);
+  });
+});
+
+describe('nombres de los edificios de la 2.4', () => {
+  it('todo lo que se construye tiene nombre en español (la interfaz y los textos lo usan)', () => {
+    for (const k of Object.keys(BUILD)) expect(BUILD_NAMES[k], k).toBeTruthy();
+    expect(BUILD_NAMES.busstation).toBe('Estación de autobuses');
+    expect(BUILD_NAMES.nursery).toBe('Guardería');
+    expect(BUILD_NAMES.residence).toBe('Residencia de mayores');
   });
 });
