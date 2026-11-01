@@ -43,8 +43,16 @@ test('2.2: candidaturas con estilo y promesas; noche electoral con una barra por
   await page.locator('.sheet-close').click();
 
   // Se juega hasta las elecciones: una barra por lista, más la tuya y la abstención.
-  await setSpeed(page, 10);
-  await expect(page.locator('.sheet h2')).toHaveText('Noche electoral', { timeout: 90_000 });
+  // 2.5: un aviso importante puede bajar a x1 (attention); se vuelve a x10 hasta la noche electoral.
+  const night = page.locator('.sheet h2', { hasText: 'Noche electoral' });
+  for (let i = 0; i < 90 && !(await night.count()); i++) {
+    if ((await page.locator('#speed').textContent()) !== 'x10' || (await page.locator('#play-pause').getAttribute('data-paused')) === 'true') {
+      if (await page.locator('.sheet-close').count()) await page.locator('.sheet-close').first().click();
+      await setSpeed(page, 10);
+    }
+    await page.waitForTimeout(1_000);
+  }
+  await expect(page.locator('.sheet h2')).toHaveText('Noche electoral', { timeout: 10_000 });
   await setSpeed(page, 0);
   await expect(page.locator('.sheet .pol-bar.rival')).toHaveCount(lists.length);
   await expect(page.locator('.sheet .pol-bar')).toHaveCount(lists.length + 2);
