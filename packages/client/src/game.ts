@@ -508,7 +508,10 @@ export function startGame(opts: GameOptions): void {
     bar.classList.remove('tb-tight', 'tb-rows');
     if (!over()) return;
     bar.classList.add('tb-tight');
-    if (over()) bar.classList.add('tb-rows');
+    if (!over()) return;
+    // En dos filas hay sitio de sobra: vuelven el «€», el «%» y la flecha (si caben).
+    bar.classList.replace('tb-tight', 'tb-rows');
+    if (over()) bar.classList.add('tb-tight');
   }
   let lastStats = state.stats.length;
   let lastLevel = townLevel(state);

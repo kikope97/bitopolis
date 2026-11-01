@@ -172,8 +172,8 @@ export class Tutorial {
     }
     target.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
     const r = target.getBoundingClientRect();
-    // Botones de arriba (▶): la flecha apunta hacia arriba, por debajo del botón (encima del mapa, sin texto).
-    const up = r.top < window.innerHeight / 3;
+    // Botones de la barra de arriba (▶): la flecha apunta hacia arriba, por debajo del botón (encima del mapa, sin texto).
+    const up = !!target.closest('.topbar');
     // Ronda 21: abajo (pestañas, bandeja) la flecha flotante pisaba la franja («Z▼as») y los títulos de la bandeja.
     // Ahora el propio botón lleva el marco y una flecha pequeña en su borde de arriba (tut-target, style.css).
     this.arrow.hidden = !up;
