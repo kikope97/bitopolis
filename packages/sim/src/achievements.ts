@@ -3,7 +3,7 @@ import { TICKS_PER_MONTH } from '@bitopolis/shared';
 import type { LandmarkKind, ScenarioId } from '@bitopolis/shared';
 import { addMoment } from './album.ts';
 import { ACHIEVEMENTS, RANKS, TOURISM } from './balance.ts';
-import { fmt } from './loans.ts';
+import { fmt, totalOwed } from './loans.ts';
 import { ownIncome } from './money.ts';
 import { type GameState, type MedalTrack, type MinAvgMax, type RecordKey, pushEvent } from './state.ts';
 
@@ -89,7 +89,11 @@ export function generations(state: GameState): number {
   return best;
 }
 
-export const reelections = (state: GameState): number => state.politics.history.filter((e) => e.winner === 'player').length;
+/** Elecciones ganadas con rival (2.3, F3: sin oposición contaban y la medalla de oro llegaba sola a los 8 años). */
+export const reelections = (state: GameState): number => state.politics.history.filter((e) => e.winner === 'player' && !e.unopposed).length;
+
+/** Caja sin lo que se debe al banco. */
+const ownCash = (state: GameState): number => state.treasury - totalOwed(state);
 
 
 const landmarkDone = (state: GameState, kind: LandmarkKind) => (state.landmarks ?? []).some((l) => l.kind === kind && l.phase >= l.phases);
@@ -146,9 +150,10 @@ export const ACHIEVEMENT_LIST: Achievement[] = [
     text: `${fmt(A.treasury)} € en la caja`,
     tier: 'oro',
     group: 'dinero',
-    hint: `Ten ${fmt(A.treasury)} € en la caja al cerrar un mes`,
-    check: (s) => s.treasury >= A.treasury,
-    progress: (s) => [Math.max(0, Math.min(s.treasury, A.treasury)), A.treasury],
+    hint: `Ten ${fmt(A.treasury)} € en la caja al cerrar un mes (sin contar lo que debes al banco)`,
+    // 2.3 (F3): lo prestado no cuenta (el perfil endeudado la ganaba al año pidiendo todo lo que le dejaban).
+    check: (s) => ownCash(s) >= A.treasury,
+    progress: (s) => [Math.max(0, Math.min(ownCash(s), A.treasury)), A.treasury],
   },
   {
     id: 'nota_a',
@@ -227,7 +232,7 @@ export const ACHIEVEMENT_LIST: Achievement[] = [
     text: `Ganas ${A.reelected} elecciones`,
     tier: 'oro',
     group: 'politica',
-    hint: `Gana ${A.reelected} elecciones`,
+    hint: `Gana ${A.reelected} elecciones con rival`,
     check: (s) => reelections(s) >= A.reelected,
     progress: (s) => [Math.min(reelections(s), A.reelected), A.reelected],
   },

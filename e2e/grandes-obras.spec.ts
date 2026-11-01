@@ -16,12 +16,12 @@ async function openTown(page: Page, request: import('@playwright/test').APIReque
   await setSpeed(page, 0);
 }
 
-/** Pueblo con ayuntamiento 3, 70 vecinos contentos y 60.000 € (el dinero entra de fuera: cuadra). */
+/** Pueblo con ayuntamiento 3, 80 vecinos contentos y 60.000 € (el dinero entra de fuera: cuadra). */
 function town(): GameState {
   const s = createInitialState({ seed: 5 });
   s.townhallLevel = 3;
   const base = s.citizens[0]!;
-  while (s.citizens.length < 70) s.citizens.push({ ...structuredClone(base), id: s.nextId++, money: 0, homeId: null, jobId: null, named: false, flow: [0, 0] });
+  while (s.citizens.length < 80) s.citizens.push({ ...structuredClone(base), id: s.nextId++, money: 0, homeId: null, jobId: null, named: false, flow: [0, 0] });
   for (const c of s.citizens) c.happiness = 70;
   transfer(s, OUTSIDE, TREASURY, 60_000, 'subvenciones');
   s.weather = { kind: 'sol', until: s.tick + 30 * 24 };
@@ -68,7 +68,7 @@ test('2.3: empezar la estación, aceptar la cofinanciación y pagar la fase 1 de
   await expect(page.locator('.phase-bar .phase-seg')).toHaveCount(3);
   await expect(page.locator('.sheet')).toContainText('La Diputación cofinancia');
   const pay = page.locator('#lm-pay');
-  await expect(pay).toContainText(/Pagar fase 1 \(14\.?000 €\)/);
+  await expect(pay).toContainText(/Pagar fase 1 \(30\.?000 €\)/);
   for (const sel of ['#lm-pay', '#lm-grant-yes']) {
     const box = (await page.locator(sel).boundingBox())!;
     expect(box.height).toBeGreaterThanOrEqual(44);
@@ -83,7 +83,7 @@ test('2.3: empezar la estación, aceptar la cofinanciación y pagar la fase 1 de
   await expect.poll(async () => (await state(page)).projects.length, { timeout: 10_000 }).toBeGreaterThan(0);
   const after = await state(page);
   expect(after.treasury).toBeLessThan(before);
-  expect(after.treasury).toBeGreaterThan(before - 14_000);
+  expect(after.treasury).toBeGreaterThan(before - 30_000);
   await expect(page.locator('.sheet')).toContainText('Fase 1 de 3 en obra');
   await expect(page.locator('.phase-seg.doing')).toHaveCount(1);
   await shot('3-fase-en-obra');

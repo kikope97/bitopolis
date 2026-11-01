@@ -31,7 +31,7 @@ const days = (s: GameState, n: number) => {
 };
 
 /** Pueblo de prueba: ayuntamiento 3, `pop` vecinos contentos (sin dinero: no se crea de la nada) y caja. */
-function town(pop = 70, cash = 100_000, seed = 5): GameState {
+function town(pop = 80, cash = 100_000, seed = 5): GameState {
   const s = createInitialState({ seed });
   s.townhallLevel = 3;
   const base = s.citizens[0]!;
@@ -58,11 +58,11 @@ describe('grandes obras por fases (2.3)', () => {
   it('pide vecinos, felicidad, nivel del ayuntamiento y caja, y lo explica', () => {
     const s = town(20, 0);
     const at = landmarkSpot(s, 'station', hall(s))!;
-    expect(validateCommand(s, { type: 'StartLandmark', kind: 'station', ...at })).toEqual({ ok: false, error: expect.stringMatching(/60 vecinos \(tienes 20\)/) });
-    const t = town(70, 0);
+    expect(validateCommand(s, { type: 'StartLandmark', kind: 'station', ...at })).toEqual({ ok: false, error: expect.stringContaining(`${LANDMARKS.specs.station.pop} vecinos (tienes 20)`) });
+    const t = town(80, 0);
     transfer(t, TREASURY, OUTSIDE, t.treasury - 1_000, 'obras');
     expect(validateCommand(t, { type: 'StartLandmark', kind: 'station', ...at })).toEqual({ ok: false, error: expect.stringMatching(/en caja/) });
-    const u = town(70);
+    const u = town(80);
     for (const c of u.citizens) c.happiness = 40;
     expect(validateCommand(u, { type: 'StartLandmark', kind: 'station', ...at })).toEqual({ ok: false, error: expect.stringMatching(/felicidad/i) });
     u.townhallLevel = 2;
@@ -144,7 +144,7 @@ describe('grandes obras por fases (2.3)', () => {
   });
 
   it('el puente de piedra va sobre el río (no encima de un puente de carretera) y frena las riadas', () => {
-    const s = town(50);
+    const s = town(LANDMARKS.specs.bridge.pop + 5);
     const river: { x: number; y: number }[] = [];
     for (let y = 0; y < s.map.h; y++) for (let x = 0; x < s.map.w; x++) if (s.map.terrain![y * s.map.w + x] === Terrain.River) river.push({ x, y });
     expect(river.length).toBeGreaterThan(0);

@@ -1,11 +1,15 @@
 import type { BuildKind, Command, LandmarkKind, TaxLevel } from '@bitopolis/shared';
-import { LANDMARKS, LOANS, PLANT_CAPACITY, TRASH, WAGE_OUTSIDE } from './balance.ts';
+import { JOBS, LANDMARKS, LOANS, MAINTENANCE, PLANT_CAPACITY, PUBLIC_SALARY, REGION, SERVICE, SERVICE_SALARY, TRASH, WAGE_OUTSIDE } from './balance.ts';
+import { bigFactorySpot } from './region.ts';
+import { ownIncome, TREASURY } from './money.ts';
+import { jobsOf, maintenanceOf } from './levels.ts';
 import { LANDMARK_KINDS, landmarkReqs, phaseCost } from './landmarks.ts';
 import { isWater, Terrain } from './terrain.ts';
 import { averageIncome, canRequestLoan, loanCapacity, loanOffer } from './loans.ts';
 import { canUpgradeTownhall, isUnlocked, nextLevel, zonesUnlocked } from './townhall.ts';
 import { buildCost, validateCommand } from './commands.ts';
 import { chance, type RngState, seedRng } from './prng.ts';
+import { hash32 } from './hash.ts';
 import { buildingAt, DIRS, footprint, type GameState, hasAdjacentRoad, terrainAt, Tile, tileIndex, Zone } from './state.ts';
 import { freeHomes } from './tick.ts';
 import { farmZoneUnlocked } from './farm.ts';
@@ -48,6 +52,8 @@ interface PlannerOpts {
   tourism?: boolean;
   /** 2.3: grandes obras: paga una fase si la caja pasa de la reserva más lo que cuesta (y acepta la cofinanciación). */
   landmarks?: boolean;
+  /** 2.3: deja un polígono de zona I donde quepa la fábrica de la gran empresa (y le dice que sí). */
+  bigCompany?: boolean;
 }
 
 /**
@@ -136,12 +142,15 @@ function roadNetworkOf(state: GameState, b: { x: number; y: number }): Set<numbe
   return out;
 }
 
+/** 2.3: fases que quiere tener en caja para empezar una gran obra. */
+const START_PHASES = 1;
+
 /**
  * 2.3: lo que hace un jugador con las grandes obras: acepta la cofinanciación
  * y el FEDER, dice que sí a la gran empresa (con el IBI bonificado), paga la
  * fase siguiente si la caja pasa de la reserva más lo que cuesta (con los
- * sueldos de la obra) y, si no hay ninguna en marcha, empieza la primera que
- * pueda pagar, cerca del centro.
+ * sueldos de la obra) y, si no hay ninguna en marcha, ahorra para su obra preferida
+ * (según la semilla) entre las que ya puede hacer y la empieza cerca del centro.
  */
 function landmarkPlan(state: GameState, reserve: number, spots: { x: number; y: number }[], keepRoads = false): Command[] {
   const offer = state.grants.find((g) => g.status === 'offered' && (g.landmark !== undefined || g.feder));
@@ -158,16 +167,16 @@ function landmarkPlan(state: GameState, reserve: number, spots: { x: number; y: 
   }
   if (state.landmarks.some((l) => l.phase < l.phases)) return [];
   const planned = keepRoads ? plannedRoadTiles(state) : new Set<number>();
-  for (const kind of LANDMARK_KINDS) {
+  // Cada partida tiene su obra preferida (orden según la semilla): entre las que ya puede hacer, ahorra para la primera.
+  const order = [...LANDMARK_KINDS].sort((a, b) => hash32(state.seed, LANDMARK_KINDS.indexOf(a)) - hash32(state.seed, LANDMARK_KINDS.indexOf(b)));
+  for (const kind of order) {
     if (state.landmarks.some((l) => l.kind === kind)) continue;
-    // No empieza lo que no puede acabar: hace falta la obra entera (todas las fases y sus sueldos) además de la reserva.
-    if (state.treasury <= reserve + (phaseCost(state, { kind }) + margin(kind)) * LANDMARKS.specs[kind].phases) continue;
-    if (landmarkReqs(state, kind).some((r) => !r.ok)) continue;
-    if (kind === 'bridge' && !riverSpots(state).length) {
-      const road = roadToRiver(state);
-      if (road) return [road];
-      continue;
-    }
+    if (landmarkReqs(state, kind).some((r) => !r.ok && r.key !== 'cash')) continue;
+    if (kind === 'bridge' && !riverSpots(state).length && !roadToRiver(state)) continue;
+    // Empieza con lo de una fase (y sus sueldos) además de la reserva y paga las demás según entra (F3: esperando
+    // a tener la obra entera en caja, el casual guardaba 50.000 € sin destino o la hacía de golpe en un mes).
+    if (state.treasury <= reserve + (phaseCost(state, { kind }) + margin(kind)) * Math.min(START_PHASES, LANDMARKS.specs[kind].phases)) return [];
+    if (kind === 'bridge' && !riverSpots(state).length) return [roadToRiver(state)!];
     const size = LANDMARKS.specs[kind].size;
     const tries: { x: number; y: number }[] =
       kind === 'bridge' ? riverSpots(state) : spots.flatMap((p) => [p, { x: p.x - 1, y: p.y }, { x: p.x, y: p.y - 1 }, { x: p.x - 1, y: p.y - 1 }]);
@@ -214,6 +223,27 @@ function riverSpots(state: GameState): { x: number; y: number }[] {
   const out: { x: number; y: number }[] = [];
   for (let y = 0; y < state.map.h; y++) for (let x = 0; x < state.map.w; x++) if (terrainAt(state, x, y) === Terrain.River && hasAdjacentRoad(state, x, y)) out.push({ x, y });
   return out;
+}
+
+/** 2.3: un rectángulo de 3×2 casillas libres (sin calle, edificio, agua ni otra zona) que contenga uno de estos solares. */
+function industrialBlock(state: GameState, from: { x: number; y: number }[], keepRoads = false): { x: number; y: number } | null {
+  const planned = keepRoads ? plannedRoadTiles(state) : new Set<number>();
+  const free = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= state.map.w || y >= state.map.h) return false;
+    const i = tileIndex(state, x, y);
+    const z = state.map.zones[i];
+    return state.map.tiles[i] !== Tile.Road && !buildingAt(state, x, y) && !isWater(terrainAt(state, x, y)) && !planned.has(i) && (z === Zone.None || z === Zone.I);
+  };
+  for (const s of from) {
+    for (let oy = s.y - 1; oy <= s.y; oy++) {
+      for (let ox = s.x - 2; ox <= s.x; ox++) {
+        let ok = true;
+        for (let y = oy; y < oy + 2 && ok; y++) for (let x = ox; x < ox + 3 && ok; x++) ok = free(x, y);
+        if (ok && validateCommand(state, { type: 'Zone', zone: 'I', x: ox, y: oy, w: 3, h: 2 }).ok) return { x: ox, y: oy };
+      }
+    }
+  }
+  return null;
 }
 
 function buildingKindOf(state: GameState, id: number): string | undefined {
@@ -329,10 +359,18 @@ function planner(name: string, o: PlannerOpts): Profile {
       const zonesOn = zonesUnlocked(state);
       // Un jugador razonable mira el parte: no añade servicios (y sus sueldos) con el mes en negativo.
       const last = state.stats.at(-1);
-      if (zonesOn && (!last || last.income >= last.expenses)) {
+      // 2.3 (F3): y solo si el superávit del mes pasado paga lo que cuesta al mes (sueldos y mantenimiento). Sin
+      // esto, el constructor gastaba la caja del primer mes en cinco servicios que el pueblo no podía pagar
+      // («El pueblo que se vacía»: −50.000 € a los 3 años, −160.000 € a los 8, con los préstamos de tesorería).
+      if (zonesOn && last && last.income >= last.expenses) {
         const count = (k: string) => state.buildings.filter((b) => b.kind === k).length;
         const wanted = o.servicesPer ? Math.ceil(pop / o.servicesPer) : 1;
-        for (const kind of o.services) if (count(kind) < wanted && tryBuild(kind)) return out;
+        const monthly = (k: BuildKind) => (k === 'road' ? 0 : MAINTENANCE[k] + JOBS[k] * SERVICE_SALARY);
+        // Lo que ya cuesta al mes lo que ha hecho desde el último parte (sueldos y mantenimiento que aún no salen en él).
+        const now = state.buildings.reduce((a, b) => a + (b.owner === TREASURY ? maintenanceOf(b) + jobsOf(b) * (b.kind in SERVICE ? SERVICE_SALARY : PUBLIC_SALARY) : 0), 0);
+        const before = -((last.breakdown['sueldos'] ?? 0) + (last.breakdown['mantenimiento'] ?? 0));
+        const room = ownIncome(last) - last.expenses - Math.max(0, now - before);
+        for (const kind of o.services) if (count(kind) < wanted && room >= monthly(kind) && tryBuild(kind)) return out;
       }
       // Vivienda municipal al principio (o siempre, según el perfil).
       if ((!zonesOn || o.municipalHousing) && freeHomes(state) + state.projects.filter((p) => p.payer === 0).length * 3 < 3 && state.demand.R > 0) {
@@ -358,6 +396,15 @@ function planner(name: string, o: PlannerOpts): Profile {
             }
           }
         }
+        // 2.3 (F3): cerca de los vecinos de la gran empresa, un polígono de 3×2 de zona I lejos del centro, donde
+        // quepa su fábrica 2×2 (pintando casillas sueltas nunca había sitio y la oferta no llegaba).
+        if (o.bigCompany && !state.bigCompany && pop >= REGION.bigCompany.pop - 10 && !bigFactorySpot(state)) {
+          const block = industrialBlock(state, [...unzoned].reverse(), o.keepRoads);
+          if (block) {
+            for (let y = block.y; y < block.y + 2; y++) for (let x = block.x; x < block.x + 3; x++) taken.add(`${x},${y}`);
+            out.push({ type: 'Zone', zone: 'I', x: block.x, y: block.y, w: 3, h: 2 });
+          }
+        }
         for (const [z, zone, demand] of want) {
           if (demand <= 15 || zoned(z) >= 3) continue;
           // La industria, lejos del centro.
@@ -379,7 +426,7 @@ function planner(name: string, o: PlannerOpts): Profile {
 
 export const PROFILES: Record<string, Profile> = {
   pasivo: { name: 'pasivo', decide: () => [] },
-  casual: planner('casual', { tax: 'medium', reserve: 3_000, activity: 0.3, services: ['park'], municipalHousing: false, tourism: true, landmarks: true }),
+  casual: planner('casual', { tax: 'medium', reserve: 3_000, activity: 0.3, services: ['park'], municipalHousing: false, tourism: true, landmarks: true, bigCompany: true }),
   // 2.2: un jugador casual que además pinta zona agraria (para medir el campo).
   campo: planner('campo', { tax: 'medium', reserve: 3_000, activity: 0.3, services: ['park'], municipalHousing: false, farms: 8 }),
   ahorrador: planner('ahorrador', { tax: 'low', reserve: 4_000, activity: 0.5, services: ['park'], municipalHousing: false }),
@@ -403,6 +450,7 @@ export const PROFILES: Record<string, Profile> = {
     keepRoads: true,
     tourism: true,
     landmarks: true,
+    bigCompany: true,
   }),
   // 2.2: como el constructor, pero pidiendo prestado todo lo que le dejen (equilibrio de los préstamos).
   endeudado: planner('endeudado', {

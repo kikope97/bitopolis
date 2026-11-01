@@ -348,6 +348,14 @@ describe('metas grandes con IA (2.3): el director', () => {
     s.tick += TICKS_PER_MONTH;
     regionMonth(s);
     expect(['ere', 'se_va']).toContain(s.bigCompany!.status);
+    // Con el ERE o el cierre anunciados no contrata (F3: contrataba para despedir a los tres meses).
+    expect(s.citizens.filter((x) => x.jobId === b.id).length).toBe(staff);
+    // Pasada la crisis y sin aviso, las reglas contratan cada mes.
+    s.region.phase = 'normal';
+    s.bigCompany!.status = 'abierta';
+    delete s.bigCompany!.warnUntil;
+    s.tick += TICKS_PER_MONTH;
+    regionMonth(s);
     expect(s.citizens.filter((x) => x.jobId === b.id).length).toBe(staff + REGION.bigCompany.hirePerMonth);
     expect(moneyDrift(s)).toBe(0);
     expect(checkInvariants(s)).toEqual([]);
