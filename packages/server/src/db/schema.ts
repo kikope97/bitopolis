@@ -18,6 +18,8 @@ export interface GamesTable {
   lease_session: string | null;
   lease_until: Generated<number>;
   seed: Generated<number>;
+  /** 2.3: escenario con el que empezó (libre, quiebra, vaciado, riada); null en las de antes. */
+  scenario: string | null;
 }
 
 export interface AiConfigTable {

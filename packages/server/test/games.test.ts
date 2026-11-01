@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { afterAll, describe, expect, it } from 'vitest';
-import { applyCommand, type GameState, hashState, step } from '@bitopolis/sim';
+import { applyCommand, createInitialState, type GameState, hashState, step } from '@bitopolis/sim';
 import { buildApp } from '../src/app.ts';
 import { loadConfig } from '../src/config.ts';
 import { openDb } from '../src/db/index.ts';
@@ -90,6 +90,34 @@ describe('partidas', () => {
     expect(fresh).not.toBe(token);
     expect((await app.inject({ method: 'GET', url: `/api/games/${token}` })).json().exists).toBe(false);
     expect((await app.inject({ method: 'GET', url: `/api/games/${fresh}` })).json().exists).toBe(true);
+  });
+
+  it('2.3: crea con escenario y terreno, guarda por replay, lo lista en /admin y la importación lo conserva', async () => {
+    const token = newGameToken();
+    const r = await app.inject({ method: 'POST', url: `/api/games/${token}`, payload: { mode: 'normal', sessionId: A, scenario: 'riada', terrain: 'llano' } });
+    expect(r.statusCode).toBe(200);
+    const state = r.json().state as GameState;
+    expect(state.scenario).toMatchObject({ id: 'riada', done: false });
+    expect(state.buildings.filter((b) => b.damaged?.cause === 'riada').length).toBeGreaterThan(0);
+    // Mismo comienzo que en el motor con la semilla que puso el servidor.
+    expect(hashState(state)).toBe(hashState(createInitialState({ seed: state.seed, scenario: 'riada', terrain: 'llano' })));
+    for (let i = 0; i < 24; i++) step(state);
+    const ok = await app.inject({ method: 'PUT', url: `/api/games/${token}/save`, payload: { sessionId: A, fromTick: 0, toTick: 24, commands: [], hash: hashState(state) } });
+    expect(ok.json()).toEqual({ ok: true, tick: 24 });
+    const row = await db.selectFrom('games').select(['scenario']).where('token', '=', token).executeTakeFirst();
+    expect(row?.scenario).toBe('riada');
+    const ex = await app.inject({ method: 'GET', url: `/api/games/${token}/export` });
+    const im = await app.inject({ method: 'POST', url: '/api/import', payload: ex.rawPayload, headers: { 'content-type': 'application/octet-stream' } });
+    expect(im.statusCode).toBe(200);
+    const copy = await db.selectFrom('games').select(['scenario', 'state']).where('token', '=', im.json().token).executeTakeFirst();
+    expect(copy?.scenario).toBe('riada');
+    expect(JSON.parse(copy!.state).scenario.id).toBe('riada');
+    // Sin escenario ni terreno: Libre, como siempre; uno que no existe, 400.
+    const plain = await create();
+    expect(plain.state.scenario).toEqual({ id: 'libre', done: true });
+    expect(hashState(plain.state)).toBe(hashState(createInitialState({ seed: plain.state.seed })));
+    const bad = await app.inject({ method: 'POST', url: `/api/games/${newGameToken()}`, payload: { mode: 'normal', sessionId: A, scenario: 'marte' } });
+    expect(bad.statusCode).toBe(400);
   });
 
   it('exporta e importa como partida nueva', async () => {

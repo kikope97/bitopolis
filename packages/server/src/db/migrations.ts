@@ -86,6 +86,15 @@ const migrations: Record<string, Migration> = {
       await db.schema.dropTable('settings').execute();
     },
   },
+  // 2.3: escenario de la partida (para la lista de /admin).
+  '0005_scenario': {
+    async up(db: Kysely<unknown>) {
+      await db.schema.alterTable('games').addColumn('scenario', 'varchar(16)').execute();
+    },
+    async down(db: Kysely<unknown>) {
+      await db.schema.alterTable('games').dropColumn('scenario').execute();
+    },
+  },
 };
 
 class InCodeProvider implements MigrationProvider {
