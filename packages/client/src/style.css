@@ -1236,5 +1236,6 @@ body.placing .tut-arrow { visibility: hidden; }
 .dilemma-options .btn .small { font-weight: 400; }
 /* 2.4: billete y cuotas (3 botones a lo ancho, 44 px) y la luz por estación. */
 .vida-seg { flex-wrap: nowrap; }
-.vida-seg .seg-btn { flex: 1 1 0; min-width: 44px; padding: 6px 4px; }
+.vida-seg .seg-btn { flex: 1 1 0; min-width: 44px; padding: 6px 4px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.vida-seg .seg-btn small { font-weight: 400; }
 .vida-seasons li.now { color: var(--accent); }

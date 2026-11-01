@@ -98,7 +98,7 @@ import { errandsSummary, openErrands, openPress } from './town-news-ui.ts';
 import { openWhatsHappening, turnHeadline } from './ai-town-ui.ts';
 import { pocketMark } from './money-ui.ts';
 import { formatDate, money, MONTHS, plural, shortDate, t } from './i18n.ts';
-import { type Camera, type Preview, render, restartAnimations, signSpot } from './render.ts';
+import { busTrips, type Camera, type Preview, render, restartAnimations, signSpot } from './render.ts';
 import type { FromWorker, SaveBatch, ToWorker } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
 import { buildingSprite, landmarkSprite, letterSprite, T, ZONE_COLOR } from './sprites.ts';
@@ -2560,6 +2560,10 @@ export function startGame(opts: GameOptions): void {
     /** Casilla que destella ahora (o null). */
     get highlight() {
       return highlight ? { x: highlight.x, y: highlight.y } : null;
+    },
+    /** 2.4: viajes del autobús que han empezado en el mapa. */
+    get busTrips() {
+      return busTrips;
     },
     /** Para las pruebas: centra la cámara en una casilla (no toca el estado). */
     centerOn(tx: number, ty: number) {

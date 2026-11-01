@@ -42,11 +42,12 @@ const FARE_NAME: Record<BusFare, string> = { gratis: 'Gratis', normal: 'Normal',
 const FEE_NAME: Record<FeeLevel, string> = { gratis: 'Gratis', reducida: 'Reducida', normal: 'Normal' };
 
 /** Tres botones (radio) a lo ancho; `data-<attr>` lleva el valor para los e2e. */
-function seg<T extends string>(label: string, attr: string, values: readonly T[], current: T, text: (v: T) => string, pick: (v: T) => void): HTMLElement {
+function seg<T extends string>(label: string, attr: string, values: readonly T[], current: T, text: (v: T) => [string, string], pick: (v: T) => void): HTMLElement {
   const box = h('div', { class: 'seg vida-seg', role: 'radiogroup', 'aria-label': label });
   for (const v of values) {
     const on = v === current;
-    const b = h('button', { class: 'seg-btn', role: 'radio', 'aria-checked': String(on), [`data-${attr}`]: v }, text(v));
+    const [name, price] = text(v);
+    const b = h('button', { class: 'seg-btn', role: 'radio', 'aria-checked': String(on), [`data-${attr}`]: v }, h('span', {}, name), h('small', {}, price));
     b.addEventListener('click', () => {
       if (!on) pick(v);
     });
@@ -71,7 +72,7 @@ export function vidaBox(state: GameState, b: Building, command: Cmd, list: (cs: 
         off,
         h('p', {}, h('strong', {}, `Usuarios del mes: ${last ?? now}`), last !== undefined && last !== now ? ` (ahora, ${now})` : '', '. Llega a todo el pueblo: quien trabaja fuera va en autobús y conserva mejor el trabajo.'),
         h('p', {}, h('strong', {}, 'Billete'), ` · ${FARE_NAME[fare].toLowerCase()}`),
-        seg('Billete del autobús', 'fare', ['gratis', 'normal', 'caro'] as const, fare, (f) => (f === 'gratis' ? 'Gratis' : `${FARE_NAME[f]} · ${TRANSIT.fare[f]} €`), (f) => void command({ type: 'SetBusFare', fare: f })),
+        seg('Billete del autobús', 'fare', ['gratis', 'normal', 'caro'] as const, fare, (f) => [FARE_NAME[f], `${TRANSIT.fare[f]} €/viaje`], (f) => void command({ type: 'SetBusFare', fare: f })),
         h(
           'p',
           { class: 'affects' },
@@ -92,7 +93,7 @@ export function vidaBox(state: GameState, b: Building, command: Cmd, list: (cs: 
         h('p', {}, h('strong', {}, `${used} de ${CARE.nursery.places} ocupadas`), ` · ${plural(free, 'libre', 'libres')}. Recoge a los niños de 0 a ${CARE.nursery.maxAgeYears} años que viven a ${CARE.nursery.radius} casillas o menos.`),
         small ? h('p', { class: 'pocket-warn' }, `${plural(small, 'niño pequeño se queda', 'niños pequeños se quedan')} sin plaza: en esas casas, uno de los padres puede dejar el trabajo.`) : '',
         h('p', {}, h('strong', {}, 'Cuota'), ` · ${FEE_NAME[fee].toLowerCase()}`),
-        seg('Cuota de la guardería', 'fee', ['gratis', 'reducida', 'normal'] as const, fee, (l) => (l === 'gratis' ? 'Gratis' : `${FEE_NAME[l]} · ${CARE.nursery.fee[l]} €`), (l) => void command({ type: 'SetCareFee', service: 'nursery', level: l })),
+        seg('Cuota de la guardería', 'fee', ['gratis', 'reducida', 'normal'] as const, fee, (l) => [FEE_NAME[l], `${CARE.nursery.fee[l]} €/mes`], (l) => void command({ type: 'SetCareFee', service: 'nursery', level: l })),
         h('p', { class: 'affects' }, `A quién afecta: ${plural(used, 'familia con plaza paga', 'familias con plaza pagan')} ${money(CARE.nursery.fee[fee])} al mes por niño${CARE.nursery.fee[fee] ? ' (si no llegan, queda como deuda)' : ''}. Con plaza nacen más niños (×${String(CARE.birthWithPlace).replace('.', ',')}). Gratis, el ayuntamiento lo paga todo.`),
       );
       return box;
@@ -107,7 +108,7 @@ export function vidaBox(state: GameState, b: Building, command: Cmd, list: (cs: 
         off,
         h('p', {}, h('strong', {}, `${inside.length} de ${places} ocupadas`), many ? ' (entre todas las residencias)' : '', ` · ${plural(Math.max(0, places - inside.length), 'libre', 'libres')}. Entran los mayores que viven solos: no se van del pueblo y viven más.`),
         h('p', {}, h('strong', {}, 'Cuota'), ` · ${FEE_NAME[fee].toLowerCase()}`),
-        seg('Cuota de la residencia', 'fee', ['gratis', 'reducida', 'normal'] as const, fee, (l) => (l === 'gratis' ? 'Gratis' : `${FEE_NAME[l]} · ${CARE.residence.fee[l]} €`), (l) => void command({ type: 'SetCareFee', service: 'residence', level: l })),
+        seg('Cuota de la residencia', 'fee', ['gratis', 'reducida', 'normal'] as const, fee, (l) => [FEE_NAME[l], `${CARE.residence.fee[l]} €/mes`], (l) => void command({ type: 'SetCareFee', service: 'residence', level: l })),
         h('p', { class: 'affects' }, `A quién afecta: ${plural(inside.length, 'mayor paga', 'mayores pagan')} ${money(CARE.residence.fee[fee])} al mes con su pensión (${money(CARE.pension)}); lo que no tengan lo pone un hijo o queda como deuda. Al ayuntamiento le entran ${money(CARE.residence.fee[fee] * inside.length)} al mes.`),
       );
       if (inside.length) box.append(h('h3', {}, 'Viven aquí'), list(inside));
