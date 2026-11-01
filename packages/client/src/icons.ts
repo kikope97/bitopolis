@@ -709,3 +709,48 @@ function drawOne(c: HTMLCanvasElement): void {
 export function drawPixelIcons(root: ParentNode = document): void {
   for (const c of root.querySelectorAll<HTMLCanvasElement>('canvas[data-icon]')) drawOne(c);
 }
+
+/*
+ * 2.3: medallas (medals-ui.ts). Un icono de 12×12 por grupo y tipo: la cinta,
+ * el disco del color del tipo (bronce, plata, oro; gris si aún falta) y el
+ * dibujo del grupo en el centro. Se nombran `medal-<grupo>-<tipo>`.
+ */
+const MEDAL_DISC = [
+  '.rr......bb.',
+  '..rr....bb..',
+  '...rr..bb...',
+  '....oooo....',
+  '..oo####oo..',
+  '.o########o.',
+  '.o########o.',
+  '.o########o.',
+  '.o########o.',
+  '.o########o.',
+  '..oo####oo..',
+  '....oooo....',
+];
+/** Dibujo de 6×5 de cada grupo (va en las columnas 3–8 y filas 5–9 del disco). */
+const MEDAL_GLYPH: Record<string, string[]> = {
+  crecimiento: ['..gg..', '.gggg.', 'gggggg', '.g..g.', '.g..g.'],
+  dinero: ['.gggg.', 'g.....', 'gggg..', 'g.....', '.gggg.'],
+  obras: ['gggggg', '.g..g.', '.g..g.', '.g..g.', 'gggggg'],
+  gente: ['.g..g.', '.g..g.', 'gggggg', 'gggggg', 'g.gg.g'],
+  politica: ['.....g', '....gg', 'g..gg.', 'gggg..', '.gg...'],
+  desgracias: ['..gg..', '.gggg.', 'gggggg', 'gggggg', '.gggg.'],
+  escenarios: ['gggg..', 'ggggg.', 'gggg..', 'g.....', 'g.....'],
+  turismo: ['.gg...', 'gggggg', 'gg..gg', 'gg..gg', 'gggggg'],
+  encargos: ['gggggg', 'gg..gg', 'g.gg.g', 'g....g', 'gggggg'],
+};
+/** Colores de cada tipo (índices de la paleta): disco, borde, dibujo y cinta. `none`: la que falta, en gris. */
+const MEDAL_TIER: Record<string, { disc: number; edge: number; glyph: number; r: number; b: number }> = {
+  bronce: { disc: 19, edge: 17, glyph: 16, r: 2, b: 9 },
+  plata: { disc: 13, edge: 14, glyph: 15, r: 2, b: 9 },
+  oro: { disc: 4, edge: 20, glyph: 17, r: 2, b: 9 },
+  none: { disc: 28, edge: 27, glyph: 26, r: 27, b: 27 },
+};
+for (const [group, glyph] of Object.entries(MEDAL_GLYPH)) {
+  for (const [tier, c] of Object.entries(MEDAL_TIER)) {
+    const rows = MEDAL_DISC.map((row, y) => [...row].map((ch, x) => (y >= 5 && y <= 9 && x >= 3 && x <= 8 && glyph[y - 5]![x - 3] === 'g' ? 'g' : ch)).join(''));
+    ICONS[`medal-${group}-${tier}`] = { rows, colors: { r: c.r, b: c.b, o: c.edge, '#': c.disc, g: c.glyph } };
+  }
+}
