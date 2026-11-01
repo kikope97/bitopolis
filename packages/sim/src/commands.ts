@@ -1,16 +1,20 @@
+import { canRepayLoan, canRequestLoan, repayLoan, requestLoan } from './loans.ts';
 import { answerErrand, canAnswerErrand } from './errands.ts';
+import { farmZoneUnlocked } from './farm.ts';
 import { answerPress, canAnswerPress } from './press.ts';
 import { canMeetAssociation, meetAssociation } from './associations.ts';
 import { canUpgradeBuilding, startUpgrade } from './levels.ts';
 import { buildDike, canBuildDike, hasDike } from './fire.ts';
 import { applyCrestVote, validBallot } from './rank.ts';
+import { canOffer, canReviewContract, offerOutlay, reviewContract, signTender } from './tenders.ts';
+import { canDedicateStreet, dedicateStreet, forgetStreet } from './streets.ts';
 import { applyTownTurn, canApplyTurn, mayorText, noteMayor, setAiShare } from './turns.ts';
 import { canMicrocredit, canSettleDebt, grantMicrocredit, settleDebt } from './household.ts';
 import { serviceCounts } from './economy.ts';
 import { BUILD_LEVEL, canUpgradeTownhall, plenoUnlocked, townLevel, upgradeTownhall, zonesUnlocked } from './townhall.ts';
 import { answerGrant, canAnswerGrant, canHoldFestival, canProposeBudget, holdFestival, materialsCost, proposeBudget } from './civic.ts';
 import { Command, TICKS_PER_DAY, tickToDate, type BuildKind, type ZoneKind } from '@bitopolis/shared';
-import { ASSOCIATIONS, BUILD, CIVIL, DEBT_LIMIT, FIRE, MICROCREDIT, MIN_WAGE, MIN_WAGE_FX, MIN_WAGE_STEP, TERRAIN, WAGE_OUTSIDE, ZONE_COST_PER_TILE } from './balance.ts';
+import { ASSOCIATIONS, BUILD, CIVIL, STREETS, DEBT_LIMIT, FIRE, MICROCREDIT, MIN_WAGE, MIN_WAGE_FX, MIN_WAGE_STEP, TERRAIN, WAGE_OUTSIDE, ZONE_COST_PER_TILE } from './balance.ts';
 import { isWater, Terrain } from './terrain.ts';
 import { applyDecision, canApplyDecision } from './decisions.ts';
 import { campaign, canCampaign, canMotion, motion } from './politics.ts';
@@ -56,9 +60,10 @@ export const BUILD_NAMES: Record<string, string> = {
   res: 'Viviendas',
   shop: 'Tienda',
   factory: 'Taller',
+  farm: 'Finca',
 };
 
-const ZONE_VALUE: Record<ZoneKind, number> = { none: Zone.None, R: Zone.R, C: Zone.C, I: Zone.I };
+const ZONE_VALUE: Record<ZoneKind, number> = { none: Zone.None, R: Zone.R, C: Zone.C, I: Zone.I, A: Zone.A };
 
 /** Coste total previsto (materiales + mano de obra al precio de fuera). */
 export function buildCost(kind: BuildKind): number {
@@ -141,9 +146,11 @@ export function pendingWorksCost(state: GameState): number {
 export function commandOutlay(state: GameState, cmd: Command): number {
   if (cmd.type === 'Build') {
     if (cmd.kind === 'road') return roadCost(state, cmd.x, cmd.y, cmd.x, cmd.y);
+    if (cmd.offer && cmd.offer !== 'local') return offerOutlay(state, cmd.kind, cmd.x, cmd.y, cmd.offer);
     const s = BUILD[cmd.kind];
     return materialsCost(state, cmd.kind, cmd.x, cmd.y) + s.workers * s.days * WAGE_OUTSIDE;
   }
+  if (cmd.type === 'DedicateStreet') return STREETS.plaque;
   if (cmd.type === 'BuildRoad') return roadCost(state, cmd.x, cmd.y, cmd.x2, cmd.y2);
   if (cmd.type === 'Zone') return cmd.zone === 'none' ? 0 : zoneChanges(state, cmd).changed * ZONE_COST_PER_TILE;
   if (cmd.type === 'BuildDike') return CIVIL.dikeCost;
@@ -159,6 +166,16 @@ export function governmentCommand(state: GameState, cmd: Command): boolean {
   governing = true;
   try {
     return applyCommand(state, cmd).ok;
+  } finally {
+    governing = false;
+  }
+}
+
+/** 2.2: valida una orden como la validaría el gobierno rival (sin aplicarla). Para `rivalMenu`. */
+export function validateAsGovernment(state: GameState, cmd: unknown): CommandResult {
+  governing = true;
+  try {
+    return validateCommand(state, cmd);
   } finally {
     governing = false;
   }
@@ -201,6 +218,13 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       if (t === Tile.Road || buildingAt(state, cmd.x, cmd.y)) return { ok: false, error: 'Ese sitio está ocupado' };
       if (hasDike(state, cmd.x, cmd.y)) return { ok: false, error: 'Ahí hay un dique' };
       if (!hasAdjacentRoad(state, cmd.x, cmd.y)) return { ok: false, error: 'Necesita una carretera al lado' };
+      // 2.2: licitación (la local es la de siempre: mismo coste y misma validación).
+      if (cmd.offer && cmd.offer !== 'local') {
+        const o = canOffer(state, cmd.kind, cmd.x, cmd.y, cmd.offer);
+        if (!o.ok) return o;
+        if (state.treasury < offerOutlay(state, cmd.kind, cmd.x, cmd.y, cmd.offer)) return { ok: false, error: 'No hay dinero suficiente' };
+        return { ok: true };
+      }
       if (state.treasury < buildCostAt(state, cmd.kind, cmd.x, cmd.y)) return { ok: false, error: 'No hay dinero suficiente' };
       return { ok: true };
     }
@@ -215,6 +239,11 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
     }
     case 'Zone': {
       if (cmd.zone !== 'none' && !zonesUnlocked(state)) return { ok: false, error: 'Las zonas se desbloquean con el ayuntamiento de nivel 2' };
+      // 2.2: la zona agraria pide, además, sus vecinos.
+      if (cmd.zone === 'A') {
+        const farm = farmZoneUnlocked(state);
+        if (!farm.ok) return farm;
+      }
       if (!inBounds(state, cmd.x, cmd.y) || !inBounds(state, cmd.x + cmd.w - 1, cmd.y + cmd.h - 1)) {
         return { ok: false, error: 'Fuera del mapa' };
       }
@@ -233,6 +262,10 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
     }
     case 'NotifyProject':
       return state.projects.some((p) => p.buildingId === cmd.buildingId) ? { ok: true } : { ok: false, error: 'No hay obra' };
+    case 'ReviewContract':
+      return canReviewContract(state, cmd.buildingId);
+    case 'DedicateStreet':
+      return canDedicateStreet(state, cmd.citizenId, cmd.x, cmd.y);
     case 'CitizenAct':
       return canApplyDecision(state, cmd.citizenId, cmd.action) ? { ok: true } : { ok: false, error: 'Decisión ya no válida' };
     case 'MeetAssociation':
@@ -271,6 +304,10 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       return (state.minWage ?? 'none') === cmd.level ? { ok: false, error: 'Ya está en ese nivel' } : { ok: true };
     case 'SettleDebt':
       return canSettleDebt(state, state.citizens.find((c) => c.id === cmd.citizenId), cmd.mode);
+    case 'RequestLoan':
+      return canRequestLoan(state, cmd.amount, cmd.months);
+    case 'RepayLoan':
+      return canRepayLoan(state, cmd.loanId, cmd.amount);
     case 'GrantMicrocredit':
       return canMicrocredit(state, state.citizens.find((c) => c.id === cmd.citizenId));
     case 'ConvenePleno': {
@@ -376,7 +413,10 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
     case 'Build': {
       if (cmd.kind === 'road') return applyCommand(state, { type: 'BuildRoad', x: cmd.x, y: cmd.y, x2: cmd.x, y2: cmd.y });
       const spec = BUILD[cmd.kind];
-      transfer(state, TREASURY, OUTSIDE, materialsCost(state, cmd.kind, cmd.x, cmd.y), 'obras');
+      const mat = materialsCost(state, cmd.kind, cmd.x, cmd.y);
+      const offer = cmd.offer ?? 'local';
+      // 2.2: con otra oferta, los materiales los paga la licitación (signTender).
+      if (offer === 'local') transfer(state, TREASURY, OUTSIDE, mat, 'obras');
       const idx = tileIndex(state, cmd.x, cmd.y);
       state.map.tiles[idx] = Tile.Grass;
       state.map.zones[idx] = Zone.None;
@@ -391,6 +431,7 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
         outsideToday: 0,
         notify: false,
       });
+      if (offer !== 'local') signTender(state, b, state.projects.at(-1)!, offer, mat);
       pushEvent(state, 'project', `Empieza la obra: ${BUILD_NAMES[cmd.kind]}`, { ref: b.id });
       break;
     }
@@ -424,6 +465,8 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
     case 'Demolish': {
       const b = buildingAt(state, cmd.x, cmd.y);
       const i = tileIndex(state, cmd.x, cmd.y);
+      // 2.2: la calle (o la plaza) que pasaba por aquí pierde su nombre.
+      forgetStreet(state, cmd.x, cmd.y);
       if (b) removeBuilding(state, b.id);
       else if (state.map.tiles[i] === Tile.Road) state.map.tiles[i] = Tile.Grass;
       else state.dikes = (state.dikes ?? []).filter((d) => d !== i);
@@ -465,6 +508,12 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       pushEvent(state, 'info', cmd.mode === 'aplazar' ? `Aplazas la deuda de ${c.name}: pagará ${c.debt?.plan?.perMonth ?? 0} € al mes durante un año, sin recargo` : `Perdonas a ${c.name} los ${amount} € que debía al ayuntamiento`, { ref: c.id });
       break;
     }
+    case 'RequestLoan':
+      requestLoan(state, cmd.amount, cmd.months);
+      break;
+    case 'RepayLoan':
+      repayLoan(state, cmd.loanId, cmd.amount);
+      break;
     case 'GrantMicrocredit': {
       const c = state.citizens.find((x) => x.id === cmd.citizenId)!;
       grantMicrocredit(state, c);
@@ -487,6 +536,12 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       pushEvent(state, 'info', `Empieza la reparación de ${b.name ?? BUILD_NAMES[b.kind]?.toLowerCase()}: abrirá en ${days} días`, { ref: b.id });
       break;
     }
+    case 'ReviewContract':
+      reviewContract(state, cmd.buildingId);
+      break;
+    case 'DedicateStreet':
+      dedicateStreet(state, cmd.citizenId, cmd.x, cmd.y);
+      break;
     case 'NotifyProject': {
       const p = state.projects.find((x) => x.buildingId === cmd.buildingId);
       if (p) p.notify = cmd.on;

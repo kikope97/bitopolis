@@ -27,6 +27,8 @@ import {
   ruleAnswer,
   topNeeds,
   plenoUnlocked,
+  STREETS,
+  streetCandidates,
 } from '@bitopolis/sim';
 import { tickToDate } from '@bitopolis/shared';
 import { api } from './api.ts';
@@ -43,6 +45,8 @@ export interface SocialCtx {
   token: string;
   state: () => GameState;
   command: Cmd;
+  /** 2.2: elegir en el mapa la calle que se dedica a un vecino (lo pone game.ts). */
+  pickStreet?: (citizenId: number, name: string) => void;
 }
 
 const RELATION_TEXT: Record<string, string> = { amistad: 'amistad', pareja: 'pareja', rivalidad: 'rivalidad', rencor: 'rencor' };
@@ -247,7 +251,29 @@ export function openPleno(ctx: SocialCtx): void {
     toast('Pleno cerrado. Las promesas quedan registradas.', { kind: 'good' });
     reopen();
   });
-  sheet('Pleno municipal', h('p', { class: 'muted' }, 'El pleno se cierra solo a los 2 días; lo que no respondas queda sin respuesta.'), list, close, h('h3', {}, 'Promesas'), promiseList);
+  sheet('Pleno municipal', h('p', { class: 'muted' }, 'El pleno se cierra solo a los 2 días; lo que no respondas queda sin respuesta.'), list, streetCard(ctx), close, h('h3', {}, 'Promesas'), promiseList);
+}
+
+/** 2.2: «Dedicar una calle»: los candidatos del motor; al elegir uno, se toca la calle en el mapa. */
+function streetCard(ctx: SocialCtx): HTMLElement | string {
+  const state = ctx.state();
+  const st = state.pleno?.street;
+  if (!st) return '';
+  const card = h('div', { class: 'petition street-card', 'data-street': st.done ? 'hecha' : 'abierta' }, h('h3', {}, 'Dedicar una calle'));
+  if (st.done) {
+    const n = state.streetNames?.at(-1);
+    card.append(h('p', { class: 'muted' }, n ? `✓ Ya tiene placa: ${n.name}.` : '✓ Ya se ha dedicado una calle en este pleno.'));
+    return card;
+  }
+  const all = streetCandidates(state);
+  const cands = st.candidates.map((id) => all.find((c) => c.id === id)).filter((c) => !!c);
+  card.append(h('p', { class: 'muted small' }, `El pleno propone a quién recordar. Luego tocas una calle recta o la Plaza Mayor (placa ${money(STREETS.plaque)}). Sus amigos y su familia lo agradecerán; quien se llevaba mal con ellos, no tanto.`));
+  for (const c of cands) {
+    const b = h('button', { class: 'btn wide street-pick', 'data-citizen': String(c.id) }, h('strong', {}, c.name), h('span', { class: 'muted small' }, ` · ${c.why}`));
+    b.addEventListener('click', () => ctx.pickStreet?.(c.id, c.name));
+    card.append(b);
+  }
+  return card;
 }
 
 /** Consejero (§7): reglas en Modo normal; IA premium en Modo IA. */

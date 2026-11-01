@@ -8,7 +8,7 @@ export type TaxLevel = z.infer<typeof TaxLevel>;
 export const BuildKind = z.enum(['road', 'water', 'power', 'park', 'school', 'clinic', 'police', 'house', 'plaza', 'market', 'bar', 'chapel', 'cemetery', 'library', 'sports', 'jail', 'firestation', 'civilprotection', 'cleanpoint']);
 export type BuildKind = z.infer<typeof BuildKind>;
 
-export const ZoneKind = z.enum(['none', 'R', 'C', 'I']);
+export const ZoneKind = z.enum(['none', 'R', 'C', 'I', 'A']);
 export type ZoneKind = z.infer<typeof ZoneKind>;
 
 const Coord = z.number().int().min(0).max(255);
@@ -21,7 +21,12 @@ export const Command = z.discriminatedUnion('type', [
   z.object({ type: z.literal('SetTaxes'), ibi: TaxLevel.optional(), tasas: TaxLevel.optional(), plusvalia: TaxLevel.optional() }),
   /** Casas municipales: en alquiler o a la venta. */
   z.object({ type: z.literal('SetHousingMode'), buildingId: z.number().int().min(1), mode: z.enum(['rent', 'sale']) }),
-  z.object({ type: z.literal('Build'), kind: BuildKind, x: Coord, y: Coord }),
+  /** 2.2: `offer` elige la licitación (obras grandes); sin ella, la local de siempre. */
+  z.object({ type: z.literal('Build'), kind: BuildKind, x: Coord, y: Coord, offer: z.enum(['local', 'fuera', 'primo']).optional() }),
+  /** 2.2: revisar el contrato de la obra del primo mientras hay rumor (lo anula pagando). */
+  z.object({ type: z.literal('ReviewContract'), buildingId: z.number().int().min(1) }),
+  /** 2.2: dedicar una calle o plaza a un vecino candidato del pleno (el nombre lo pone el motor). */
+  z.object({ type: z.literal('DedicateStreet'), citizenId: z.number().int().min(1), x: Coord, y: Coord }),
   /** Carretera en línea recta de (x,y) a (x2,y2): horizontal o vertical. */
   z.object({ type: z.literal('BuildRoad'), x: Coord, y: Coord, x2: Coord, y2: Coord }),
   z.object({ type: z.literal('Zone'), zone: ZoneKind, x: Coord, y: Coord, w: Size, h: Size }),
@@ -79,6 +84,7 @@ export const Command = z.discriminatedUnion('type', [
           motivo: z.string().max(400),
           recuerdo: z.string().max(300).optional(),
           escudo: z.object({ pieza: z.string().max(20), lema: z.string().max(40) }).optional(),
+          biografia: z.string().max(400).optional(),
         }),
       )
       .max(300),
@@ -92,6 +98,10 @@ export const Command = z.discriminatedUnion('type', [
         /** 2.1: titulares de El Eco y el encargo con historia. */
         titulares: z.array(z.object({ seccion: z.enum(['sucesos', 'cartas', 'anuncios']), texto: z.string().max(300), sobre: z.number().int().optional(), suceso: z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(40).optional() })).max(3).optional(),
         encargo: z.object({ id: z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(40), carta: z.string().max(500) }).optional(),
+        /** 2.2: pies de foto del álbum. */
+        pies: z.array(z.object({ tick: z.number().int(), kind: z.string().max(40), texto: z.string().max(200) })).max(4).optional(),
+        /** 2.2: el gobierno del rival con IA (opciones de su menú y su discurso). */
+        rival: z.object({ picks: z.array(z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(60)).max(2), discurso: z.string().max(300) }).optional(),
       })
       .optional(),
   }),
@@ -108,6 +118,9 @@ export const Command = z.discriminatedUnion('type', [
     type: z.literal('ChooseCrest'),
     votes: z.array(z.object({ vecino: z.number().int(), pieza: z.string().regex(/^[a-z_]+$/).max(20), lema: z.string().regex(/^[a-z_]+$/).max(40) })).min(1).max(300),
   }),
+  /** 2.2: préstamo municipal (múltiplos de 1.000 €, a 12, 24 o 48 meses) y amortización anticipada (con comisión). */
+  z.object({ type: z.literal('RequestLoan'), amount: z.number().int().min(1_000).max(200_000).multipleOf(1_000), months: z.union([z.literal(12), z.literal(24), z.literal(48)]) }),
+  z.object({ type: z.literal('RepayLoan'), loanId: z.number().int().min(1), amount: z.number().int().min(1).max(10_000_000) }),
   /** 2.0: % de vecinos con IA (solo sube: nadie deja de pensar con IA). */
   z.object({ type: z.literal('SetAiShare'), share: z.number().int().min(0).max(100) }),
   /** 2.0: días de juego entre turnos de la IA (el cliente los alarga a x3/x10). */

@@ -1,14 +1,11 @@
+import { loansMonth } from './loans.ts';
 import { errandsDay } from './errands.ts';
 import { pressDay } from './press.ts';
 import { TICKS_PER_DAY, TICKS_PER_MONTH, tickToDate } from '@bitopolis/shared';
 import {
   BUSINESS_SEED_CASH,
   COMMUTER_DAILY,
-  DEBT_INTEREST,
   FOUND_MIN_MONEY,
-  DEBT_INTEREST_CAP,
-  DEBT_INTEREST_HIGH,
-  DEBT_INTEREST_STEP,
   DEBT_LIMIT,
   FACTORY_REVENUE_PER_WORKER,
   GROWTH,
@@ -24,15 +21,18 @@ import {
   SERVICE_SALARY,
   WAGE_LOCAL,
   WAGE_OUTSIDE,
+  TENDER,
   CRIME,
   SOCIAL_PLACES,
   TERRAIN,
   TURN,
   CIVIL,
+  FARM,
   FIRE,
 } from './balance.ts';
+import { farmMonth, growFarms } from './farm.ts';
 import { applyCommand, BUILD_NAMES, removeBuilding } from './commands.ts';
-import { OUTSIDE, TREASURY, transfer } from './money.ts';
+import { OUTSIDE, ownIncome, TREASURY, transfer } from './money.ts';
 import { chance, nextInt, pick } from './prng.ts';
 import { detectTriggers, onNamedArrival, resolveDuePending } from './decisions.ts';
 import {
@@ -67,8 +67,9 @@ import { aiByShare, plansDay, turnsTick } from './turns.ts';
 import { ruleTurn } from './decisions.ts';
 import { basicLiving, drownedInDebt, economyStats, outsideJobsMonth, settleMonth, totalDebt, unansweredDeferrals } from './household.ts';
 import { FIRST_NAMES, SURNAMES } from './names.ts';
+import { tenderDay, tenderDone, tenderPace } from './tenders.ts';
 import { addMemory, goalFor, memoryMood, onCitizenLeaves, PROFESSIONS, relationMood, socialDay } from './social.ts';
-import { politicsDay } from './politics.ts';
+import { politicsDay, politicsPrune } from './politics.ts';
 import {
   type Building,
   type Citizen,
@@ -90,7 +91,8 @@ import {
 /* ---------- consultas ---------- */
 
 export function isBusiness(b: Building): boolean {
-  return b.kind === 'shop' || b.kind === 'factory';
+  // 2.2: las fincas también son empresas (nómina, IBI rústico y dividendos), con su cosecha anual.
+  return b.kind === 'shop' || b.kind === 'factory' || b.kind === 'farm';
 }
 
 export function homeCapacity(b: Building): number {
@@ -155,6 +157,8 @@ export function updateNetworks(state: GameState): { water: Set<number>; power: S
   const roadsWith = { water: new Set<number>(), power: new Set<number>() };
   const byRoad = new Map<number, Building[]>();
   for (const b of state.buildings) {
+    // 2.2: las fincas no necesitan agua ni luz (no gastan la capacidad de las plantas).
+    if (b.kind === 'farm') continue;
     for (const [dx, dy] of DIRS) {
       const nx = b.x + dx;
       const ny = b.y + dy;
@@ -291,7 +295,7 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
     if (employs) f.push({ label: 'Le suben los costes (sueldo mínimo)', value: -MIN_WAGE_FX.ownerMood * step });
   }
   // Ronda 15: su negocio pierde dinero (se nota, con o sin sueldo mínimo).
-  const losing = state.buildings.some((b) => b.owner === c.id && isBusiness(b) && b.books && b.books.sales - b.books.wages - b.books.taxes < 0);
+  const losing = state.buildings.some((b) => b.owner === c.id && isBusiness(b) && b.kind !== 'farm' && b.books && b.books.sales - b.books.wages - b.books.taxes < 0);
   if (losing) f.push({ label: 'Su negocio pierde dinero', value: -5 });
   f.push(...taxMood(state, c));
   f.push(...relationMood(c));
@@ -330,7 +334,8 @@ function progressProjects(state: GameState): void {
   const busy = new Set<number>();
   for (const p of state.projects) {
     p.crew = [];
-    for (const c of state.citizens) {
+    // 2.2: la empresa de fuera trae su cuadrilla (los parados del pueblo no cobran).
+    for (const c of p.offer === 'fuera' ? [] : state.citizens) {
       if (p.crew.length >= p.workersNeeded) break;
       if (c.jobId === null && !busy.has(c.id)) {
         p.crew.push(c.id);
@@ -340,9 +345,9 @@ function progressProjects(state: GameState): void {
     // Nunca se bloquea: lo que falte se contrata fuera, más caro.
     p.outsideToday = p.workersNeeded - p.crew.length;
     for (const id of p.crew) transfer(state, p.payer, id, WAGE_LOCAL, 'obras');
-    transfer(state, p.payer, OUTSIDE, p.outsideToday * WAGE_OUTSIDE, 'obras');
-    // v1.7: con nieve, las obras avanzan a la mitad (los sueldos se pagan igual).
-    p.workerDaysDone += p.workersNeeded * weatherFx(state).build;
+    transfer(state, p.payer, OUTSIDE, p.outsideToday * (p.offer === 'fuera' ? TENDER.cheap.wage : WAGE_OUTSIDE), 'obras');
+    // v1.7: con nieve, las obras avanzan a la mitad (los sueldos se pagan igual). 2.2: el ritmo de la oferta.
+    p.workerDaysDone += p.offer ? p.workersNeeded * weatherFx(state).build * tenderPace(p) : p.workersNeeded * weatherFx(state).build;
   }
   for (const p of [...state.projects]) {
     if (p.workerDaysDone < p.workerDaysNeeded) continue;
@@ -352,7 +357,10 @@ function progressProjects(state: GameState): void {
     b.built = true;
     pushEvent(state, 'built', `Terminada la obra: ${BUILD_NAMES[b.kind]}`, { ref: b.id, notify: p.notify });
     onBuildingDone(state, b);
+    if (p.offer) tenderDone(state, b);
   }
+  // 2.2: rumores y escándalos de las licitaciones.
+  tenderDay(state);
   // Quien trabajó hoy en una obra no cobra como commuter.
   for (const c of state.citizens) {
     // v1.9: quien está en paro no cobra (cobra la prestación al mes).
@@ -411,6 +419,8 @@ function growZones(state: GameState, served: { water: Set<number>; power: Set<nu
       notify: false,
     });
   }
+  // 2.2: fincas en la zona agraria (solo carretera; sin zona A no tira dados).
+  growFarms(state);
 }
 
 /* ---------- vecinos ---------- */
@@ -551,7 +561,7 @@ function endOfDay(state: GameState): void {
   const served = updateNetworks(state);
   // v1.8: días seguidos sin agua o sin luz (el icono sobre la casa sale cuando dura).
   for (const b of state.buildings) {
-    if (!b.built || b.kind === 'water' || b.kind === 'power') continue;
+    if (!b.built || b.kind === 'water' || b.kind === 'power' || b.kind === 'farm') continue;
     b.dryDays = b.hasWater ? 0 : (b.dryDays ?? 0) + 1;
     b.darkDays = b.hasPower ? 0 : (b.darkDays ?? 0) + 1;
   }
@@ -650,7 +660,8 @@ function businessPayroll(state: GameState, r: ReturnType<typeof monthRates>): vo
 function payBusinesses(state: GameState): void {
   for (const b of state.buildings) if (isBusiness(b) && b.built) payDividends(state, b);
   for (const b of [...state.buildings]) {
-    if (isBusiness(b) && b.unpaidMonths >= 2) {
+    // 2.2: una finca vive de una cosecha al año: no cierra por un mes malo.
+    if (isBusiness(b) && b.unpaidMonths >= (b.kind === 'farm' ? FARM.closeAfter : 2)) {
       const wage = MIN_WAGE_STEP[state.minWage ?? 'none'] > 0 ? ` (sueldo mínimo ${MIN_WAGE[state.minWage]} €)` : '';
       pushEvent(state, 'business', `Cierra ${b.name ?? BUILD_NAMES[b.kind]?.toLowerCase()}: no puede pagar las nóminas${wage}`, { ref: b.id });
       // Ronda 15: el dueño lo sufre y se acuerda del ayuntamiento; tarda en volver a intentarlo.
@@ -676,6 +687,8 @@ function endOfMonth(state: GameState): void {
   }
   // v1.9: todos los sueldos primero; luego cada vecino paga lo básico, la vivienda y los
   // tributos (lo que no pueda, como deuda), devuelve deudas y, si le sobra, ocio.
+  // 2.2: las fincas que cosechan este mes venden (y pagan a los temporeros) antes de las nóminas.
+  farmMonth(state);
   businessPayroll(state, r);
   outsideJobsMonth(state);
   // Las tiendas destrozadas en disturbios no venden hasta que se reparan (v1.8).
@@ -693,16 +706,12 @@ function endOfMonth(state: GameState): void {
   lifeMonth(state);
   // 2.1: voluntarios de protección civil (por reglas).
   volunteersMonth(state);
-  if (state.treasury < 0) {
-    const debt = -state.treasury;
-    const interest = Math.min(debt, DEBT_INTEREST_STEP) * DEBT_INTEREST + Math.max(0, debt - DEBT_INTEREST_STEP) * DEBT_INTEREST_HIGH;
-    // Tope: los intereses no pasan de una parte de lo ingresado en el mes (si no, la deuda no se paga nunca).
-    const cap = Math.max(100, state.month.income * DEBT_INTEREST_CAP);
-    transfer(state, TREASURY, OUTSIDE, Math.ceil(Math.min(interest, cap)), 'intereses');
-  }
   monthlyMarket(state);
+  // 2.2: cuotas de los préstamos, préstamo de tesorería si la caja sigue en negativo y nota nueva.
+  loansMonth(state);
 
-  if (state.treasury < -DEBT_LIMIT) state.debtMonths++;
+  // Quiebra: nota D y caja por debajo de −DEBT_LIMIT tres meses seguidos.
+  if (state.treasury < -DEBT_LIMIT && state.rating === 'D') state.debtMonths++;
   else state.debtMonths = 0;
   if (state.debtMonths >= 3 && !state.bankrupt) {
     state.bankrupt = true;
@@ -712,7 +721,7 @@ function endOfMonth(state: GameState): void {
     state.bankrupt = false;
     pushEvent(state, 'info', 'La caja vuelve a estar sana');
   }
-  const net = state.month.income - state.month.expenses;
+  const net = ownIncome(state.month) - state.month.expenses;
   if (net < 0 && state.treasury > 0 && state.treasury / -net < 3) {
     const months = Math.max(1, Math.floor(state.treasury / -net));
     pushEvent(state, 'warning', `A este ritmo, la caja aguanta ${months} ${months === 1 ? 'mes' : 'meses'}`);
@@ -741,6 +750,8 @@ export function step(state: GameState): void {
   fireTick(state);
   // 2.0: turnos del pueblo con IA (abrir, y si vencen sin respuesta, reglas).
   turnsTick(state, ruleTurn);
+  // 2.2: ninguna candidatura sin su líder (se va, muere o acaba en la cárcel de fuera).
+  politicsPrune(state);
 }
 
 /** Aplica los comandos de este tick y avanza. */

@@ -17,8 +17,10 @@ import { homeRobbery, robbery, stationsFor } from './crime.ts';
 import { burnable, fireCovered, ignite, placeName, scare, scareCandidates } from './fire.ts';
 import type { Brewing } from './director-core.ts';
 import { canFound, freeShopLot } from './economy.ts';
+import { FARM_NAME, farmOutlook, feastCandidates, HARVEST_NAME, hail, hailCandidates, harvestFeast } from './farm.ts';
 import { offerErrand } from './errands.ts';
 import { publishEdition } from './press.ts';
+import { applyRivalPicks } from './rival-ai.ts';
 import { hash32 } from './hash.ts';
 import { debtBand, totalDebt } from './household.ts';
 import { transfer } from './money.ts';
@@ -29,10 +31,12 @@ import { type Citizen, type GameState, pushEvent } from './state.ts';
 import { setDirectorImpl, type TurnLog } from './turns.ts';
 import { BUILD_NAMES } from './commands.ts';
 import { trashServed, trashStateOf } from './trash-core.ts';
+import { rumoredTenders, scandal, worksName } from './tenders.ts';
+import { streetCandidates } from './streets.ts';
 
 const plural = (n: number) => (n === 1 ? 'un edificio' : `${n} edificios`);
 
-export const DIRECTOR_KINDS = ['robo_tienda', 'robo_casa', 'asociacion', 'manifestacion', 'pelea', 'reconciliacion', 'gratitud', 'rumor', 'oposicion', 'local', 'encuentro', 'ayuda', 'incendio', 'susto', 'ratas'] as const;
+export const DIRECTOR_KINDS = ['robo_tienda', 'robo_casa', 'asociacion', 'manifestacion', 'pelea', 'reconciliacion', 'gratitud', 'rumor', 'oposicion', 'local', 'encuentro', 'ayuda', 'incendio', 'susto', 'ratas', 'licitacion', 'homenaje', 'cosecha', 'granizo'] as const;
 export type DirectorKind = (typeof DIRECTOR_KINDS)[number];
 
 export interface DirectorCandidate {
@@ -56,6 +60,10 @@ export interface DirectorChoice {
   titulares?: { seccion: 'sucesos' | 'cartas' | 'anuncios'; texto: string; sobre?: number; suceso?: string }[];
   /** 2.1: el encargo con historia (id de `errandCandidates`) y la carta con la que lo pide un vecino. */
   encargo?: { id: string; carta: string };
+  /** 2.2: pies de foto del álbum (momento por tick y tipo). */
+  pies?: { tick: number; kind: string; texto: string }[];
+  /** 2.2: el gobierno del rival con IA (ids de `rivalMenu` y su discurso). */
+  rival?: { picks: string[]; discurso: string };
 }
 
 const first = (c: Citizen) => c.name.split(' ')[0]!;
@@ -143,6 +151,26 @@ export function directorMenu(state: GameState): DirectorCandidate[] {
       }),
   );
 
+  // 2.2: el campo. La fiesta de la cosecha (o de la vendimia) en el mes de cosecha; el granizo, solo tras una tormenta.
+  add(
+    feastCandidates(state).map((b) => ({
+      id: `cosecha:${b.id}`,
+      kind: 'cosecha' as const,
+      bad: false,
+      text: `${b.crop === 'vinedo' ? 'Fiesta de la vendimia' : 'Fiesta de la cosecha'} en ${FARM_NAME[b.crop!]}`,
+      why: `es el mes de ${HARVEST_NAME[b.crop!]} y la cosecha viene ${farmOutlook(b)}`,
+    })),
+  );
+  add(
+    hailCandidates(state).map((b) => ({
+      id: `granizo:${b.id}`,
+      kind: 'granizo' as const,
+      bad: true,
+      text: `Una granizada arrasa parte de ${FARM_NAME[b.crop!]}`,
+      why: `ha habido tormenta hace poco y la cosecha sigue en el campo (prevista ${farmOutlook(b)})`,
+    })),
+  );
+
   // Asociaciones y manifestaciones.
   add(
     freshCauses(state).map(([cause, cs]) => ({ id: `asociacion:${cause}`, kind: 'asociacion', bad: true, text: `Los vecinos que piden ${CAUSE_ASK[cause]} fundan una asociación`, why: `${cs.length} vecinos con la misma queja: ${CAUSE_TEXT[cause]}` })),
@@ -220,6 +248,30 @@ export function directorMenu(state: GameState): DirectorCandidate[] {
   if (p.party && p.mayor === 'player') {
     const f = [...FACTIONS].sort((a, b) => p.factions[a].satisfaction - p.factions[b].satisfaction)[0]!;
     out.push({ id: `oposicion:${f}`, kind: 'oposicion', bad: true, text: `«${p.party.name}» da un mitin entre ${FACTION_TEXT[f].toLowerCase()}`, why: `es la facción más descontenta (${Math.round(p.factions[f].satisfaction)})` });
+  }
+
+  // 2.2: el escándalo de la obra del primo (solo con el rumor ya corriendo en el bar).
+  add(
+    rumoredTenders(state).map((t) => {
+      const councillor = byId(state, t.councillorId ?? -1);
+      return {
+        id: `licitacion:${t.buildingId}`,
+        kind: 'licitacion' as const,
+        bad: true,
+        text: `Estalla el escándalo de la obra de ${worksName(t.kind)}`,
+        why: `la obra fue para el negocio de un amigo del concejal${councillor ? ` ${first(councillor)}` : ''} y ya se comenta en el bar`,
+        owed: state.tick >= (t.revealAt ?? 0),
+      };
+    }),
+  );
+  // 2.2: homenaje: con el pleno abierto y la calle sin dedicar, el pueblo pide un nombre.
+  const st = state.pleno?.street;
+  if (st && !st.done) {
+    add(
+      streetCandidates(state)
+        .filter((c) => st.candidates.includes(c.id) && st.candidates[0] !== c.id)
+        .map((c) => ({ id: `homenaje:${c.id}`, kind: 'homenaje' as const, bad: false, text: `El pueblo pide una calle para ${c.name}`, why: c.why.toLowerCase() })),
+    );
   }
 
   // Una historia: dos vecinos quieren el único local libre.
@@ -313,6 +365,11 @@ export function applyDirector(state: GameState, choice: DirectorChoice): TurnLog
   // Ronda 17: el titular de un suceso que al final no pasó no sale.
   const heads = (choice.titulares ?? []).filter((t) => !t.suceso || used.has(t.suceso));
   if (heads.length) publishEdition(state, heads.map((t) => ({ section: t.seccion, text: t.texto, ...(t.sobre !== undefined ? { ref: t.sobre } : {}) })), 'ia');
+  if (choice.rival) applyRivalPicks(state, choice.rival.picks, choice.rival.discurso || undefined);
+  for (const p of choice.pies ?? []) {
+    const m = (state.album ?? []).find((x) => x.tick === p.tick && x.kind === p.kind && !x.caption);
+    if (m) m.caption = p.texto;
+  }
   if (choice.encargo?.id) {
     const e = offerErrand(state, choice.encargo.id, choice.encargo.carta || undefined);
     if (e) lines.push({ id: e.by, text: `Encargo: ${e.text}`, ...(choice.encargo.carta ? { motivo: choice.encargo.carta } : {}) });
@@ -340,6 +397,10 @@ function brewingText(c: DirectorCandidate): string {
       return 'Se oyen comentarios en el bar sobre el ayuntamiento';
     case 'incendio':
       return `Huele a humo: ${c.why}`;
+    case 'licitacion':
+      return `Hay quien hace preguntas en el bar: ${c.why}`;
+    case 'granizo':
+      return `El cielo amenaza piedra sobre el campo: ${c.why}`;
     default:
       return c.text;
   }
@@ -472,6 +533,31 @@ function perform(state: GameState, c: DirectorCandidate): { id: number; text: st
       }
       pushEvent(state, 'warning', `${c.text}: ${plural(hit.length)} sin recogida de basura`, { ref: b.id, notify: true });
       return { id: people[0]?.id ?? 0, text: c.text };
+    }
+    case 'licitacion': {
+      const t = rumoredTenders(state).find((x) => x.buildingId === Number(arg));
+      if (!t || !scandal(state, t)) return null;
+      return { id: t.councillorId ?? 0, text: c.text };
+    }
+    case 'homenaje': {
+      const st = state.pleno?.street;
+      const id = Number(arg);
+      if (!st || st.done || !st.candidates.includes(id)) return null;
+      // Pasa a ser el primero de la lista del pleno.
+      st.candidates = [id, ...st.candidates.filter((x) => x !== id)];
+      const name = state.citizens.find((x) => x.id === id)?.name ?? state.departed?.find((x) => x.id === id)?.name ?? 'un vecino';
+      pushEvent(state, 'info', `En el bar se pide que una calle lleve el nombre de ${name}`, { ref: id });
+      return { id, text: c.text };
+    }
+    case 'cosecha': {
+      const b = state.buildings.find((x) => x.id === Number(arg));
+      if (!b || !harvestFeast(state, b)) return null;
+      return { id: state.citizens.find((x) => x.jobId === b.id)?.id ?? 0, text: c.text };
+    }
+    case 'granizo': {
+      const b = state.buildings.find((x) => x.id === Number(arg));
+      if (!b || !hail(state, b)) return null;
+      return { id: state.citizens.find((x) => x.jobId === b.id)?.id ?? 0, text: c.text };
     }
     case 'local': {
       const [a, b] = pair();

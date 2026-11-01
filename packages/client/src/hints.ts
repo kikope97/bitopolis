@@ -22,7 +22,7 @@ export function nextHint(state: GameState): Hint {
   if (roads <= 7) return { text: 'Alarga la calle: elige Carretera y arrastra desde la calle del ayuntamiento.', tool: 'road' };
   if (!has('water')) return { text: 'Sin agua nadie quiere vivir aquí. Construye una bomba de agua junto a una carretera.', tool: 'water' };
   if (!has('power')) return { text: 'Ahora la luz: pon una central eléctrica junto a una carretera conectada.', tool: 'power' };
-  const unserved = state.buildings.filter((b) => b.built && b.kind !== 'water' && b.kind !== 'power' && (!b.hasWater || !b.hasPower));
+  const unserved = state.buildings.filter((b) => b.built && b.kind !== 'water' && b.kind !== 'power' && b.kind !== 'farm' && (!b.hasWater || !b.hasPower));
   if (unserved.length > 0) {
     return { text: `${unserved.length} edificio(s) sin agua o luz (icono de gota o rayo). Conéctalos con carretera a las plantas, o construye otra si están llenas.` };
   }

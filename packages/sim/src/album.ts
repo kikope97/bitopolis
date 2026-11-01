@@ -12,6 +12,8 @@ export interface Moment {
   text: string;
   x: number;
   y: number;
+  /** 2.2: pie de foto escrito por la IA (el director). */
+  caption?: string;
 }
 
 const ALBUM_MAX = 80;
@@ -31,6 +33,11 @@ const FIRST_KINDS: Record<string, string> = {
   library: 'Abre la biblioteca',
   sports: 'Abre el polideportivo',
 };
+
+/** 2.2: un momento que no sale de los sucesos del día (la primera cosecha se vende al cerrar el mes). */
+export function addMoment(state: GameState, kind: string, text: string, at: { x: number; y: number }, unique = true): void {
+  if (state.album) add(state, kind, text, at, unique);
+}
 
 function add(state: GameState, kind: string, text: string, at: { x: number; y: number }, unique: boolean): void {
   if (unique && state.album.some((m) => m.kind === kind)) return;

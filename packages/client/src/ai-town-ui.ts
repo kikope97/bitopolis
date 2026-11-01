@@ -100,6 +100,8 @@ export function mindBox(s: GameState, c: Citizen): HTMLElement | null {
     const days = Math.max(0, Math.ceil((c.plan.until - s.tick) / 24));
     box.append(h('p', { class: 'mind-plan' }, `Su plan: ${planText(c.plan)} (quedan ${days} ${days === 1 ? 'día' : 'días'}).`));
   }
+  // 2.2: su vida, escrita por la IA una vez al mes.
+  if (c.bio) box.append(h('p', { class: 'mind-bio' }, h('strong', {}, 'Su vida: '), c.bio.text, h('span', { class: 'muted small' }, ` (escrita el ${formatDate(tickToDate(c.bio.tick))})`)));
   if (c.notes?.length) {
     box.append(h('p', { class: 'muted small' }, 'Lo que ha apuntado estas semanas:'));
     box.append(h('ul', { class: 'mind-notes small' }, ...[...c.notes].reverse().map((n) => h('li', {}, `${formatDate(tickToDate(n.tick))}: ${n.text}`))));

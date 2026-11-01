@@ -130,3 +130,13 @@ pnpm e2e                            # Playwright, viewport móvil y escritorio; 
 - `sim/src/rank.ts` (+ `rank-core.ts`): rangos (`RANKS`), escudo por código, votación (`rankCandidates`; en Modo IA los votos van en `acts[].escudo` del `TownTurn`). Cliente: `rank-ui.ts`, `crest.ts`, `away-ui.ts` («Mientras no estabas»), `town-news-ui.ts` (encargos y El Eco).
 - Migración 13→14: `migrate14Fire`, `migrate14Errands`, `migrate14Rank`, `migrate14Trash` encadenadas (cada parte en su función).
 - e2e: `incendios`, `basura`, `rangos`, `encargos`. Planes de lo siguiente: `docs/propuestas/v2.2-*`, `v2.3-*`, `v2.4-*`.
+
+## Economía y política (2.2) — formato de partida 15, TURN_PROMPT_VERSION 11
+- `sim/src/loans.ts` (+ `invariants-loans.ts`): nota A–D (`state.rating`, `ratingOf`, carga = cuotas ÷ ingresos medios), `RequestLoan`/`RepayLoan`, préstamo de tesorería en vez del descubierto, intereses de demora con D, tope por plazo (`loanCapacity(state, months)`). `ownIncome` (money.ts): lo prestado nunca cuenta como superávit. Números en `LOANS`. Cliente: `loans-ui.ts`.
+- `sim/src/tenders.ts`: licitaciones desde el ayuntamiento 2 (`Build.offer`: local, fuera, primo), rumor y escándalo, `ReviewContract`; `TENDER`. Cliente: `tender-ui.ts` (`chooseOffer` en los e2e).
+- `sim/src/streets.ts`: `DedicateStreet` desde el pleno, placa y rótulo; `STREETS`. `sim/src/farm.ts`: zona A (`Zone.A=4`), fincas, cultivo por terreno, cosecha anual (`farmMonth`), temporeros, granizo; `FARM`.
+- Política: `Party.style`, promesas medibles (`RIVAL_PROMISES`), hasta 3 candidaturas (`politics.lists`, `presentarse`, `LISTS`); `tally` reparte el voto por listas sin azar. `recentlyBuilt`: el rival no repite obra en 6 meses.
+- `sim/src/rival-ai.ts`: cuando gobierna el rival, el director recibe `gobierno_rival` (`rivalMenu`, cerrado) y `applyRivalPicks` lo aplica con `governmentCommand`, una vez al mes (`rivalAiWanted`); si no, `rivalGovern`. Quien gobierna lleva `es_alcalde` y su menú no tiene irse/pedir/quejarse/manifestarse.
+- IA: biografía mensual (`turn.monthly`, `acts[].biografia`, `Citizen.bio`), pies de foto (`director.pies`, `Moment.caption`), `cuentas` en `turnShared`. Turno mensual en lotes de `TURN_BATCH_MONTHLY` (8). `DirectorOut` recorta listas y descarta solo el campo extra que esté mal.
+- Perfiles del simulador: `campo`, `endeudado` (`borrow`), `keepRoads`; `report.sales` y `report.loans`.
+- e2e: `prestamos`, `licitaciones`, `campo`, `elecciones-listas`.

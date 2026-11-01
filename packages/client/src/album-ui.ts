@@ -128,7 +128,15 @@ export function openAlbum(ctx: SocialCtx): void {
       'figure',
       { class: 'album-card' },
       el,
-      h('figcaption', {}, h('strong', {}, formatDate(tickToDate(m.tick))), ` · ${m.text}`, live ? h('span', { class: 'muted small' }, ' (así está hoy)') : ''),
+      h(
+        'figcaption',
+        {},
+        h('strong', {}, formatDate(tickToDate(m.tick))),
+        ` · ${m.text}`,
+        live ? h('span', { class: 'muted small' }, ' (así está hoy)') : '',
+        // 2.2: el pie que escribe la IA (el director), si lo hay.
+        m.caption ? h('span', { class: 'album-caption' }, h('span', { 'aria-hidden': 'true' }, '✦ '), `«${m.caption}»`) : '',
+      ),
       save,
     );
   };

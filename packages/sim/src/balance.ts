@@ -77,6 +77,8 @@ export const JOBS: Record<BuildingKind, number> = {
   res: 0,
   shop: 3,
   factory: 5,
+  // 2.2: un empleo fijo (los temporeros van aparte, en el mes de cosecha).
+  farm: 1,
 };
 
 export const HOMES: Partial<Record<BuildingKind, number>> = { house: 3, res: 4 };
@@ -105,6 +107,7 @@ export const MAINTENANCE: Record<BuildingKind, number> = {
   res: 0,
   shop: 0,
   factory: 0,
+  farm: 0,
 };
 
 /** Radio de cobertura de los servicios (tiles) y su efecto en la felicidad. */
@@ -203,16 +206,94 @@ export const CAMPAIGN_COST = 300;
 export const TAX_RELIEF_DAYS = 90;
 /** Plazo del rival para cumplir lo prometido si gana (meses tras las elecciones). */
 export const RIVAL_PROMISE_MONTHS = 12;
+/**
+ * 2.2 (rival político y vecinos que se presentan): candidaturas, promesas
+ * medibles y el gobierno rival con IA. El reparto del voto es sin azar.
+ */
+export const LISTS = {
+  /** Como mucho, candidaturas en la oposición a la vez (cada una de una facción). */
+  max: 3,
+  /** Lo que paga de su bolsillo un vecino para presentarse. */
+  cost: 200,
+  minAge: 25,
+  minAmbition: 60,
+  /** Solo si su facción está descontenta (satisfacción por debajo). Ronda 18: 40 no llegaba nunca. */
+  maxSatisfaction: 60,
+  /** Solo en los meses anteriores a las elecciones. */
+  months: 12,
+  /** Por reglas: probabilidad (por hash, sin dados) de que un vecino que puede se presente ese mes (%). */
+  ruleChance: 40,
+  /** Afinidad con cada lista del voto contra el gobierno: la de su facción pesa más. */
+  affinitySame: 3,
+  affinityOther: 1,
+  /** El jugador en la oposición frente a otras listas (y lo que suma cada punto de campaña). */
+  affinityPlayer: 1.5,
+  affinityCampaign: 0.25,
+  /** Tirón de la facción de una candidatura hacia ella (a la intención de voto). */
+  factionPull: 0.12,
+} as const;
+
+/** Promesas del rival (2.2): menú cerrado con comprobación medible. */
+export const RIVAL_PROMISES = {
+  /** Como mucho, promesas propias por candidatura (las mociones aprobadas van aparte). */
+  max: 3,
+  /** «Crear empleo»: vecinos con trabajo de más sobre los que había al llegar al gobierno. */
+  jobs: 5,
+  /** «Sanear la deuda»: caja mínima con superávit el mes pasado. */
+  cleanTreasury: 5_000,
+} as const;
+
+/** Gobierno rival con IA (2.2, `rival-ai.ts`). */
+export const RIVAL_AI = {
+  /** Opciones del menú como mucho, y de cada tipo. */
+  menuMax: 12,
+  works: 4,
+  taxes: 3,
+  /** Lo que elige la IA como mucho cada mes. */
+  picks: 2,
+  /** Discurso del alcalde rival (caracteres). */
+  speechMax: 140,
+  /** Recortes solo con la caja por debajo. */
+  cutBelow: 0,
+  /** Las obras dejan al menos esto en caja. */
+  reserve: 3_000,
+} as const;
+
 /** Plazo para cumplir una moción aprobada (meses). */
 export const MOTION_MONTHS = 6;
 /** Apoyo extra al gobierno recién elegido (se apaga en 12 meses). */
 export const HONEYMOON = 0.25;
-/** Interés mensual de la deuda: 1 % hasta 5.000 € y 3 % por encima. */
-export const DEBT_INTEREST = 0.01;
-export const DEBT_INTEREST_HIGH = 0.03;
-export const DEBT_INTEREST_STEP = 5_000;
-/** Los intereses de un mes no superan esta parte de lo ingresado ese mes (ronda 07). */
-export const DEBT_INTEREST_CAP = 0.25;
+/**
+ * 2.2: préstamos municipales con calificación A–D (loans.ts). Sustituyen a los
+ * intereses del descubierto: lo que pide el alcalde se devuelve en cuota fija y,
+ * si a fin de mes la caja sigue en negativo, el hueco pasa solo a un préstamo de
+ * tesorería a 12 meses con recargo (y la nota baja). Carga = cuotas del mes ÷
+ * ingresos medios de 12 meses (sin contar lo prestado).
+ */
+export const LOANS = {
+  /** Interés mensual según la nota (A ≈ 4,9 % TAE … D ≈ 26,8 % TAE). */
+  rate: { A: 0.004, B: 0.007, C: 0.012, D: 0.02 },
+  /** Lo que se puede deber en total, en veces los ingresos anuales (con D no se presta). */
+  maxRatio: { A: 2, B: 1.2, C: 0.6, D: 0 },
+  /** Plazos en meses. */
+  terms: [12, 24, 48],
+  /** Importe: múltiplos de 1.000 € entre min y max. */
+  step: 1_000,
+  min: 1_000,
+  max: 200_000,
+  /** Comisión por amortizar antes de tiempo (sobre lo amortizado). */
+  earlyFee: 0.01,
+  /** Préstamo de tesorería: plazo y recargo sobre el tipo de la nota. */
+  treasuryMonths: 12,
+  treasuryPenalty: 1.5,
+  /** Préstamos pedidos a la vez como mucho (más uno de tesorería). */
+  maxLoans: 4,
+  /** Umbrales de la carga para cada nota y meses de superávit para la A. */
+  load: { A: 0.1, B: 0.2, C: 0.35 },
+  surplusMonths: 6,
+  /** Con la carga por encima, el 💰 de la barra se pone en ámbar. */
+  warnLoad: 0.25,
+} as const;
 
 /* ---------------- v0.3: tributos y vivienda ---------------- */
 
@@ -240,7 +321,7 @@ export const GRUDGE_DECAY = 0.997;
 export const GRUDGE_MAX = 40;
 
 /** Valor base de una vivienda, local o nave (antes de barrio y demanda). */
-export const PROPERTY_VALUE: Partial<Record<BuildingKind, number>> = { house: 7_000, res: 9_000, shop: 20_000, factory: 30_000 };
+export const PROPERTY_VALUE: Partial<Record<BuildingKind, number>> = { house: 7_000, res: 9_000, shop: 20_000, factory: 30_000, farm: 12_000 };
 /** Entrada mínima para comprar (resto con hipoteca) y cuota mensual. */
 export const DOWN_PAYMENT = 0.2;
 export const MORTGAGE_MONTHS = 120;
@@ -766,4 +847,110 @@ export const TRASH = {
   plagueRadius: 3,
   /** Días entre avisos de ratas. */
   warnEveryDays: 7,
+} as const;
+
+/**
+ * 2.2: licitaciones de obras (tenders.ts). Las obras con materiales desde
+ * `minCost` eligen oferta: local (la de siempre), barata de fuera o la del
+ * primo del concejal. `mat` multiplica los materiales y `days` el plazo.
+ */
+export const TENDER = {
+  minCost: 2_500,
+  /** Llegan con el ayuntamiento de este nivel (las primeras obras, las del tutorial, van sin licitación). */
+  fromLevel: 2,
+  /** Barata de fuera: su cuadrilla cobra `wage` al día (no los parados del pueblo); con p, sobrecoste al terminar. */
+  cheap: { mat: 0.8, days: 1.3, wage: 60, overrun: 0.25, p: 0.4 },
+  // Ronda 18: antes (0,15 y 0,25) la de fuera salía siempre a cuenta.
+  /** La del primo: `kick` de los materiales va a la caja de su negocio; con p, escándalo. */
+  crony: { mat: 0.9, days: 0.9, kick: 0.1, p: 0.35 },
+  /** Rumor en el bar y estallido (días desde la firma). */
+  warnDays: 14,
+  revealDays: 28,
+  /** Con director (Modo IA): si no lo hace estallar en estos días tras `revealDays`, se olvida. */
+  forgetDays: 28,
+  /** «Revisar el contrato» durante el rumor: cuesta esta parte de los materiales. */
+  cancelFee: 0.2,
+  // Ronda 18: con el 10 % revisar costaba lo que ahorraba el primo (salía gratis).
+  /** Recuerdo del escándalo en los vecinos con nombre (felicidad) y bajada de campaña en cada facción. */
+  scandalMood: -8,
+  scandalCampaign: 3,
+  /** El concejal al que se le revisa el contrato: rencor. */
+  offendedGrudge: 4,
+  /** Licitaciones guardadas (las 10 últimas; las vivas no se borran). */
+  keep: 10,
+} as const;
+
+/** 2.2: calles y plazas con nombre de vecinos (streets.ts). */
+export const STREETS = {
+  /** La placa. */
+  plaque: 150,
+  /** Amigos y familia del homenajeado: felicidad; quien se llevaba mal: rencor. */
+  friendHappiness: 4,
+  rivalGrudge: 2,
+  /** Candidatos: mayores desde esta edad y «muy queridos» con tantas amistades. */
+  oldAge: 70,
+  lovedFriends: 3,
+  candidates: 3,
+} as const;
+
+/**
+ * 2.2: el campo (zona A, fincas). Cosecha = base anual × factor del año; el
+ * factor empieza en `start` tras cada cosecha y se acumula cada día con el
+ * tiempo (lluvia suma, calor resta; el regadío lo nota poco). En el mes de
+ * cosecha, cada tormenta quita un 15 %; una riada, un 60 % al regadío.
+ * Ronda de la 2.2: la base del plan (2.400–4.200 €/año) no pagaba ni el
+ * sueldo del empleo fijo (900 €/mes); se sube para que la finca viva de lo suyo.
+ */
+export const FARM = {
+  /** Vecinos y nivel del ayuntamiento para pintar zona A. */
+  unlockPop: 20,
+  level: 2,
+  jobs: 1,
+  /** Temporeros en el mes de cosecha y lo que cobra cada uno por la temporada. */
+  seasonal: 3,
+  seasonalWage: 450,
+  /** Venta anual con un año normal (factor 1), por cultivo. */
+  base: { secano: 12_500, regadio: 17_500, olivar: 15_000, vinedo: 16_000 },
+  /** Mes de la cosecha (1–12): secano julio, huerta agosto, vendimia septiembre, aceituna noviembre. */
+  harvestMonth: { secano: 7, regadio: 8, vinedo: 9, olivar: 11 },
+  /** Factor del año: de dónde parte y lo que suma cada día de lluvia o resta cada día de calor. */
+  start: 1,
+  /** Lo que se seca la tierra cada día (compensa la lluvia media del año). */
+  dry: -0.0012,
+  rain: 0.02,
+  heat: -0.015,
+  /** El regadío nota el tiempo a esta parte. */
+  irrigated: 0.3,
+  /** Tormenta en el mes de cosecha y riada (regadío), multiplicativos. */
+  storm: -0.15,
+  flood: -0.6,
+  /** Granizo (suceso del director, solo tras una tormenta reciente sobre la finca). */
+  hail: -0.3,
+  hailDays: 21,
+  /** Fiesta de la cosecha (suceso bueno del director): un poco más de venta y alegría. */
+  feast: 0.05,
+  feastReach: 8,
+  min: 0.4,
+  max: 1.3,
+  /** El factor se acumula sin recortar (hasta este tope); al vender, se recorta a min–max. */
+  cap: 2,
+  /** IBI rústico: el de una finca es esta parte del normal. */
+  ibiRustic: 0.3,
+  /** Regadío a esta distancia del río (casillas, también en diagonal). */
+  riverReach: 2,
+  /** Cosecha prevista: buena desde aquí, mala por debajo de `badBelow`. */
+  goodFrom: 1.05,
+  badBelow: 0.8,
+  /** Crecimiento: probabilidad diaria con solar libre, y una finca por cada tantos vecinos (más una). */
+  growChance: 0.25,
+  popPerFarm: 20,
+  /** Y no más de tantas por taller (más una): el campo no pasa a la industria. */
+  perFactory: 3,
+  growth: { workers: 2, days: 2 },
+  /** Caja inicial: sueldos hasta la primera cosecha y un colchón. */
+  seedExtra: 1_000,
+  /** Caja que guarda (el resto, dividendos): un año de sueldos. */
+  cashCap: 12_000,
+  /** No cierra por un mes malo: solo tras tantos meses seguidos sin pagar el sueldo. */
+  closeAfter: 6,
 } as const;

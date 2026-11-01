@@ -19,8 +19,39 @@ export const PARTY_NAMES: Record<Faction, string> = {
   ecologistas: 'Bitópolis Verde',
 };
 
+/** 2.2: estilo del rival, de los rasgos de su líder (cambia lo que promete y cómo gobierna). */
+export const RIVAL_STYLES = ['populista', 'tecnico', 'conservador', 'verde'] as const;
+export type RivalStyle = (typeof RIVAL_STYLES)[number];
+
+export const STYLE_TEXT: Record<RivalStyle, string> = {
+  populista: 'Populista',
+  tecnico: 'Técnico',
+  conservador: 'Conservador',
+  verde: 'Verde',
+};
+
+/** Estilo que se le supone a una facción (partidas de antes de la 2.2). */
+export const FACTION_STYLE: Record<Faction, RivalStyle> = {
+  jubilados: 'conservador',
+  jovenes: 'populista',
+  empresarios: 'tecnico',
+  ecologistas: 'verde',
+};
+
+/**
+ * 2.2: cómo se comprueba una promesa. `exigencia`: deja de faltar lo que pedía
+ * la facción; `impuestos`: no los sube; `empleo`: más vecinos con trabajo;
+ * `deuda`: caja saneada con superávit.
+ */
+export const PROMISE_CHECKS = ['exigencia', 'impuestos', 'empleo', 'deuda'] as const;
+export type PromiseCheck = (typeof PROMISE_CHECKS)[number];
+
 /** Compromiso del partido rival (v1.1): se cumple si la exigencia deja de faltar en el pueblo. */
 export interface RivalPromise {
+  /** 2.2: tipo de comprobación (las de antes, `exigencia`). */
+  check: PromiseCheck;
+  /** 2.2: referencia medida al llegar al gobierno (nivel de impuestos o vecinos con trabajo). */
+  base?: number;
   faction: Faction;
   /** Texto de la exigencia del motor (p. ej. «un centro de salud»). */
   need: string;
@@ -38,6 +69,10 @@ export interface Party {
   faction: Faction;
   founded: number;
   promises: RivalPromise[];
+  /** 2.2: estilo (de los rasgos del líder). */
+  style: RivalStyle;
+  /** 2.2: lo último que dijo gobernando (la IA, filtrado). */
+  speech?: { tick: number; text: string };
 }
 
 export interface ElectionResult {
@@ -49,6 +84,10 @@ export interface ElectionResult {
   winner: 'player' | 'rival';
   rivalName: string | null;
   unopposed: boolean;
+  /** 2.2: votos de cada candidatura (para la noche electoral con una barra por lista). */
+  lists?: { leaderId: number; name: string; leaderName: string; faction: Faction; votes: number }[];
+  /** 2.2: nombre de quien gana si es otra candidatura. */
+  winnerName?: string | null;
 }
 
 export interface Politics {
@@ -76,6 +115,14 @@ export interface Politics {
   motions: { need: string; faction: Faction; tick: number; approved: boolean }[];
   /** v1.3: lo que ha hecho el gobierno rival (obras, impuestos, recortes, promesas), lo último al final. */
   log: { tick: number; text: string }[];
+  /**
+   * 2.2: candidaturas (hasta `LISTS.max`, una por líder). Incluye una copia de
+   * `party` (la fuente de verdad es `party`; `syncLists` la copia, nunca la misma
+   * referencia, para que el hash sea igual en el cliente y en el servidor).
+   */
+  lists: Party[];
+  /** 2.2: mes (tick / mes) en que la IA gobernó por el rival; ese mes no gobiernan las reglas. */
+  rivalAiMonth?: number;
 }
 
 export function emptyPolitics(tick = 0): Politics {
@@ -94,6 +141,7 @@ export function emptyPolitics(tick = 0): Politics {
     lastMotion: -1,
     motions: [],
     log: [],
+    lists: [],
   };
 }
 

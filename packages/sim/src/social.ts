@@ -8,7 +8,9 @@ import { hash32 } from './hash.ts';
 import { radiusOf } from './levels.ts';
 import { isFemaleName } from './names.ts';
 import { leaveTown } from './household.ts';
-import { OUTSIDE, TREASURY, transfer } from './money.ts';
+import { streetCandidates } from './streets.ts';
+import { tendersForget } from './tenders.ts';
+import { OUTSIDE, ownIncome, TREASURY, transfer } from './money.ts';
 import { chance, pick } from './prng.ts';
 import type { Building, Citizen, GameState } from './state.ts';
 import type { Faction } from './politics-core.ts';
@@ -97,6 +99,15 @@ export const MEMORY_KINDS = [
   'ratas',
   'tiro_basura',
   'vio_tirar_basura',
+  // 2.2: licitaciones y calles.
+  'obra_de_fuera',
+  'escandalo',
+  'contrato_revisado',
+  'homenaje',
+  // 2.2: el campo.
+  'temporada',
+  'buena_cosecha',
+  'granizo',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -182,6 +193,8 @@ export interface Petition {
 export interface Pleno {
   tick: number;
   petitions: Petition[];
+  /** 2.2: «Dedicar una calle»: los candidatos del motor y si ya se dedicó en este pleno. */
+  street?: { candidates: number[]; done: boolean };
 }
 export interface PromiseRecord {
   id: number;
@@ -352,6 +365,20 @@ export function memoryText(state: GameState, m: Memory): string {
       return 'Tiró la basura al monte porque no pasa el camión';
     case 'vio_tirar_basura':
       return `Vio a ${who} tirar la basura al monte`;
+    case 'obra_de_fuera':
+      return 'Una obra del pueblo se la dieron a una empresa de fuera';
+    case 'escandalo':
+      return m.about.length ? `Se destapó el escándalo de la obra del primo de ${who}` : 'Se destapó el escándalo de una obra del ayuntamiento';
+    case 'contrato_revisado':
+      return 'El alcalde le revisó el contrato de una obra';
+    case 'homenaje':
+      return m.about.length ? `El pueblo dedicó una calle a ${who}` : 'El pueblo le dedicó una calle';
+    case 'temporada':
+      return 'Trabajó de temporero en la cosecha';
+    case 'buena_cosecha':
+      return 'Celebró una buena cosecha en el pueblo';
+    case 'granizo':
+      return 'El granizo arruinó parte de la cosecha';
   }
 }
 
@@ -543,6 +570,7 @@ export function onCitizenLeaves(state: GameState, leaving: Citizen): void {
   // v1.9: salda lo que pueda; lo que deba y no pague se da por perdido.
   leaveTown(state, leaving);
   rememberDeparted(state, leaving, 'se_fue');
+  tendersForget(state, leaving.id);
   for (const c of state.citizens) {
     const r = relation(c, leaving.id);
     if (!r) continue;
@@ -707,7 +735,7 @@ function needBaseline(state: GameState, need: Need): number {
   if (need === 'empleo') return state.citizens.filter((c) => c.jobId === null).length;
   if (need === 'bajar_tasas') return LEVEL[taxLevels(state).tasas];
   if (need === 'bajar_ibi') return LEVEL[taxLevels(state).ibi];
-  return state.buildings.filter((b) => b.built && (!b.hasWater || !b.hasPower)).length;
+  return state.buildings.filter((b) => b.built && b.kind !== 'farm' && (!b.hasWater || !b.hasPower)).length;
 }
 
 function needMet(state: GameState, p: PromiseRecord): boolean {
@@ -813,7 +841,9 @@ export function convenePleno(state: GameState): void {
       petitions.push({ id: state.nextId++, citizenId: leader.id, need, yes, no: state.citizens.length - yes, supporters, answer: null, opposition: true });
     }
   }
-  state.pleno = { tick: state.tick, petitions };
+  // 2.2: una calle por pleno, entre los candidatos que propone el motor.
+  const street = streetCandidates(state).map((c) => c.id);
+  state.pleno = { tick: state.tick, petitions, ...(street.length ? { street: { candidates: street, done: false } } : {}) };
   pushEvent(state, 'info', `Pleno municipal: ${petitions.length} peticiones${leader ? ', una de la oposición' : ' de los vecinos'}`);
 }
 
@@ -1066,7 +1096,7 @@ export const OBJECTIVES: ObjectiveDef[] = [
   { id: 'propietarios', text: 'Ten 5 vecinos propietarios', reward: 1_500, done: (s) => s.citizens.filter((c) => c.owns).length >= 5 },
   { id: 'cincuenta', text: 'Llega a 50 vecinos', reward: 5_000, unlock: 'plaza', done: (s) => s.citizens.length >= 50 },
   { id: 'promesa', text: 'Cumple una promesa del pleno', reward: 1_500, done: (s) => s.promises.some((p) => p.status === 'kept') },
-  { id: 'sin_deuda', text: 'Cierra 6 meses seguidos con superávit (con 30 vecinos o más)', reward: 2_000, done: (s) => s.citizens.length >= 30 && s.stats.length >= 6 && s.stats.slice(-6).every((m) => m.income >= m.expenses) },
+  { id: 'sin_deuda', text: 'Cierra 6 meses seguidos con superávit (con 30 vecinos o más)', reward: 2_000, done: (s) => s.citizens.length >= 30 && s.stats.length >= 6 && s.stats.slice(-6).every((m) => ownIncome(m) >= m.expenses) },
   { id: 'doscientos', text: 'Llega a 200 vecinos', reward: 10_000, unlock: 'market', done: (s) => s.citizens.length >= 200 },
   { id: 'elecciones', text: 'Gana unas elecciones con rival', reward: 3_000, done: (s) => s.politics.history.some((h) => h.winner === 'player' && !h.unopposed) },
 ];

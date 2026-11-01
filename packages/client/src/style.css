@@ -361,6 +361,16 @@ html[data-contrast='alto'] .btn, html[data-contrast='alto'] .seg-btn, html[data-
 .pol-bar.abst .pol-fill { background: repeating-linear-gradient(45deg, #94b0c2 0 3px, #566c86 3px 6px); }
 .btn[aria-disabled='true'] { color: var(--muted); border-style: dashed; box-shadow: none; cursor: not-allowed; }
 body.election-night .bubbles { display: none; }
+/* 2.2: tarjetas de las candidaturas (legibles a 360 px: las promesas bajan de línea). */
+.pol-label { overflow-wrap: anywhere; }
+.rival-card { border: 2px solid var(--line); border-left: 4px solid #b13e53; padding: 6px 10px; margin: 8px 0; background: var(--panel-2); }
+.rival-card.governs { border-left-color: var(--accent); }
+.rival-card h4 { margin: 0 0 4px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; overflow-wrap: anywhere; }
+.rival-card p { margin: 2px 0 6px; }
+.promises { list-style: none; margin: 4px 0 8px; padding: 0; }
+.promises li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 8px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.promise-need { flex: 1 1 10em; min-width: 0; }
+.promises .pill { white-space: nowrap; }
 
 /* Letra pixel (opción estética): 11 filas por em → a 22 px cada píxel mide 2 px exactos. */
 html[data-font='pixel'] body, html[data-font='pixel'] button, html[data-font='pixel'] input, html[data-font='pixel'] select { font-family: 'Bitopolis Pixel', ui-monospace, monospace; -webkit-font-smoothing: none; font-smooth: never; }
@@ -495,6 +505,8 @@ html[data-text='200'] { --ui: 1.3; }
 .tb-stat .tb-text { overflow: hidden; text-overflow: ellipsis; }
 #hud-money { flex: 1 1 auto; justify-content: flex-start; }
 #hud-money.neg { color: var(--bad); }
+/* 2.2: los préstamos se llevan más del 25 % de lo que entra. */
+#hud-money.load { color: var(--accent); }
 .trend { font-size: 0.8em; }
 .trend.up { color: var(--good); }
 .trend.down { color: var(--bad); }
@@ -855,6 +867,9 @@ html[data-font='pixel'] body #hud-date, html[data-font='pixel'] body .bar-num, h
 .tb-speed { min-width: 44px; }
 .confirm-bar.danger p { -webkit-line-clamp: 3; }
 @media (max-width: 420px) {
+  /* Ronda 18: con elecciones, las cifras de arriba no se pisan. */
+  #hud-poll .poll-days, #hud-poll .poll-opp { display: none; }
+  #hud-poll { padding: 0 4px; }
   html[data-text='150'] .tb-stat .px-icon, html[data-text='200'] .tb-stat .px-icon, html[data-font='pixel'] .tb-stat .px-icon,
   html[data-text='200'] .trend, html[data-font='pixel'] .trend { display: none; }
   html[data-text='200'] .tb-btn, html[data-font='pixel'] .tb-btn { padding: 0 2px; }
@@ -1091,3 +1106,45 @@ body.placing .tut-arrow { visibility: hidden; }
   html[data-text='200'] .away-rank, html[data-text='200'] .away-who { flex-direction: column; }
 }
 .press-help { margin: 4px 0 6px; padding-left: 18px; }
+/* 2.2: biografía y pies de foto escritos por la IA. */
+/* Ronda 18: el pie se lee sobre el papel de la postal. */
+.album-caption { display: block; font-style: italic; color: #5d275d; margin-top: 2px; }
+.mind-bio { margin: 6px 0; }
+/* 2.2: licitaciones (tres tarjetas, >= 64 px, a 360 px una debajo de otra) y calles con nombre. */
+.tender-cards { display: grid; gap: 8px; margin: 6px 0 4px; }
+.tender-card { display: grid; gap: 2px; min-height: 64px; width: 100%; text-align: left; padding: 8px 10px; background: var(--panel-2); color: inherit; border: 2px solid var(--line); border-left: 4px solid var(--muted); font: inherit; cursor: pointer; }
+.tender-card.recommended { border-left-color: var(--good); }
+.tender-card[data-offer='primo'] { border-left-color: var(--bad); }
+.tender-card:disabled { opacity: 0.55; cursor: not-allowed; }
+.tender-card:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+.tc-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.tc-price { white-space: nowrap; font-weight: 700; }
+.tc-line { color: var(--muted); font-size: 0.875rem; }
+.tc-risk { font-size: 0.875rem; color: var(--bad); }
+.tc-risk.ok { color: var(--good); font-weight: 700; } /* Ronda 18: contraste. */
+.street-card .street-pick { display: block; text-align: left; margin-top: 6px; min-height: 48px; }
+
+/* ---------- 2.2: préstamos (Dinero › Préstamos) ---------- */
+.loan-head { display: flex; gap: 12px; align-items: center; }
+.loan-head p { margin: 2px 0; }
+.loan-badge { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 2px solid var(--line); border-radius: 4px; font-weight: 700; font-size: 1.5rem; background: var(--bg); }
+.loan-badge.r-A { color: var(--good); border-color: var(--good); }
+.loan-badge.r-B { color: var(--blue); border-color: var(--blue); }
+.loan-badge.r-C { color: var(--accent); border-color: var(--accent); }
+.loan-badge.r-D { color: var(--bad); border-color: var(--bad); }
+.loan-amount { display: flex; gap: 8px; align-items: stretch; margin: 8px 0; }
+.loan-step { min-width: 44px; min-height: 44px; padding: 0 12px; font-size: 1.4rem; }
+.loan-value { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; min-height: 44px; border: 2px solid var(--line); border-radius: 4px; font-weight: 700; font-variant-numeric: tabular-nums; background: var(--bg); }
+/* Ronda 18: cuatro botones (±1.000 y ±5.000) caben a 360 px. */
+.loan-amount { gap: 4px; }
+.loan-step { padding: 0 8px; font-size: 1.15rem; }
+.loan-value { min-width: 5.5em; }
+.loan-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.loan-chip { flex: 1 1 0; min-width: 0; min-height: 44px; padding: 6px 8px; }
+.loan-chip[aria-checked='true'] { border-color: var(--accent); box-shadow: inset 0 -4px 0 var(--accent); }
+.loan-offer { margin: 10px 0 4px; }
+.loan-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.loan-item { padding: 8px 12px; border: 2px solid var(--line); background: var(--bg); }
+.loan-item.tesoreria { border-left: 6px solid var(--accent); }
+.loan-item p { margin: 4px 0; }
+.loan-repay { width: 100%; margin-top: 4px; }

@@ -248,8 +248,8 @@ describe('turnos del pueblo con IA (2.0)', () => {
   }, 120_000);
 
   it('continuidad: cada vecino con IA guarda sus notas (4 como mucho) y su actitud se contagia a los vecinos por reglas', () => {
-    // 2.1: con 11, la actitud media de ese pueblo se redondeaba a 0 y nadie la copiaba (depende del azar del fuzz).
-    const { state } = runSimulation({ seed: 7, days: 300, profile: 'constructor', aiMode: true, aiShare: 40, onTurn: fuzzTurn(12) });
+    // 2.1: con 11 (y en la 2.2 con 12), la actitud media de ese pueblo se redondeaba a 0 y nadie la copiaba (depende del azar del fuzz).
+    const { state } = runSimulation({ seed: 7, days: 300, profile: 'constructor', aiMode: true, aiShare: 40, onTurn: fuzzTurn(13) });
     const ais = state.citizens.filter((c) => c.named && c.notes?.length);
     expect(ais.length).toBeGreaterThan(0);
     expect(ais.every((c) => c.notes!.length <= 4)).toBe(true);
@@ -316,4 +316,27 @@ describe('turnos del pueblo con IA (2.0)', () => {
     expect(r.acts[0]!.escudo).toBeUndefined();
     expect(Command.safeParse({ type: 'TownTurn', n: 1, acts: r.acts }).success).toBe(true);
   });
+
+  it('2.2: el primer turno de cada mes es mensual: biografía de cada vecino y pies de las fotos del mes', () => {
+    const { state } = runSimulation({ seed: 3, days: 200, profile: 'constructor', aiMode: true, aiShare: 100 });
+    let guard = 0;
+    while (!(state.ai!.turn?.monthly) && guard++ < 24 * 60) step(state);
+    const t = state.ai!.turn!;
+    expect(t.monthly).toBe(true);
+    const c = state.citizens.find((x) => t.ids.includes(x.id))!;
+    const req = buildTurnRequest(state, [c.id]);
+    expect(req.user).toContain('su_biografia');
+    // Una foto sin pie del último mes.
+    state.album = [...(state.album ?? []), { tick: state.tick - 24, kind: 'prueba', text: 'Fiesta en la plaza', x: 1, y: 1 }];
+    const dreq = buildDirectorRequest(state);
+    expect(dreq.photos.length).toBeGreaterThan(0);
+    const f = dreq.photos.find((p) => p.kind === 'prueba')!;
+    const parsed = parseDirector(JSON.stringify({ sucesos: [], avisos: [], foco: '', cronica: '', titulares: [], encargo: { id: '', carta: '' }, pies: [{ id: f.id, texto: 'Todo el pueblo en la plaza' }, { id: 'f99', texto: 'Inventada' }] }), dreq.ids, `${dreq.shared}\n${dreq.user}`, { photos: dreq.photos });
+    expect(parsed!.director.pies).toEqual([{ tick: f.tick, kind: 'prueba', texto: 'Todo el pueblo en la plaza' }]);
+    const act = { vecino: c.id, accion: 'seguir', gesto: { con: 0, tipo: 'ninguno' }, actitud: 0, gasto: { donde: 'pueblo', tienda: 0, ocio: false }, plan: { tipo: 'ninguno', necesidad: '', meses: 0 }, pensamiento: '', motivo: '', biografia: 'Llegó joven al pueblo, trabaja en el taller y sueña con abrir su propia tienda.' };
+    expect(applyCommand(state, { type: 'TownTurn', n: t.n, acts: [act], director: { sucesos: [], avisos: [], pies: parsed!.director.pies } }).ok).toBe(true);
+    expect(c.bio?.text).toContain('taller');
+    expect(state.album!.find((m) => m.kind === 'prueba')!.caption).toBe('Todo el pueblo en la plaza');
+    expect(checkInvariants(state)).toEqual([]);
+  }, 120_000);
 });

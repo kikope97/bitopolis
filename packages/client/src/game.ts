@@ -1,6 +1,16 @@
 import { tickToDate, type Command } from '@bitopolis/shared';
 import {
   BUILD_NAMES,
+  CROP_HINT,
+  isWater,
+  CROP_TEXT,
+  cropAt,
+  expectedHarvest,
+  FARM,
+  farmOutlook,
+  HARVEST_NAME,
+  harvestMonthOf,
+  MONTH_NAMES,
   type Building,
   salePrice,
   unitValue,
@@ -59,9 +69,14 @@ import {
   zonesUnlocked,
   isFemaleName,
   lowerFirst,
+  tenderApplies,
+  streetSegment,
+  STREETS,
 } from '@bitopolis/sim';
+import { contractBox, openTender } from './tender-ui.ts';
 import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
 import { openNeighbours, openReport, openTaxes as openTaxesSheet } from './economy-ui.ts';
+import { heavyLoad, loadPct, openLoans } from './loans-ui.ts';
 import { LAYERS, type LayerId, NEED_ICON } from './layers.ts';
 import { openTownHall } from './civic-ui.ts';
 import { openAlbum, snapMoments } from './album-ui.ts';
@@ -78,7 +93,7 @@ import { formatDate, money, MONTHS, plural, shortDate, t } from './i18n.ts';
 import { type Camera, type Preview, render, restartAnimations, signSpot } from './render.ts';
 import type { FromWorker, SaveBatch, ToWorker } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
-import { buildingSprite, letterSprite, T } from './sprites.ts';
+import { buildingSprite, letterSprite, T, ZONE_COLOR } from './sprites.ts';
 import { commandFor, costText, isLocked, lockLong, lockShort, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayCost } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
 import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, h, isSheetOpen, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack } from './ui.ts';
@@ -132,6 +147,9 @@ export function startGame(opts: GameOptions): void {
   let pendingEnd: { x: number; y: number } | null = null;
   /** v1.4: en pantallas táctiles, una obra se coloca en dos pasos (ver, confirmar). */
   let pendingPlace: { a: { x: number; y: number }; b: { x: number; y: number } } | null = null;
+  /** 2.2: dedicando una calle (desde el pleno): a quién, y la casilla propuesta. */
+  let dedicating: { citizenId: number; name: string } | null = null;
+  let pendingDedication: { x: number; y: number } | null = null;
   let touchInput = false;
   /** Cursor de casilla para jugar con teclado (flechas + Intro). */
   let cursor: { x: number; y: number } | null = null;
@@ -540,7 +558,10 @@ export function startGame(opts: GameOptions): void {
     moneyTrend.textContent = diff > 0 ? '▲' : diff < 0 ? '▼' : '';
     moneyTrend.className = `trend ${diff > 0 ? 'up' : diff < 0 ? 'down' : ''}`;
     $('#hud-money').classList.toggle('neg', state.treasury < 0);
-    $('#hud-money').setAttribute('aria-label', `Caja del ayuntamiento: ${money(state.treasury)}${diff > 0 ? ', subiendo' : diff < 0 ? ', bajando' : ''}. Ver cuentas`);
+    // 2.2: en ámbar si los préstamos se llevan más del 25 % de lo que entra.
+    const heavy = state.treasury >= 0 && heavyLoad(state);
+    $('#hud-money').classList.toggle('load', heavy);
+    $('#hud-money').setAttribute('aria-label', `Caja del ayuntamiento: ${money(state.treasury)}${diff > 0 ? ', subiendo' : diff < 0 ? ', bajando' : ''}${heavy ? `; los préstamos se llevan el ${loadPct(state)} % de lo que entra` : ''}. Ver cuentas`);
     popText.textContent = String(state.citizens.length);
     $('#hud-pop').setAttribute('aria-label', `Habitantes: ${state.citizens.length}. Ver la lista`);
     const happy = state.citizens.length ? Math.round(state.citizens.reduce((s, c) => s + c.happiness, 0) / state.citizens.length) : 0;
@@ -653,7 +674,12 @@ export function startGame(opts: GameOptions): void {
     if (plain.length === 1) toast(plain[0]!.text, { kind: 'good' });
     else if (plain.length > 1) toast(`${plain.length} obras terminadas`, { kind: 'good' });
     for (const e of fresh) {
-      if (e.kind === 'bankrupt' || e.kind === 'warning') {
+      if (e.kind === 'warning' && e.text.startsWith('Se comenta en el bar') && e.ref) {
+        // 2.2: el rumor de la obra del primo lleva a su ficha, con «Revisar el contrato».
+        sfx.warn();
+        calmPause();
+        toast(e.text, { kind: 'warn', sticky: true, onClick: () => focusBuilding(e.ref!) });
+      } else if (e.kind === 'bankrupt' || e.kind === 'warning') {
         sfx.warn();
         duck(1.5);
         if (e.kind === 'bankrupt') shake(4, 400);
@@ -711,15 +737,16 @@ export function startGame(opts: GameOptions): void {
           if (!quiet) toast(e.text, { kind: e.text.includes('escapa') ? 'warn' : 'info', onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
           continue;
         }
-        const bad = /Disturbios|llenos|escapa/.test(e.text);
+        // Ronda 18: el escándalo de una licitación es una mala noticia (fija, con aviso y lleva a la obra).
+        const bad = /Disturbios|llenos|escapa|^Escándalo/.test(e.text);
         // Ronda 15: un robo con el ladrón escapado se avisa, pero no para el juego (solo disturbios y calabozos llenos).
         if (quiet && !bad) continue;
         if (bad) {
           sfx.warn();
           calmPause();
-          if (/Disturbios|llenos/.test(e.text)) attention(refSpot(e.ref) ?? state.buildings.find((b) => b.kind === 'police' && b.built));
+          if (/Disturbios|llenos|^Escándalo/.test(e.text)) attention(refSpot(e.ref) ?? state.buildings.find((b) => b.kind === 'police' && b.built));
         }
-        toast(e.text, { kind: bad ? 'warn' : 'good', sticky: /Disturbios|llenos/.test(e.text), onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+        toast(e.text, { kind: bad ? 'warn' : 'good', sticky: /Disturbios|llenos|^Escándalo/.test(e.text), onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
       } else if (e.kind === 'fire') {
         // 2.1: riesgos, incendios, bomberos y urgencias.
         const go = e.ref !== undefined ? () => focusBuilding(e.ref!) : undefined;
@@ -1037,7 +1064,7 @@ export function startGame(opts: GameOptions): void {
    * elegir ese edificio, no la casilla vacía de encima (Mirar y Derribar).
    */
   function pickTile(cx: number, cy: number, t: { x: number; y: number }): { x: number; y: number } {
-    if (tool.id !== 'inspect' && tool.id !== 'demolish') return t;
+    if ((tool.id !== 'inspect' && tool.id !== 'demolish') || dedicating) return t;
     const here = state.buildings.some((b) => b.x === t.x && b.y === t.y);
     const below = state.buildings.some((b) => b.x === t.x && b.y === t.y + 1);
     if (here || !below) return t;
@@ -1115,7 +1142,10 @@ export function startGame(opts: GameOptions): void {
       fling = { vx: fling.vx * 0.6 + (dx / dt) * 0.4, vy: fling.vy * 0.6 + (dy / dt) * 0.4, t: now };
     } else if (gesture.mode === 'paint' && gesture.startTile) {
       const t1 = tileAt(e.clientX, e.clientY);
-      if (t1) preview = previewFor(gesture.startTile, t1);
+      if (t1) {
+        preview = previewFor(gesture.startTile, t1);
+        farmHint(gesture.startTile, t1);
+      }
     }
   });
 
@@ -1167,6 +1197,7 @@ export function startGame(opts: GameOptions): void {
   );
 
   async function tapTile(tile: { x: number; y: number }) {
+    if (dedicating) return proposeDedication(tile);
     if (tool.id === 'inspect') return inspect(tile);
     if (isLocked(tool, state)) {
       toast(lockLong(tool, state), { kind: 'warn' });
@@ -1231,7 +1262,70 @@ export function startGame(opts: GameOptions): void {
       return proposePlace(tile, tile);
     }
     const cmd = commandFor(tool, tile, tile);
-    if (cmd) await command(cmd);
+    if (cmd) await placeBuild(cmd);
+  }
+
+  /**
+   * 2.2: las obras grandes se licitan: antes de construir, la hoja con las tres
+   * ofertas (la local, la de siempre, va primero). El resto, directo.
+   */
+  function placeBuild(cmd: Command): Promise<boolean> {
+    if (cmd.type !== 'Build' || cmd.kind === 'road' || cmd.offer || !tenderApplies(state, cmd.kind, cmd.x, cmd.y) || !validateCommand(state, cmd).ok) return command(cmd);
+    return new Promise((resolve) => {
+      openTender(state, cmd, (offer) => void command({ ...cmd, offer }).then(resolve));
+    });
+  }
+
+  /* ---------- 2.2: dedicar una calle (desde el pleno) ---------- */
+  function startDedication(citizenId: number, name: string) {
+    closeSheet();
+    selectTool('inspect');
+    dedicating = { citizenId, name };
+    $('#tool-info').replaceChildren(h('b', {}, 'Dedicar una calle'), ` a ${name}: toca una carretera o la Plaza Mayor (placa ${money(STREETS.plaque)}). Esc para cancelar.`);
+    if (touchInput) {
+      $('#confirm-text').textContent = `Calle para ${name}: toca una carretera o la plaza.`;
+      ($('#confirm-yes') as HTMLButtonElement).hidden = true;
+      showBar(true);
+    }
+    refreshStrip();
+    $('#sr-live').textContent = `Elige la calle para ${name}.`;
+  }
+
+  function proposeDedication(tile: { x: number; y: number }) {
+    if (!dedicating) return;
+    const cmd: Command = { type: 'DedicateStreet', citizenId: dedicating.citizenId, x: tile.x, y: tile.y };
+    const v = validateCommand(state, cmd);
+    const seg = streetSegment(state, tile.x, tile.y);
+    pendingDedication = v.ok ? tile : null;
+    preview = seg ? { tiles: seg.tiles.map(([x, y]) => ({ x, y })), ok: v.ok } : { tiles: [tile], ok: false };
+    const what = v.ok ? `¿Dedicar ${seg!.axis === 'plaza' ? 'la plaza' : 'esta calle'} a ${dedicating.name}?` : `No se puede (${v.error})`;
+    $('#confirm-text').replaceChildren(h('span', { class: 'cc-what' }, what), v.ok ? h('span', { class: 'cc-cost' }, `Placa: ${money(STREETS.plaque)}`) : '');
+    const yes = $('#confirm-yes') as HTMLButtonElement;
+    yes.textContent = 'Dedicar aquí';
+    yes.className = 'btn primary';
+    yes.disabled = !v.ok;
+    yes.hidden = !v.ok;
+    showBar(true);
+    document.body.classList.add('placing');
+  }
+
+  function endDedication() {
+    dedicating = null;
+    pendingDedication = null;
+    preview = null;
+    showBar(false);
+    selectTool('inspect');
+  }
+
+  async function confirmDedication() {
+    const d = dedicating;
+    const at = pendingDedication;
+    endDedication();
+    if (!d || !at) return;
+    if (await command({ type: 'DedicateStreet', citizenId: d.citizenId, x: at.x, y: at.y })) {
+      const n = state.streetNames?.at(-1);
+      toast(n ? `Se descubre la placa: ${n.name}` : 'Calle dedicada', { kind: 'good' });
+    }
   }
 
   /**
@@ -1245,11 +1339,33 @@ export function startGame(opts: GameOptions): void {
     if (cmd.type === 'Zone') {
       const { changed, skipped } = zoneChanges(state, cmd);
       if (cmd.zone === 'none') return `${plural(changed, 'casilla', 'casillas')}, gratis`;
-      return `${plural(changed, 'casilla', 'casillas')}, ${money(changed * ZONE_COST_PER_TILE)}${skipped ? ` (no se cobran ${skipped} ocupadas o ya marcadas; los árboles sí, se talan al construir)` : ''}`;
+      const crops = cmd.zone === 'A' ? ` · ${cropsText(cmd)}` : '';
+      return `${plural(changed, 'casilla', 'casillas')}, ${money(changed * ZONE_COST_PER_TILE)}${skipped ? ` (no se cobran ${skipped} ocupadas o ya marcadas; los árboles sí, se talan al construir)` : ''}${crops}`;
     }
     const n = tilesOf(cmd).filter((t) => state.map.tiles[t.y * state.map.w + t.x] !== Tile.Road && !state.buildings.some((q) => q.x === t.x && q.y === t.y)).length;
     const bridges = bridgeTiles(a, b);
     return `${plural(n, 'casilla nueva', 'casillas nuevas')}, ${money(lineCost(a, b))}${bridges ? ` (con puente de ${plural(bridges, 'casilla', 'casillas')})` : ''}`;
+  }
+
+  /** 2.2: qué se plantaría en la zona agraria: «Aquí: regadío (río)» (o los cultivos que salgan, del más común). */
+  function cropsText(cmd: Extract<Command, { type: 'Zone' }>): string {
+    const n = new Map<string, number>();
+    for (const t of tilesOf(cmd)) {
+      if (t.x < 0 || t.y < 0 || t.x >= state.map.w || t.y >= state.map.h || isWater(state.map.terrain?.[t.y * state.map.w + t.x])) continue;
+      const c = CROP_HINT[cropAt(state, t.x, t.y)];
+      n.set(c, (n.get(c) ?? 0) + 1);
+    }
+    const list = [...n.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c);
+    return list.length ? `Aquí: ${list.join(' y ')}` : '';
+  }
+
+  /** 2.2: mientras se arrastra la zona agraria, la franja dice qué saldría ahí. */
+  function farmHint(a: { x: number; y: number }, b: { x: number; y: number }) {
+    if (tool.zone !== 'A') return;
+    const cmd = commandFor(tool, a, b);
+    if (cmd?.type !== 'Zone') return;
+    $('#tool-info').replaceChildren(h('b', {}, tool.label), `: ${lineText(a, b)}`);
+    refreshStrip();
   }
 
   /** Coste de un tramo de carretera (los puentes, más caros) y cuántas casillas son puente (v1.7). */
@@ -1298,7 +1414,7 @@ export function startGame(opts: GameOptions): void {
     cancelPlace();
     if (!p) return;
     const cmd = commandFor(tool, p.a, p.b);
-    if (cmd) await command(cmd);
+    if (cmd) await placeBuild(cmd);
     // Tras una carretera o zona, la franja vuelve a la ayuda de la herramienta (no a «toca dónde termina»).
     if (tool.shape !== 'tap') selectTool(tool.id);
   }
@@ -1318,10 +1434,11 @@ export function startGame(opts: GameOptions): void {
   // Además, la barra no acepta toques en sus primeros 350 ms (por si algún clic llega tarde).
   let barShownAt = 0;
   const barReady = () => performance.now() - barShownAt > 350;
-  $('#confirm-yes').onclick = () => barReady() && void confirmPlace();
+  $('#confirm-yes').onclick = () => barReady() && void (dedicating ? confirmDedication() : confirmPlace());
   $('#confirm-no').onclick = () => {
     if (!barReady()) return;
-    if (anchor) cancelAnchor();
+    if (dedicating) endDedication();
+    else if (anchor) cancelAnchor();
     else cancelPlace();
   };
 
@@ -1394,6 +1511,7 @@ export function startGame(opts: GameOptions): void {
     } else if (k === 'Escape') {
       if (!tray.hidden) closeTray();
       else if (isSheetOpen()) closeSheet();
+      else if (dedicating) endDedication();
       else if (pendingPlace) cancelPlace();
       else if (anchor && touchInput) cancelAnchor();
       else if (anchor) {
@@ -1422,7 +1540,7 @@ export function startGame(opts: GameOptions): void {
       img.getContext('2d')!.drawImage(c, 0, 0);
       wrap.append(img);
     } else if (tl.zone && tl.zone !== 'none') {
-      const color = { R: 6, C: 10, I: 4 }[tl.zone];
+      const color = ZONE_COLOR[tl.zone];
       const img = document.createElement('canvas');
       img.width = 5;
       img.height = 7;
@@ -1554,6 +1672,8 @@ export function startGame(opts: GameOptions): void {
     selected = null;
     anchor = null;
     pendingEnd = null;
+    dedicating = null;
+    pendingDedication = null;
     if (pendingPlace) cancelPlace();
     showBar(false);
     closeTray();
@@ -1684,6 +1804,9 @@ export function startGame(opts: GameOptions): void {
       return;
     }
     const content: (Node | string)[] = [];
+    // 2.2: el contrato de la obra (fuera o el primo) y «Revisar el contrato» si hay rumor.
+    const contract = contractBox(state, b, command, () => inspect({ x: b.x, y: b.y }));
+    if (contract) content.push(contract);
     const p = state.projects.find((x) => x.buildingId === b.id);
     if (p) {
       const pct = Math.round((100 * p.workerDaysDone) / p.workerDaysNeeded);
@@ -1737,7 +1860,9 @@ export function startGame(opts: GameOptions): void {
       if (home) content.push(servicesTable(b));
       else {
         const pills: HTMLElement[] = [];
-        if (b.kind !== 'water' && b.kind !== 'power') {
+        // 2.2: la finca no necesita agua ni luz: su ficha cuenta la cosecha.
+        if (b.kind === 'farm') content.push(farmBox(b));
+        else if (b.kind !== 'water' && b.kind !== 'power') {
           pills.push(h('span', { class: `pill ${b.hasWater ? 'good' : 'bad'}` }, b.hasWater ? 'Agua ✓' : `SIN AGUA${b.dryDays ? ` (${plural(b.dryDays, 'día', 'días')})` : ''}`));
           pills.push(h('span', { class: `pill ${b.hasPower ? 'good' : 'bad'}` }, b.hasPower ? 'Luz ✓' : `SIN LUZ${b.darkDays ? ` (${plural(b.darkDays, 'día', 'días')})` : ''}`));
         }
@@ -1816,10 +1941,31 @@ export function startGame(opts: GameOptions): void {
     }
     const owner = b.owner === 0 ? 'Municipal' : b.owner === -1 ? 'Privado (inversor de fuera)' : 'De un vecino';
     content.push(h('p', { class: 'muted' }, owner));
-    inspectSheet = sheet(b.name ?? BUILD_NAMES[b.kind] ?? b.kind, ...content);
+    inspectSheet = sheet(b.name ?? (b.kind === 'farm' && b.crop ? `Finca · ${CROP_TEXT[b.crop]}` : (BUILD_NAMES[b.kind] ?? b.kind)), ...content);
     inspectSheet.classList.add('half');
     const body = document.querySelector('.sheet-body');
     if (body) body.scrollTop = prevScroll;
+  }
+
+  /** 2.2: ficha de la finca: cultivo, mes de la cosecha y cómo viene. */
+  function farmBox(b: Building): HTMLElement {
+    const crop = b.crop ?? cropAt(state, b.x, b.y);
+    const month = harvestMonthOf(crop);
+    const d = tickToDate(state.tick);
+    const done = b.harvested === d.year;
+    const outlook = farmOutlook(b);
+    const why = crop === 'regadio' ? 'junto al río: el agua no le falta y el tiempo le afecta poco' : crop === 'secano' ? 'depende de la lluvia; el calor le quita' : 'en la colina: depende de la lluvia; el calor le quita';
+    const when = done ? `ya cosechada este año; la próxima, en ${MONTH_NAMES[month - 1]}` : d.month === month ? `este mes (${HARVEST_NAME[crop]})` : `en ${MONTH_NAMES[month - 1]} (${HARVEST_NAME[crop]})`;
+    const k = b.books;
+    return h(
+      'div',
+      { class: 'farm-box' },
+      h('p', {}, h('strong', {}, 'Cultivo: '), `${CROP_TEXT[crop]}, ${why}.`),
+      h('p', {}, h('strong', {}, 'Cosecha: '), `${when}.`),
+      h('p', { class: 'farm-outlook' }, h('strong', {}, 'Cosecha prevista: '), h('span', { class: `pill ${outlook === 'buena' ? 'good' : outlook === 'mala' ? 'bad' : ''}` }, outlook), ` · unos ${money(expectedHarvest(b))} si fuera hoy`),
+      h('p', { class: 'muted small' }, `${plural(FARM.jobs, 'empleo fijo', 'empleos fijos')} y ${FARM.seasonal} temporeros en la cosecha (${money(FARM.seasonalWage)} cada uno; primero, vecinos en paro). Solo pide carretera: ni agua ni luz. Paga IBI rústico. Caja: ${money(b.cash)}.`),
+      k && k.sales > 0 ? h('p', {}, `El mes pasado vendió la cosecha: ${money(k.sales)}.`) : '',
+    );
   }
 
   /**
@@ -1906,8 +2052,9 @@ export function startGame(opts: GameOptions): void {
   const currentSheetTitle = () => currentSheet()?.querySelector('#sheet-title')?.textContent ?? 'la ficha';
 
   /* ---------- menú, impuestos y cuentas ---------- */
-  const social: SocialCtx = { token, state: () => state, command };
+  const social: SocialCtx = { token, state: () => state, command, pickStreet: (id, name) => startDedication(id, name) };
   const openTaxes = () => openTaxesSheet(() => state, command);
+  const openLoansSheet = () => openLoans(() => state, command);
   // 2.0: el % de vecinos con IA se cambia en Ajustes (con key del servidor, lo fija /admin).
   let aiShareLocked = true;
   if (state.aiMode) void api.aiMeta().then((m) => (aiShareLocked = m.serverKey)).catch(() => undefined);
@@ -1962,6 +2109,8 @@ export function startGame(opts: GameOptions): void {
         ['Caja: ', h('strong', {}, money(state.treasury)), net !== null ? ` · último mes: ${net >= 0 ? '+' : ''}${money(net)}` : ''],
         item('Parte mensual', go(openAccounts)),
         item('Impuestos', go(openTaxes)),
+        // 2.2: préstamos municipales (destaca con mucha carga o nota D).
+        item(`Préstamos · nota ${state.rating ?? 'B'}`, go(openLoansSheet), heavyLoad(state) || state.rating === 'D'),
       ),
       card(
         'build',
@@ -2321,7 +2470,7 @@ export function startGame(opts: GameOptions): void {
     // La sacudida se aplica a una copia de la cámara: no cambia dónde mira el jugador.
     const [sx, sy] = shakeOffset(time);
     const view = sx || sy ? { ...cam, x: cam.x + sx * dpr(), y: cam.y + sy * dpr() } : cam;
-    render(ctx, state, view, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer, highlight });
+    render(ctx, state, view, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer, highlight, labels: cam.zoom >= touchZoom() });
     placeBubbles();
     requestAnimationFrame(frame);
   }

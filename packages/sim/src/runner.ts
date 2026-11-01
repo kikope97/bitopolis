@@ -1,9 +1,10 @@
-import { type Command, DAYS_PER_YEAR, TICKS_PER_DAY, type TimedCommand } from '@bitopolis/shared';
+import { type Command, DAYS_PER_YEAR, TICKS_PER_DAY, TICKS_PER_MONTH, type TimedCommand } from '@bitopolis/shared';
 import { applyCommand } from './commands.ts';
 import { hashState } from './hash.ts';
 import { checkInvariants, moneyDrift } from './invariants.ts';
 import { PROFILES, profileRng } from './profiles.ts';
-import { createInitialState, type GameState } from './state.ts';
+import { loanLoad, RATINGS, totalOwed } from './loans.ts';
+import { createInitialState, type GameState, type Rating } from './state.ts';
 import { averageHappiness, step } from './tick.ts';
 
 export interface RunOptions {
@@ -32,6 +33,30 @@ export interface SimReport {
   events: Record<string, number>;
   commands: TimedCommand[];
   monthly: GameState['stats'];
+  /**
+   * 2.2: ventas de las empresas por año (tiendas, talleres y fincas), lo que entra
+   * de fuera al pueblo (`income`: ventas fuera, sueldos de fuera, PIE, subvenciones…)
+   * y la parte del campo: sobre las ventas (`farmShare`) y sobre lo que entra (`farmShareIn`).
+   */
+  sales: { year: number; shop: number; factory: number; farm: number; farms: number; income: number; farmShare: number; farmShareIn: number }[];
+  /** 2.2: préstamos municipales. */
+  loans: LoanMetrics;
+}
+
+export interface LoanMetrics {
+  rating: Rating;
+  /** La peor nota y meses en cada una. */
+  worst: Rating;
+  months: Record<Rating, number>;
+  /** Carga máxima de un mes (cuotas ÷ ingresos medios), en %. */
+  maxLoadPct: number;
+  /** Préstamos pedidos (y lo pedido) y de tesorería. */
+  requested: number;
+  requestedAmount: number;
+  treasury: number;
+  /** Lo que se debe al final y los intereses y comisiones pagados. */
+  owed: number;
+  interest: number;
 }
 
 export function runSimulation(opts: RunOptions): { state: GameState; report: SimReport } {
@@ -44,10 +69,21 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
   let bankruptDay: number | null = null;
   let populationAt1Year: number | null = null;
   const eventCounts: Record<string, number> = {};
+  const sales: SimReport['sales'] = [];
+  let lastIn = state.ledger.externalIn;
+  const loans: LoanMetrics = { rating: state.rating, worst: state.rating, months: { A: 0, B: 0, C: 0, D: 0 }, maxLoadPct: 0, requested: 0, requestedAmount: 0, treasury: 0, owed: 0, interest: 0 };
+  let statsSeen = 0;
+  let treasurySeen = -1;
 
   for (let day = 0; day < opts.days; day++) {
     for (const cmd of profile.decide(state, prng)) {
-      if (applyCommand(state, cmd).ok) commands.push({ tick: state.tick, cmd });
+      if (applyCommand(state, cmd).ok) {
+        commands.push({ tick: state.tick, cmd });
+        if (cmd.type === 'RequestLoan') {
+          loans.requested++;
+          loans.requestedAmount += cmd.amount;
+        }
+      }
     }
     for (let h = 0; h < TICKS_PER_DAY; h++) {
       step(state);
@@ -58,6 +94,36 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
       }
     }
     if (state.bankrupt && bankruptDay === null) bankruptDay = day + 1;
+    // 2.2: al cerrar cada mes, las ventas del mes de cada tipo de empresa (b.books).
+    if (state.tick % TICKS_PER_MONTH === 0) {
+      const year = Math.ceil(state.tick / TICKS_PER_MONTH / 12);
+      let row = sales.find((r) => r.year === year);
+      if (!row) sales.push((row = { year, shop: 0, factory: 0, farm: 0, farms: 0, income: 0, farmShare: 0, farmShareIn: 0 }));
+      row.income += state.ledger.externalIn - lastIn;
+      lastIn = state.ledger.externalIn;
+      for (const b of state.buildings) {
+        if ((b.kind === 'shop' || b.kind === 'factory' || b.kind === 'farm') && b.books) row[b.kind] += b.books.sales;
+      }
+      row.farms = state.buildings.filter((b) => b.kind === 'farm').length;
+      const total = row.shop + row.factory + row.farm;
+      row.farmShare = total ? Math.round((row.farm / total) * 1000) / 10 : 0;
+      row.farmShareIn = row.income ? Math.round((row.farm / row.income) * 1000) / 10 : 0;
+    }
+    // 2.2: al cerrar cada mes, la nota y la carga.
+    for (const t of state.loanLedger.treasuryTicks) {
+      if (t > treasurySeen) {
+        loans.treasury++;
+        treasurySeen = t;
+      }
+    }
+    const closed = state.stats.at(-1)?.month ?? 0;
+    if (closed !== statsSeen) {
+      statsSeen = closed;
+      loans.months[state.rating]++;
+      if (RATINGS.indexOf(state.rating) > RATINGS.indexOf(loans.worst)) loans.worst = state.rating;
+      const load = loanLoad(state);
+      if (Number.isFinite(load)) loans.maxLoadPct = Math.max(loans.maxLoadPct, Math.round(load * 100));
+    }
     if (day + 1 === DAYS_PER_YEAR) populationAt1Year = state.citizens.length;
     if (opts.checkEveryDay) {
       for (const e of checkInvariants(state)) invariantErrors.push(`día ${day + 1}: ${e}`);
@@ -69,6 +135,9 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
     }
   }
   invariantErrors.push(...checkInvariants(state));
+  loans.rating = state.rating;
+  loans.owed = totalOwed(state);
+  loans.interest = state.loanLedger.interest;
 
   return {
     state,
@@ -90,6 +159,8 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
       events: eventCounts,
       commands,
       monthly: state.stats,
+      sales,
+      loans,
     },
   };
 }

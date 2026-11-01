@@ -15,9 +15,11 @@ import type { Departed } from './family.ts';
 // Solo el tipo: importar crime.ts aquí crea un ciclo al cargar (crime → social → commands → state).
 import type { Justice } from './crime.ts';
 import { emptyRank, type TownRank } from './rank-core.ts';
+import type { Tender } from './tenders.ts';
+import type { StreetName } from './streets.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
-export const FORMAT_VERSION = 14;
+export const FORMAT_VERSION = 15;
 
 export const MAP_W = 48;
 export const MAP_H = 48;
@@ -26,8 +28,8 @@ export const MAP_H = 48;
 export const Tile = { Grass: 0, Road: 1, Tree: 2 } as const;
 export type Tile = (typeof Tile)[keyof typeof Tile];
 
-/** Capa de zonas. */
-export const Zone = { None: 0, R: 1, C: 2, I: 3 } as const;
+/** Capa de zonas (2.2: A = agraria, fincas). */
+export const Zone = { None: 0, R: 1, C: 2, I: 3, A: 4 } as const;
 export type Zone = (typeof Zone)[keyof typeof Zone];
 
 export type BuildingKind =
@@ -56,7 +58,9 @@ export type BuildingKind =
   /** Crecen solos sobre zonas. */
   | 'res'
   | 'shop'
-  | 'factory';
+  | 'factory'
+  /** 2.2: finca (crece sola sobre zona agraria). */
+  | 'farm';
 
 export interface Building {
   id: number;
@@ -98,7 +102,16 @@ export interface Building {
   privateUnits?: number;
   /** 2.1: basura acumulada sin recoger (ver trash.ts). */
   trash?: number;
+  /** 2.2: fincas: cultivo (sale del terreno, farm.ts) y factor de la cosecha del año (se acumula con el tiempo). */
+  crop?: Crop;
+  yieldFx?: number;
+  /** 2.2: año (de juego) de la última cosecha vendida y última tormenta sobre la finca (tick). */
+  harvested?: number;
+  stormed?: number;
 }
+
+/** 2.2: cultivos de las fincas (ver farm.ts). */
+export type Crop = 'secano' | 'regadio' | 'olivar' | 'vinedo';
 
 /** Obra en curso: necesita obreros × días. */
 export interface Project {
@@ -113,6 +126,8 @@ export interface Project {
   /** Obreros de fuera contratados hoy. */
   outsideToday: number;
   notify: boolean;
+  /** 2.2: oferta de la licitación (sin definir = local, la de siempre). */
+  offer?: 'local' | 'fuera' | 'primo';
 }
 
 export interface Citizen {
@@ -196,8 +211,12 @@ export interface Citizen {
   thought?: string;
   /** 2.0: lo que el propio vecino (la IA) apunta de cada semana; lo lee la semana siguiente. */
   notes?: { tick: number; text: string }[];
+  /** 2.2: su biografía, que la IA reescribe una vez al mes (si no, `narrativeSummary`). */
+  bio?: { text: string; tick: number };
   /** 2.1: voluntario de protección civil. */
   volunteer?: boolean;
+  /** 2.2: se ha apuntado de temporero para la cosecha (tick en que se apuntó). */
+  temporero?: number;
 }
 
 export interface CitizenDebt {
@@ -401,6 +420,42 @@ export interface GameState {
   /** 2.1: diques (índices de casilla) y contadores de emergencias. */
   dikes: number[];
   emergencies: Emergencies;
+  /** 2.2: licitaciones de obras (las últimas; ver tenders.ts) y calles con nombre (streets.ts). */
+  tenders?: Tender[];
+  streetNames?: StreetName[];
+  /** 2.2: préstamos municipales (loans.ts), nota de las cuentas y contabilidad (Σ left = lent − repaid). */
+  loans: Loan[];
+  rating: Rating;
+  loanLedger: LoanLedger;
+}
+
+/** 2.2: nota de las cuentas del ayuntamiento (A la mejor). */
+export type Rating = 'A' | 'B' | 'C' | 'D';
+
+/** 2.2: un préstamo vivo (los devueltos se quitan). Importes enteros. */
+export interface Loan {
+  id: number;
+  /** Lo que se prestó (en los de tesorería, la suma de los huecos refinanciados). */
+  principal: number;
+  /** Lo que queda por devolver (sin intereses). */
+  left: number;
+  /** Cuota fija mensual (capital + intereses). */
+  quota: number;
+  /** Interés mensual. */
+  rate: number;
+  monthsLeft: number;
+  kind: 'banco' | 'tesoreria';
+  tick: number;
+}
+
+export interface LoanLedger {
+  /** Capital prestado y devuelto desde el principio. */
+  lent: number;
+  repaid: number;
+  /** Intereses y comisiones pagados. */
+  interest: number;
+  /** Ticks de los préstamos de tesorería de los últimos 12 meses (para la nota). */
+  treasuryTicks: number[];
 }
 
 export interface Emergencies {
@@ -519,6 +574,10 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiSh
     emergencies: { fires: 0, putOut: 0, saved: 0, floodsAvoided: 0 },
     rank: emptyRank(seed, terrain),
     trash: { start: -1 },
+    streetNames: [],
+    loans: [],
+    rating: 'B',
+    loanLedger: { lent: 0, repaid: 0, interest: 0, treasuryTicks: [] },
   };
   // Árboles dispersos (se talan gratis al construir encima).
   for (let i = 0; i < tiles.length; i++) {

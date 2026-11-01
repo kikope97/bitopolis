@@ -1,6 +1,7 @@
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { protestFor, type Association } from './associations.ts';
-import { DEBT, FIRE, KIDS_MAX, TURN } from './balance.ts';
+import { DEBT, FIRE, KIDS_MAX, LISTS, TURN } from './balance.ts';
+import { canPresent, presentCandidacy } from './politics.ts';
 import { BUILD_NAMES, removeBuilding } from './commands.ts';
 import { homeRobbery } from './crime.ts';
 import { becomeVolunteer, canVolunteer, fireHelpTargets, helpAfterFire, homelessByFire, placeName, shelter } from './fire.ts';
@@ -13,6 +14,7 @@ import { jobsOf } from './levels.ts';
 import { addMemory, goalFor, NEED_TEXT, needOf, needsOf, PROFESSIONS, relation, setRelation } from './social.ts';
 import { transfer } from './money.ts';
 import { canDump, dumpTrash } from './trash.ts';
+import { canSignTemporero, HARVEST_NAME, signTemporero } from './farm.ts';
 import { type Building, type Citizen, DESIRES, FEARS, type GameState, pushEvent, type Trigger } from './state.ts';
 
 /**
@@ -42,7 +44,9 @@ export interface TownAi {
   /** Días de juego entre turnos (7 a x1; el cliente lo alarga a x3/x10 con `SetTurnPace`). */
   paceDays: number;
   /** Turno abierto esperando a la IA, o null. */
-  turn: { n: number; opened: number; due: number; kind: 'semana' | 'rapida'; reason?: string; ids: number[] } | null;
+  turn: { n: number; opened: number; due: number; kind: 'semana' | 'rapida'; reason?: string; ids: number[]; monthly?: boolean } | null;
+  /** 2.2: mes del último turno mensual (biografías y pies de foto). */
+  lastMonthly?: number;
   /** Último número de turno y cuándo toca el siguiente. */
   lastN: number;
   next: number;
@@ -89,6 +93,8 @@ export interface TurnAct {
   recuerdo?: string;
   /** 2.1: su voto para el escudo, si hay votación abierta (ids del menú). */
   escudo?: { pieza: string; lema: string };
+  /** 2.2: en el turno mensual, su biografía reescrita. */
+  biografia?: string;
 }
 
 export function emptyTownAi(share = TURN.defaultShare): TownAi {
@@ -173,12 +179,14 @@ function desperate(c: Citizen): boolean {
 export function turnMenu(state: GameState, c: Citizen): MenuItem[] {
   const out: MenuItem[] = [{ accion: 'seguir', detalle: 'seguir con su vida como hasta ahora' }];
   const pol = state.politics;
+  // Ronda 18: quien gobierna no se pide nada a sí mismo, ni se manifiesta contra sí, ni se va (disolvería su gobierno).
+  const governs = pol.mayor === c.id;
   // Elecciones a la vista: decide su voto (secreto).
   if (pol.party !== null && pol.nextElection - state.tick <= 10 * TICKS_PER_DAY && !c.vote) {
     out.push({ accion: 'votar_gobierno' }, { accion: 'votar_oposicion' }, { accion: 'abstenerse' });
   }
   const assoc = protestFor(state, c);
-  if (assoc && c.protest !== assoc.id && c.protest !== -assoc.id) out.push({ accion: 'manifestarse', detalle: `la asociación «${assoc.name}» convoca una manifestación` }, { accion: 'no_ir' });
+  if (assoc && !governs && c.protest !== assoc.id && c.protest !== -assoc.id) out.push({ accion: 'manifestarse', detalle: `la asociación «${assoc.name}» convoca una manifestación` }, { accion: 'no_ir' });
   // Trabajo.
   for (const b of vacantJobs(state, c)) out.push({ accion: `aceptar_trabajo:${b.id}`, detalle: `empleo en ${(b.name ?? BUILD_NAMES[b.kind] ?? b.kind).toString()}` });
   if (c.jobId !== null) out.push({ accion: 'dimitir', detalle: 'dejar su trabajo en el pueblo' });
@@ -201,14 +209,16 @@ export function turnMenu(state: GameState, c: Citizen): MenuItem[] {
   if (mine) out.push({ accion: 'dejar_asociacion', detalle: `dejar «${mine.name}»` });
   else for (const a of (state.associations ?? []).slice(0, 2)) out.push({ accion: `unirse_asociacion:${a.id}`, detalle: `unirse a «${a.name}»` });
   // Pedir y quejarse.
-  for (const n of needsOf(state, c).slice(0, 2)) out.push({ accion: `pedir:${n}`, detalle: `pedir al alcalde ${NEED_TEXT[n]}` });
-  out.push({ accion: 'quejarse', detalle: 'quejarse al ayuntamiento' });
+  if (!governs) {
+    for (const n of needsOf(state, c).slice(0, 2)) out.push({ accion: `pedir:${n}`, detalle: `pedir al alcalde ${NEED_TEXT[n]}` });
+    out.push({ accion: 'quejarse', detalle: 'quejarse al ayuntamiento' });
+  }
   // 2.1: sin camión y con la basura en la puerta, puede tirarla al monte (contamina y está mal visto).
   if (canDump(state, c)) out.push({ accion: 'tirar_al_monte', detalle: 'tirar la basura al monte: no pasa el camión por su calle (contamina cerca y los vecinos lo verán mal)' });
   // Deudas.
   if (totalDebt(c) >= DEBT.noticeable) {
     out.push({ accion: 'apretarse', detalle: 'apretarse el cinturón para pagar lo que debe' });
-    if (c.debt && c.debt.town >= DEBT.noticeable && !c.debt.plan) out.push({ accion: 'pedir_aplazamiento', detalle: 'pedir al alcalde que le aplace la deuda con el ayuntamiento' });
+    if (!governs && c.debt && c.debt.town >= DEBT.noticeable && !c.debt.plan) out.push({ accion: 'pedir_aplazamiento', detalle: 'pedir al alcalde que le aplace la deuda con el ayuntamiento' });
   }
   // Familia.
   const p = partnerOf(state, c);
@@ -229,10 +239,15 @@ export function turnMenu(state: GameState, c: Citizen): MenuItem[] {
     const guests = homelessByFire(state).filter((x) => x !== c && c.relations.some((r) => r.id === x.id && (r.kind === 'amistad' || r.kind === 'pareja')));
     for (const g of guests.slice(0, 2)) out.push({ accion: `acoger:${g.id}`, detalle: `acoger en su casa a ${g.name.split(' ')[0]}, que se ha quedado sin ella por el fuego` });
   }
+  // 2.2: en el mes de cosecha, quien está parado puede apuntarse de temporero.
+  const harvest = canSignTemporero(state, c);
+  if (harvest?.crop) out.push({ accion: 'temporero', detalle: `apuntarse de temporero para ${HARVEST_NAME[harvest.crop]} (está sin trabajo; un sueldo de temporada)` });
   if (canVolunteer(state, c)) out.push({ accion: 'hacerse_voluntario', detalle: 'apuntarse como voluntario de protección civil (está en paro)' });
+  // 2.2: presentarse a las elecciones con su propia candidatura (si cumple los requisitos).
+  if (canPresent(state, c).ok) out.push({ accion: 'presentarse', detalle: `presentarse a las elecciones con su propia candidatura (le cuesta ${LISTS.cost} €; su facción está descontenta)` });
   // Solo si está desesperado: robar en una casa del pueblo.
   if (desperate(c)) out.push({ accion: 'robar', detalle: 'robar en una casa del pueblo (está sin dinero, sin trabajo y endeudado)' });
-  out.push({ accion: 'irse', detalle: 'irse del pueblo y vender lo que tenga' });
+  if (!governs) out.push({ accion: 'irse', detalle: 'irse del pueblo y vender lo que tenga' });
   return out;
 }
 
@@ -335,6 +350,10 @@ export function extraAction(state: GameState, c: Citizen, verb: string, arg: str
       return shelter(state, c, state.citizens.find((x) => x.id === Number(arg)));
     case 'hacerse_voluntario':
       return becomeVolunteer(state, c);
+    case 'temporero':
+      return signTemporero(state, c);
+    case 'presentarse':
+      return presentCandidacy(state, c);
     case 'tirar_al_monte':
       return canDump(state, c) ? dumpTrash(state, c) : 'al final no tira la basura al monte';
     case 'robar': {
@@ -454,6 +473,10 @@ export function applyTownTurn(state: GameState, n: number, acts: TurnAct[], extr
       parts.push(`avisa: ${planText(c.plan)}`);
     }
     c.thought = cleanText(a.pensamiento, 160) || c.thought;
+    if (t.monthly) {
+      const bio = cleanText(a.biografia, 300);
+      if (bio.length >= 20) c.bio = { text: bio, tick: state.tick };
+    }
     const note = cleanText(a.recuerdo, 160);
     if (note) c.notes = [...(c.notes ?? []), { tick: state.tick, text: note }].slice(-TURN.notes);
     if (parts.length) lines.push({ id: c.id, text: `${c.name} ${parts.join('; ')}`, motivo: cleanText(a.motivo, 160) });
@@ -580,7 +603,11 @@ export function turnsTick(state: GameState, ruleFallback: (state: GameState, ids
     return;
   }
   ai.lastN++;
-  ai.turn = { n: ai.lastN, opened: state.tick, due: state.tick + TURN.dueHours, kind, reason: kind === 'rapida' ? ai.quick ?? undefined : undefined, ids };
+  // 2.2: el primer turno semanal de cada mes es «mensual»: biografías y pies de foto.
+  const month = Math.floor(state.tick / TICKS_PER_MONTH);
+  const monthly = kind === 'semana' && ai.lastMonthly !== month;
+  if (monthly) ai.lastMonthly = month;
+  ai.turn = { n: ai.lastN, opened: state.tick, due: state.tick + TURN.dueHours, kind, reason: kind === 'rapida' ? ai.quick ?? undefined : undefined, ids, ...(monthly ? { monthly: true } : {}) };
   if (kind === 'rapida') {
     ai.lastQuick = state.tick;
     ai.quick = null;
@@ -675,7 +702,7 @@ export function mayorText(state: GameState, cmd: { type: string } & Record<strin
     case 'Build':
       return cmd.kind === 'road' ? null : { text: `manda construir ${(BUILD_NAMES[cmd.kind as string] ?? String(cmd.kind)).toLowerCase()}`, big: false };
     case 'Zone':
-      return cmd.zone === 'none' ? null : { text: `marca zona ${cmd.zone === 'R' ? 'residencial' : cmd.zone === 'C' ? 'comercial' : 'industrial'}`, big: false };
+      return cmd.zone === 'none' ? null : { text: `marca zona ${cmd.zone === 'R' ? 'residencial' : cmd.zone === 'C' ? 'comercial' : cmd.zone === 'A' ? 'agraria' : 'industrial'}`, big: false };
     case 'Demolish': {
       const b = state.buildings.find((x) => x.x === cmd.x && x.y === cmd.y);
       return b ? { text: `derriba ${(b.name ?? BUILD_NAMES[b.kind] ?? b.kind).toLowerCase()}`, big: b.kind === 'house' || b.kind === 'res' || b.kind === 'shop' } : null;

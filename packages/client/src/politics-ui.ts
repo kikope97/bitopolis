@@ -1,5 +1,20 @@
 import { tickToDate } from '@bitopolis/shared';
-import { CAMPAIGN_COST, canCampaign, canMotion, daysToElection, type ElectionResult, FACTION_TEXT, FACTIONS, type GameState, OPPOSITION_POP, politicsActive } from '@bitopolis/sim';
+import {
+  CAMPAIGN_COST,
+  candidacies,
+  canCampaign,
+  canMotion,
+  daysToElection,
+  type ElectionResult,
+  FACTION_TEXT,
+  FACTIONS,
+  type GameState,
+  OPPOSITION_POP,
+  type Party,
+  politicsActive,
+  STYLE_TEXT,
+  tally,
+} from '@bitopolis/sim';
 import { formatDate } from './i18n.ts';
 import { lowMotion } from './prefs.ts';
 import { $, confirmDialog, h, sheet } from './ui.ts';
@@ -44,10 +59,11 @@ export function renderPollChip(state: GameState, onOpen: () => void): void {
   const d = daysToElection(state);
   const countdown = d <= 90 ? ` · ${d} d` : '';
   // v1.8: «Votos» a la vista en pantallas anchas (ronda 13: «84 %» solo no se entendía).
-  chip.replaceChildren('🗳 ', opp ? 'Oposición · ' : h('span', { class: 'poll-word' }, 'Votos '), `${p.approval} %${countdown}`);
+  // Ronda 18: en pantallas estrechas solo «🗳 55 %» (la cuenta atrás y «Oposición» quedan en el nombre accesible).
+  chip.replaceChildren('🗳 ', opp ? h('span', { class: 'poll-opp' }, 'Oposición · ') : h('span', { class: 'poll-word' }, 'Votos '), `${p.approval} %`, h('span', { class: 'poll-days' }, countdown));
   chip.classList.toggle('soon', d <= 90);
   chip.classList.toggle('neg', p.approval < 50);
-  chip.setAttribute('aria-label', `${opp ? 'Estás en la oposición. ' : ''}Intención de voto: ${p.approval} %. Elecciones: ${left(state)}. Ver política`);
+  chip.setAttribute('aria-label', `${opp ? 'Estás en la oposición. ' : ''}Intención de voto: ${p.approval} %. Elecciones: ${left(state)}${d <= 90 ? ` (${d} días)` : ''}. Ver política`);
   if (!chip.dataset.bound) {
     chip.dataset.bound = '1';
     chip.addEventListener('click', onOpen);
@@ -80,9 +96,16 @@ export function openPolitics(ctx: SocialCtx): void {
   }
   items.push(h('p', {}, `Próximas elecciones: ${date} (${left(state)}).`));
   items.push(h('h3', {}, 'Intención de voto'), h('p', { class: 'muted small' }, 'Entre quienes piensan votar (sin contar la abstención).'));
-  items.push(bar('Tú', p.approval, 'me'));
-  if (p.party) items.push(bar(`«${p.party.name}»`, 100 - p.approval, 'rival'));
-  else items.push(h('p', { class: 'muted' }, 'Todavía no hay candidatura rival. Si tu intención de voto baja, algún vecino se animará a fundar un partido.'));
+  const lists = candidacies(state);
+  if (lists.length) {
+    // 2.2: una barra por candidatura (el voto contra el gobierno se reparte entre ellas).
+    const t = tally(state);
+    const pcts = percents(t.votes.map((v) => v.votes));
+    const pctOf = (who: 'player' | number) => pcts[t.votes.findIndex((v) => v.who === who)] ?? 0;
+    items.push(bar('Tú', pctOf('player'), 'me'));
+    for (const l of lists) items.push(bar(`«${l.name}»`, pctOf(l.leaderId), 'rival'));
+  } else items.push(bar('Tú', p.approval, 'me'));
+  if (!lists.length) items.push(h('p', { class: 'muted' }, 'Todavía no hay candidatura rival. Si tu intención de voto baja, algún vecino se animará a fundar un partido.'));
 
   items.push(
     h('h3', {}, 'Facciones'),
@@ -121,35 +144,68 @@ export function openPolitics(ctx: SocialCtx): void {
     );
   }
 
-  if (p.party) {
-    const leader = h('button', { class: 'btn small' }, `Ver la ficha de ${p.party.leaderName}`);
-    leader.addEventListener('click', () => openCitizen(ctx, p.party!.leaderId));
-    items.push(h('h3', {}, opp ? 'Gobierno' : 'Oposición'), h('p', {}, `«${p.party.name}», de la facción ${FACTION_TEXT[p.party.faction].toLowerCase()}. Lo lidera ${p.party.leaderName}.`), leader);
-    // Lo que ha prometido el rival (y si lo cumple): munición para la oposición.
-    if (p.party.promises.length) {
-      const status = { pending: 'pendiente', kept: '✓ cumplida', broken: '✗ incumplida' } as const;
-      items.push(
-        h('h3', {}, `Promesas de «${p.party.name}»`),
-        h(
-          'ul',
-          { class: 'accounts' },
-          ...p.party.promises.map((pr) =>
-            h(
-              'li',
-              { class: pr.status === 'broken' ? 'neg' : pr.status === 'kept' ? 'pos' : '' },
-              h('span', {}, `${pr.need} (${FACTION_TEXT[pr.faction].toLowerCase()})${pr.fromMotion ? ' · tu moción' : ''}`),
-              h('span', {}, pr.status === 'pending' && p.mayor === p.party!.leaderId ? `pendiente hasta el ${formatDate(tickToDate(pr.deadline))}` : status[pr.status]),
-            ),
-          ),
-        ),
-      );
-    }
+  // 2.2: tarjeta de cada candidatura: estilo, promesas (pendiente, cumplida o rota) y lo último que dijo.
+  if (lists.length) {
+    items.push(h('h3', {}, opp ? 'Gobierno' : lists.length > 1 ? 'Oposición: candidaturas' : 'Oposición'));
+    for (const l of lists) items.push(rivalCard(ctx, state, l));
   }
   if (p.history.length) {
     items.push(h('h3', {}, 'Elecciones anteriores'));
     items.push(h('ul', { class: 'people' }, ...[...p.history].reverse().map((r) => h('li', {}, resultText(r)))));
   }
   sheet('Política y elecciones', ...items);
+}
+
+/** Porcentajes enteros que suman 100 (mayor resto). */
+function percents(parts: number[]): number[] {
+  const total = parts.reduce((a, b) => a + b, 0);
+  if (total <= 0) return parts.map(() => 0);
+  const raw = parts.map((n) => (n / total) * 100);
+  const out = raw.map(Math.floor);
+  const order = raw.map((v, i) => [v - Math.floor(v), i] as const).sort((a, b) => b[0] - a[0]);
+  for (let k = 0; k < 100 - out.reduce((a, b) => a + b, 0); k++) out[order[k % order.length]![1]]!++;
+  return out;
+}
+
+const PROMISE_CHIP = {
+  pending: { cls: 'warn', text: 'pendiente' },
+  kept: { cls: 'good', text: '✓ cumplida' },
+  broken: { cls: 'bad', text: '✗ rota' },
+} as const;
+
+/** Tarjeta de una candidatura (2.2): quién la lidera, su estilo, sus promesas y su discurso. */
+function rivalCard(ctx: SocialCtx, state: GameState, l: Party): HTMLElement {
+  const p = state.politics;
+  const governs = p.mayor === l.leaderId;
+  const leader = h('button', { class: 'btn small' }, `Ver la ficha de ${l.leaderName.split(' ')[0]}`);
+  leader.addEventListener('click', () => openCitizen(ctx, l.leaderId));
+  const style = l.style ? STYLE_TEXT[l.style] : null;
+  return h(
+    'section',
+    { class: `rival-card${governs ? ' governs' : ''}`, 'aria-label': `Candidatura «${l.name}»` },
+    h('h4', {}, `«${l.name}»`, style ? h('span', { class: 'pill rival-style' }, style) : ''),
+    h('p', {}, `Lo lidera ${l.leaderName}, de la facción ${FACTION_TEXT[l.faction].toLowerCase()}.${governs ? ' Gobierna el pueblo.' : ''}`),
+    l.speech ? h('p', { class: 'quote' }, `«${l.speech.text}»`) : '',
+    l.promises.length
+      ? h(
+          'ul',
+          { class: 'promises', 'aria-label': 'Promesas' },
+          ...l.promises.map((pr) =>
+            h(
+              'li',
+              {},
+              h('span', { class: 'promise-need' }, `${pr.need}${pr.fromMotion ? ' · tu moción' : ''}`),
+              h(
+                'span',
+                { class: `pill ${PROMISE_CHIP[pr.status].cls}` },
+                pr.status === 'pending' && governs ? `pendiente · hasta ${formatDate(tickToDate(pr.deadline))}` : PROMISE_CHIP[pr.status].text,
+              ),
+            ),
+          ),
+        )
+      : h('p', { class: 'muted small' }, 'No ha prometido nada concreto.'),
+    leader,
+  );
 }
 
 /** Moción desde la oposición: llevar al pleno lo que pide la facción. */
@@ -185,6 +241,10 @@ function motionIntro(state: GameState): HTMLElement {
 function resultText(r: ElectionResult): string {
   const y = tickToDate(r.tick).year;
   if (r.unopposed) return `Año ${y}: sin rival, alcalde por aclamación.`;
+  if (r.lists && r.lists.length > 1) {
+    const rest = r.lists.map((l) => `«${l.name}» ${l.votes}`).join(', ');
+    return `Año ${y}: ${r.winner === 'player' ? 'ganaste' : `ganó ${r.winnerName ?? 'otra candidatura'}`} (tú ${r.player} votos; ${rest}; ${r.abstention} se abstuvieron).`;
+  }
   return `Año ${y}: ${r.winner === 'player' ? 'ganaste' : 'perdiste'} (${r.player} votos frente a ${r.rival} de «${r.rivalName}»; ${r.abstention} se abstuvieron).`;
 }
 
@@ -193,15 +253,12 @@ export function openElectionNight(ctx: SocialCtx): void {
   const state = ctx.state();
   const r = state.politics.history.at(-1);
   if (!r) return;
-  // Porcentajes que suman 100 (mayor resto) y, al lado, los votos.
-  const parts = r.unopposed ? [r.player, r.abstention] : [r.player, r.rival, r.abstention];
-  const total = Math.max(1, parts.reduce((a, b) => a + b, 0));
-  const raw = parts.map((n) => (n / total) * 100);
-  const pcts = raw.map(Math.floor);
-  const order = raw.map((v, i) => [v - Math.floor(v), i] as const).sort((a, b) => b[0] - a[0]);
-  for (let k = 0; k < 100 - pcts.reduce((a, b) => a + b, 0); k++) pcts[order[k % order.length]![1]]!++;
-  const labels = r.unopposed ? [`Tú (${r.player} votos)`, `Abstención (${r.abstention})`] : [`Tú (${r.player} votos)`, `«${r.rivalName}» (${r.rival})`, `Abstención (${r.abstention})`];
-  const classes = r.unopposed ? ['me', 'abst'] : ['me', 'rival', 'abst'];
+  // Porcentajes que suman 100 (mayor resto) y, al lado, los votos. 2.2: una barra por lista.
+  const rivals = r.unopposed ? [] : (r.lists ?? [{ name: r.rivalName ?? '', votes: r.rival }]);
+  const parts = [r.player, ...rivals.map((l) => l.votes), r.abstention];
+  const pcts = percents(parts);
+  const labels = [`Tú (${r.player} votos)`, ...rivals.map((l) => `«${l.name}» (${l.votes})`), `Abstención (${r.abstention})`];
+  const classes = ['me', ...rivals.map(() => 'rival'), 'abst'];
   const rows = labels.map((l, i) => bar(l, pcts[i]!, classes[i]));
   if (!lowMotion()) {
     for (const row of rows) {
@@ -217,6 +274,7 @@ export function openElectionNight(ctx: SocialCtx): void {
   sheet(
     'Noche electoral',
     h('p', { class: 'big-number' }, r.unopposed ? 'Sin rival: sigues de alcalde' : won ? '¡Ganas las elecciones!' : 'Pierdes las elecciones'),
+    rivals.length > 1 ? h('p', { class: 'muted' }, `Se presentaron ${rivals.length + 1} candidaturas.`) : '',
     ...rows,
     h('p', {}, resultText(r)),
     !won ? h('p', {}, 'Pasas a la oposición: no puedes gobernar, pero sí hablar con los vecinos y hacer campaña. No hay game over: en cuatro años vuelves a presentarte.') : '',

@@ -56,6 +56,7 @@ createServer((req, res) => {
           const n = (d.noticias ?? []).find((x) => x.seccion === sec);
           return { seccion: sec, sobre: n?.id ?? '', texto: n ? `Lo que se cuenta: ${n.texto.split(/[.:(]/)[0]}` : 'Semana tranquila en el pueblo' };
         }),
+        pies: (d.fotos ?? []).map((f) => ({ id: f.id, texto: 'Un día que el pueblo no olvidará' })),
         encargo: d.encargos_posibles?.[0] ? { id: d.encargos_posibles[0].id, carta: 'Alcalde, se lo pido de corazón: nos haría mucha falta en el pueblo.' } : { id: '', carta: '' },
       };
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -78,6 +79,7 @@ createServer((req, res) => {
           pensamiento: `Soy ${v.nombre.split(' ')[0]} y esta semana me toca mover ficha en el pueblo.`,
           motivo: 'Con lo que está pasando en el pueblo, no puedo quedarme de brazos cruzados.',
           recuerdo: 'Esta semana he pedido cosas al alcalde.',
+          biografia: whole.includes('"mensual":true') ? `${v.nombre.split(' ')[0]} vive en el pueblo y cada semana pide algo al alcalde.` : '',
         };
       });
       const delay = Number(process.env.FAKE_LLM_DELAY_MS ?? 0);

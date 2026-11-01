@@ -6,6 +6,7 @@ import { addMemory } from './social.ts';
 import { type Citizen, type GameState, inBounds, pushEvent, terrainAt } from './state.ts';
 import { Terrain } from './terrain.ts';
 import { floodChanceAt, floodRepairFactor, snowRoads } from './fire.ts';
+import { farmWeatherDay, floodFarm } from './farm.ts';
 
 /**
  * v1.7: estaciones y tiempo. Cada pocos días cambia el tiempo según la
@@ -79,6 +80,8 @@ export function weatherDay(state: GameState): void {
     if (kind !== prev) announce(state, kind);
     if (kind === 'tormenta') flood(state);
   }
+  // 2.2: el tiempo de hoy va haciendo la cosecha del año de cada finca.
+  farmWeatherDay(state);
   if (state.weather.kind === 'nieve') {
     // 2.1: en el radio de la protección civil, el quitanieves cuesta la mitad.
     const roads = snowRoads(state);
@@ -125,7 +128,11 @@ export function flood(state: GameState): void {
   }
   let cost = 0;
   const people = new Set<Citizen>();
+  // 2.2: en una finca no hay obra que reparar: la riada se lleva la cosecha del regadío.
+  const farms = hit.filter((b) => b.kind === 'farm');
+  for (const b of farms) floodFarm(b);
   for (const b of hit) {
+    if (b.kind === 'farm') continue;
     const spec = BUILD[b.kind as keyof typeof BUILD];
     cost += Math.round((spec?.materials ?? 2_000) * WEATHER.floodRepair * floodRepairFactor(state, b));
     for (const c of state.citizens) if (c.homeId === b.id || c.jobId === b.id) people.add(c);
@@ -135,7 +142,7 @@ export function flood(state: GameState): void {
   pushEvent(
     state,
     'info',
-    `El río se desborda: ${hit.length === 1 ? 'se anega un edificio' : `se anegan ${hit.length} edificios`} de la orilla. Reparaciones: ${cost} €`,
+    `El río se desborda: ${hit.length === 1 ? 'se anega un edificio' : `se anegan ${hit.length} edificios`} de la orilla. Reparaciones: ${cost} €${farms.length ? ` (${farms.length === 1 ? 'una huerta pierde' : `${farms.length} huertas pierden`} buena parte de la cosecha)` : ''}`,
     { ref: hit[0]!.id },
   );
 }

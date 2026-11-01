@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createInitialState, FORMAT_VERSION, MIGRATIONS, migrate, migrate14Trash } from '../src/index.ts';
+import { TICKS_PER_MONTH } from '@bitopolis/shared';
+import { checkInvariants, createInitialState, FORMAT_VERSION, MIGRATIONS, migrate, migrate14Trash, migrate15Loans, OUTSIDE, step, transfer, TREASURY } from '../src/index.ts';
 
 describe('migración 13 → 14 (2.1)', () => {
   it('basura: campo de suciedad vacío y 60 días de gracia (migrate14Trash)', () => {
@@ -13,6 +14,30 @@ describe('migración 13 → 14 (2.1)', () => {
     expect(m.fields.dirt).toEqual(new Array(m.map.w * m.map.h).fill(0));
     // Lo que ya tenía no se toca.
     expect(migrate14Trash({ trash: { start: 7 }, map: { w: 1, h: 1 }, fields: { dirt: [3] } })).toMatchObject({ trash: { start: 7 }, fields: { dirt: [3] } });
+  });
+});
+
+describe('migración 14 → 15 (2.2, préstamos)', () => {
+  it('sin préstamos y nota B; una caja negativa heredada pasa a préstamo de tesorería al cerrar el mes (migrate15Loans)', () => {
+    const s = createInitialState({ seed: 4 }) as unknown as Record<string, any>;
+    const v14: Record<string, any> = structuredClone({ ...s, formatVersion: 14 });
+    delete v14.loans;
+    delete v14.rating;
+    delete v14.loanLedger;
+    const m = migrate(v14);
+    expect(m.formatVersion).toBe(FORMAT_VERSION);
+    expect(m.loans).toEqual([]);
+    expect(m.rating).toBe('B');
+    expect(m.loanLedger).toEqual({ lent: 0, repaid: 0, interest: 0, treasuryTicks: [] });
+    expect(checkInvariants(m)).toEqual([]);
+    // Caja negativa de antes (con el descubierto viejo): al siguiente fin de mes, préstamo de tesorería.
+    transfer(m, TREASURY, OUTSIDE, m.treasury + 1_500, 'obras');
+    while (m.tick < TICKS_PER_MONTH) step(m);
+    expect(m.loans.filter((l) => l.kind === 'tesoreria')).toHaveLength(1);
+    expect(m.treasury).toBeGreaterThanOrEqual(0);
+    expect(checkInvariants(m)).toEqual([]);
+    // Lo que ya tenía no se toca.
+    expect(migrate15Loans({ loans: [{ id: 1 }], rating: 'C', loanLedger: { lent: 5 } })).toMatchObject({ loans: [{ id: 1 }], rating: 'C', loanLedger: { lent: 5 } });
   });
 });
 
