@@ -1009,12 +1009,13 @@ export interface LandmarkSpec {
  */
 export const LANDMARKS = {
   specs: {
-    // Medido con `pnpm sim` (casual a 4 años): con 30 vecinos, 50 de felicidad y 3 × 6.000 € salía en el mes 5; así, entre el 27 y el 40.
-    bridge: { pop: 40, happiness: 55, townhall: 3, onRiver: true, size: 1, phases: 3, phaseCost: 15_000, workers: 4, days: 5 },
-    station: { pop: 60, happiness: 55, townhall: 3, size: 2, phases: 3, phaseCost: 14_000, workers: 6, days: 6 },
-    fair: { pop: 80, happiness: 55, townhall: 3, size: 2, phases: 2, phaseCost: 12_000, workers: 6, days: 6 },
-    stadium: { pop: 120, happiness: 60, townhall: 4, size: 2, phases: 3, phaseCost: 25_000, workers: 8, days: 8 },
-    cathedral: { pop: 150, happiness: 60, townhall: 4, needs: 'chapel', size: 2, phases: 4, phaseCost: 30_000, workers: 8, days: 10 },
+    // Medido con `pnpm sim` (casual a 4 años): con 30 vecinos, 50 de felicidad y 3 × 6.000 € salía en el mes 5. F3 (2.3): con
+    // el perfil pagando fase a fase, la primera obra se termina hacia el mes 33 (19–43) y la caja queda en ~35.000 €.
+    bridge: { pop: 60, happiness: 55, townhall: 3, onRiver: true, size: 1, phases: 3, phaseCost: 28_000, workers: 4, days: 5 },
+    station: { pop: 70, happiness: 55, townhall: 3, size: 2, phases: 3, phaseCost: 30_000, workers: 6, days: 6 },
+    fair: { pop: 80, happiness: 55, townhall: 3, size: 2, phases: 2, phaseCost: 40_000, workers: 6, days: 6 },
+    stadium: { pop: 120, happiness: 60, townhall: 4, size: 2, phases: 3, phaseCost: 40_000, workers: 8, days: 8 },
+    cathedral: { pop: 150, happiness: 60, townhall: 4, needs: 'chapel', size: 2, phases: 4, phaseCost: 45_000, workers: 8, days: 10 },
   } satisfies Record<LandmarkKind, LandmarkSpec>,
   /** Efectos con todas las fases hechas. */
   effects: {
@@ -1030,9 +1031,9 @@ export const LANDMARKS = {
     cathedral: { happiness: 3, attract: 5 },
   },
   /** Mantenimiento mensual: esta parte de lo gastado. */
-  upkeep: 0.005,
+  upkeep: 0.01,
   /** Cofinanciación de la Diputación (`Grant.landmark`): parte de cada fase; con el ayuntamiento 5, `shareTop`. */
-  grant: { shareMin: 0.3, shareMax: 0.5, shareTop: 0.6, offerDays: 30 },
+  grant: { shareMin: 0.25, shareMax: 0.4, shareTop: 0.5, offerDays: 30 },
   /** IA: voluntarios (la fase sale más barata), polémica (actitud −1 en la facción que paga) y donaciones. */
   volunteersCut: 0.1,
   controversyAttitude: -1,
@@ -1067,11 +1068,11 @@ export const TOURISM = {
   minAttract: 8,
   /** Lo que resta la contaminación media (0–100) en las casillas con edificio. Con 0,3, un pueblo con talleres no tenía turistas. */
   pollution: 0.1,
-  perAttract: 6,
+  perAttract: 8,
   /** Casas rurales (vivienda en propiedad con `rural`): plazas, lo que gana el dueño por visitante y tope al mes. */
-  rural: { beds: 3, perVisitor: 40, maxMonth: 600, openCost: 1_500, minVisitors: 40 },
+  rural: { beds: 3, perVisitor: 40, maxMonth: 600, openCost: 1_500, minVisitors: 50 },
   /** Noches por visitante; la tasa (€/noche por nivel) quita esta parte de visitantes por nivel. */
-  nights: 2,
+  nights: 3,
   taxDrop: 0.12,
   /** Entorno protegido: radio sin zona I ni fábricas, atractivo ×1,3 y −8 de felicidad a los empresarios. */
   protect: { radius: 6, attract: 1.3, ownerMood: -8 },
@@ -1092,13 +1093,13 @@ export const TOURISM = {
 export const REGION = {
   /** La primera fase normal dura esto (también en las partidas migradas). */
   firstMonths: 18,
-  minMonths: 18,
-  maxMonths: 36,
+  minMonths: 15,
+  maxMonths: 30,
   warnMonths: 2,
   /** Probabilidad de pasar a otra fase al acabar la actual (si no, normal). */
   next: {
-    normal: { bonanza: 0.3, crisis: 0.25 },
-    bonanza: { crisis: 0.35 },
+    normal: { bonanza: 0.3, crisis: 0.4 },
+    bonanza: { crisis: 0.4 },
     crisis: { normal: 0.7 },
   },
   /** Efectos por fase: ventas de los talleres, plazas de trabajo fuera, demanda I, valor de la vivienda y visitantes. */
@@ -1145,22 +1146,22 @@ export const SCENARIOS = {
   libre: {},
   /**
    * Pueblo en quiebra: caja −8.000, 25 vecinos resentidos. Meta: cuentas en positivo
-   * (caja menos lo que se debe al banco) y 6 meses seguidos de superávit antes de 24.
+   * (caja menos lo que se debe al banco) y 13 meses seguidos de superávit antes de 24 (F3: con −8.000 y 6 meses, el casual ganaba al 6.º mes).
    */
   quiebra: {
-    treasury: -8_000,
+    treasury: -18_000,
     citizens: 25,
     grudge: 15,
     debtMonths: 2,
     rating: 'C',
-    surplusMonths: 6,
+    surplusMonths: 13,
     deadlineMonths: 24,
     /** Pueblo de partida (además del ayuntamiento, de nivel 2): casas municipales, bloques, tiendas, talleres y parque. */
     village: { house: 2, res: 6, shop: 2, factory: 1, park: 1 },
     money: [300, 1_500],
     age: [22, 70],
   },
-  /** El pueblo que se vacía: 30 vecinos de 60–80 años, 8 casas vacías, demanda R −30 un año. Meta: 50 vecinos en 36 meses. */
+  /** El pueblo que se vacía: 30 vecinos de 60–80 años, 8 casas vacías, demanda R baja año y medio. Meta: 58 vecinos en 36 meses (F3: con 50 y un año, se ganaba al 13.º mes). */
   vaciado: {
     citizens: 30,
     ageMin: 60,
@@ -1168,29 +1169,29 @@ export const SCENARIOS = {
     emptyHouses: 8,
     /** Plan: −30; con −30 los empleos de los talleres traían gente igual y la meta caía al 4.º mes. */
     demandR: -60,
-    demandMonths: 12,
-    goalPop: 50,
+    demandMonths: 18,
+    goalPop: 58,
     deadlineMonths: 36,
     treasury: 30_000,
     village: { house: 2, res: 8, shop: 1, factory: 1, park: 1 },
     money: [2_000, 6_000],
   },
-  /** Tras la riada: río obligatorio, 6 edificios dañados, 20.000 € de emergencia a 12 meses, riadas ×1,5 el primer año. Meta: reparar todo y 40 vecinos. */
+  /** Tras la riada: río obligatorio, 6 edificios dañados, 20.000 € de emergencia a 24 meses, riadas ×1,5 el primer año. Meta: reparar todo y 62 vecinos (F3: con reparaciones de 4.000 € y 40 vecinos se ganaba al 5.º mes). */
   riada: {
     damaged: 6,
     grant: 20_000,
-    grantMonths: 12,
+    grantMonths: 24,
     /** Anticipo de la subvención al empezar (el resto, al terminar de reparar en plazo; si no, se devuelve con recargo). */
     grantAdvance: 0.3,
     floodFx: 1.5,
     floodMonths: 12,
-    goalPop: 40,
+    goalPop: 62,
     deadlineMonths: 36,
     citizens: 22,
     treasury: 12_000,
     /** Reparar lo de la riada: parte de los materiales del edificio (mínimo `repairMin`). */
-    repair: 1,
-    repairMin: 4_000,
+    repair: 2,
+    repairMin: 22_000,
     village: { house: 2, res: 7, shop: 2, factory: 2, park: 1 },
     money: [400, 2_000],
     age: [20, 72],
@@ -1209,7 +1210,7 @@ export const ACHIEVEMENTS = {
   couples: 10,
   owners: 20,
   /** Política: reelecciones, promesas cumplidas, presupuestos aprobados seguidos. */
-  reelected: 2,
+  reelected: 3,
   promises: 10,
   budgetYears: 5,
   /** Desgracias: riadas superadas. */
@@ -1226,7 +1227,7 @@ export const ACHIEVEMENTS = {
   /** Entorno protegido sin turistificar durante estos meses seguidos. */
   protectedMonths: 12,
   /** Crisis superada sin cierres: con al menos estas empresas al acabar. */
-  crisisMinBusinesses: 3,
+  crisisMinBusinesses: 8,
   /** Encargos cumplidos (los cuenta `errands.medals`, 2.1): bronce, plata y oro. */
   errands: [1, 5, 15],
 } as const;

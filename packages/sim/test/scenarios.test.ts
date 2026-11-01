@@ -101,7 +101,7 @@ describe('escenarios', () => {
     expect(s.citizens.every((c) => c.grudge === SCENARIOS.quiebra.grudge && c.homeId !== null)).toBe(true);
     expect(s.debtMonths).toBe(SCENARIOS.quiebra.debtMonths);
     expect(s.townhallLevel).toBe(2);
-    expect(s.scenario).toMatchObject({ id: 'quiebra', done: false, deadline: SCENARIOS.quiebra.deadlineMonths * TICKS_PER_MONTH, goal: { kind: 'superavit', target: 6 } });
+    expect(s.scenario).toMatchObject({ id: 'quiebra', done: false, deadline: SCENARIOS.quiebra.deadlineMonths * TICKS_PER_MONTH, goal: { kind: 'superavit', target: SCENARIOS.quiebra.surplusMonths } });
     expect(scenarioStatus(s)?.monthsLeft).toBe(SCENARIOS.quiebra.deadlineMonths);
   });
   it('El pueblo que se vacía: mayores, casas vacías y demanda R baja el primer año', () => {
@@ -128,7 +128,7 @@ describe('escenarios', () => {
     expect(scenarioFx(s).flood).toBe(SCENARIOS.riada.floodFx);
   });
   it('cumplir da medalla y foto; sin hacer nada vence el plazo y sigue como Libre', () => {
-    const won = runSimulation({ seed: 1, days: 30 * 18, profile: 'casual', scenario: 'vaciado' });
+    const won = runSimulation({ seed: 1, days: 30 * 24, profile: 'casual', scenario: 'vaciado' });
     expect(won.state.scenario).toMatchObject({ done: true, won: true });
     expect(won.state.medals.map((m) => m.id)).toContain('escenario:vaciado');
     expect(won.state.album.some((m) => m.kind === 'escenario_vaciado')).toBe(true);
@@ -139,9 +139,9 @@ describe('escenarios', () => {
     expect(lost.report.invariantErrors).toEqual([]);
   });
   it('la ayuda de la riada se cobra al reparar a tiempo y se devuelve con recargo si no', () => {
-    const fixed = runSimulation({ seed: 2, days: 30 * 13, profile: 'casual', scenario: 'riada' });
+    const fixed = runSimulation({ seed: 2, days: 30 * (SCENARIOS.riada.grantMonths + 2), profile: 'casual', scenario: 'riada' });
     expect(fixed.state.grants.find((g) => g.emergency)?.status).toBe('paid');
-    const idle = runSimulation({ seed: 2, days: 30 * 13, profile: 'pasivo', scenario: 'riada' });
+    const idle = runSimulation({ seed: 2, days: 30 * (SCENARIOS.riada.grantMonths + 2), profile: 'pasivo', scenario: 'riada' });
     expect(idle.state.grants.find((g) => g.emergency)?.status).toBe('expired');
     expect(idle.state.stats.some((m) => 'reintegro de subvención' in m.breakdown)).toBe(true);
     expect(idle.report.invariantErrors).toEqual([]);
