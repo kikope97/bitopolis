@@ -44,8 +44,8 @@ test('2.2: pedir un préstamo (importe, plazo, cuota y TAE), verlo en la lista y
   await expect(page.locator('.loan-badge')).toHaveText(state.rating);
   await expect(page.locator('.sheet')).toContainText('No debes nada al banco');
   // 5.000 € por defecto; dos toques a «+» → 7.000 €; plazo 12 meses.
-  await page.getByRole('button', { name: 'Mil euros más' }).click();
-  await page.getByRole('button', { name: 'Mil euros más' }).click();
+  await page.getByRole('button', { name: 'Mil euros más', exact: true }).click();
+  await page.getByRole('button', { name: 'Mil euros más', exact: true }).click();
   await expect(page.locator('.loan-value')).toHaveText(/^7\.?000 €$/);
   await page.getByRole('radio', { name: '12 meses' }).click();
   await expect(page.getByRole('radio', { name: '12 meses' })).toHaveAttribute('aria-checked', 'true');
@@ -82,15 +82,15 @@ test('2.2: con mucha carga, el 💰 se pone en ámbar y Préstamos lo avisa', as
   page.on('pageerror', (e) => errors.push(e.message));
   if (info.project.name === 'movil') await page.setViewportSize({ width: 360, height: 740 });
   const { state } = runSimulation({ seed: 42, days: 300, profile: 'casual', checkEveryDay: false });
-  // Todo lo que prestan, a 12 meses: la cuota pasa del 25 % de lo que entra.
-  expect(applyCommand(state, { type: 'RequestLoan', amount: loanCapacity(state), months: 12 }).ok).toBe(true);
+  // Ronda 18: lo máximo a 12 meses (el banco ya no deja pasar del 35 % de lo que entra), por encima del 25 %.
+  expect(applyCommand(state, { type: 'RequestLoan', amount: loanCapacity(state, 12), months: 12 }).ok).toBe(true);
   await openTown(page, request, state);
   await expect(page.locator('#hud-money')).toHaveClass(/\bload\b/);
   await expect(page.locator('#hud-money')).toHaveAttribute('aria-label', /préstamos se llevan el \d+ %/);
   await page.locator('#menu').click();
   await expect(page.getByRole('button', { name: /^Préstamos · nota/ })).toHaveClass(/attn/);
   await page.getByRole('button', { name: /^Préstamos · nota/ }).click();
-  await expect(page.locator('.loan-head')).toContainText('carga muy alta');
+  await expect(page.locator('.loan-head')).toContainText(/carga (muy )?alta/);
   await page.screenshot({ path: `test-results/capturas/${info.project.name}-prestamos-3-carga.png` });
   expect(errors).toEqual([]);
 });
