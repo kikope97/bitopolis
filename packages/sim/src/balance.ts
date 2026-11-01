@@ -767,3 +767,45 @@ export const TRASH = {
   /** Días entre avisos de ratas. */
   warnEveryDays: 7,
 } as const;
+
+/**
+ * 2.2: licitaciones de obras (tenders.ts). Las obras con materiales desde
+ * `minCost` eligen oferta: local (la de siempre), barata de fuera o la del
+ * primo del concejal. `mat` multiplica los materiales y `days` el plazo.
+ */
+export const TENDER = {
+  minCost: 2_500,
+  /** Llegan con el ayuntamiento de este nivel (las primeras obras, las del tutorial, van sin licitación). */
+  fromLevel: 2,
+  /** Barata de fuera: su cuadrilla cobra `wage` al día (no los parados del pueblo); con p, sobrecoste al terminar. */
+  cheap: { mat: 0.8, days: 1.3, wage: 60, overrun: 0.15, p: 0.25 },
+  /** La del primo: `kick` de los materiales va a la caja de su negocio; con p, escándalo. */
+  crony: { mat: 0.9, days: 0.9, kick: 0.1, p: 0.35 },
+  /** Rumor en el bar y estallido (días desde la firma). */
+  warnDays: 14,
+  revealDays: 28,
+  /** Con director (Modo IA): si no lo hace estallar en estos días tras `revealDays`, se olvida. */
+  forgetDays: 28,
+  /** «Revisar el contrato» durante el rumor: cuesta esta parte de los materiales. */
+  cancelFee: 0.1,
+  /** Recuerdo del escándalo en los vecinos con nombre (felicidad) y bajada de campaña en cada facción. */
+  scandalMood: -4,
+  scandalCampaign: 1,
+  /** El concejal al que se le revisa el contrato: rencor. */
+  offendedGrudge: 4,
+  /** Licitaciones guardadas (las 10 últimas; las vivas no se borran). */
+  keep: 10,
+} as const;
+
+/** 2.2: calles y plazas con nombre de vecinos (streets.ts). */
+export const STREETS = {
+  /** La placa. */
+  plaque: 150,
+  /** Amigos y familia del homenajeado: felicidad; quien se llevaba mal: rencor. */
+  friendHappiness: 4,
+  rivalGrudge: 2,
+  /** Candidatos: mayores desde esta edad y «muy queridos» con tantas amistades. */
+  oldAge: 70,
+  lovedFriends: 3,
+  candidates: 3,
+} as const;

@@ -160,7 +160,17 @@ export const MIGRATIONS: Record<number, Migration> = {
   }),
   // 2.1: emergencias, encargos y periódico (cada parte, en su función).
   13: (s) => ({ ...migrate14Trash(migrate14Rank(migrate14Errands(migrate14Fire(s)))), formatVersion: 14 }),
+  // 2.2: licitaciones y calles (cada parte de la 2.2, en su función).
+  14: (s) => ({ ...migrate15Tenders(s), formatVersion: 15 }),
 };
+
+/**
+ * 2.2 (14 → 15), licitaciones y calles con nombre: sin licitaciones y sin
+ * calles dedicadas. Las obras en marcha siguen como locales (sin `offer`).
+ */
+export function migrate15Tenders(s: Record<string, any>): Record<string, any> {
+  return { ...s, tenders: Array.isArray(s.tenders) ? s.tenders : [], streetNames: Array.isArray(s.streetNames) ? s.streetNames : [] };
+}
 
 /** 2.1: encargos del pueblo y El Eco de Bitópolis, vacíos (el primero, en unos días). */
 function migrate14Errands(s: Record<string, any>): Record<string, any> {

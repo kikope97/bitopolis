@@ -59,7 +59,11 @@ import {
   zonesUnlocked,
   isFemaleName,
   lowerFirst,
+  tenderApplies,
+  streetSegment,
+  STREETS,
 } from '@bitopolis/sim';
+import { contractBox, openTender } from './tender-ui.ts';
 import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
 import { openNeighbours, openReport, openTaxes as openTaxesSheet } from './economy-ui.ts';
 import { LAYERS, type LayerId, NEED_ICON } from './layers.ts';
@@ -132,6 +136,9 @@ export function startGame(opts: GameOptions): void {
   let pendingEnd: { x: number; y: number } | null = null;
   /** v1.4: en pantallas táctiles, una obra se coloca en dos pasos (ver, confirmar). */
   let pendingPlace: { a: { x: number; y: number }; b: { x: number; y: number } } | null = null;
+  /** 2.2: dedicando una calle (desde el pleno): a quién, y la casilla propuesta. */
+  let dedicating: { citizenId: number; name: string } | null = null;
+  let pendingDedication: { x: number; y: number } | null = null;
   let touchInput = false;
   /** Cursor de casilla para jugar con teclado (flechas + Intro). */
   let cursor: { x: number; y: number } | null = null;
@@ -653,7 +660,12 @@ export function startGame(opts: GameOptions): void {
     if (plain.length === 1) toast(plain[0]!.text, { kind: 'good' });
     else if (plain.length > 1) toast(`${plain.length} obras terminadas`, { kind: 'good' });
     for (const e of fresh) {
-      if (e.kind === 'bankrupt' || e.kind === 'warning') {
+      if (e.kind === 'warning' && e.text.startsWith('Se comenta en el bar') && e.ref) {
+        // 2.2: el rumor de la obra del primo lleva a su ficha, con «Revisar el contrato».
+        sfx.warn();
+        calmPause();
+        toast(e.text, { kind: 'warn', sticky: true, onClick: () => focusBuilding(e.ref!) });
+      } else if (e.kind === 'bankrupt' || e.kind === 'warning') {
         sfx.warn();
         duck(1.5);
         if (e.kind === 'bankrupt') shake(4, 400);
@@ -1037,7 +1049,7 @@ export function startGame(opts: GameOptions): void {
    * elegir ese edificio, no la casilla vacía de encima (Mirar y Derribar).
    */
   function pickTile(cx: number, cy: number, t: { x: number; y: number }): { x: number; y: number } {
-    if (tool.id !== 'inspect' && tool.id !== 'demolish') return t;
+    if ((tool.id !== 'inspect' && tool.id !== 'demolish') || dedicating) return t;
     const here = state.buildings.some((b) => b.x === t.x && b.y === t.y);
     const below = state.buildings.some((b) => b.x === t.x && b.y === t.y + 1);
     if (here || !below) return t;
@@ -1167,6 +1179,7 @@ export function startGame(opts: GameOptions): void {
   );
 
   async function tapTile(tile: { x: number; y: number }) {
+    if (dedicating) return proposeDedication(tile);
     if (tool.id === 'inspect') return inspect(tile);
     if (isLocked(tool, state)) {
       toast(lockLong(tool, state), { kind: 'warn' });
@@ -1231,7 +1244,70 @@ export function startGame(opts: GameOptions): void {
       return proposePlace(tile, tile);
     }
     const cmd = commandFor(tool, tile, tile);
-    if (cmd) await command(cmd);
+    if (cmd) await placeBuild(cmd);
+  }
+
+  /**
+   * 2.2: las obras grandes se licitan: antes de construir, la hoja con las tres
+   * ofertas (la local, la de siempre, va primero). El resto, directo.
+   */
+  function placeBuild(cmd: Command): Promise<boolean> {
+    if (cmd.type !== 'Build' || cmd.kind === 'road' || cmd.offer || !tenderApplies(state, cmd.kind, cmd.x, cmd.y) || !validateCommand(state, cmd).ok) return command(cmd);
+    return new Promise((resolve) => {
+      openTender(state, cmd, (offer) => void command({ ...cmd, offer }).then(resolve));
+    });
+  }
+
+  /* ---------- 2.2: dedicar una calle (desde el pleno) ---------- */
+  function startDedication(citizenId: number, name: string) {
+    closeSheet();
+    selectTool('inspect');
+    dedicating = { citizenId, name };
+    $('#tool-info').replaceChildren(h('b', {}, 'Dedicar una calle'), ` a ${name}: toca una carretera o la Plaza Mayor (placa ${money(STREETS.plaque)}). Esc para cancelar.`);
+    if (touchInput) {
+      $('#confirm-text').textContent = `Calle para ${name}: toca una carretera o la plaza.`;
+      ($('#confirm-yes') as HTMLButtonElement).hidden = true;
+      showBar(true);
+    }
+    refreshStrip();
+    $('#sr-live').textContent = `Elige la calle para ${name}.`;
+  }
+
+  function proposeDedication(tile: { x: number; y: number }) {
+    if (!dedicating) return;
+    const cmd: Command = { type: 'DedicateStreet', citizenId: dedicating.citizenId, x: tile.x, y: tile.y };
+    const v = validateCommand(state, cmd);
+    const seg = streetSegment(state, tile.x, tile.y);
+    pendingDedication = v.ok ? tile : null;
+    preview = seg ? { tiles: seg.tiles.map(([x, y]) => ({ x, y })), ok: v.ok } : { tiles: [tile], ok: false };
+    const what = v.ok ? `¿Dedicar ${seg!.axis === 'plaza' ? 'la plaza' : 'esta calle'} a ${dedicating.name}?` : `No se puede (${v.error})`;
+    $('#confirm-text').replaceChildren(h('span', { class: 'cc-what' }, what), v.ok ? h('span', { class: 'cc-cost' }, `Placa: ${money(STREETS.plaque)}`) : '');
+    const yes = $('#confirm-yes') as HTMLButtonElement;
+    yes.textContent = 'Dedicar aquí';
+    yes.className = 'btn primary';
+    yes.disabled = !v.ok;
+    yes.hidden = !v.ok;
+    showBar(true);
+    document.body.classList.add('placing');
+  }
+
+  function endDedication() {
+    dedicating = null;
+    pendingDedication = null;
+    preview = null;
+    showBar(false);
+    selectTool('inspect');
+  }
+
+  async function confirmDedication() {
+    const d = dedicating;
+    const at = pendingDedication;
+    endDedication();
+    if (!d || !at) return;
+    if (await command({ type: 'DedicateStreet', citizenId: d.citizenId, x: at.x, y: at.y })) {
+      const n = state.streetNames?.at(-1);
+      toast(n ? `Se descubre la placa: ${n.name}` : 'Calle dedicada', { kind: 'good' });
+    }
   }
 
   /**
@@ -1298,7 +1374,7 @@ export function startGame(opts: GameOptions): void {
     cancelPlace();
     if (!p) return;
     const cmd = commandFor(tool, p.a, p.b);
-    if (cmd) await command(cmd);
+    if (cmd) await placeBuild(cmd);
     // Tras una carretera o zona, la franja vuelve a la ayuda de la herramienta (no a «toca dónde termina»).
     if (tool.shape !== 'tap') selectTool(tool.id);
   }
@@ -1318,10 +1394,11 @@ export function startGame(opts: GameOptions): void {
   // Además, la barra no acepta toques en sus primeros 350 ms (por si algún clic llega tarde).
   let barShownAt = 0;
   const barReady = () => performance.now() - barShownAt > 350;
-  $('#confirm-yes').onclick = () => barReady() && void confirmPlace();
+  $('#confirm-yes').onclick = () => barReady() && void (dedicating ? confirmDedication() : confirmPlace());
   $('#confirm-no').onclick = () => {
     if (!barReady()) return;
-    if (anchor) cancelAnchor();
+    if (dedicating) endDedication();
+    else if (anchor) cancelAnchor();
     else cancelPlace();
   };
 
@@ -1394,6 +1471,7 @@ export function startGame(opts: GameOptions): void {
     } else if (k === 'Escape') {
       if (!tray.hidden) closeTray();
       else if (isSheetOpen()) closeSheet();
+      else if (dedicating) endDedication();
       else if (pendingPlace) cancelPlace();
       else if (anchor && touchInput) cancelAnchor();
       else if (anchor) {
@@ -1554,6 +1632,8 @@ export function startGame(opts: GameOptions): void {
     selected = null;
     anchor = null;
     pendingEnd = null;
+    dedicating = null;
+    pendingDedication = null;
     if (pendingPlace) cancelPlace();
     showBar(false);
     closeTray();
@@ -1684,6 +1764,9 @@ export function startGame(opts: GameOptions): void {
       return;
     }
     const content: (Node | string)[] = [];
+    // 2.2: el contrato de la obra (fuera o el primo) y «Revisar el contrato» si hay rumor.
+    const contract = contractBox(state, b, command, () => inspect({ x: b.x, y: b.y }));
+    if (contract) content.push(contract);
     const p = state.projects.find((x) => x.buildingId === b.id);
     if (p) {
       const pct = Math.round((100 * p.workerDaysDone) / p.workerDaysNeeded);
@@ -1906,7 +1989,7 @@ export function startGame(opts: GameOptions): void {
   const currentSheetTitle = () => currentSheet()?.querySelector('#sheet-title')?.textContent ?? 'la ficha';
 
   /* ---------- menú, impuestos y cuentas ---------- */
-  const social: SocialCtx = { token, state: () => state, command };
+  const social: SocialCtx = { token, state: () => state, command, pickStreet: (id, name) => startDedication(id, name) };
   const openTaxes = () => openTaxesSheet(() => state, command);
   // 2.0: el % de vecinos con IA se cambia en Ajustes (con key del servidor, lo fija /admin).
   let aiShareLocked = true;
@@ -2321,7 +2404,7 @@ export function startGame(opts: GameOptions): void {
     // La sacudida se aplica a una copia de la cámara: no cambia dónde mira el jugador.
     const [sx, sy] = shakeOffset(time);
     const view = sx || sy ? { ...cam, x: cam.x + sx * dpr(), y: cam.y + sy * dpr() } : cam;
-    render(ctx, state, view, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer, highlight });
+    render(ctx, state, view, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer, highlight, labels: cam.zoom >= touchZoom() });
     placeBubbles();
     requestAnimationFrame(frame);
   }

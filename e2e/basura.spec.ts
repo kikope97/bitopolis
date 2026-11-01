@@ -1,7 +1,7 @@
 import { gzipSync } from 'node:zlib';
 import { expect, type Page, test } from '@playwright/test';
 import { type GameState, OUTSIDE, runSimulation, transfer, TRASH, TREASURY, trashServed, updateFields, validateCommand } from '../packages/sim/src/index.ts';
-import { pickTool, setSpeed, skipTutorial, state, tile } from './helpers.ts';
+import { chooseOffer, pickTool, setSpeed, skipTutorial, state, tile } from './helpers.ts';
 
 /** 2.1: basura y punto limpio. */
 function pack(s: GameState) {
@@ -89,6 +89,7 @@ test('2.1: sin recogida hay bolsas y ratas; el punto limpio se construye, su cam
     await page.waitForTimeout(400);
     await yes.click();
   }
+  await chooseOffer(page);
   await expect.poll(async () => (await state(page)).buildings.some((b: { kind: string }) => b.kind === 'cleanpoint'), { timeout: 10_000 }).toBe(true);
 
   // Termina la obra y el camión recoge: la casa de las ratas queda limpia.

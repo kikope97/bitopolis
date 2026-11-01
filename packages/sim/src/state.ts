@@ -15,9 +15,11 @@ import type { Departed } from './family.ts';
 // Solo el tipo: importar crime.ts aquí crea un ciclo al cargar (crime → social → commands → state).
 import type { Justice } from './crime.ts';
 import { emptyRank, type TownRank } from './rank-core.ts';
+import type { Tender } from './tenders.ts';
+import type { StreetName } from './streets.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
-export const FORMAT_VERSION = 14;
+export const FORMAT_VERSION = 15;
 
 export const MAP_W = 48;
 export const MAP_H = 48;
@@ -113,6 +115,8 @@ export interface Project {
   /** Obreros de fuera contratados hoy. */
   outsideToday: number;
   notify: boolean;
+  /** 2.2: oferta de la licitación (sin definir = local, la de siempre). */
+  offer?: 'local' | 'fuera' | 'primo';
 }
 
 export interface Citizen {
@@ -403,6 +407,9 @@ export interface GameState {
   /** 2.1: diques (índices de casilla) y contadores de emergencias. */
   dikes: number[];
   emergencies: Emergencies;
+  /** 2.2: licitaciones de obras (las últimas; ver tenders.ts) y calles con nombre (streets.ts). */
+  tenders?: Tender[];
+  streetNames?: StreetName[];
 }
 
 export interface Emergencies {
@@ -521,6 +528,7 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiSh
     emergencies: { fires: 0, putOut: 0, saved: 0, floodsAvoided: 0 },
     rank: emptyRank(seed, terrain),
     trash: { start: -1 },
+    streetNames: [],
   };
   // Árboles dispersos (se talan gratis al construir encima).
   for (let i = 0; i < tiles.length; i++) {

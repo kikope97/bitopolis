@@ -39,3 +39,5 @@ export * from './press.ts';
 export * from './fire.ts';
 export * from './rank.ts';
 export * from './trash.ts';
+export * from './tenders.ts';
+export * from './streets.ts';

@@ -1094,3 +1094,16 @@ body.placing .tut-arrow { visibility: hidden; }
 /* 2.2: biografía y pies de foto escritos por la IA. */
 .album-caption { display: block; font-style: italic; color: var(--muted); margin-top: 2px; }
 .mind-bio { margin: 6px 0; }
+/* 2.2: licitaciones (tres tarjetas, >= 64 px, a 360 px una debajo de otra) y calles con nombre. */
+.tender-cards { display: grid; gap: 8px; margin: 6px 0 4px; }
+.tender-card { display: grid; gap: 2px; min-height: 64px; width: 100%; text-align: left; padding: 8px 10px; background: var(--panel-2); color: inherit; border: 2px solid var(--line); border-left: 4px solid var(--muted); font: inherit; cursor: pointer; }
+.tender-card.recommended { border-left-color: var(--good); }
+.tender-card[data-offer='primo'] { border-left-color: var(--bad); }
+.tender-card:disabled { opacity: 0.55; cursor: not-allowed; }
+.tender-card:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+.tc-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.tc-price { white-space: nowrap; font-weight: 700; }
+.tc-line { color: var(--muted); font-size: 0.875rem; }
+.tc-risk { font-size: 0.875rem; color: var(--bad); }
+.tc-risk.ok { color: var(--good); }
+.street-card .street-pick { display: block; text-align: left; margin-top: 6px; min-height: 48px; }
