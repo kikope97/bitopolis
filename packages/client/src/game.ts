@@ -103,6 +103,7 @@ import type { FromWorker, SaveBatch, ToWorker } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
 import { buildingSprite, landmarkSprite, letterSprite, T, ZONE_COLOR } from './sprites.ts';
 import { bigCompanyContent, landmarkContent, openRegion, regionAttention, regionSummary } from './landmarks-ui.ts';
+import { comarcaPending, comarcaSummary, openComarca } from './comarca-ui.ts';
 import { commandFor, costText, isLocked, lockLong, lockShort, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayCost } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
 import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, h, isSheetOpen, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack } from './ui.ts';
@@ -734,6 +735,11 @@ export function startGame(opts: GameOptions): void {
         vibrate(150);
         calmPause();
         openElectionNight(social);
+      } else if (e.kind === 'info' && /ofrece un acuerdo de/.test(e.text)) {
+        // 2.5: oferta de un pueblo vecino con plazo: aviso fijo que lleva a «Comarca», y se frena.
+        toast(e.text, { kind: 'warn', sticky: true, onClick: () => withBack('Pueblo', openHub, openComarcaSheet) });
+        slowDown();
+        calmPause();
       } else if (/quiere montar|Fondos europeos|ofrece pagar el/.test(e.text)) {
         // Ronda 19: la gran empresa, el FEDER y la cofinanciación son decisiones con plazo: aviso fijo y se frena.
         toast(e.text, { kind: 'warn', sticky: true, onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
@@ -813,6 +819,9 @@ export function startGame(opts: GameOptions): void {
         const decide = e.text.startsWith('Toca presentar');
         if (decide) slowDown();
         toast(e.text, { kind: e.text.includes('rechaza') ? 'warn' : 'info', sticky: decide, onClick: () => openTownHall(social, 'budget') });
+      } else if (e.kind === 'politics' && /, alcalde de |baja los impuestos: atraerá/.test(e.text)) {
+        // 2.5: lo que dicen los alcaldes vecinos (lleva a «Comarca»; a x10, nada).
+        if (!quiet) toast(e.text, { kind: 'info', onClick: () => withBack('Pueblo', openHub, openComarcaSheet) });
       } else if (e.kind === 'politics') {
         // Lo que responde a una acción tuya (moción, campaña) se avisa siempre.
         if (quiet && !e.text.startsWith('Faltan') && !/moción|campaña/i.test(e.text)) continue;
@@ -964,6 +973,24 @@ export function startGame(opts: GameOptions): void {
     }
   }
   const turnTimer = setInterval(() => void pollTurn(), 1500);
+  /* ---------- 2.5: turno mensual de los alcaldes vecinos (IA del servidor) ---------- */
+  let neighborBusy = false;
+  async function pollNeighbors() {
+    const t = state.comarca?.turn;
+    if (!state.aiMode || !t || lost || neighborBusy || document.hidden) return;
+    neighborBusy = true;
+    try {
+      const r = await api.neighbors(token, t.month);
+      const res = r.neighbors;
+      // Si no llega a tiempo, deciden las reglas al vencer (el reloj no espera).
+      if (res && res.status === 'ready' && state.comarca?.turn?.month === t.month) await command({ type: 'NeighborTurn', month: t.month, picks: res.picks }, true);
+    } catch {
+      /* sin conexión: reglas */
+    } finally {
+      neighborBusy = false;
+    }
+  }
+  const neighborTimer = setInterval(() => void pollNeighbors(), 3000);
   /** Ritmo de los turnos según la velocidad: a x3 y x10, turnos más espaciados (menos esperas y menos gasto). */
   function syncTurnPace(s: number) {
     if (!state.aiMode || !state.ai || s <= 0) return;
@@ -2154,6 +2181,7 @@ export function startGame(opts: GameOptions): void {
       closeSheet();
       focusBuilding(b.id);
     }, () => withBack('Pueblo', openHub, openRegionSheet));
+  const openComarcaSheet = () => openComarca({ state: () => state, command: (c) => command(c) });
   const openErrandsSheet = () => openErrands(social, (id) => withBack('Encargos del pueblo', openErrandsSheet, () => openCitizen(social, id)));
   const openPressSheet = () =>
     openPress(social, (ref) => {
@@ -2235,7 +2263,14 @@ export function startGame(opts: GameOptions): void {
         item('Historia', go(() => openHistory(state))),
       ),
       // 2.3: la comarca (bonanza o crisis), la gran empresa y las grandes obras.
-      card('town', 'Comarca', [regionSummary(state)], item('Comarca y grandes obras', go(openRegionSheet), regionAttention(state))),
+      // 2.5: los pueblos vecinos y sus alcaldes (ofertas con plazo).
+      card(
+        'town',
+        'Comarca',
+        [regionSummary(state), ' · ', comarcaSummary(state)],
+        item('Comarca y grandes obras', go(openRegionSheet), regionAttention(state)),
+        item('Pueblos vecinos', go(openComarcaSheet), comarcaPending(state) > 0),
+      ),
       // 2.1: encargos del pueblo y El Eco de Bitópolis.
       card(
         'inspect',
@@ -2515,6 +2550,7 @@ export function startGame(opts: GameOptions): void {
         clearInterval(heartbeat);
         clearInterval(decisionTimer);
         clearInterval(turnTimer);
+        clearInterval(neighborTimer);
         document.removeEventListener('visibilitychange', onVisibility);
         window.removeEventListener('pagehide', onPageHide);
         window.removeEventListener('popstate', onBack);
