@@ -1,3 +1,6 @@
+import { canFundLandmarkPhase, canPauseLandmark, canStartLandmark, fundLandmarkPhase, pauseLandmark, startLandmark } from './landmarks.ts';
+import { canProtectArea, canSetTouristTax, protectArea, setTouristTax } from './tourism.ts';
+import { answerBigCompany, canAnswerBigCompany } from './region.ts';
 import { canRepayLoan, canRequestLoan, repayLoan, requestLoan } from './loans.ts';
 import { answerErrand, canAnswerErrand } from './errands.ts';
 import { farmZoneUnlocked } from './farm.ts';
@@ -341,6 +344,19 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       return state.pleno ? { ok: true } : { ok: false, error: 'No hay pleno abierto' };
     case 'TalkTo':
       return state.citizens.some((c) => c.id === cmd.citizenId && c.named) ? { ok: true } : { ok: false, error: 'Ese vecino no está' };
+    // 2.3: metas grandes (cada bloque valida en su archivo).
+    case 'StartLandmark':
+      return canStartLandmark(state, cmd.kind, cmd.x, cmd.y);
+    case 'FundLandmarkPhase':
+      return canFundLandmarkPhase(state, cmd.id);
+    case 'PauseLandmark':
+      return canPauseLandmark(state, cmd.id);
+    case 'SetTouristTax':
+      return canSetTouristTax(state, cmd.level);
+    case 'ProtectArea':
+      return canProtectArea(state, cmd.heritageId);
+    case 'AnswerBigCompany':
+      return canAnswerBigCompany(state, cmd.accept, cmd.incentive);
   }
 }
 
@@ -576,6 +592,24 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       break;
     case 'TalkTo':
       talkTo(state, state.citizens.find((c) => c.id === cmd.citizenId)!);
+      break;
+    case 'StartLandmark':
+      startLandmark(state, cmd.kind, cmd.x, cmd.y);
+      break;
+    case 'FundLandmarkPhase':
+      fundLandmarkPhase(state, cmd.id);
+      break;
+    case 'PauseLandmark':
+      pauseLandmark(state, cmd.id);
+      break;
+    case 'SetTouristTax':
+      setTouristTax(state, cmd.level);
+      break;
+    case 'ProtectArea':
+      protectArea(state, cmd.heritageId);
+      break;
+    case 'AnswerBigCompany':
+      answerBigCompany(state, cmd.accept, cmd.incentive);
       break;
   }
   if (mayor) noteMayor(state, mayor.text, mayor.big);

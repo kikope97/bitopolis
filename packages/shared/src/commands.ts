@@ -11,6 +11,20 @@ export type BuildKind = z.infer<typeof BuildKind>;
 export const ZoneKind = z.enum(['none', 'R', 'C', 'I', 'A']);
 export type ZoneKind = z.infer<typeof ZoneKind>;
 
+/** 2.3: grandes obras por fases (puente de piedra, estación, feria, estadio, catedral). */
+export const LandmarkKind = z.enum(['bridge', 'station', 'fair', 'stadium', 'cathedral']);
+export type LandmarkKind = z.infer<typeof LandmarkKind>;
+
+/** 2.3: incentivo que ofrece el ayuntamiento a la gran empresa. */
+export const BigCompanyIncentive = z.enum(['ninguno', 'ibi_bonificado', 'suelo_gratis']);
+export type BigCompanyIncentive = z.infer<typeof BigCompanyIncentive>;
+
+/** 2.3: escenario y forma del terreno al empezar una partida (Libre y aleatorio por defecto). */
+export const ScenarioId = z.enum(['libre', 'quiebra', 'vaciado', 'riada']);
+export type ScenarioId = z.infer<typeof ScenarioId>;
+export const TerrainShape = z.enum(['aleatorio', 'rio', 'costa', 'colina', 'llano']);
+export type TerrainShape = z.infer<typeof TerrainShape>;
+
 const Coord = z.number().int().min(0).max(255);
 const Size = z.number().int().min(1).max(16);
 
@@ -121,6 +135,15 @@ export const Command = z.discriminatedUnion('type', [
   /** 2.2: préstamo municipal (múltiplos de 1.000 €, a 12, 24 o 48 meses) y amortización anticipada (con comisión). */
   z.object({ type: z.literal('RequestLoan'), amount: z.number().int().min(1_000).max(200_000).multipleOf(1_000), months: z.union([z.literal(12), z.literal(24), z.literal(48)]) }),
   z.object({ type: z.literal('RepayLoan'), loanId: z.number().int().min(1), amount: z.number().int().min(1).max(10_000_000) }),
+  /** 2.3: grandes obras: empezar (x, y = ancla del 2×2), pagar la fase siguiente y parar entre fases. */
+  z.object({ type: z.literal('StartLandmark'), kind: LandmarkKind, x: Coord, y: Coord }),
+  z.object({ type: z.literal('FundLandmarkPhase'), id: z.number().int().min(1) }),
+  z.object({ type: z.literal('PauseLandmark'), id: z.number().int().min(1) }),
+  /** 2.3: tasa turística (0, 1 o 2 € por noche) y entorno protegido alrededor del patrimonio. */
+  z.object({ type: z.literal('SetTouristTax'), level: z.union([z.literal(0), z.literal(1), z.literal(2)]) }),
+  z.object({ type: z.literal('ProtectArea'), heritageId: z.number().int().min(1) }),
+  /** 2.3: responder a la oferta de la gran empresa. */
+  z.object({ type: z.literal('AnswerBigCompany'), accept: z.boolean(), incentive: BigCompanyIncentive }),
   /** 2.0: % de vecinos con IA (solo sube: nadie deja de pensar con IA). */
   z.object({ type: z.literal('SetAiShare'), share: z.number().int().min(0).max(100) }),
   /** 2.0: días de juego entre turnos de la IA (el cliente los alarga a x3/x10). */
