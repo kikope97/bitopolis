@@ -3020,7 +3020,8 @@ function nearest(r: number, g: number, b: number): number {
 const REMAP: Record<TimeOfDay, number[]> = {
   day: RGB.map((_, i) => i),
   dusk: RGB.map(([r, g, b], i) => (LIGHTS.has(i) ? i : nearest(r * 0.9 + 10, g * 0.8 + 2, b * 0.72 + 12))),
-  night: RGB.map(([r, g, b], i) => (LIGHTS.has(i) ? i : nearest(r * 0.34 + 8, g * 0.44 + 8, b * 0.6 + 28))),
+  // Ronda 21: de noche se veía un pozo oscuro (también a x3, cada ~7 s): más claro, sin perder el tono azul.
+  night: RGB.map(([r, g, b], i) => (LIGHTS.has(i) ? i : nearest(r * 0.46 + 12, g * 0.54 + 12, b * 0.7 + 30))),
 };
 
 const cache = new Map<string, HTMLCanvasElement>();
