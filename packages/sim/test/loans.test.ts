@@ -10,6 +10,7 @@ import {
   hashState,
   LOANS,
   loanCapacity,
+  loanAdvice,
   loanInvariants,
   loanLoad,
   loansMonth,
@@ -19,11 +20,13 @@ import {
   profileRng,
   quota,
   ratingOf,
+  ruleAdvice,
   replay,
   runSimulation,
   seedRng,
   step,
   tae,
+  turnShared,
   transfer,
   TREASURY,
   validateCommand,
@@ -225,4 +228,22 @@ describe('préstamos municipales (2.2)', () => {
     expect(ok).toBeGreaterThan(10);
     expect(s.loans.length).toBeLessThanOrEqual(LOANS.maxLoans + 1);
   }, 240_000);
+
+  it('el consejero avisa de la nota D, de la carga y de la tesorería; la IA solo ve la nota y una banda', () => {
+    const s = withBooks(10_000);
+    expect(loanAdvice(s)).toEqual([]);
+    s.loans = [{ id: 900, principal: 3_000, left: 3_000, quota: 300, rate: 0.0105, monthsLeft: 12, kind: 'tesoreria', tick: s.tick }];
+    s.loanLedger.lent = 3_000;
+    expect(loanAdvice(s)[0]).toMatch(/tesorería/);
+    s.loans[0]!.quota = 3_000;
+    expect(loanAdvice(s)[0]).toMatch(/se comen el 30 %/);
+    s.rating = 'D';
+    expect(loanAdvice(s)[0]).toMatch(/nota D/);
+    expect(ruleAdvice(s, 'que_cambiarias').join(' ')).toMatch(/nota D/);
+    expect(ruleAdvice(s, 'como_va').join(' ')).toMatch(/préstamos se llevan 3\.000 € al mes/);
+    const ai = runSimulation({ seed: 3, days: 20, profile: 'casual', aiMode: true }).state;
+    ai.ai!.turn = { n: 1, kind: 'semana', opened: ai.tick, due: ai.tick + 10, ids: [] } as never;
+    const line = turnShared(ai).match(/"cuentas":"([^"]*)"/)![1]!;
+    expect(line).toBe('nota B (A la mejor, D sin crédito), carga de los préstamos sin deuda');
+  });
 });
