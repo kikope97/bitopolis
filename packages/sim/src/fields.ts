@@ -1,6 +1,6 @@
 import type { GameState } from './state.ts';
 import { Tile } from './state.ts';
-import { CRIME, FIELDS, REGION, TERRAIN, TRASH, WATERWORKS } from './balance.ts';
+import { CRIME, DENSITY, FIELDS, REGION, TERRAIN, TRASH, WATERWORKS } from './balance.ts';
 import { landmarkStamps } from './landmarks.ts';
 import { radiusOf } from './levels.ts';
 import { isWater, Terrain } from './terrain.ts';
@@ -112,6 +112,8 @@ export function updateFields(state: GameState): void {
         for (const st of landmarkStamps(state, b)) stamp(st.field === 'good' ? good : st.field === 'noise' ? noise : emit, w, h, st.x, st.y, st.radius, st.amount);
         break;
     }
+    // 2.5: un bloque que creció con la densidad hace más ruido (DENSITY.noisePerLevel por nivel).
+    if (b.kind === 'res' && b.dense) stamp(noise, w, h, b.x, b.y, DENSITY.noiseRadius, DENSITY.noisePerLevel * b.dense);
     // 2.1: la basura sin recoger ensucia la calle (bolsas desde dirtyAt; con ratas, a tope).
     if ((b.trash ?? 0) >= TRASH.dirtyAt) stamp(dirt, w, h, b.x, b.y, TRASH.dirtRadius, (100 * (b.trash ?? 0)) / TRASH.ratsAt);
     const people = residents.get(b.id) ?? 0;

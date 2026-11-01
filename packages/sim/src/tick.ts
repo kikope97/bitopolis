@@ -1,4 +1,5 @@
 import { loansMonth } from './loans.ts';
+import { densityDay, homesOf, vpoMonth, vpoRentMonth } from './density.ts';
 import { attended, careMonth, careMood, childcareMonth, isRetired, pensionsMonth } from './care.ts';
 import { busDemandR, transitMonth, transitMood } from './transit.ts';
 import { fairMonth, isLandmarkKind, landmarkMood, landmarksDay, landmarksMonth, stationCommuterBonus, stationDemandR } from './landmarks.ts';
@@ -19,7 +20,6 @@ import {
   DEBT_LIMIT,
   FACTORY_REVENUE_PER_WORKER,
   GROWTH,
-  HOMES,
   PIE_PER_CITIZEN,
   DEBT,
   JOBS_OUTSIDE,
@@ -104,7 +104,8 @@ export function isBusiness(b: Building): boolean {
 export function homeCapacity(b: Building): number {
   // 2.1: una casa destrozada por el fuego no admite a nadie nuevo hasta repararla.
   // 2.3: tampoco lo que destrozó la riada del escenario.
-  return b.built && !burntDown(b) && b.damaged?.cause !== 'riada' ? (HOMES[b.kind] ?? 0) : 0;
+  // 2.5: los bloques según su densidad (homesOf); la VPO no se reparte así, sino por sorteo (density.ts).
+  return b.built && !burntDown(b) && b.damaged?.cause !== 'riada' && b.kind !== 'vpo' ? homesOf(b) : 0;
 }
 
 export function jobCapacity(b: Building): number {
@@ -561,6 +562,7 @@ function endOfDay(state: GameState): void {
   }
   state.demand = computeDemand(state);
   growZones(state, served);
+  densityDay(state, freeHomes(state));
   arrivals(state);
   departures(state);
   maybeSplitTaxes(state);
@@ -686,12 +688,14 @@ function endOfMonth(state: GameState): void {
   const shops = state.buildings.filter((b) => b.kind === 'shop' && b.built && !b.damaged);
   basicLiving(state, shops);
   monthlyHousing(state, r);
+  vpoRentMonth(state);
   // 2.4: residencia y guardería (cuotas con charge: lo impagado queda como deuda).
   careMonth(state);
   settleMonth(state, shops);
   // 2.3: en septiembre, la feria regional trae compradores de fuera.
   fairMonth(state, shops);
   housingTroubles(state);
+  vpoMonth(state);
   payBusinesses(state);
   // 2.3: visitantes, casas rurales y tasa turística.
   tourismMonth(state);

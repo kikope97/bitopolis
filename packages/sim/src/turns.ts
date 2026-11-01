@@ -10,6 +10,7 @@ import type { Brewing } from './director-core.ts';
 import type { DirectorChoice } from './director.ts';
 import { hash32 } from './hash.ts';
 import { totalDebt } from './household.ts';
+import { askVpo, homesOf, vpoMenu } from './density.ts';
 import { jobsOf } from './levels.ts';
 import { addMemory, goalFor, NEED_TEXT, needOf, needsOf, plenoAwaits, plenoQuickIds, plenoReactFromTurn, plenoReactionMenu, PROFESSIONS, relation, setRelation } from './social.ts';
 import { dilemmaMayorText, dilemmaQuickIds } from './dilemmas.ts';
@@ -159,7 +160,7 @@ function vacantJobs(state: GameState, c: Citizen): Building[] {
 function freeHomesFor(state: GameState, c: Citizen): Building[] {
   const use = new Map<number, number>();
   for (const x of state.citizens) if (x.homeId !== null) use.set(x.homeId, (use.get(x.homeId) ?? 0) + 1);
-  const cap = (b: Building) => (b.built && b.damaged?.cause !== 'fuego' ? (b.kind === 'house' ? 3 : b.kind === 'res' ? 4 : 0) : 0);
+  const cap = (b: Building) => (b.built && b.damaged?.cause !== 'fuego' ? (b.kind === 'house' || b.kind === 'res' ? homesOf(b) : 0) : 0);
   return state.buildings
     .filter((b) => b.id !== c.homeId && cap(b) > (use.get(b.id) ?? 0))
     .sort((a, b) => (state.fields.land[b.y * state.map.w + b.x] ?? 0) - (state.fields.land[a.y * state.map.w + a.x] ?? 0) || a.id - b.id)
@@ -290,6 +291,8 @@ export function turnMenu(state: GameState, c: Citizen): MenuItem[] {
   // 2.4: cuidados de un padre o una madre mayor (plazas y cuota reales) y trabajo fuera en autobús.
   out.push(...careMenu(state, c));
   out.push(...transitMenu(state, c));
+  // 2.5: pedir un piso de la vivienda protegida (al final, en su función).
+  out.push(...vpoMenu(state, c));
   return out;
 }
 
@@ -424,6 +427,8 @@ export function extraAction(state: GameState, c: Citizen, verb: string, arg: str
       return careAction(state, c, verb, arg);
     case 'buscar_trabajo_fuera':
       return searchJobOutside(state, c);
+    case 'pedir_vpo':
+      return askVpo(state, c);
     case 'robar': {
       if (!desperate(c)) return 'se lo piensa mejor y no roba';
       const targets = state.buildings.filter((b) => (b.kind === 'house' || b.kind === 'res') && b.built && b.id !== c.homeId);

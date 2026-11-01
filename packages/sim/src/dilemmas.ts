@@ -9,7 +9,8 @@
  * (`Dilemma.intro`, validada); la IA nunca escribe las opciones.
  */
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
-import { CARE, DEBT, DILEMMA, GRUDGE_MAX, WATERWORKS } from './balance.ts';
+import { CARE, DEBT, DILEMMA, GRUDGE_MAX, VPO, WATERWORKS } from './balance.ts';
+import { askedVpo, giveVpo, incomeOf, vpoDraw, vpoFree, vpoPool } from './density.ts';
 import { riverNear, startSpill } from './waterworks.ts';
 import { residenceFree } from './care.ts';
 import type { CommandResult } from './commands.ts';
@@ -36,6 +37,7 @@ export const DILEMMA_TITLE: Record<DilemmaKind, string> = {
   familia_con_deudas: 'Una familia que no puede pagar',
   fabrica_vierte: 'La fábrica que vierte al río',
   preso_arrepentido: 'Un preso arrepentido',
+  ultima_vpo: 'La última vivienda protegida',
 };
 
 const first = (c: Citizen | undefined) => c?.name.split(' ')[0] ?? 'un vecino';
@@ -176,6 +178,29 @@ function prisonerCandidates(state: GameState): DilemmaCandidate[] {
   return out;
 }
 
+/**
+ * 2.5: queda un piso en la VPO y lo quieren dos familias con nombre (las dos lo
+ * pidieron, o están entre las que menos ganan). Opciones: a una, a la otra o sorteo.
+ */
+function vpoCandidates(state: GameState): DilemmaCandidate[] {
+  const last = vpoFree(state).find((x) => x.free === 1);
+  if (!last) return [];
+  const pool = vpoPool(state).filter((c) => c.named);
+  // Primero quienes lo pidieron; luego, quien menos gana.
+  const [x, y] = pool.sort((a, b) => Number(askedVpo(state, b)) - Number(askedVpo(state, a)) || incomeOf(a) - incomeOf(b) || a.id - b.id);
+  if (!x || !y) return [];
+  return [
+    {
+      key: `vpo_${x.id}_${y.id}`,
+      kind: 'ultima_vpo',
+      citizenIds: [x.id, y.id],
+      buildingId: last.b.id,
+      options: ['vpo_primero', 'vpo_segundo', 'vpo_sorteo'],
+      text: `Queda un piso en la vivienda protegida y lo necesitan ${x.name} (ganó ${incomeOf(x)} € el mes pasado) y ${y.name} (${incomeOf(y)} €)`,
+    },
+  ];
+}
+
 /** ¿Se puede abrir un dilema ahora? Ninguno abierto, uno al mes como mucho y gobierna el jugador. */
 export function canOpenDilemma(state: GameState): boolean {
   if (state.politics.mayor !== 'player' || state.citizens.length < DILEMMA.minPop) return false;
@@ -192,7 +217,7 @@ export function dilemmaCandidates(state: GameState): DilemmaCandidate[] {
   // El caso se reconoce por su edificio (la fábrica) o por su primer afectado.
   const caseOf = (x: { kind: string; buildingId?: number; citizenIds: number[] }) => (x.kind === 'fabrica_vierte' ? `${x.kind}_b${x.buildingId}` : `${x.kind}_${x.citizenIds[0]}`);
   const seen = new Set(state.dilemmas.map(caseOf));
-  return [...residenceCandidates(state), ...familyCandidates(state), ...factoryCandidates(state), ...prisonerCandidates(state)].filter(
+  return [...residenceCandidates(state), ...familyCandidates(state), ...factoryCandidates(state), ...prisonerCandidates(state), ...vpoCandidates(state)].filter(
     (c) => !seen.has(caseOf(c)) && c.citizenIds.length > 0 && c.citizenIds.every((id) => state.citizens.some((x) => x.id === id)),
   );
 }
@@ -235,6 +260,8 @@ export function dilemmaText(state: GameState, d: Dilemma): string {
     }
     case 'preso_arrepentido':
       return `${a?.name ?? 'Un vecino'} cumple condena y pide perdón. Su familia pide que el alcalde solicite el indulto.`;
+    case 'ultima_vpo':
+      return `Queda un piso en la vivienda protegida (${VPO.rent} € al mes) y lo necesitan ${a?.name ?? 'una familia'} y ${b?.name ?? 'otra familia'}. Solo cabe una.`;
   }
 }
 
@@ -267,6 +294,13 @@ export function dilemmaOption(state: GameState, d: Dilemma, option: string): { l
       return { label: 'Pedir el indulto', effect: `${first(a)} sale ya (+${p.pardonFamilyMood} de ánimo a su familia); a los de mano dura no les gustará` };
     case 'que_cumpla':
       return { label: 'Que cumpla la condena', effect: `Sigue preso; su familia lo pasa mal (${p.serveFamilyMood} de ánimo)` };
+    case 'vpo_primero':
+    case 'vpo_segundo': {
+      const [win, lose] = option === 'vpo_primero' ? [a, b] : [b, a];
+      return { label: `El piso, para ${first(win)}`, effect: `${first(win)} entra (+${VPO.winMood} de ánimo); ${first(lose)} se queda fuera (${VPO.leftOutMood} y rencor)` };
+    }
+    case 'vpo_sorteo':
+      return { label: 'Que decida el sorteo', effect: 'El sorteo de siempre entre quienes lo piden: nadie podrá decir que eligió el alcalde' };
   }
   return { label: option, effect: '' };
 }
@@ -288,6 +322,11 @@ export function canResolveDilemma(state: GameState, id: number, option: string):
     if (!m.ok) return m;
   }
   if (option === 'perdonar' && !(main.debt?.town ?? 0)) return { ok: false, error: 'Ya no debe nada al ayuntamiento' };
+  if (option === 'vpo_primero' || option === 'vpo_segundo') {
+    const win = byId(state, d.citizenIds[option === 'vpo_primero' ? 0 : 1]);
+    if (!win) return { ok: false, error: 'Ese vecino ya no vive en el pueblo' };
+    if (!vpoFree(state).some((x) => x.b.id === d.buildingId && x.free > 0)) return { ok: false, error: 'Ya no queda ningún piso libre' };
+  }
   return { ok: true };
 }
 
@@ -413,6 +452,29 @@ export function resolveDilemma(state: GameState, id: number, option: string): vo
       const hard = state.citizens.filter((c) => c.named && c !== a && c.traits.terco >= p.orderTerco && !kinOf(state, a).includes(c)).slice(0, p.orderMax);
       for (const c of hard) grudge(c, p.pardonOrderGrudge);
       pushEvent(state, 'info', `${a.name} sale de la cárcel con el indulto que pidió el alcalde`, { ref: a.id });
+      break;
+    }
+    case 'vpo_primero':
+    case 'vpo_segundo':
+    case 'vpo_sorteo': {
+      const vpo = state.buildings.find((x) => x.id === d.buildingId);
+      if (!vpo) break;
+      const pair = [a, b].filter((x): x is Citizen => !!x);
+      // El sorteo, entre los dos (mismo hash que el sorteo del mes).
+      const win = option === 'vpo_primero' ? a : option === 'vpo_segundo' ? b : vpoDraw(state, vpo, pair)[0];
+      const room = vpoFree(state).find((x) => x.b.id === vpo.id)?.free ?? 0;
+      if (!win || room <= 0) break;
+      giveVpo(state, vpo, win, room);
+      const lose = pair.find((x) => x !== win);
+      if (lose) {
+        mood(lose, VPO.leftOutMood);
+        if (option !== 'vpo_sorteo') {
+          grudge(lose, VPO.leftOutGrudge);
+          addMemory(state, lose, 'dilema_en_contra', 4, -3);
+        }
+      }
+      if (option !== 'vpo_sorteo') addMemory(state, win, 'dilema_a_favor', 4, 3);
+      pushEvent(state, 'info', option === 'vpo_sorteo' ? `El sorteo da el último piso protegido a ${first(win)}` : `El último piso protegido es para ${first(win)}`, { ref: win.id });
       break;
     }
     case 'que_cumpla': {

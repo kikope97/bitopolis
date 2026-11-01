@@ -122,6 +122,8 @@ export const MEMORY_KINDS = [
   'a_la_residencia',
   'cuida_padre',
   'excursion',
+  // 2.5 (bloque F): vivienda protegida.
+  'piso_protegido',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -412,6 +414,8 @@ export function memoryText(state: GameState, m: Memory): string {
       return m.about.length ? `Cuida en casa a ${who}` : 'Su familia le cuida en casa';
     case 'excursion':
       return 'Fue de excursión en el autobús de los jubilados';
+    case 'piso_protegido':
+      return 'Le tocó un piso de la vivienda protegida';
   }
 }
 
