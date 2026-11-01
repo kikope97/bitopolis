@@ -1,4 +1,4 @@
-import { HOMES } from './balance.ts';
+import { HOMES, LISTS } from './balance.ts';
 import { farmInvariants } from './farm.ts';
 import { totalInternalMoney } from './money.ts';
 import type { GameState } from './state.ts';
@@ -55,6 +55,26 @@ export function checkInvariants(state: GameState): string[] {
   errors.push(...tenderErrors(state), ...streetErrors(state));
   // 2.2: fincas solo en zona agraria y con el cultivo de su terreno.
   errors.push(...farmInvariants(state));
+  errors.push(...listInvariants(state));
+  return errors;
+}
+
+/** 2.2: candidaturas: como mucho `LISTS.max`, una por líder, con el líder en el pueblo y el partido principal dentro. */
+export function listInvariants(state: GameState): string[] {
+  const errors: string[] = [];
+  const p = state.politics;
+  if (!p) return errors;
+  const lists = p.lists ?? [];
+  if (lists.length > LISTS.max) errors.push(`${lists.length} candidaturas (máx. ${LISTS.max})`);
+  const leaders = new Set<number>();
+  for (const l of lists) {
+    if (leaders.has(l.leaderId)) errors.push(`candidatura repetida del vecino ${l.leaderId}`);
+    leaders.add(l.leaderId);
+    if (!state.citizens.some((c) => c.id === l.leaderId)) errors.push(`candidatura sin líder (${l.leaderId})`);
+  }
+  if (p.party && !leaders.has(p.party.leaderId)) errors.push('el partido principal no está en las listas');
+  if (!p.party && lists.length) errors.push('listas sin partido principal');
+  if (p.mayor !== 'player' && p.party?.leaderId !== p.mayor) errors.push('gobierna alguien que no encabeza el partido');
   return errors;
 }
 

@@ -439,7 +439,7 @@ describe('ronda 09: arreglos de la vida social y el pleno', () => {
   it('pleno: la oposición no da campaña fuera del último año ni por encima de 3; incumplirle resta', () => {
     const s = town();
     const leader = s.citizens.find((x) => x.named)!;
-    s.politics.party = { leaderId: leader.id, leaderName: leader.name, name: 'Bitópolis Joven', faction: 'jovenes', founded: s.tick, promises: [] };
+    s.politics.party = { leaderId: leader.id, leaderName: leader.name, name: 'Bitópolis Joven', faction: 'jovenes', founded: s.tick, promises: [], style: 'populista' };
     s.politics.nextElection = s.tick + 30 * TICKS_PER_MONTH;
     s.politics.campaign.jovenes = 0;
     applyCommand(s, { type: 'ConvenePleno' });

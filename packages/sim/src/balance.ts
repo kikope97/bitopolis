@@ -206,6 +206,59 @@ export const CAMPAIGN_COST = 300;
 export const TAX_RELIEF_DAYS = 90;
 /** Plazo del rival para cumplir lo prometido si gana (meses tras las elecciones). */
 export const RIVAL_PROMISE_MONTHS = 12;
+/**
+ * 2.2 (rival político y vecinos que se presentan): candidaturas, promesas
+ * medibles y el gobierno rival con IA. El reparto del voto es sin azar.
+ */
+export const LISTS = {
+  /** Como mucho, candidaturas en la oposición a la vez (cada una de una facción). */
+  max: 3,
+  /** Lo que paga de su bolsillo un vecino para presentarse. */
+  cost: 200,
+  minAge: 25,
+  minAmbition: 60,
+  /** Solo si su facción está descontenta (satisfacción por debajo). */
+  maxSatisfaction: 40,
+  /** Solo en los meses anteriores a las elecciones. */
+  months: 12,
+  /** Por reglas: probabilidad (por hash, sin dados) de que un vecino que puede se presente ese mes (%). */
+  ruleChance: 40,
+  /** Afinidad con cada lista del voto contra el gobierno: la de su facción pesa más. */
+  affinitySame: 3,
+  affinityOther: 1,
+  /** El jugador en la oposición frente a otras listas (y lo que suma cada punto de campaña). */
+  affinityPlayer: 1.5,
+  affinityCampaign: 0.25,
+  /** Tirón de la facción de una candidatura hacia ella (a la intención de voto). */
+  factionPull: 0.12,
+} as const;
+
+/** Promesas del rival (2.2): menú cerrado con comprobación medible. */
+export const RIVAL_PROMISES = {
+  /** Como mucho, promesas propias por candidatura (las mociones aprobadas van aparte). */
+  max: 3,
+  /** «Crear empleo»: vecinos con trabajo de más sobre los que había al llegar al gobierno. */
+  jobs: 5,
+  /** «Sanear la deuda»: caja mínima con superávit el mes pasado. */
+  cleanTreasury: 5_000,
+} as const;
+
+/** Gobierno rival con IA (2.2, `rival-ai.ts`). */
+export const RIVAL_AI = {
+  /** Opciones del menú como mucho, y de cada tipo. */
+  menuMax: 12,
+  works: 4,
+  taxes: 3,
+  /** Lo que elige la IA como mucho cada mes. */
+  picks: 2,
+  /** Discurso del alcalde rival (caracteres). */
+  speechMax: 140,
+  /** Recortes solo con la caja por debajo. */
+  cutBelow: 0,
+  /** Las obras dejan al menos esto en caja. */
+  reserve: 3_000,
+} as const;
+
 /** Plazo para cumplir una moción aprobada (meses). */
 export const MOTION_MONTHS = 6;
 /** Apoyo extra al gobierno recién elegido (se apaga en 12 meses). */

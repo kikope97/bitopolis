@@ -1,6 +1,7 @@
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { protestFor, type Association } from './associations.ts';
-import { DEBT, FIRE, KIDS_MAX, TURN } from './balance.ts';
+import { DEBT, FIRE, KIDS_MAX, LISTS, TURN } from './balance.ts';
+import { canPresent, presentCandidacy } from './politics.ts';
 import { BUILD_NAMES, removeBuilding } from './commands.ts';
 import { homeRobbery } from './crime.ts';
 import { becomeVolunteer, canVolunteer, fireHelpTargets, helpAfterFire, homelessByFire, placeName, shelter } from './fire.ts';
@@ -238,6 +239,8 @@ export function turnMenu(state: GameState, c: Citizen): MenuItem[] {
   const harvest = canSignTemporero(state, c);
   if (harvest?.crop) out.push({ accion: 'temporero', detalle: `apuntarse de temporero para ${HARVEST_NAME[harvest.crop]} (está sin trabajo; un sueldo de temporada)` });
   if (canVolunteer(state, c)) out.push({ accion: 'hacerse_voluntario', detalle: 'apuntarse como voluntario de protección civil (está en paro)' });
+  // 2.2: presentarse a las elecciones con su propia candidatura (si cumple los requisitos).
+  if (canPresent(state, c).ok) out.push({ accion: 'presentarse', detalle: `presentarse a las elecciones con su propia candidatura (le cuesta ${LISTS.cost} €; su facción está descontenta)` });
   // Solo si está desesperado: robar en una casa del pueblo.
   if (desperate(c)) out.push({ accion: 'robar', detalle: 'robar en una casa del pueblo (está sin dinero, sin trabajo y endeudado)' });
   out.push({ accion: 'irse', detalle: 'irse del pueblo y vender lo que tenga' });
@@ -345,6 +348,8 @@ export function extraAction(state: GameState, c: Citizen, verb: string, arg: str
       return becomeVolunteer(state, c);
     case 'temporero':
       return signTemporero(state, c);
+    case 'presentarse':
+      return presentCandidacy(state, c);
     case 'tirar_al_monte':
       return canDump(state, c) ? dumpTrash(state, c) : 'al final no tira la basura al monte';
     case 'robar': {

@@ -16,6 +16,7 @@ import {
   serviceSaturation,
   runSimulation,
   step,
+  syncLists,
   updateFactions,
   validActions,
   validateCommand,
@@ -71,7 +72,7 @@ describe('elecciones (v1.0)', () => {
 
   it('avisos de popularidad a 12, 6, 3 y 1 meses', () => {
     const s = town();
-    s.politics.party = { leaderId: s.citizens.find((c) => c.named)!.id, leaderName: 'X', name: 'Bitópolis Verde', faction: 'ecologistas', founded: s.tick, promises: [] };
+    s.politics.party = { leaderId: s.citizens.find((c) => c.named)!.id, leaderName: 'X', name: 'Bitópolis Verde', faction: 'ecologistas', founded: s.tick, promises: [], style: 'populista' };
     s.politics.nextElection = s.tick + 13 * TICKS_PER_MONTH;
     const seen: string[] = [];
     for (let i = 0; i < 13 * TICKS_PER_MONTH - 24; i++) {
@@ -166,7 +167,7 @@ describe('elecciones (v1.0)', () => {
     const f = (Object.keys(s.politics.factions) as (keyof typeof s.politics.factions)[]).find((k) => s.politics.factions[k].demand)!;
     if (!f) return;
     const need = s.politics.factions[f].demand!;
-    party.promises.push({ faction: f, need, deadline: s.tick + 10, status: 'pending', fromMotion: true });
+    party.promises.push({ check: 'exigencia', faction: f, need, deadline: s.tick + 10, status: 'pending', fromMotion: true });
     const before = s.politics.campaign[f];
     for (let i = 0; i < TICKS_PER_MONTH + 24; i++) step(s);
     const pr = party.promises.at(-1)!;
@@ -238,7 +239,9 @@ describe('elecciones (v1.0)', () => {
   it('con un partido en la oposición, su líder pregunta en el pleno; rechazarle tiene coste', () => {
     const s = town();
     const leader = s.citizens.find((c) => c.named)!;
-    s.politics.party = { leaderId: leader.id, leaderName: leader.name, name: 'Bitópolis Joven', faction: 'jovenes', founded: s.tick, promises: [] };
+    s.politics.party = { leaderId: leader.id, leaderName: leader.name, name: 'Bitópolis Joven', faction: 'jovenes', founded: s.tick, promises: [], style: 'populista' };
+    // 2.2: el partido principal va también en las listas.
+    syncLists(s);
     s.politics.campaign.jovenes = 2;
     expect(applyCommand(s, { type: 'ConvenePleno' }).ok).toBe(true);
     const q = s.pleno!.petitions.find((p) => p.opposition);
