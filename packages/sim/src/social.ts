@@ -112,6 +112,11 @@ export const MEMORY_KINDS = [
   // 2.3: grandes obras.
   'dono_obra',
   'obra_voluntario',
+  // 2.4: cuidados y autobús.
+  'deja_trabajo_crianza',
+  'a_la_residencia',
+  'cuida_padre',
+  'excursion',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -384,6 +389,14 @@ export function memoryText(state: GameState, m: Memory): string {
       return 'Donó dinero para una gran obra del pueblo';
     case 'obra_voluntario':
       return 'Echó una mano como voluntario en una gran obra';
+    case 'deja_trabajo_crianza':
+      return 'Dejó su trabajo para cuidar del bebé (no había plaza en la guardería)';
+    case 'a_la_residencia':
+      return m.about.length ? `Llevó a ${who} a la residencia` : 'Entró en la residencia';
+    case 'cuida_padre':
+      return m.about.length ? `Cuida en casa a ${who}` : 'Su familia le cuida en casa';
+    case 'excursion':
+      return 'Fue de excursión en el autobús de los jubilados';
   }
 }
 
