@@ -1,6 +1,6 @@
 import { TICKS_PER_MONTH } from '@bitopolis/shared';
 import { LOANS } from './balance.ts';
-import { OUTSIDE, TREASURY, transfer } from './money.ts';
+import { OUTSIDE, ownIncome, TREASURY, transfer } from './money.ts';
 import { type GameState, type Loan, type Rating, pushEvent } from './state.ts';
 
 /**
@@ -36,10 +36,6 @@ export function tae(rate: number): number {
   return Math.round((growth(rate, 12) - 1) * 1000) / 10;
 }
 
-/** Lo que entró este mes (o un mes de stats) sin contar lo prestado. */
-function ownIncome(m: { income: number; breakdown: Record<string, number> }): number {
-  return m.income - Math.max(0, m.breakdown['préstamo'] ?? 0);
-}
 
 /** Ingresos medios de los últimos 12 meses cerrados (sin préstamos). `withCurrent` suma el mes en curso. */
 export function averageIncome(state: GameState, withCurrent = false): number {
@@ -99,9 +95,15 @@ export function ratingOf(state: GameState): Rating {
 }
 
 /** Lo que aún se puede pedir ahora (múltiplo de 1.000; 0 si no se puede). */
-export function loanCapacity(state: GameState): number {
+export function loanCapacity(state: GameState, months?: number): number {
   const rating = state.rating ?? 'B';
-  const room = LOANS.maxRatio[rating] * averageIncome(state) * 12 - totalOwed(state);
+  let room = LOANS.maxRatio[rating] * averageIncome(state) * 12 - totalOwed(state);
+  // Ronda 18: a un plazo dado, la cuota nueva y las que ya hay no pasan de la carga de la nota C.
+  if (months) {
+    const free = LOANS.load.C * averageIncome(state) - monthlyQuotas(state);
+    const perEuro = quota(100_000, LOANS.rate[rating], months) / 100_000;
+    room = Math.min(room, free / perEuro);
+  }
   return Math.max(0, Math.min(LOANS.max, Math.floor(room / LOANS.step) * LOANS.step));
 }
 
@@ -121,6 +123,8 @@ export function canRequestLoan(state: GameState, amount: number, months: number)
   if ((state.loans ?? []).filter((l) => l.kind === 'banco').length >= LOANS.maxLoans) return { ok: false, error: `Como mucho ${LOANS.maxLoans} préstamos a la vez` };
   const cap = loanCapacity(state);
   if (amount > cap) return { ok: false, error: cap > 0 ? `Con la nota ${state.rating} te prestan hasta ${fmt(cap)} €` : `Con la nota ${state.rating} y lo que ya debes, no te prestan más` };
+  const capTerm = loanCapacity(state, months);
+  if (amount > capTerm) return { ok: false, error: capTerm > 0 ? `A ${months} meses, las cuotas se comerían demasiado: te prestan hasta ${fmt(capTerm)} € (o pide a más plazo)` : `A ${months} meses, las cuotas ya se comen demasiado de lo que entra` };
   return { ok: true };
 }
 
@@ -211,10 +215,19 @@ export function loansMonth(state: GameState): void {
     transfer(state, OUTSIDE, TREASURY, gap, 'préstamo');
     pushEvent(state, 'warning', `La caja cerró el mes en negativo: el banco cubre ${fmt(gap)} € con un préstamo de tesorería a ${LOANS.treasuryMonths} meses (más caro, y la nota baja)`, { notify: true });
   }
+  // Ronda 18: con nota D, nadie cubre la caja en negativo, pero sí se pagan intereses de demora.
+  if (state.treasury < 0 && prev === 'D') {
+    const late = Math.ceil(-state.treasury * LOANS.rate.D);
+    transfer(state, TREASURY, OUTSIDE, late, 'intereses');
+    state.loanLedger.interest += late;
+    pushEvent(state, 'warning', `La caja sigue en negativo con nota D: ${fmt(late)} € de intereses de demora este mes`);
+  }
   const since = state.tick - 12 * TICKS_PER_MONTH;
   state.loanLedger.treasuryTicks = state.loanLedger.treasuryTicks.filter((t) => t > since);
   const next = ratingOf(state);
-  if (next !== prev) {
+  // Ronda 18: sin préstamos, el vaivén entre A y B no se avisa.
+  const quiet = !state.loans.length && RATINGS.indexOf(next) <= 1 && RATINGS.indexOf(prev) <= 1;
+  if (next !== prev && !quiet) {
     const down = RATINGS.indexOf(next) > RATINGS.indexOf(prev);
     pushEvent(state, down ? 'warning' : 'info', down ? `Las cuentas bajan a nota ${next}: ${next === 'D' ? 'nadie presta más al ayuntamiento' : 'los préstamos salen más caros'}` : `Las cuentas suben a nota ${next}: los préstamos salen más baratos`);
   }

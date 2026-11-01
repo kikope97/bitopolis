@@ -17,7 +17,7 @@ import { levelOf } from './levels.ts';
 import { BUILD_NAMES, buildCost, governmentCommand } from './commands.ts';
 import { rivalBudget } from './civic.ts';
 import { felt, saturated, taxLevels, updateFeltTaxes } from './economy.ts';
-import { OUTSIDE, TREASURY, transfer } from './money.ts';
+import { OUTSIDE, ownIncome, TREASURY, transfer } from './money.ts';
 import { hash32 } from './hash.ts';
 import { addHook, addMemory } from './social.ts';
 import { buildingAt, type Citizen, type GameState, hasAdjacentRoad, pushEvent, Tile, tileIndex } from './state.ts';
@@ -276,7 +276,7 @@ const PROMISE_NEED = { impuestos: 'no subir impuestos', empleo: 'crear empleo', 
 export function promisesFor(state: GameState, faction: Faction, style: RivalStyle, deadline: number): RivalPromise[] {
   const demands = state.politics.factions[faction].unmet;
   const last = state.stats.at(-1);
-  const debt = state.treasury < RIVAL_PROMISES.cleanTreasury || (!!last && last.income < last.expenses);
+  const debt = state.treasury < RIVAL_PROMISES.cleanTreasury || (!!last && ownIncome(last) < last.expenses);
   const extra: (keyof typeof PROMISE_NEED)[] =
     style === 'populista' ? ['impuestos', 'empleo'] : style === 'tecnico' ? ['deuda', 'empleo'] : style === 'conservador' ? ['impuestos', 'deuda'] : ['impuestos'];
   const out: RivalPromise[] = [];
@@ -340,7 +340,9 @@ export function presentCandidacy(state: GameState, c: Citizen): string {
 /** Modo normal (y vecinos sin IA): un vecino que puede se presenta, como mucho uno al mes (por hash, sin dados). */
 function rulePresent(state: GameState): void {
   const month = Math.floor(state.tick / TICKS_PER_MONTH);
-  const ai = (c: Citizen) => state.aiMode && c.named && !!state.ai && state.ai.share > 0;
+  // Ronda 18: los vecinos con IA se presentan en su turno; si la IA no respondió el último, por reglas.
+  const answered = state.ai?.log.at(-1)?.source === 'ia';
+  const ai = (c: Citizen) => answered && state.aiMode && c.named && !!state.ai && state.ai.share > 0;
   const can = state.citizens.filter((c) => !ai(c) && canPresent(state, c).ok);
   if (!can.length) return;
   const score = (c: Citizen) => c.traits.ambicion + c.traits.social + c.grudge * 2 - c.happiness;
@@ -529,10 +531,10 @@ export function rivalGovern(state: GameState): void {
   const taxesBefore = JSON.stringify(taxLevels(state));
   // Impuestos según la facción; con déficit y la caja baja, como cualquier gobierno, los sube.
   const last = state.stats.at(-1);
-  const deficit = !!last && last.income < last.expenses && state.treasury < 10_000;
+  const deficit = !!last && ownIncome(last) < last.expenses && state.treasury < 10_000;
   // Margen (ronda 09): tras subir por déficit, solo baja con superávit claro y caja holgada.
   // Sin margen, subía y bajaba cada mes y el registro se llenaba de cambios de impuestos.
-  const calm = !last || (last.income > last.expenses * 1.1 && state.treasury > 15_000);
+  const calm = !last || (ownIncome(last) > last.expenses * 1.1 && state.treasury > 15_000);
   // 2.2: si prometió no subirlos, las reglas cumplen (el déficit se aguanta sin obras); el populista los quiere bajos.
   const noRaise = p.party.promises.some((x) => x.status === 'pending' && x.check === 'impuestos');
   const want = deficit && !noRaise ? 'high' : f === 'empresarios' || f === 'jubilados' || p.party.style === 'populista' ? 'low' : 'medium';
@@ -565,6 +567,8 @@ export function rivalGovern(state: GameState): void {
   // Primero, lo prometido que se resuelve con una obra.
   const owed = p.party.promises.filter((x) => x.status === 'pending' && NEED_BUILD[x.need]).map((x) => NEED_BUILD[x.need]!);
   for (const kind of [...owed, ...FACTION_BUILD[f]]) {
+    // Ronda 18: no repite la misma obra (hacía un colegio cada mes) hasta medio año después.
+    if (recentlyBuilt(state, kind)) continue;
     const exists = state.buildings.filter((b) => b.kind === kind).length;
     if (kind !== 'house' && kind !== 'park' && exists > 0 && !saturated(state, kind as never)) continue;
     // Como mucho un parque por cada 25 vecinos y una casa municipal por cada 15.
@@ -578,6 +582,15 @@ export function rivalGovern(state: GameState): void {
       break;
     }
   }
+}
+
+/** ¿El gobierno rival empezó esta obra (o hay una igual a medias) en los últimos 6 meses? */
+export function recentlyBuilt(state: GameState, kind: string): boolean {
+  if (state.buildings.some((b) => b.kind === kind && !b.built)) return true;
+  const name = BUILD_NAMES[kind];
+  if (!name) return false;
+  const since = state.tick - 6 * TICKS_PER_MONTH;
+  return state.politics.log.some((l) => l.tick > since && l.text.includes(name) && /empieza|construir/i.test(l.text));
 }
 
 /** Obra que resuelve una exigencia (para que el gobierno rival la priorice). */
@@ -629,7 +642,7 @@ export function checkRivalPromises(state: GameState): void {
     } else if (check === 'empleo') {
       pr.base ??= employed(state);
       kept = employed(state) >= pr.base + RIVAL_PROMISES.jobs;
-    } else kept = state.treasury >= RIVAL_PROMISES.cleanTreasury && !!last && last.income >= last.expenses;
+    } else kept = state.treasury >= RIVAL_PROMISES.cleanTreasury && !!last && ownIncome(last) >= last.expenses;
     if (!kept && !broken && state.tick > pr.deadline) broken = true;
     if (kept && !broken) {
       pr.status = 'kept';
@@ -699,11 +712,8 @@ export function politicsDay(state: GameState): void {
     checkRivalPromises(state);
     // 2.2: si el mes pasado gobernó la IA del rival (`applyRivalPicks`), las reglas no lo hacen.
     const month = Math.floor(state.tick / TICKS_PER_MONTH);
-    // Ronda 18: si gobiernan las reglas, ese mes ya está gobernado (la IA no vuelve a gobernar).
-    if (p.rivalAiMonth !== month - 1) {
-      rivalGovern(state);
-      if (p.mayor !== 'player') p.rivalAiMonth = month;
-    }
+    // Las reglas cubren el mes que acaba (m-1); la IA, el que empieza: no se pisan.
+    if (p.rivalAiMonth !== month - 1) rivalGovern(state);
   }
   warnings(state);
   if (state.tick >= p.nextElection) holdElection(state);

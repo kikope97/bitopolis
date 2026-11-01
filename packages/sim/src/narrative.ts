@@ -4,6 +4,7 @@ import { activeObjectives, lowerFirst, NEED_TEXT, needOf } from './social.ts';
 import { daysToElection, FACTION_TEXT, politicsActive } from './politics.ts';
 import { fmt, loanCapacity, loanLoad, monthlyQuotas } from './loans.ts';
 import { LOANS } from './balance.ts';
+import { ownIncome } from './money.ts';
 import { nextLevel } from './townhall.ts';
 import type { GameEvent, GameState } from './state.ts';
 import { type Season, seasonOf } from './weather.ts';
@@ -23,7 +24,7 @@ export function townFacts(state: GameState) {
     poblacion: state.citizens.length,
     felicidad_media: Math.round(averageHappiness(state)),
     caja: state.treasury,
-    saldo_ultimo_mes: last ? last.income - last.expenses : 0,
+    saldo_ultimo_mes: last ? ownIncome(last) - last.expenses : 0,
     viviendas_libres: freeHomes(state),
     empleos_libres: vacancies(state),
     sin_trabajo_en_el_pueblo: state.citizens.filter((c) => c.jobId === null).length,

@@ -217,8 +217,8 @@ export const LISTS = {
   cost: 200,
   minAge: 25,
   minAmbition: 60,
-  /** Solo si su facción está descontenta (satisfacción por debajo). */
-  maxSatisfaction: 40,
+  /** Solo si su facción está descontenta (satisfacción por debajo). Ronda 18: 40 no llegaba nunca. */
+  maxSatisfaction: 60,
   /** Solo en los meses anteriores a las elecciones. */
   months: 12,
   /** Por reglas: probabilidad (por hash, sin dados) de que un vecino que puede se presente ese mes (%). */
@@ -859,7 +859,8 @@ export const TENDER = {
   /** Llegan con el ayuntamiento de este nivel (las primeras obras, las del tutorial, van sin licitación). */
   fromLevel: 2,
   /** Barata de fuera: su cuadrilla cobra `wage` al día (no los parados del pueblo); con p, sobrecoste al terminar. */
-  cheap: { mat: 0.8, days: 1.3, wage: 60, overrun: 0.15, p: 0.25 },
+  cheap: { mat: 0.8, days: 1.3, wage: 60, overrun: 0.25, p: 0.4 },
+  // Ronda 18: antes (0,15 y 0,25) la de fuera salía siempre a cuenta.
   /** La del primo: `kick` de los materiales va a la caja de su negocio; con p, escándalo. */
   crony: { mat: 0.9, days: 0.9, kick: 0.1, p: 0.35 },
   /** Rumor en el bar y estallido (días desde la firma). */
@@ -868,10 +869,11 @@ export const TENDER = {
   /** Con director (Modo IA): si no lo hace estallar en estos días tras `revealDays`, se olvida. */
   forgetDays: 28,
   /** «Revisar el contrato» durante el rumor: cuesta esta parte de los materiales. */
-  cancelFee: 0.1,
+  cancelFee: 0.2,
+  // Ronda 18: con el 10 % revisar costaba lo que ahorraba el primo (salía gratis).
   /** Recuerdo del escándalo en los vecinos con nombre (felicidad) y bajada de campaña en cada facción. */
-  scandalMood: -4,
-  scandalCampaign: 1,
+  scandalMood: -8,
+  scandalCampaign: 3,
   /** El concejal al que se le revisa el contrato: rencor. */
   offendedGrudge: 4,
   /** Licitaciones guardadas (las 10 últimas; las vivas no se borran). */

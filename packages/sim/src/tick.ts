@@ -32,7 +32,7 @@ import {
 } from './balance.ts';
 import { farmMonth, growFarms } from './farm.ts';
 import { applyCommand, BUILD_NAMES, removeBuilding } from './commands.ts';
-import { OUTSIDE, TREASURY, transfer } from './money.ts';
+import { OUTSIDE, ownIncome, TREASURY, transfer } from './money.ts';
 import { chance, nextInt, pick } from './prng.ts';
 import { detectTriggers, onNamedArrival, resolveDuePending } from './decisions.ts';
 import {
@@ -721,7 +721,7 @@ function endOfMonth(state: GameState): void {
     state.bankrupt = false;
     pushEvent(state, 'info', 'La caja vuelve a estar sana');
   }
-  const net = state.month.income - state.month.expenses;
+  const net = ownIncome(state.month) - state.month.expenses;
   if (net < 0 && state.treasury > 0 && state.treasury / -net < 3) {
     const months = Math.max(1, Math.floor(state.treasury / -net));
     pushEvent(state, 'warning', `A este ritmo, la caja aguanta ${months} ${months === 1 ? 'mes' : 'meses'}`);

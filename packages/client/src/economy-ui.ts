@@ -1,5 +1,5 @@
 import type { Command, TaxLevel } from '@bitopolis/shared';
-import { BUILD_NAMES, totalDebt, type Citizen, type GameState, IBI_RATE, MIN_WAGE, type MinWageLevel, PLUSVALIA_RATE, TASA_BASURAS, TASA_TERRAZAS, TAX_SPLIT_POP, trashActive, trashFee, trashServed, unitValue } from '@bitopolis/sim';
+import { BUILD_NAMES, ownIncome, totalDebt, type Citizen, type GameState, IBI_RATE, MIN_WAGE, type MinWageLevel, PLUSVALIA_RATE, TASA_BASURAS, TASA_TERRAZAS, TAX_SPLIT_POP, trashActive, trashFee, trashServed, unitValue } from '@bitopolis/sim';
 import { money, MONTHS } from './i18n.ts';
 import { economyLines } from './money-ui.ts';
 import { h, sheet } from './ui.ts';
@@ -196,7 +196,8 @@ export function openReport(state: GameState): void {
     return;
   }
   const monthName = MONTHS[(last.month - 1 + 12) % 12] ?? '';
-  const net = last.income - last.expenses;
+  // Ronda 18: lo prestado no cuenta como superávit.
+  const net = ownIncome(last) - last.expenses;
   const reasons = Object.entries(last.breakdown)
     .filter(([, v]) => v < 0)
     .sort((a, b) => a[1] - b[1])

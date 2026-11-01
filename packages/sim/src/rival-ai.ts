@@ -3,7 +3,7 @@ import { BUILD, RIVAL_AI } from './balance.ts';
 import { canHoldFestival } from './civic.ts';
 import { BUILD_NAMES, buildCostAt, governmentCommand, validateAsGovernment } from './commands.ts';
 import { saturated, taxLevels } from './economy.ts';
-import { FACTION_BUILD, freeSpots, LEVEL_TEXT, NEED_BUILD, rivalAct, syncLists } from './politics.ts';
+import { FACTION_BUILD, freeSpots, LEVEL_TEXT, NEED_BUILD, recentlyBuilt, rivalAct, syncLists } from './politics.ts';
 import { FACTION_TEXT, STYLE_TEXT, type RivalStyle } from './politics-core.ts';
 import { inventedName, inventedNumber } from './prompt.ts';
 import type { GameState } from './state.ts';
@@ -67,7 +67,7 @@ function wantedWorks(state: GameState): BuildKind[] {
   const all = [...owed, ...FACTION_BUILD[party.faction], ...STYLE_BUILD[party.style ?? 'populista'], 'clinic', 'school', 'police', 'park', 'house', 'firestation'];
   const out: BuildKind[] = [];
   for (const k of all) {
-    if (!(k in BUILD) || k === 'road' || out.includes(k as BuildKind)) continue;
+    if (!(k in BUILD) || k === 'road' || out.includes(k as BuildKind) || recentlyBuilt(state, k)) continue;
     const kind = k as BuildKind;
     const exists = state.buildings.filter((b) => b.kind === kind).length;
     // Lo mismo que las reglas: no repetir un servicio que aún da abasto; parques y casas, con tope.
@@ -191,7 +191,8 @@ function clean(s: unknown, max: number): string {
  * Devuelve los ids aplicados.
  */
 export function applyRivalPicks(state: GameState, picks: readonly string[], discurso?: string): string[] {
-  if (!rivalGoverns(state)) return [];
+  // Ronda 18: una vez al mes (un turno que llega ya en el mes siguiente no gobierna dos veces).
+  if (!rivalAiWanted(state)) return [];
   const p = state.politics;
   const party = p.party!;
   const menu = rivalMenu(state);

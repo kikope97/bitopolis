@@ -6,6 +6,11 @@ import type { GameState } from './state.ts';
  * las empresas (por su id). Lo que entra o sale de fuera se apunta en el
  * ledger para poder comprobar que el dinero se conserva.
  */
+/** Ronda 18: lo que entró en un mes sin contar lo prestado (un préstamo no es superávit). */
+export function ownIncome(m: { income: number; breakdown: Record<string, number> }): number {
+  return m.income - Math.max(0, m.breakdown['préstamo'] ?? 0);
+}
+
 export const TREASURY = 0;
 export const OUTSIDE = -1;
 

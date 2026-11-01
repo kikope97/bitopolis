@@ -81,15 +81,17 @@ export function openLoans(getState: () => GameState, command: Cmd): void {
 }
 
 function requestForm(state: GameState, command: Cmd, reopen: () => void): Node[] {
-  const cap = loanCapacity(state);
+  // Ronda 18: el máximo depende del plazo (la cuota no puede comerse demasiado de lo que entra).
+  const cap = loanCapacity(state, months);
   amount = Math.max(LOANS.min, Math.min(amount, Math.max(LOANS.min, cap), LOANS.max));
   const offer = loanOffer(state, amount, months);
   const cmd: Command = { type: 'RequestLoan', amount, months };
   const v = validateCommand(state, cmd);
   const step = (delta: number, label: string, aria: string) => {
-    const next = amount + delta;
+    // Ronda 18: los saltos grandes se quedan en el tope en vez de no hacer nada.
+    const next = Math.max(LOANS.min, Math.min(amount + delta, Math.max(LOANS.min, cap)));
     const b = h('button', { class: 'btn loan-step', 'aria-label': aria }, label);
-    if (next < LOANS.min || next > Math.max(LOANS.min, cap)) b.setAttribute('disabled', '');
+    if (next === amount) b.setAttribute('disabled', '');
     b.addEventListener('click', () => {
       amount = next;
       reopen();
@@ -115,8 +117,8 @@ function requestForm(state: GameState, command: Cmd, reopen: () => void): Node[]
   });
   return [
     h('h3', {}, 'Pedir préstamo'),
-    h('p', { class: 'muted small' }, cap > 0 ? `Con nota ${state.rating} te prestan hasta ${money(cap)} (contando lo que ya debes).` : v.ok ? '' : (v as { error: string }).error),
-    h('div', { class: 'loan-amount' }, step(-LOANS.step, '−', 'Mil euros menos'), h('output', { class: 'loan-value', 'aria-live': 'polite' }, money(amount)), step(LOANS.step, '+', 'Mil euros más')),
+    h('p', { class: 'muted small' }, cap > 0 ? `Con nota ${state.rating} a ${months} meses te prestan hasta ${money(cap)} (contando lo que ya debes y sus cuotas).` : v.ok ? '' : (v as { error: string }).error),
+    h('div', { class: 'loan-amount' }, step(-5 * LOANS.step, '−5k', 'Cinco mil euros menos'), step(-LOANS.step, '−', 'Mil euros menos'), h('output', { class: 'loan-value', 'aria-live': 'polite' }, money(amount)), step(LOANS.step, '+', 'Mil euros más'), step(5 * LOANS.step, '+5k', 'Cinco mil euros más')),
     chips,
     h(
       'p',
