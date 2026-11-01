@@ -496,6 +496,20 @@ export function startGame(opts: GameOptions): void {
   $('#hud-pop').replaceChildren(pixelIcon('people'), popText);
   const happyText = h('span', { class: 'tb-text' });
   $('#hud-happy').replaceChildren(pixelIcon('smile'), happyText);
+  /**
+   * Ronda 21: la barra de arriba se encaja sola. Primero, sin la flecha de tendencia, el «€» ni el «%»;
+   * si aún no cabe (texto grande en 360 px), en dos filas: ▶, velocidad, caja y avisos arriba; el resto, debajo.
+   * Los iconos nunca se quitan (sin ellos, «77 61» no se entendía).
+   */
+  let topbarKey = '';
+  function fitTopbar() {
+    const bar = $('.topbar');
+    const over = () => bar.scrollWidth > bar.clientWidth + 1;
+    bar.classList.remove('tb-tight', 'tb-rows');
+    if (!over()) return;
+    bar.classList.add('tb-tight');
+    if (over()) bar.classList.add('tb-rows');
+  }
   let lastStats = state.stats.length;
   let lastLevel = townLevel(state);
   let upgradeWarned = townLevel(state) - 1;
@@ -555,7 +569,14 @@ export function startGame(opts: GameOptions): void {
     }
     const d = tickToDate(state.tick);
     paintCalendar(d);
-    $('#hud-date').textContent = shortDate(d);
+    // Ronda 21: el año va aparte; en pantallas estrechas se ve «21 dic» (antes, en 360 px, no se veía la fecha).
+    const dateEl = $('#hud-date');
+    const dateKey = shortDate(d);
+    if (dateEl.dataset.v !== dateKey) {
+      dateEl.dataset.v = dateKey;
+      const [dd, mm, yy] = dateKey.split(' ');
+      dateEl.replaceChildren(`${dd} ${mm}`, h('span', { class: 'hud-year' }, ` ${yy}`));
+    }
     $('#hud-date').setAttribute('aria-label', formatDate(d));
     // v1.7: el tiempo de hoy junto a la fecha (icono y, en pantallas anchas, el nombre).
     const wk = state.weather?.kind ?? 'sol';
@@ -574,7 +595,12 @@ export function startGame(opts: GameOptions): void {
     }
     const diff = state.treasury - (dayAgoTreasury[0] ?? state.treasury);
     // Ronda 15: con 6 cifras la barra se pisaba: en miles a partir de 100.000 €.
-    moneyText.textContent = Math.abs(state.treasury) >= 100_000 ? `${Math.round(state.treasury / 1000)} mil €` : money(state.treasury);
+    // Ronda 21: el «€» va aparte: si la barra no cabe, se quita antes que los iconos (fitTopbar).
+    const moneyNum = Math.abs(state.treasury) >= 100_000 ? `${Math.round(state.treasury / 1000)} mil` : money(state.treasury).replace(/\s€$/, '');
+    if (moneyText.dataset.v !== moneyNum) {
+      moneyText.dataset.v = moneyNum;
+      moneyText.replaceChildren(moneyNum, h('span', { class: 'tb-unit' }, ' €'));
+    }
     moneyTrend.textContent = diff > 0 ? '▲' : diff < 0 ? '▼' : '';
     moneyTrend.className = `trend ${diff > 0 ? 'up' : diff < 0 ? 'down' : ''}`;
     $('#hud-money').classList.toggle('neg', state.treasury < 0);
@@ -589,6 +615,12 @@ export function startGame(opts: GameOptions): void {
     $('#hud-happy').classList.toggle('neg', happy > 0 && happy < 45);
     $('#hud-happy').setAttribute('aria-label', `Felicidad media ${happy} de 100: ver por qué`);
     renderPollChip(state, () => openPolitics(social));
+    // Ronda 21: si cambia lo largo de las cifras, se vuelve a encajar la barra de arriba.
+    const barKey = `${moneyNum}|${popText.textContent}|${happyText.textContent}|${$('#hud-poll').textContent}|${$('#hud-poll').hidden}|${$('#ai-chip').hidden}`;
+    if (barKey !== topbarKey) {
+      topbarKey = barKey;
+      fitTopbar();
+    }
     $('#game').classList.toggle('opposition', state.politics.mayor !== 'player');
     updateDemand();
     updateToolLocks();
@@ -1022,6 +1054,7 @@ export function startGame(opts: GameOptions): void {
     // Alturas reales de las barras: las hojas, la bandeja y el tutorial se colocan con ellas.
     const root = document.documentElement.style;
     const side = matchMedia('(orientation: landscape) and (max-height: 500px)').matches;
+    fitTopbar();
     root.setProperty('--top-h', `${Math.round($('.topbar').getBoundingClientRect().height)}px`);
     root.setProperty('--dock-h', side ? '0px' : `${Math.round($('#dock').getBoundingClientRect().height)}px`);
     root.setProperty('--strip-h', `${Math.round($('#strip').getBoundingClientRect().height)}px`);
@@ -1759,6 +1792,9 @@ export function startGame(opts: GameOptions): void {
     if (inTray) tabBuild.replaceChildren(h('span', { class: 'tab-sprite' }, toolIcon(tl)), h('span', { class: 'tab-label', 'aria-hidden': 'true' }, tl.label));
     else tabBuild.replaceChildren(pixelIcon('build'), h('span', { class: 'tab-label', 'aria-hidden': 'true' }, 'Construir'));
     tabBuild.setAttribute('aria-label', inTray ? `Construir: ${tl.label} elegido. Cambiar` : 'Construir');
+    // Ronda 21: al trazar (carretera, zonas, densidad), «Capas» y «?» se apartan: un toque en esa esquina
+    // abría las capas en vez de marcar la casilla. Vuelven con «Mirar» o con otra herramienta.
+    document.body.classList.toggle('tracing', tl.shape !== 'tap');
     const info = $('#tool-info');
     const locked = isLocked(tl, state);
     // Con «Mirar», la franja enseña la fecha y la demanda.
@@ -2405,10 +2441,13 @@ export function startGame(opts: GameOptions): void {
     legend.hidden = layer === 'none';
     if (layer === 'missing') {
       // v1.9.1: con poca altura (móvil en horizontal) empieza plegada: si no, tapa medio mapa.
-      if (matchMedia('(max-height: 500px)').matches) legendFolded = true;
+      // Ronda 21: en el móvil en vertical también (plegada enseña lo que más falta, 2–3 filas).
+      if (matchMedia('(max-height: 500px), (max-width: 719px)').matches) legendFolded = true;
       missingLegend();
     } else legend.replaceChildren(h('strong', {}, def.label), ...def.legend.map((x) => h('span', { class: `legend-item ${x.cls}` }, x.text)));
     const chip = $('#layers');
+    // Ronda 21: con leyenda, en el móvil el chip se queda en su icono (la leyenda ya dice qué capa es).
+    document.body.classList.toggle('layer-on', layer !== 'none');
     chip.querySelector('.chip-text')!.textContent = layer === 'none' ? 'Capas' : def.label;
     chip.setAttribute('aria-label', `Capas de datos: ${def.label}. Cambiar`);
     chip.setAttribute('aria-pressed', String(layer !== 'none'));
@@ -2425,11 +2464,12 @@ export function startGame(opts: GameOptions): void {
     const rows = sum.map((r) => {
       const name = `${NEED_LABEL[r.key][0]!.toUpperCase()}${NEED_LABEL[r.key].slice(1)}`;
       const count = r.falta ? `falta en ${plural(r.falta, 'casa', 'casas')}` : `lleno en ${plural(r.lleno, 'casa', 'casas')}`;
-      const go = h('button', { class: 'legend-go', 'aria-label': `Construir: ${NEED_LABEL[r.key]}` }, 'Construir');
+      const go = h('button', { class: 'legend-go', 'aria-label': `Construir: ${NEED_LABEL[r.key]}` }, pixelIcon('build'), h('span', { class: 'legend-go-text' }, 'Construir'));
       go.addEventListener('click', () => selectTool(TOOL_FOR[r.key]!));
       return h('span', { class: 'legend-need' }, pixelIcon(NEED_ICON[r.key]), h('span', { class: 'legend-text' }, `${name}: ${count}`), go);
     });
-    const head = h('button', { class: 'legend-head', 'aria-expanded': String(!legendFolded) }, h('strong', {}, 'Qué falta'), h('span', { 'aria-hidden': 'true' }, legendFolded ? ' ▸' : ' ▾'));
+    const more = legendFolded && rows.length > 2 ? h('span', { class: 'legend-more' }, ` · ver las ${rows.length}`) : '';
+    const head = h('button', { class: 'legend-head', 'aria-expanded': String(!legendFolded) }, h('strong', {}, 'Qué falta'), h('span', { 'aria-hidden': 'true' }, legendFolded ? ' ▸' : ' ▾'), more);
     head.addEventListener('click', () => {
       legendFolded = !legendFolded;
       missingLegend();
@@ -2437,7 +2477,8 @@ export function startGame(opts: GameOptions): void {
     $('#legend').classList.toggle('folded', legendFolded);
     $('#legend').replaceChildren(
       head,
-      ...(legendFolded ? [] : rows.length ? rows : [h('span', {}, 'A ninguna vivienda le falta nada.')]),
+      // Ronda 21: plegada sigue enseñando lo que más falta (el CSS deja 2–3 filas; en horizontal, ninguna).
+      ...(rows.length ? rows : legendFolded ? [] : [h('span', {}, 'A ninguna vivienda le falta nada.')]),
       ...(legendFolded ? [] : [h('span', { class: 'legend-note' }, 'Marco rojo: falta. Amarillo a trazos: llega, pero está lleno. Un icono por casa: lo que más falta.')]),
     );
   }
@@ -2615,6 +2656,35 @@ export function startGame(opts: GameOptions): void {
   $('#hud-happy').onclick = () => withBack('Pueblo', openHub, openHappiness);
   $('#bell').onclick = openLog;
   $('#strip-info').onclick = openDemand;
+  // Ronda 21: la ayuda de la franja se corta a dos líneas; al tocarla se lee entera (y otro toque la recoge).
+  const toolInfo = $('#tool-info');
+  const markClamp = () => {
+    const cut = !toolInfo.classList.contains('open') && toolInfo.scrollHeight > toolInfo.clientHeight + 1;
+    toolInfo.classList.toggle('more', cut);
+    if (cut || toolInfo.classList.contains('open')) {
+      toolInfo.setAttribute('aria-expanded', String(toolInfo.classList.contains('open')));
+      toolInfo.setAttribute('role', 'button');
+      toolInfo.tabIndex = 0;
+    } else {
+      for (const a of ['aria-expanded', 'role', 'tabindex']) toolInfo.removeAttribute(a);
+    }
+  };
+  toolInfo.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && toolInfo.getAttribute('role') === 'button') {
+      e.preventDefault();
+      e.stopPropagation();
+      toolInfo.click();
+    }
+  });
+  toolInfo.addEventListener('click', () => {
+    if (!toolInfo.classList.contains('open') && !toolInfo.classList.contains('more')) return;
+    toolInfo.classList.toggle('open');
+    markClamp();
+  });
+  new MutationObserver(() => {
+    toolInfo.classList.remove('open');
+    requestAnimationFrame(markClamp);
+  }).observe(toolInfo, { childList: true, characterData: true, subtree: true });
   $('#whatnow').onclick = () => {
     // v1.6: el consejo va en la franja de abajo (antes, un aviso más) y elige la herramienta.
     const hint = nextHint(state);
@@ -2695,6 +2765,9 @@ export function startGame(opts: GameOptions): void {
   const offPrefs = onPrefs((p) => {
     if (p.calm && speed > 1) setSpeed(1);
     markCalm();
+    // El tamaño del texto cambia lo que cabe arriba.
+    topbarKey = '';
+    fitTopbar();
   });
   requestAnimationFrame(frame);
 }
