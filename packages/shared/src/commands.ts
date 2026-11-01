@@ -79,6 +79,7 @@ export const Command = z.discriminatedUnion('type', [
           motivo: z.string().max(400),
           recuerdo: z.string().max(300).optional(),
           escudo: z.object({ pieza: z.string().max(20), lema: z.string().max(40) }).optional(),
+          biografia: z.string().max(400).optional(),
         }),
       )
       .max(300),
@@ -92,6 +93,8 @@ export const Command = z.discriminatedUnion('type', [
         /** 2.1: titulares de El Eco y el encargo con historia. */
         titulares: z.array(z.object({ seccion: z.enum(['sucesos', 'cartas', 'anuncios']), texto: z.string().max(300), sobre: z.number().int().optional(), suceso: z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(40).optional() })).max(3).optional(),
         encargo: z.object({ id: z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(40), carta: z.string().max(500) }).optional(),
+        /** 2.2: pies de foto del álbum. */
+        pies: z.array(z.object({ tick: z.number().int(), kind: z.string().max(40), texto: z.string().max(200) })).max(4).optional(),
       })
       .optional(),
   }),

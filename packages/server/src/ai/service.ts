@@ -369,7 +369,7 @@ export class AiService {
         usage.cachedIn = r.usage.cachedIn;
         usage.out = r.usage.out;
         if (r.truncated) status = 'truncated';
-        const parsed = parseDirector(r.text, req.ids, `${req.shared}\n${req.user}`, { news: req.news, errands: req.errands });
+        const parsed = parseDirector(r.text, req.ids, `${req.shared}\n${req.user}`, { news: req.news, errands: req.errands, photos: req.photos });
         if (parsed) {
           result.director = parsed.director;
           if (parsed.focus) result.focus = parsed.focus;

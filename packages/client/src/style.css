@@ -1091,3 +1091,6 @@ body.placing .tut-arrow { visibility: hidden; }
   html[data-text='200'] .away-rank, html[data-text='200'] .away-who { flex-direction: column; }
 }
 .press-help { margin: 4px 0 6px; padding-left: 18px; }
+/* 2.2: biografía y pies de foto escritos por la IA. */
+.album-caption { display: block; font-style: italic; color: var(--muted); margin-top: 2px; }
+.mind-bio { margin: 6px 0; }

@@ -56,6 +56,8 @@ export interface DirectorChoice {
   titulares?: { seccion: 'sucesos' | 'cartas' | 'anuncios'; texto: string; sobre?: number; suceso?: string }[];
   /** 2.1: el encargo con historia (id de `errandCandidates`) y la carta con la que lo pide un vecino. */
   encargo?: { id: string; carta: string };
+  /** 2.2: pies de foto del álbum (momento por tick y tipo). */
+  pies?: { tick: number; kind: string; texto: string }[];
 }
 
 const first = (c: Citizen) => c.name.split(' ')[0]!;
@@ -313,6 +315,10 @@ export function applyDirector(state: GameState, choice: DirectorChoice): TurnLog
   // Ronda 17: el titular de un suceso que al final no pasó no sale.
   const heads = (choice.titulares ?? []).filter((t) => !t.suceso || used.has(t.suceso));
   if (heads.length) publishEdition(state, heads.map((t) => ({ section: t.seccion, text: t.texto, ...(t.sobre !== undefined ? { ref: t.sobre } : {}) })), 'ia');
+  for (const p of choice.pies ?? []) {
+    const m = (state.album ?? []).find((x) => x.tick === p.tick && x.kind === p.kind && !x.caption);
+    if (m) m.caption = p.texto;
+  }
   if (choice.encargo?.id) {
     const e = offerErrand(state, choice.encargo.id, choice.encargo.carta || undefined);
     if (e) lines.push({ id: e.by, text: `Encargo: ${e.text}`, ...(choice.encargo.carta ? { motivo: choice.encargo.carta } : {}) });

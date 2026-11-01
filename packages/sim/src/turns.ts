@@ -42,7 +42,9 @@ export interface TownAi {
   /** Días de juego entre turnos (7 a x1; el cliente lo alarga a x3/x10 con `SetTurnPace`). */
   paceDays: number;
   /** Turno abierto esperando a la IA, o null. */
-  turn: { n: number; opened: number; due: number; kind: 'semana' | 'rapida'; reason?: string; ids: number[] } | null;
+  turn: { n: number; opened: number; due: number; kind: 'semana' | 'rapida'; reason?: string; ids: number[]; monthly?: boolean } | null;
+  /** 2.2: mes del último turno mensual (biografías y pies de foto). */
+  lastMonthly?: number;
   /** Último número de turno y cuándo toca el siguiente. */
   lastN: number;
   next: number;
@@ -89,6 +91,8 @@ export interface TurnAct {
   recuerdo?: string;
   /** 2.1: su voto para el escudo, si hay votación abierta (ids del menú). */
   escudo?: { pieza: string; lema: string };
+  /** 2.2: en el turno mensual, su biografía reescrita. */
+  biografia?: string;
 }
 
 export function emptyTownAi(share = TURN.defaultShare): TownAi {
@@ -454,6 +458,10 @@ export function applyTownTurn(state: GameState, n: number, acts: TurnAct[], extr
       parts.push(`avisa: ${planText(c.plan)}`);
     }
     c.thought = cleanText(a.pensamiento, 160) || c.thought;
+    if (t.monthly) {
+      const bio = cleanText(a.biografia, 300);
+      if (bio.length >= 20) c.bio = { text: bio, tick: state.tick };
+    }
     const note = cleanText(a.recuerdo, 160);
     if (note) c.notes = [...(c.notes ?? []), { tick: state.tick, text: note }].slice(-TURN.notes);
     if (parts.length) lines.push({ id: c.id, text: `${c.name} ${parts.join('; ')}`, motivo: cleanText(a.motivo, 160) });
@@ -580,7 +588,11 @@ export function turnsTick(state: GameState, ruleFallback: (state: GameState, ids
     return;
   }
   ai.lastN++;
-  ai.turn = { n: ai.lastN, opened: state.tick, due: state.tick + TURN.dueHours, kind, reason: kind === 'rapida' ? ai.quick ?? undefined : undefined, ids };
+  // 2.2: el primer turno semanal de cada mes es «mensual»: biografías y pies de foto.
+  const month = Math.floor(state.tick / TICKS_PER_MONTH);
+  const monthly = kind === 'semana' && ai.lastMonthly !== month;
+  if (monthly) ai.lastMonthly = month;
+  ai.turn = { n: ai.lastN, opened: state.tick, due: state.tick + TURN.dueHours, kind, reason: kind === 'rapida' ? ai.quick ?? undefined : undefined, ids, ...(monthly ? { monthly: true } : {}) };
   if (kind === 'rapida') {
     ai.lastQuick = state.tick;
     ai.quick = null;

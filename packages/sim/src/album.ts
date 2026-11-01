@@ -12,6 +12,8 @@ export interface Moment {
   text: string;
   x: number;
   y: number;
+  /** 2.2: pie de foto escrito por la IA (el director). */
+  caption?: string;
 }
 
 const ALBUM_MAX = 80;

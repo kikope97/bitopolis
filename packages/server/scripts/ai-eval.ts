@@ -64,6 +64,7 @@ const simulated: LLMProvider = {
         cronica: 'Pasan cosas en el pueblo.',
         titulares: [{ seccion: 'anuncios', sobre: '', texto: 'El pueblo sigue adelante' }],
         encargo: e ? { id: e.id, carta: 'Alcalde, hágalo por el pueblo.' } : { id: '', carta: '' },
+        pies: ((d as unknown as { fotos?: { id: string }[] }).fotos ?? []).map((f) => ({ id: f.id, texto: 'Un día para recordar' })),
       });
       return { text, usage: { in: tokens(req.system + (req.shared ?? '') + req.user), cachedIn: 0, out: tokens(text) } };
     }
@@ -89,6 +90,7 @@ const simulated: LLMProvider = {
         pensamiento: voces[(v.vecino + i) % voces.length]!,
         motivo: voces[(v.vecino * 7 + i) % voces.length]!,
         recuerdo: i % 2 ? 'Fui a la tienda del pueblo.' : '',
+        biografia: req.shared?.includes('"mensual":true') ? 'Vive en el pueblo desde hace tiempo y trabaja cerca de casa.' : '',
       };
     });
     const text = JSON.stringify({ decisiones });
@@ -195,7 +197,7 @@ for (let seed = 1; seed <= Number(values.seeds); seed++) {
           dir.tokensIn += r.usage.in || tokens(req.system + req.shared + req.user);
           dir.tokensCached += r.usage.cachedIn;
           dir.tokensOut += r.usage.out || tokens(r.text);
-          director = parseDirector(r.text, req.ids, `${req.shared}\n${req.user}`, { news: req.news, errands: req.errands });
+          director = parseDirector(r.text, req.ids, `${req.shared}\n${req.user}`, { news: req.news, errands: req.errands, photos: req.photos });
           if (director) {
             dir.valid++;
             for (const x of director.director.sucesos) dir.picked[x.id.split(':')[0]!] = (dir.picked[x.id.split(':')[0]!] ?? 0) + 1;

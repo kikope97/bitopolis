@@ -196,6 +196,8 @@ export interface Citizen {
   thought?: string;
   /** 2.0: lo que el propio vecino (la IA) apunta de cada semana; lo lee la semana siguiente. */
   notes?: { tick: number; text: string }[];
+  /** 2.2: su biografía, que la IA reescribe una vez al mes (si no, `narrativeSummary`). */
+  bio?: { text: string; tick: number };
   /** 2.1: voluntario de protección civil. */
   volunteer?: boolean;
 }

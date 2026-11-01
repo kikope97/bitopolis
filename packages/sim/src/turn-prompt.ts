@@ -1,4 +1,4 @@
-import { tickToDate } from '@bitopolis/shared';
+import { TICKS_PER_MONTH, tickToDate } from '@bitopolis/shared';
 import { z } from 'zod';
 import { CAUSE_ASK } from './associations.ts';
 import { MIN_WAGE } from './balance.ts';
@@ -13,7 +13,7 @@ import { errandCandidates } from './errands.ts';
 import { weekNews } from './press.ts';
 import { rankCandidates } from './rank.ts';
 import { inventedName, inventedNumber, toneOf } from './prompt.ts';
-import { GOAL_TEXT, HOOK_TEXT, hookFor, memoryText, NEED_TEXT, NEEDS, needsOf } from './social.ts';
+import { GOAL_TEXT, HOOK_TEXT, hookFor, memoryText, narrativeSummary, NEED_TEXT, NEEDS, needsOf } from './social.ts';
 import type { Citizen, GameState } from './state.ts';
 import { averageHappiness } from './tick.ts';
 import { GESTURES, gestureCandidates, isAiCitizen, PLANS, planText, SPEND, type TurnAct, turnMenu } from './turns.ts';
@@ -26,7 +26,7 @@ import { GESTURES, gestureCandidates, isAiCitizen, PLANS, planText, SPEND, type 
  * La salida tiene un esquema fijo (sin uniones por vecino); cada parte se valida
  * en el motor con el menú del vecino. Nunca va texto libre del jugador.
  */
-export const TURN_PROMPT_VERSION = 9;
+export const TURN_PROMPT_VERSION = 10;
 
 export const TURN_SYSTEM = `Eres la mente de los vecinos de Bitópolis, un pueblo español pequeño. Cada semana decides, a la vez, qué hace cada vecino de la lista. Ellos viven de verdad: trabajan, compran, se enamoran, se enfadan, ahorran o se arruinan, y reaccionan a lo que hace el alcalde (el jugador).
 
@@ -40,6 +40,7 @@ Para cada vecino del lote devuelve exactamente un objeto con:
 - "pensamiento": una frase en primera persona, en español de España, con su tono y su vida (máx. 140 caracteres).
 - "motivo": por qué hace lo que hace esta semana, en una frase corta en primera persona (máx. 160 caracteres).
 - "escudo": solo si en el pueblo hay "votacion_escudo", su voto: una "pieza" y un "lema" (ids de esa votación), según lo que le importa; si no, "" y "".
+- "biografia": solo si el turno es "mensual": su vida en 2 o 3 frases en tercera persona (máx. 280 caracteres), reescribiendo "su_biografia" con lo que ha pasado (sus notas y recuerdos); si no es mensual, "".
 - "recuerdo": lo que apunta de esta semana para acordarse (un hecho, no un sentimiento; máx. 120 caracteres), o "" si no pasó nada. Sus notas anteriores están en "sus_notas".
 
 Reglas:
@@ -68,7 +69,7 @@ export function turnShared(state: GameState): string {
   const t = ai.turn;
   const shops = state.buildings.filter((b) => b.kind === 'shop' && b.built && !b.damaged);
   const data = {
-    turno: t ? { numero: t.n, tipo: t.kind === 'rapida' ? `reacción rápida a: el alcalde ${t.reason}` : 'semana' } : null,
+    turno: t ? { numero: t.n, tipo: t.kind === 'rapida' ? `reacción rápida a: el alcalde ${t.reason}` : 'semana', ...(t.monthly ? { mensual: true } : {}) } : null,
     fecha: `día ${d.day}, mes ${d.month}, año ${d.year}`,
     poblacion: state.citizens.length,
     felicidad_media: Math.round(averageHappiness(state)),
@@ -171,6 +172,7 @@ function citizenBrief(state: GameState, c: Citizen) {
     ...(hook ? { gancho: HOOK_TEXT[hook.kind] } : {}),
     ...(c.thought ? { pensaba: c.thought } : {}),
     ...(c.notes?.length ? { sus_notas: c.notes.map((n) => n.text) } : {}),
+    ...(state.ai?.turn?.monthly ? { su_biografia: c.bio?.text ?? narrativeSummary(state, c) } : {}),
     ...(lastLine ? { la_semana_pasada: lastLine.text } : {}),
     ...(c.plan ? { su_plan: planText(c.plan) } : {}),
     actitud_anterior: c.attitude ?? 0,
@@ -219,8 +221,9 @@ export const TURN_SCHEMA = {
           motivo: { type: 'string' },
           recuerdo: { type: 'string' },
           escudo: { type: 'object', properties: { pieza: { type: 'string' }, lema: { type: 'string' } }, required: ['pieza', 'lema'], additionalProperties: false },
+          biografia: { type: 'string' },
         },
-        required: ['vecino', 'accion', 'gesto', 'actitud', 'gasto', 'plan', 'pensamiento', 'motivo', 'recuerdo', 'escudo'],
+        required: ['vecino', 'accion', 'gesto', 'actitud', 'gasto', 'plan', 'pensamiento', 'motivo', 'recuerdo', 'escudo', 'biografia'],
         additionalProperties: false,
       },
     },
@@ -267,6 +270,7 @@ const ActSchema = z.object({
   motivo: z.string().max(600),
   recuerdo: z.string().max(600).optional(),
   escudo: z.object({ pieza: z.string().max(40), lema: z.string().max(60) }).optional(),
+  biografia: z.string().max(1200).optional(),
 });
 
 const clean = (s: string, max: number) =>
@@ -306,6 +310,8 @@ export function parseTurn(text: string, ids: number[], sent: string): { acts: Tu
     if (bad(motivo)) motivo = '';
     let recuerdo = clean(a.recuerdo ?? '', 120);
     if (bad(recuerdo)) recuerdo = '';
+    let biografia = clean(a.biografia ?? '', 280);
+    if (bad(biografia)) biografia = '';
     acts.push({
       vecino: a.vecino,
       // Ronda 17: cada campo dentro de los límites del comando `TownTurn` (si no, el turno entero se rechazaría).
@@ -320,6 +326,7 @@ export function parseTurn(text: string, ids: number[], sent: string): { acts: Tu
       pensamiento,
       motivo,
       ...(recuerdo ? { recuerdo } : {}),
+      ...(biografia ? { biografia } : {}),
       // El voto del escudo, solo con ids de la votación que se envió.
       ...(a.escudo && /^[a-z_]{1,20}$/.test(a.escudo.pieza) && /^[a-z_]{1,40}$/.test(a.escudo.lema) && sent.includes(`"id":"${a.escudo.pieza}"`) && sent.includes(`"id":"${a.escudo.lema}"`)
         ? { escudo: { pieza: a.escudo.pieza, lema: a.escudo.lema } }
@@ -342,6 +349,7 @@ Devuelve:
 - "foco": el tema de la semana en una frase corta (máx. 100 caracteres).
 - "cronica": 2 o 3 frases en español de España, como el periódico del pueblo, sobre lo que ha hecho el alcalde, cómo está el pueblo y lo que pasa esta semana (máx. 400 caracteres).
 - "titulares": hasta 3 titulares de El Eco de Bitópolis, uno por sección ("sucesos", "cartas" al director, "anuncios"). Cada titular cuenta solo una de "noticias" o uno de los sucesos que eliges esta semana (su id en "sobre"), con un "texto" de periódico de pueblo (máx. 110 caracteres). No cuentes cómo acaba un suceso: lo decide el juego. Si una sección no tiene noticia, no pongas titular. En "cartas", la voz de un vecino.
+- "pies": solo si hay "fotos": un pie de foto para cada una ("id" y "texto", máx. 110 caracteres, como en un álbum de pueblo, sin inventar nada); si no, lista vacía.
 - "encargo": si encaja con la semana, uno de "encargos_posibles" ("id") con la "carta" (máx. 220 caracteres, en primera persona, firmada por quien lo pide) con la que se lo pide al alcalde; si no, id "" y carta "".
 
 Reglas:
@@ -368,8 +376,12 @@ export const DIRECTOR_SCHEMA = {
       items: { type: 'object', properties: { seccion: { type: 'string', enum: ['sucesos', 'cartas', 'anuncios'] }, sobre: { type: 'string' }, texto: { type: 'string' } }, required: ['seccion', 'sobre', 'texto'], additionalProperties: false },
     },
     encargo: { type: 'object', properties: { id: { type: 'string' }, carta: { type: 'string' } }, required: ['id', 'carta'], additionalProperties: false },
+    pies: {
+      type: 'array',
+      items: { type: 'object', properties: { id: { type: 'string' }, texto: { type: 'string' } }, required: ['id', 'texto'], additionalProperties: false },
+    },
   },
-  required: ['sucesos', 'avisos', 'foco', 'cronica', 'titulares', 'encargo'],
+  required: ['sucesos', 'avisos', 'foco', 'cronica', 'titulares', 'encargo', 'pies'],
   additionalProperties: false,
 } as const;
 
@@ -382,6 +394,8 @@ export interface DirectorRequest {
   /** 2.1: noticias de la semana (id «nX» → vecino o edificio) y encargos posibles. */
   news: { id: string; ref?: number }[];
   errands: string[];
+  /** 2.2: fotos del álbum sin pie (id «fX» → momento). */
+  photos: { id: string; tick: number; kind: string }[];
 }
 
 /** La petición del director: el mismo bloque común del turno y el menú de sucesos. */
@@ -391,6 +405,8 @@ export function buildDirectorRequest(state: GameState, shared = turnShared(state
   const budget = dramaBudget(state, menu);
   const news = weekNews(state);
   const errands = errandCandidates(state).slice(0, 4);
+  // 2.2: en el turno mensual, hasta 4 fotos del último mes sin pie.
+  const photos = state.ai?.turn?.monthly ? (state.album ?? []).filter((m) => !m.caption && state.tick - m.tick <= TICKS_PER_MONTH).slice(-4).map((m, i) => ({ id: `f${i + 1}`, tick: m.tick, kind: m.kind, text: m.text })) : [];
   const paceTicks = Math.max(1, (state.ai?.paceDays ?? 7) * 24);
   const data = {
     presupuesto_drama: { sucesos_malos_que_caben: budget.bad, por_que: budget.why },
@@ -398,6 +414,7 @@ export function buildDirectorRequest(state: GameState, shared = turnShared(state
     menu: menu.map((m) => ({ id: m.id, tipo: m.kind, malo: m.bad, avisado: brewing.some((b) => b.id === m.id), texto: m.text, por_que: m.why })),
     noticias: news.map((n) => ({ id: n.id, seccion: n.section, texto: n.text })),
     encargos_posibles: errands.map((e) => ({ id: e.key, lo_pide: state.citizens.find((c) => c.id === e.by)?.name ?? 'el pueblo', que: e.text })),
+    ...(photos.length ? { fotos: photos.map((f) => ({ id: f.id, momento: f.text })) } : {}),
   };
   const user = `Director de la semana (elige entre el menú):\n${JSON.stringify(data)}`;
   return {
@@ -408,6 +425,7 @@ export function buildDirectorRequest(state: GameState, shared = turnShared(state
     ids: menu.map((m) => m.id),
     news: news.map((n) => ({ id: n.id, ...(n.ref !== undefined ? { ref: n.ref } : {}) })),
     errands: errands.map((e) => e.key),
+    photos: photos.map((f) => ({ id: f.id, tick: f.tick, kind: f.kind })),
   };
 }
 
@@ -419,10 +437,11 @@ const DirectorOut = z.object({
   cronica: z.string().max(2000),
   titulares: z.array(z.object({ seccion: z.string().max(20), sobre: z.string().max(20), texto: z.string().max(600) })).max(6).optional(),
   encargo: z.object({ id: z.string().max(60), carta: z.string().max(1000) }).optional(),
+  pies: z.array(z.object({ id: z.string().max(10), texto: z.string().max(600) })).max(8).optional(),
 });
 
 /** Lee la respuesta del director: solo ids del menú y textos sin nombres inventados. Null si no vale. */
-export function parseDirector(text: string, ids: string[], sent: string, extra: { news?: { id: string; ref?: number }[]; errands?: string[] } = {}): { director: DirectorChoice; focus: string; chronicle: string } | null {
+export function parseDirector(text: string, ids: string[], sent: string, extra: { news?: { id: string; ref?: number }[]; errands?: string[]; photos?: { id: string; tick: number; kind: string }[] } = {}): { director: DirectorChoice; focus: string; chronicle: string } | null {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
@@ -458,8 +477,16 @@ export function parseDirector(text: string, ids: string[], sent: string, extra: 
   }
   const carta = clean(r.data.encargo?.carta ?? '', 260);
   const encargo = r.data.encargo?.id && extra.errands?.includes(r.data.encargo.id) ? { id: r.data.encargo.id, carta: bad(carta) ? '' : carta } : undefined;
+  // 2.2: pies de foto (solo de las fotos enviadas).
+  const pies: NonNullable<DirectorChoice['pies']> = [];
+  for (const p of r.data.pies ?? []) {
+    const f = extra.photos?.find((x) => x.id === p.id);
+    const texto = clean(p.texto, 120);
+    if (!f || texto.length < 4 || bad(texto) || pies.some((x) => x.tick === f.tick && x.kind === f.kind)) continue;
+    pies.push({ tick: f.tick, kind: f.kind, texto });
+  }
   return {
-    director: { sucesos: picked, avisos: pick(r.data.avisos), ...(titulares.length ? { titulares } : {}), ...(encargo ? { encargo } : {}) },
+    director: { sucesos: picked, avisos: pick(r.data.avisos), ...(titulares.length ? { titulares } : {}), ...(encargo ? { encargo } : {}), ...(pies.length ? { pies } : {}) },
     focus: bad(focus) ? '' : focus,
     chronicle: bad(chronicle) ? '' : chronicle,
   };
