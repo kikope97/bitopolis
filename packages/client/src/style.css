@@ -867,6 +867,9 @@ html[data-font='pixel'] body #hud-date, html[data-font='pixel'] body .bar-num, h
 .tb-speed { min-width: 44px; }
 .confirm-bar.danger p { -webkit-line-clamp: 3; }
 @media (max-width: 420px) {
+  /* Ronda 18: con elecciones, las cifras de arriba no se pisan. */
+  #hud-poll .poll-days, #hud-poll .poll-opp { display: none; }
+  #hud-poll { padding: 0 4px; }
   html[data-text='150'] .tb-stat .px-icon, html[data-text='200'] .tb-stat .px-icon, html[data-font='pixel'] .tb-stat .px-icon,
   html[data-text='200'] .trend, html[data-font='pixel'] .trend { display: none; }
   html[data-text='200'] .tb-btn, html[data-font='pixel'] .tb-btn { padding: 0 2px; }
@@ -1104,7 +1107,8 @@ body.placing .tut-arrow { visibility: hidden; }
 }
 .press-help { margin: 4px 0 6px; padding-left: 18px; }
 /* 2.2: biografía y pies de foto escritos por la IA. */
-.album-caption { display: block; font-style: italic; color: var(--muted); margin-top: 2px; }
+/* Ronda 18: el pie se lee sobre el papel de la postal. */
+.album-caption { display: block; font-style: italic; color: #5d275d; margin-top: 2px; }
 .mind-bio { margin: 6px 0; }
 /* 2.2: licitaciones (tres tarjetas, >= 64 px, a 360 px una debajo de otra) y calles con nombre. */
 .tender-cards { display: grid; gap: 8px; margin: 6px 0 4px; }
@@ -1117,7 +1121,7 @@ body.placing .tut-arrow { visibility: hidden; }
 .tc-price { white-space: nowrap; font-weight: 700; }
 .tc-line { color: var(--muted); font-size: 0.875rem; }
 .tc-risk { font-size: 0.875rem; color: var(--bad); }
-.tc-risk.ok { color: var(--good); }
+.tc-risk.ok { color: var(--good); font-weight: 700; } /* Ronda 18: contraste. */
 .street-card .street-pick { display: block; text-align: left; margin-top: 6px; min-height: 48px; }
 
 /* ---------- 2.2: préstamos (Dinero › Préstamos) ---------- */

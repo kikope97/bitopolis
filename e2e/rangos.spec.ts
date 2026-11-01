@@ -60,7 +60,8 @@ test('2.1: el pueblo sube de rango con fanfarria, cartel en la entrada y escudo 
   await shot('2-pueblo');
   await card.click();
   await expect(page.locator('#sheet-title')).toHaveText('Escudo y rango');
-  await expect(page.locator('.sheet')).toContainText('Para Villa');
+  // 2.2: el pueblo crece antes; según la semilla, falta gente para Villa o ya se va a celebrar.
+  await expect(page.locator('.sheet')).toContainText(/Para Villa|Villa: mañana se celebra/);
   await shot('3-escudo');
   expect(errors).toEqual([]);
 });

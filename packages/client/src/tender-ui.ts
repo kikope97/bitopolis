@@ -17,7 +17,7 @@ export function openTender(state: GameState, cmd: { kind: BuildKind; x: number; 
   const cards = offers.map((o) => {
     const card = h(
       'button',
-      { class: `tender-card${o.offer === 'local' ? ' recommended' : ''}`, 'data-offer': o.offer, ...(o.available ? {} : { disabled: '' }), 'aria-label': `${TITLE[o.offer]}: ${money(o.price)}, ${plural(o.days, 'día', 'días')}. ${o.who}. ${o.risk}` },
+      { class: `tender-card${o.offer === 'local' ? ' recommended' : ''}`, 'data-offer': o.offer, ...(o.available ? {} : { disabled: '' }), 'aria-label': `${TITLE[o.offer]}${o.offer === 'local' ? ' (recomendada)' : ''}: ${money(o.price)}, ${plural(o.days, 'día', 'días')}. ${o.who}. ${o.risk}` },
       h('span', { class: 'tc-head' }, h('strong', {}, TITLE[o.offer]), h('span', { class: 'tc-price' }, o.available ? `≈ ${money(o.price)}` : '—')),
       h('span', { class: 'tc-line' }, o.available ? `Plazo: ${plural(o.days, 'día', 'días')}` : ''),
       h('span', { class: 'tc-line' }, o.who),

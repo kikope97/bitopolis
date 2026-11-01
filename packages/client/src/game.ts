@@ -737,15 +737,16 @@ export function startGame(opts: GameOptions): void {
           if (!quiet) toast(e.text, { kind: e.text.includes('escapa') ? 'warn' : 'info', onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
           continue;
         }
-        const bad = /Disturbios|llenos|escapa/.test(e.text);
+        // Ronda 18: el escándalo de una licitación es una mala noticia (fija, con aviso y lleva a la obra).
+        const bad = /Disturbios|llenos|escapa|^Escándalo/.test(e.text);
         // Ronda 15: un robo con el ladrón escapado se avisa, pero no para el juego (solo disturbios y calabozos llenos).
         if (quiet && !bad) continue;
         if (bad) {
           sfx.warn();
           calmPause();
-          if (/Disturbios|llenos/.test(e.text)) attention(refSpot(e.ref) ?? state.buildings.find((b) => b.kind === 'police' && b.built));
+          if (/Disturbios|llenos|^Escándalo/.test(e.text)) attention(refSpot(e.ref) ?? state.buildings.find((b) => b.kind === 'police' && b.built));
         }
-        toast(e.text, { kind: bad ? 'warn' : 'good', sticky: /Disturbios|llenos/.test(e.text), onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+        toast(e.text, { kind: bad ? 'warn' : 'good', sticky: /Disturbios|llenos|^Escándalo/.test(e.text), onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
       } else if (e.kind === 'fire') {
         // 2.1: riesgos, incendios, bomberos y urgencias.
         const go = e.ref !== undefined ? () => focusBuilding(e.ref!) : undefined;

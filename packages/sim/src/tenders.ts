@@ -236,7 +236,8 @@ export function scandal(state: GameState, t: Tender): boolean {
   for (const c of state.citizens) if (c.named) addMemory(state, c, 'escandalo', 4, TENDER.scandalMood, t.councillorId !== undefined && t.councillorId !== c.id ? [t.councillorId] : []);
   const owner = state.citizens.find((c) => c.id === t.ownerId);
   const councillor = state.citizens.find((c) => c.id === t.councillorId);
-  const who = owner ? `${t.businessName} de ${owner.name}` : 'una empresa amiga';
+  // Ronda 18: «Ferretería de Lucía» no repite «de Lucía».
+  const who = owner ? ((t.businessName ?? '').includes(owner.name.split(' ')[0]!) ? t.businessName : `${t.businessName} de ${owner.name}`) : 'una empresa amiga';
   pushEvent(state, 'crime', `Escándalo en el ayuntamiento: la obra de ${worksName(t.kind)} fue para ${who}${councillor && councillor !== owner ? `, amigo del concejal ${councillor.name}` : ''}`, { ref: t.buildingId, notify: true });
   return true;
 }
