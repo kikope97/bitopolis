@@ -207,7 +207,10 @@ function simulateTown(state: GameState, t: NeighborTown): void {
   const taxCut = (t.taxCutUntil ?? -1) > state.tick;
   const target = COMARCA.baseHappiness + COMARCA.phaseHappiness[t.specialty][phase] + (taxCut ? COMARCA.taxCut.happiness : 0) + t.relation;
   t.happiness = Math.round(t.happiness + (target - t.happiness) * COMARCA.happinessPull);
-  t.pop = Math.max(COMARCA.popLimits.min, Math.min(COMARCA.popLimits.max, Math.round(t.pop * (1 + (t.happiness - 50) * COMARCA.growth))));
+  // Crece o mengua con la felicidad (al menos un vecino al mes si se nota).
+  const d = t.pop * (t.happiness - 50) * COMARCA.growth;
+  const delta = Math.abs(t.happiness - 50) < 3 ? 0 : d > 0 ? Math.max(1, Math.round(d)) : Math.min(-1, Math.round(d));
+  t.pop = Math.max(COMARCA.popLimits.min, Math.min(COMARCA.popLimits.max, t.pop + delta));
   const income = t.pop * COMARCA.incomePerPop * (phase === 'crisis' ? 0.7 : phase === 'bonanza' ? 1.2 : 1);
   t.treasury = Math.round(t.treasury + income - (taxCut ? t.pop * COMARCA.taxCut.costPerPop : 0));
 }
