@@ -58,7 +58,13 @@ export async function skipTutorial(page: Page) {
 export async function pickTool(page: Page, id: string) {
   if (['inspect', 'road', 'demolish'].includes(id)) return page.locator(`#tab-${id}`).click();
   if (await page.locator('#tray').isHidden()) await page.locator('#tab-build').click();
+  await openTrayCat(page, id);
   await page.locator(`#tray [data-tool="${id}"]`).click();
+}
+
+/** Pruebas 2.5: las categorías de la bandeja sin nada disponible salen plegadas; esto abre la de `id`. */
+export async function openTrayCat(page: Page, id: string) {
+  await page.locator(`#tray details:has([data-tool="${id}"])`).evaluate((d) => ((d as HTMLDetailsElement).open = true));
 }
 
 /** 2.2: si sale la hoja de la licitación (obras grandes), elige una oferta (por defecto, la local). */

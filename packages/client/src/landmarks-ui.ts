@@ -158,7 +158,7 @@ export function openRegion(state: GameState, send: Send, focus: (b: Building) =>
     go.addEventListener('click', () => focus(b));
     content.push(go);
   }
-  sheet('Comarca', ...content);
+  sheet('Comarca y grandes obras', ...content);
 }
 
 /** La gran empresa: la oferta con sus tres respuestas, o cómo le va. */

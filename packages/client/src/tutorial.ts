@@ -4,7 +4,8 @@ import { $, confirmDialog, h } from './ui.ts';
 
 /** Tutorial guiado (~3 min): una flecha señala qué tocar. */
 interface Step {
-  text: string;
+  /** Texto; puede depender del puntero (ratón o dedo). */
+  text: string | (() => string);
   /** Selector del elemento al que apunta la flecha (o null: el mapa). */
   target: (tool: ToolId) => string | null;
   done: (s: GameState, tool: ToolId, ctx: Ctx) => boolean;
@@ -16,6 +17,7 @@ interface Ctx {
   roads0: number;
 }
 
+const coarse = () => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 const roadCount = (s: GameState) => s.map.tiles.filter((t) => t === 1).length;
 /** v1.6: las obras están en la bandeja «Construir»: primero la pestaña, luego la casilla. */
 const inTray = (id: string) => (document.querySelector('#tray:not([hidden])') ? `#tray [data-tool="${id}"]` : '#tab-build');
@@ -28,7 +30,11 @@ const STEPS: Step[] = [
     done: (s, tool, c) => tool === 'road' || roadCount(s) > c.roads0,
   },
   {
-    text: 'Toca el final de la calle del ayuntamiento y luego dónde quieres que acabe. Confirma con «Construir».',
+    // Con ratón no hay barra «Construir»: se confirma con un segundo clic en el final.
+    text: () =>
+      coarse()
+        ? 'Toca el final de la calle del ayuntamiento y luego dónde quieres que acabe. Confirma con «Construir».'
+        : 'Haz clic en el final de la calle del ayuntamiento y luego dónde quieres que acabe. Haz clic otra vez en el final para confirmar.',
     target: () => null,
     done: (s, _t, c) => roadCount(s) > c.roads0,
   },
@@ -171,7 +177,8 @@ export class Tutorial {
       this.onFocus?.(cur.focus);
     }
     const p = this.box.querySelector('p')!;
-    if (p.textContent !== cur.text) p.textContent = cur.text;
+    const text = typeof cur.text === 'function' ? cur.text() : cur.text;
+    if (p.textContent !== text) p.textContent = text;
     // Los botones del mapa suben por encima de la caja (ronda 12: la caja tapaba «Capas» y «?»).
     if (this.box.isConnected) document.documentElement.style.setProperty('--tut-h', `${this.box.offsetHeight + 8}px`);
     const sel = cur.target(tool);

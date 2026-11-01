@@ -112,5 +112,5 @@ export function openComarca(ctx: ComarcaCtx): void {
     if (deals.length) body.push(h('p', { class: 'small' }, `Acuerdos en vigor: ${deals.map((k) => OFFER_TEXT[k]).join(', ')}.`));
     for (const t of towns) body.push(townCard(ctx, state, t));
   }
-  sheet('Comarca', ...body);
+  sheet('Pueblos vecinos', ...body);
 }

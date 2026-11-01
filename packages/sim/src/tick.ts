@@ -350,6 +350,18 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
   return f;
 }
 
+/**
+ * Lo que más le preocupa, de más a menos, para la ficha y las listas. Lo que
+ * notan todos por igual (los tributos) va detrás de lo suyo propio si lo suyo
+ * pesa al menos la mitad: así la lista no dice «tasas altas» de cada vecino.
+ */
+export function worriesOf(state: GameState, c: Citizen): { label: string; value: number }[] {
+  const shared = new Set(taxMood(state, c).map((f) => f.label));
+  const bad = happinessFactors(state, c).filter((f) => f.value < 0);
+  const weight = (f: { label: string; value: number }) => (shared.has(f.label) ? f.value / 2 : f.value);
+  return bad.sort((a, b) => weight(a) - weight(b) || Number(shared.has(a.label)) - Number(shared.has(b.label)) || a.value - b.value);
+}
+
 function targetHappiness(state: GameState, c: Citizen): number {
   const t = 38 + happinessFactors(state, c).reduce((s, x) => s + x.value, 0);
   return Math.max(0, Math.min(100, t));

@@ -30,7 +30,7 @@ test('2.5: Pueblo › Comarca: una tarjeta por pueblo y la oferta con Aceptar/Re
 
   await page.locator('#menu').click();
   await page.getByRole('button', { name: /Pueblos vecinos/ }).click();
-  await expect(page.locator('.sheet h2')).toContainText('Comarca');
+  await expect(page.locator('.sheet h2')).toContainText('Pueblos vecinos');
   await expect(page.locator('.comarca-town')).toHaveCount(3);
   const first = page.locator('.comarca-town').first();
   await expect(first).toContainText(st.comarca.towns[0].mayor.name);

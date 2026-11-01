@@ -4,7 +4,7 @@ import { Terrain } from './terrain.ts';
 import { isUnlocked } from './townhall.ts';
 import { levelOf, radiusOf, truckRouteOf } from './levels.ts';
 import { serviceSaturation } from './economy.ts';
-import { buildingAt, DIRS, footprint, type GameState, inBounds, terrainAt, Tile, tileIndex, Zone } from './state.ts';
+import { buildingAt, DIRS, footprint, type GameState, hasAdjacentRoad, inBounds, terrainAt, Tile, tileIndex, Zone } from './state.ts';
 import { truckRoutes } from './trash-core.ts';
 
 /**
@@ -174,4 +174,34 @@ export function coverageSummary(state: GameState): { key: NeedKey; falta: number
     }
   }
   return NEED_KEYS.filter((k) => sum.has(k)).map((k) => ({ key: k, ...sum.get(k)! }));
+}
+
+/**
+ * Solar de zona que nunca se construirá porque no toca ninguna carretera (el
+ * crecimiento de `tick.ts` y las fincas solo eligen casillas con una carretera
+ * al lado). Lo usan la franja, la ficha del solar y la hoja de demanda.
+ */
+export function zoneLotWithoutRoad(state: GameState, x: number, y: number): boolean {
+  if (!inBounds(state, x, y)) return false;
+  const i = tileIndex(state, x, y);
+  const z = state.map.zones[i];
+  if (z === undefined || z === Zone.None || state.map.tiles[i] === Tile.Road) return false;
+  if (buildingAt(state, x, y)) return false;
+  return !hasAdjacentRoad(state, x, y);
+}
+
+/** Cuántos solares de cada zona no tocan carretera (los ya construidos no cuentan). */
+export function zonesWithoutRoad(state: GameState): { R: number; C: number; I: number; A: number } {
+  const out = { R: 0, C: 0, I: 0, A: 0 };
+  const { w, h, zones } = state.map;
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const z = zones[y * w + x];
+      if (!z || !zoneLotWithoutRoad(state, x, y)) continue;
+      if (z === Zone.R) out.R++;
+      else if (z === Zone.C) out.C++;
+      else if (z === Zone.I) out.I++;
+      else if (z === Zone.A) out.A++;
+    }
+  return out;
 }

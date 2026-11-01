@@ -257,6 +257,9 @@ pre.prompt { white-space: pre-wrap; word-break: break-word; max-height: 40vh; ov
 .bubble-text { display: block; }
 .ai-badge { margin-left: 8px; vertical-align: middle; padding: 0 4px; font-size: 0.7rem; font-weight: 700; color: #f4f4f4; background: #3b5dc9; border-radius: 2px; }
 .ai-mark { color: #ffcd75; }
+/* Abajo a la izquierda del mapa: arriba lo tapan los avisos y a la derecha están «Capas» y «?». */
+.slow-note { position: absolute; left: max(8px, env(safe-area-inset-left)); bottom: 8px; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; max-width: calc(100% - 96px); padding: 6px 8px 6px 12px; background: var(--panel); border: 2px solid var(--accent); border-radius: 4px; box-shadow: 2px 2px 0 #1a1c2c; font-weight: 700; }
+.slow-note[hidden] { display: none; }
 .ai-banner { position: absolute; left: 8px; right: 72px; top: 8px; margin: 0; padding: 8px 12px; background: #ef7d57; color: #1a1c2c; font-weight: 700; border-radius: 4px; }
 .quote { color: var(--accent); }
 @media (prefers-reduced-motion: no-preference) {
@@ -687,6 +690,11 @@ html[data-text='200'] .tab .px-icon, html[data-text='200'] .tab .tab-sprite { wi
   box-shadow: 0 -4px 0 #1a1c2c;
 }
 .tray h3 { margin: 6px 0 4px; font-size: calc(13px * var(--ui)); color: var(--accent); font-family: ui-monospace, 'Cascadia Mono', Menlo, monospace; }
+.tray-cat > summary { display: flex; align-items: center; gap: 6px; min-height: 32px; cursor: pointer; list-style: none; }
+.tray-cat > summary::-webkit-details-marker { display: none; }
+.tray-cat > summary::before { content: '▸'; color: var(--accent); }
+.tray-cat[open] > summary::before { content: '▾'; }
+.tray-cat:not([open]) > summary h3 { color: var(--muted); }
 .tray-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
 .tray .tool {
   position: relative;
@@ -769,6 +777,8 @@ body.in-game .toast-close { margin: 0; min-width: 44px; min-height: 44px; }
 .mini-portrait { width: 28px; height: 42px; image-rendering: pixelated; background: #333c57; }
 .person-row .p-name { font-weight: 700; }
 .person-row .p-sub { display: block; color: var(--muted); font-size: 0.85em; }
+/* Listas de cuentas y demanda: el título y la explicación en líneas distintas. */
+.accounts .p-sub { display: block; color: var(--muted); font-size: 0.85em; font-weight: 400; }
 .person-row .p-mood { font-variant-numeric: tabular-nums; font-weight: 700; }
 /* Ronda 21: en la lista de vecinos, el detalle va a lo ancho (antes caía en la columna de 28 px y salía palabra a palabra). */
 .people .person-row > .p-sub { grid-column: 2 / -1; }
@@ -992,6 +1002,8 @@ html[data-text='200'] .tray-grid { grid-template-columns: repeat(auto-fill, minm
 .mg-chip { padding: 2px 8px; border: 1px solid var(--line); background: var(--panel); }
 .mg-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .mg-why { margin-top: 4px; }
+.mg-note { margin: 0 0 8px; padding: 6px 8px; border-left: 4px solid var(--good); background: var(--panel-2); font-weight: 700; }
+.mg-after { margin: 4px 0; }
 
 /* v1.8: nivel de los servicios en la ficha. */
 .level-box { margin: 8px 0; padding: 8px 12px; border: 2px solid var(--line); background: var(--bg); }

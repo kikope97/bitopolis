@@ -257,7 +257,8 @@ export function addMemory(state: GameState, c: Citizen, kind: MemoryKind, import
 }
 
 /** Minúscula solo la primera letra: los nombres propios que vengan detrás se quedan como están. */
-export const lowerFirst = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
+/** Baja la inicial («Tasas altas» → «tasas altas»), pero no la de una sigla («IBI alto» sigue igual). */
+export const lowerFirst = (t: string) => (/^\p{Lu}\p{Lu}/u.test(t) ? t : t.charAt(0).toLowerCase() + t.slice(1));
 
 const nameOf = (state: GameState, id: number) => state.citizens.find((c) => c.id === id)?.name.split(' ')[0] ?? 'alguien que ya no vive aquí';
 
@@ -836,12 +837,14 @@ export function canConvenePleno(state: GameState): { ok: boolean; error?: string
   return { ok: true };
 }
 
-/** Convoca un pleno: hasta 3 peticiones de vecinos con nombre, votadas por todos. */
-export function convenePleno(state: GameState): void {
-  transfer(state, TREASURY, OUTSIDE, PLENO_COST, 'plenos');
-  state.lastPlenoTick = state.tick;
+/**
+ * Qué se pediría si se convocara el pleno ahora: hasta 3 peticiones de vecinos
+ * con nombre y, con partido en la oposición, la pregunta de su líder. Puro (sin
+ * azar ni cambios): lo usan `convenePleno` y la vista previa del cliente («Hoy pedirían»).
+ */
+export function plenoPlan(state: GameState): { citizenId: number; need: Need; opposition?: true }[] {
   const named = state.citizens.filter((c) => c.named).sort((a, b) => a.happiness - b.happiness);
-  const petitions: Petition[] = [];
+  const out: { citizenId: number; need: Need; opposition?: true }[] = [];
   // Lo que ya está prometido y pendiente no se vuelve a pedir: una obra no cumple dos promesas (ronda 09).
   const promised = (n: Need) => state.promises.some((p) => p.status === 'pending' && p.need === n);
   // Con un partido en la oposición, su líder también pregunta (v1.3, aplazado de la ronda 07).
@@ -850,33 +853,32 @@ export function convenePleno(state: GameState): void {
   const leader = party && state.politics.mayor === 'player' ? state.citizens.find((c) => c.id === party.leaderId) : undefined;
   const oppNeed = leader ? needsOf(state, leader).find((n) => !promised(n)) : undefined;
   for (const c of named) {
-    if (petitions.length >= 3) break;
-    const need = needsOf(state, c).find((n) => !petitions.some((p) => p.need === n) && !promised(n) && n !== oppNeed);
-    if (!need) continue;
+    if (out.length >= 3) break;
+    const need = needsOf(state, c).find((n) => !out.some((p) => p.need === n) && !promised(n) && n !== oppNeed);
+    if (need) out.push({ citizenId: c.id, need });
+  }
+  if (leader && oppNeed) out.push({ citizenId: leader.id, need: oppNeed, opposition: true });
+  return out;
+}
+
+/** Convoca un pleno: hasta 3 peticiones de vecinos con nombre, votadas por todos. */
+export function convenePleno(state: GameState): void {
+  const plan = plenoPlan(state);
+  transfer(state, TREASURY, OUTSIDE, PLENO_COST, 'plenos');
+  state.lastPlenoTick = state.tick;
+  const petitions: Petition[] = [];
+  for (const p of plan) {
     let yes = 0;
     const supporters: number[] = [];
     for (const v of state.citizens) {
-      if (wantsNeed(state, v, need)) {
+      if (wantsNeed(state, v, p.need)) {
         yes++;
         if (v.named) supporters.push(v.id);
       }
     }
-    petitions.push({ id: state.nextId++, citizenId: c.id, need, yes, no: state.citizens.length - yes, supporters, answer: null });
+    petitions.push({ id: state.nextId++, citizenId: p.citizenId, need: p.need, yes, no: state.citizens.length - yes, supporters, answer: null, ...(p.opposition ? { opposition: true } : {}) });
   }
-  if (leader) {
-    const need = oppNeed;
-    if (need) {
-      let yes = 0;
-      const supporters: number[] = [];
-      for (const v of state.citizens) {
-        if (wantsNeed(state, v, need)) {
-          yes++;
-          if (v.named) supporters.push(v.id);
-        }
-      }
-      petitions.push({ id: state.nextId++, citizenId: leader.id, need, yes, no: state.citizens.length - yes, supporters, answer: null, opposition: true });
-    }
-  }
+  const leader = plan.some((p) => p.opposition);
   // 2.2: una calle por pleno, entre los candidatos que propone el motor.
   const street = streetCandidates(state).map((c) => c.id);
   const speakers = plenoSpeakers(state, petitions);
