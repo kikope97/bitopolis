@@ -83,7 +83,7 @@ export const TOOLS: Tool[] = [
   // 2.1: recogida de basura.
   { id: 'cleanpoint', label: 'Punto limpio', shape: 'tap', build: 'cleanpoint', key: 'u', help: 'Su camión recoge la basura por las calles de alrededor (60 casillas al día). Solo quien tiene recogida paga la tasa de basuras.' },
   // 2.3: turismo (uno por partida; su forma sale del terreno).
-  { id: 'heritage', label: 'Patrimonio', shape: 'tap', build: 'heritage', key: 'o', help: 'Monumento que atrae visitantes (uno por pueblo): faro junto al mar, molino junto al río, castillo en la colina o rollo con plaza porticada en el llano. Turismo, en Pueblo › Ayuntamiento.' },
+  { id: 'heritage', label: 'Patrimonio', shape: 'tap', build: 'heritage', key: '', help: 'Monumento que atrae visitantes (uno por pueblo): faro junto al mar, molino junto al río, castillo en la colina o rollo con plaza porticada en el llano. Turismo, en Pueblo › Ayuntamiento.' },
   // 2.3: grandes obras por fases (sin atajo de teclado: se eligen en la bandeja).
   { id: 'bridge', label: 'Puente de piedra', shape: 'tap', landmark: 'bridge', key: '', help: 'Sobre el río, junto a una carretera. 3 fases: riadas a la mitad en la orilla y el suelo de alrededor vale más. Cada fase se paga cuando quieras.' },
   { id: 'station', label: 'Estación de tren', shape: 'tap', landmark: 'station', key: '', help: 'Ocupa 2×2 casillas. 3 fases: más ganas de vivir aquí, más trabajo fuera y el viaje sale más barato.' },

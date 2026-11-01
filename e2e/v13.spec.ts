@@ -20,7 +20,7 @@ test('v1.3: skyline que se mueve, llave de píxeles, tecla O y nota del enlace',
     return n;
   });
   expect(keyPixels).toBeGreaterThan(10);
-  await expect(page.locator('summary')).not.toContainText('🔑');
+  await expect(page.locator('summary', { hasText: 'Tu enlace' })).not.toContainText('🔑');
   // Sin URL pública distinta, no hace falta la nota.
   await expect(page.locator('#link-note')).toBeHidden();
 
