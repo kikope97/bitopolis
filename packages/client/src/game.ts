@@ -1,6 +1,7 @@
 import { tickToDate, type Command } from '@bitopolis/shared';
 import {
   BUILD_NAMES,
+  buildingAt,
   CROP_HINT,
   isWater,
   CROP_TEXT,
@@ -1065,8 +1066,9 @@ export function startGame(opts: GameOptions): void {
    */
   function pickTile(cx: number, cy: number, t: { x: number; y: number }): { x: number; y: number } {
     if ((tool.id !== 'inspect' && tool.id !== 'demolish') || dedicating) return t;
-    const here = state.buildings.some((b) => b.x === t.x && b.y === t.y);
-    const below = state.buildings.some((b) => b.x === t.x && b.y === t.y + 1);
+    // 2.3: `occupies` (vía buildingAt) cuenta las 4 casillas de los edificios 2×2.
+    const here = !!buildingAt(state, t.x, t.y);
+    const below = !!buildingAt(state, t.x, t.y + 1);
     if (here || !below) return t;
     const r = canvas.getBoundingClientRect();
     const fy = (((cy - r.top) * dpr() + cam.y) / tileSize()) % 1;
@@ -1205,7 +1207,7 @@ export function startGame(opts: GameOptions): void {
     }
     if (tool.id === 'demolish') {
       // v1.6: se confirma en la franja de abajo, en rojo (antes, una ventana que tapaba el mapa).
-      const b = state.buildings.find((x) => x.x === tile.x && x.y === tile.y);
+      const b = buildingAt(state, tile.x, tile.y);
       const onRiver = terrainAt(state, tile.x, tile.y) === Terrain.River;
       const what = b ? (b.name ?? BUILD_NAMES[b.kind]) : state.map.tiles[tile.y * state.map.w + tile.x] === Tile.Road ? (onRiver ? 'Puente' : 'Carretera') : hasDike(state, tile.x, tile.y) ? 'Dique' : null;
       if (!what) {
@@ -1342,7 +1344,7 @@ export function startGame(opts: GameOptions): void {
       const crops = cmd.zone === 'A' ? ` · ${cropsText(cmd)}` : '';
       return `${plural(changed, 'casilla', 'casillas')}, ${money(changed * ZONE_COST_PER_TILE)}${skipped ? ` (no se cobran ${skipped} ocupadas o ya marcadas; los árboles sí, se talan al construir)` : ''}${crops}`;
     }
-    const n = tilesOf(cmd).filter((t) => state.map.tiles[t.y * state.map.w + t.x] !== Tile.Road && !state.buildings.some((q) => q.x === t.x && q.y === t.y)).length;
+    const n = tilesOf(cmd).filter((t) => state.map.tiles[t.y * state.map.w + t.x] !== Tile.Road && !buildingAt(state, t.x, t.y)).length;
     const bridges = bridgeTiles(a, b);
     return `${plural(n, 'casilla nueva', 'casillas nuevas')}, ${money(lineCost(a, b))}${bridges ? ` (con puente de ${plural(bridges, 'casilla', 'casillas')})` : ''}`;
   }
@@ -1444,7 +1446,7 @@ export function startGame(opts: GameOptions): void {
 
   /** Qué hay en una casilla (para el lector de pantalla). */
   function describeTile(t: { x: number; y: number }): string {
-    const b = state.buildings.find((x) => x.x === t.x && x.y === t.y);
+    const b = buildingAt(state, t.x, t.y);
     const i = t.y * state.map.w + t.x;
     const ter = state.map.terrain?.[i] ?? 0;
     const road = state.map.tiles[i] === Tile.Road;
@@ -1695,7 +1697,7 @@ export function startGame(opts: GameOptions): void {
 
   function inspect(tile: { x: number; y: number }) {
     selected = tile;
-    const b = state.buildings.find((x) => x.x === tile.x && x.y === tile.y);
+    const b = buildingAt(state, tile.x, tile.y);
     openInspect = () => {
       const fresh = state.buildings.find((x) => x.id === b?.id);
       if (b && !fresh) {

@@ -72,6 +72,7 @@ import { addMemory, goalFor, memoryMood, onCitizenLeaves, PROFESSIONS, relationM
 import { politicsDay, politicsPrune } from './politics.ts';
 import {
   type Building,
+  buildingAt,
   type Citizen,
   DIRS,
   DESIRES,
@@ -391,7 +392,7 @@ function growZones(state: GameState, served: { water: Set<number>; power: Set<nu
       for (let x = 0; x < w; x++) {
         const i = y * w + x;
         if (zones[i] !== zone || tiles[i] === Tile.Road) continue;
-        if (state.buildings.some((b) => b.x === x && b.y === y)) continue;
+        if (buildingAt(state, x, y)) continue;
         const ok = DIRS.some(([dx, dy]) => {
           const nx = x + dx;
           const ny = y + dy;

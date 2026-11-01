@@ -1,4 +1,4 @@
-import { canUpgradeTownhall, coverageSummary, type GameState, NEED_LABEL, TOWNHALL_LEVELS, freeHomes, taxLevels, zonesUnlocked } from '@bitopolis/sim';
+import { buildingAt, canUpgradeTownhall, coverageSummary, type GameState, NEED_LABEL, TOWNHALL_LEVELS, freeHomes, taxLevels, zonesUnlocked } from '@bitopolis/sim';
 import type { ToolId } from './tools.ts';
 
 export interface Hint {
@@ -51,7 +51,7 @@ export function nextHint(state: GameState): Hint {
     return { text: 'Hay casas libres. Pon el tiempo en marcha (▶, y acelera a x3) y espera a que llegue gente.' };
   }
   const { R, C, I } = state.demand;
-  const zoned = (z: number) => state.map.zones.some((v, i) => v === z && !state.buildings.some((b) => b.y * state.map.w + b.x === i));
+  const zoned = (z: number) => state.map.zones.some((v, i) => v === z && !buildingAt(state, i % state.map.w, Math.floor(i / state.map.w)));
   if (R > 20 && !zoned(1)) return { text: 'Hay demanda de viviendas (R). Pinta una zona residencial junto a una carretera con agua y luz.', tool: 'zoneR' };
   if (I > 20 && !zoned(3)) return { text: 'Hay gente sin trabajo en el pueblo. Pinta una zona industrial (I), mejor lejos de las casas.', tool: 'zoneI' };
   if (C > 20 && !zoned(2)) return { text: 'Los vecinos quieren tiendas. Pinta una zona comercial (C).', tool: 'zoneC' };

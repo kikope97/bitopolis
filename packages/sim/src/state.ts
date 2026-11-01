@@ -108,6 +108,10 @@ export interface Building {
   /** 2.2: año (de juego) de la última cosecha vendida y última tormenta sobre la finca (tick). */
   harvested?: number;
   stormed?: number;
+  /** 2.3: lado en casillas (sin definir = 1). Las grandes obras son 2×2: ver `occupies`. */
+  size?: 2;
+  /** 2.3: vivienda en propiedad convertida en casa rural (turismo, tourism.ts). */
+  rural?: boolean;
 }
 
 /** 2.2: cultivos de las fincas (ver farm.ts). */
@@ -648,8 +652,31 @@ export function inBounds(state: GameState, x: number, y: number): boolean {
   return x >= 0 && y >= 0 && x < state.map.w && y < state.map.h;
 }
 
+/** 2.3: lado del edificio en casillas (1, o 2 en las grandes obras 2×2). */
+export function sizeOf(b: { x: number; y: number; size?: number }): number {
+  return b.size ?? 1;
+}
+
+/**
+ * 2.3: ¿ocupa el edificio la casilla (x, y)? Un edificio 2×2 se ancla en su
+ * casilla (x, y) y ocupa también las 3 de la derecha y de abajo. Es el único
+ * sitio donde se decide: úsalo en vez de comparar `b.x === x && b.y === y`.
+ */
+export function occupies(b: { x: number; y: number; size?: number }, x: number, y: number): boolean {
+  const n = b.size ?? 1;
+  return x >= b.x && y >= b.y && x < b.x + n && y < b.y + n;
+}
+
+/** 2.3: casillas que ocupa un edificio (la del ancla primero). */
+export function footprint(b: { x: number; y: number; size?: number }): [number, number][] {
+  const n = b.size ?? 1;
+  const out: [number, number][] = [];
+  for (let dy = 0; dy < n; dy++) for (let dx = 0; dx < n; dx++) out.push([b.x + dx, b.y + dy]);
+  return out;
+}
+
 export function buildingAt(state: GameState, x: number, y: number): Building | undefined {
-  return state.buildings.find((b) => b.x === x && b.y === y);
+  return state.buildings.find((b) => occupies(b, x, y));
 }
 
 export function buildingById(state: GameState, id: number): Building | undefined {

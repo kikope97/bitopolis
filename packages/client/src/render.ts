@@ -1,4 +1,4 @@
-import { ambulanceFor, type GameState, isWater, streetSegment, Terrain, Tile, trashStateOf, truckRoutes, Zone } from '@bitopolis/sim';
+import { ambulanceFor, buildingAt, type GameState, isWater, streetSegment, Terrain, Tile, trashStateOf, truckRoutes, Zone } from '@bitopolis/sim';
 import { happinessMarks, type LayerId, layerCanvas, missingMarks, NEED_ICON } from './layers.ts';
 import { pixelIcon } from './icons.ts';
 
@@ -624,7 +624,7 @@ export function render(
     for (const m of missingMarks(state)) {
       if (!m.needs.length) continue;
       const top = m.needs[0]!;
-      const built = state.buildings.some((b) => b.x === m.x && b.y === m.y);
+      const built = !!buildingAt(state, m.x, m.y);
       const falta = top.status === 'falta';
       if (cssTile < 22) {
         // Punto de 10×10 con borde claro: rojo lleno si falta, amarillo con hueco si está lleno.

@@ -15,7 +15,7 @@ import { addMemory, goalFor, NEED_TEXT, needOf, needsOf, PROFESSIONS, relation, 
 import { transfer } from './money.ts';
 import { canDump, dumpTrash } from './trash.ts';
 import { canSignTemporero, HARVEST_NAME, signTemporero } from './farm.ts';
-import { type Building, type Citizen, DESIRES, FEARS, type GameState, pushEvent, type Trigger } from './state.ts';
+import { type Building, buildingAt, type Citizen, DESIRES, FEARS, type GameState, pushEvent, type Trigger } from './state.ts';
 
 /**
  * 2.0 (petición del creador): «la superIA del pueblo». En Modo IA, los vecinos
@@ -704,7 +704,7 @@ export function mayorText(state: GameState, cmd: { type: string } & Record<strin
     case 'Zone':
       return cmd.zone === 'none' ? null : { text: `marca zona ${cmd.zone === 'R' ? 'residencial' : cmd.zone === 'C' ? 'comercial' : cmd.zone === 'A' ? 'agraria' : 'industrial'}`, big: false };
     case 'Demolish': {
-      const b = state.buildings.find((x) => x.x === cmd.x && x.y === cmd.y);
+      const b = buildingAt(state, Number(cmd.x), Number(cmd.y));
       return b ? { text: `derriba ${(b.name ?? BUILD_NAMES[b.kind] ?? b.kind).toLowerCase()}`, big: b.kind === 'house' || b.kind === 'res' || b.kind === 'shop' } : null;
     }
     case 'SetTax': {
