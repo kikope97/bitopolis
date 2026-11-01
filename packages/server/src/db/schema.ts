@@ -18,6 +18,9 @@ export interface GamesTable {
   lease_session: string | null;
   lease_until: Generated<number>;
   seed: Generated<number>;
+  /** 2.3: enlace de solo lectura /v/<view_token> (null si no se comparte) y desde cuándo. */
+  view_token?: string | null;
+  view_created_at?: string | null;
 }
 
 export interface AiConfigTable {
