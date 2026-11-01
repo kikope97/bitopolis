@@ -294,7 +294,8 @@ El alcance está congelado hasta la v1.0. Todo lo de la sección 15 solo entra s
 
 - **v2.0 — La superIA del pueblo** (ronda 16, pedido por el creador): turnos semanales con IA para un % de vecinos, decisiones económicas por lotes, director del pueblo con presupuesto de drama, notas y contagio de actitud, modelos desde la API key y escalera de gasto. Ver §9.6.
 
-- **v2.1 — Emergencias y encargos** (ronda 17, pedido por el creador): bomberos e incendios con aviso previo, protección civil y diques, ambulancia, basura y punto limpio, encargos del pueblo, El Eco de Bitópolis, rangos de aldea a capital comarcal con escudo, «Mientras no estabas». Siguientes versiones: `docs/propuestas/hoja-de-ruta-2.x.md`.
+- **v2.1 — Emergencias y encargos** (ronda 17, pedido por el creador): bomberos e incendios con aviso previo, protección civil y diques, ambulancia, basura y punto limpio, encargos del pueblo, El Eco de Bitópolis, rangos de aldea a capital comarcal con escudo, «Mientras no estabas».
+- **v2.2 — Economía y política** (ronda 18): préstamos con nota A–D, licitaciones con la oferta del primo y escándalo, calles con nombre, el campo con cosechas, rival con estilo y promesas, varias candidaturas, biografías y pies de foto con IA y el gobierno del rival con IA. Siguientes versiones: `docs/propuestas/hoja-de-ruta-2.x.md`.
 
 ## 15. Después de la v1.0 (backlog, no implementar antes)
 
