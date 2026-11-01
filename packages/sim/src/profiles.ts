@@ -66,7 +66,7 @@ interface PlannerOpts {
 
 const TRANSIT_RIDERS = 20;
 const CARE_ELDERS = 6;
-const CARE_COUPLES = 2;
+const CARE_COUPLES = 3;
 
 /**
  * 2.2: préstamo «con cabeza» para lo que falta: el hueco hasta `cost` (más un
@@ -431,7 +431,7 @@ function planner(name: string, o: PlannerOpts): Profile {
           ['residence', elders >= CARE_ELDERS],
         ];
         // Con holgura: que el superávit pague dos veces lo que cuesta al mes.
-        for (const [kind, ok] of wants) if (ok && !has(kind) && isUnlocked(state, kind) && room >= 2 * cost(kind) && tryBuild(kind)) return out;
+        for (const [kind, ok] of wants) if (ok && !has(kind) && isUnlocked(state, kind) && room >= 3 * cost(kind) && tryBuild(kind)) return out;
       }
       // Vivienda municipal al principio (o siempre, según el perfil).
       if ((!zonesOn || o.municipalHousing) && freeHomes(state) + state.projects.filter((p) => p.payer === 0).length * 3 < 3 && state.demand.R > 0) {

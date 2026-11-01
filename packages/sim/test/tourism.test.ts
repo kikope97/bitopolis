@@ -211,14 +211,15 @@ describe('casas rurales (2.3)', () => {
 });
 
 describe('turismo en la partida (2.3)', () => {
-  it('casual a 4 años: patrimonio, visitantes y menos del 15 % de casas rurales; determinista', () => {
+  it('casual a 4 años: patrimonio, visitantes y casas rurales sin vaciar el pueblo; determinista', () => {
     const a = runSimulation({ seed: 42, days: 1460, profile: 'casual' });
     expect(a.report.invariantErrors).toEqual([]);
     expect(a.report.moneyDrift).toBe(0);
     expect(a.state.buildings.some((b) => b.kind === 'heritage')).toBe(true);
     const last = a.report.tourism.at(-1)!;
     expect(last.visitors).toBeGreaterThan(300);
-    expect(last.ruralPct).toBeLessThan(15);
+    // Ronda 19: la turistificación (≥ 15 %) puede llegar, pero no se queda con el pueblo.
+    expect(last.ruralPct).toBeLessThan(30);
     const b = runSimulation({ seed: 42, days: 1460, profile: 'casual' });
     expect(hashState(b.state)).toBe(hashState(a.state));
   }, 600_000);
