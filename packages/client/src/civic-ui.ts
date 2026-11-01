@@ -1,5 +1,5 @@
 import { tickToDate } from '@bitopolis/shared';
-import { ASSOCIATIONS, BUDGET_TEXT, type BudgetPlan, CAUSE_ASK, canHoldFestival, FESTIVAL, GRANT_NAME, kidsCount } from '@bitopolis/sim';
+import { ASSOCIATIONS, BUDGET_TEXT, type BudgetPlan, CAUSE_ASK, canHoldFestival, FESTIVAL, grantTerms, kidsCount } from '@bitopolis/sim';
 import { formatDate, money } from './i18n.ts';
 import type { SocialCtx } from './social-ui.ts';
 import { confirmDialog, h, sheet } from './ui.ts';
@@ -70,7 +70,8 @@ export function openTownHall(ctx: SocialCtx, focus?: 'budget' | 'festival' | 'gr
   const live = s.grants.filter((g) => g.status === 'offered' || g.status === 'accepted');
   if (!live.length) grants.push(h('p', { class: 'muted' }, 'Ahora mismo no hay ofertas. Llegan de vez en cuando (desde 10 vecinos).'));
   for (const g of live) {
-    const what = GRANT_NAME[g.kind] ?? g.kind;
+    // 2.3: las de las grandes obras y el FEDER tienen sus condiciones (grantTerms).
+    const terms = grantTerms(g);
     if (g.status === 'offered') {
       const yes = h('button', { class: 'btn primary' }, 'Aceptar');
       const no = h('button', { class: 'btn' }, 'Rechazar');
@@ -82,13 +83,13 @@ export function openTownHall(ctx: SocialCtx, focus?: 'budget' | 'festival' | 'gr
       });
       grants.push(
         h('div', { class: 'petition' },
-          h('p', {}, `Pagan el ${Math.round(g.share * 100)} % de ${what} si se termina en 6 meses.`),
-          h('p', { class: 'muted small' }, 'Al aceptar cobras un anticipo del 30 %. Si no lo terminas a tiempo, lo devuelves con un 10 % de recargo.'),
+          h('p', {}, terms.offer),
+          h('p', { class: 'muted small' }, terms.terms),
           h('div', { class: 'row' }, yes, no),
         ),
       );
     } else {
-      grants.push(h('p', {}, `Aceptada: ${what}, ${Math.round(g.share * 100)} %. Anticipo cobrado: ${money(g.advance)}. Plazo hasta el ${formatDate(tickToDate(g.deadline))}.`));
+      grants.push(h('p', {}, terms.accepted));
     }
   }
 

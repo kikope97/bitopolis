@@ -1148,3 +1148,16 @@ body.placing .tut-arrow { visibility: hidden; }
 .loan-item.tesoreria { border-left: 6px solid var(--accent); }
 .loan-item p { margin: 4px 0; }
 .loan-repay { width: 100%; margin-top: 4px; }
+
+/* 2.3: grandes obras (barra de fases de la ficha, icono 2×2 de la bandeja) y la gran empresa. */
+.tool-icon canvas.wide { width: 40px; height: 50px; margin-bottom: -4px; }
+.phase-bar { display: flex; gap: 4px; margin: 8px 0; }
+.phase-seg { position: relative; flex: 1; min-height: 28px; border: 2px solid var(--line); background: var(--bg); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.phase-seg.done { background: var(--good); border-color: var(--good); color: var(--bg); }
+.phase-seg.doing { border-color: var(--accent); }
+.phase-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); opacity: 0.55; }
+.phase-num { position: relative; font-weight: 700; }
+.landmark-sheet .btn.wide { margin-top: 6px; }
+.bc-opt { margin: 6px 0; }
+.bc-opt p { margin: 2px 0 0; }
+
