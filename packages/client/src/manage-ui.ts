@@ -2,7 +2,10 @@ import { tickToDate } from '@bitopolis/shared';
 import {
   BUILD_LEVEL,
   BUILD_NAMES,
+  budgetFx,
   canUpgradeTownhall,
+  type GameState,
+  maintenanceOf,
   coverageSummary,
   CRIME,
   daysToElection,
@@ -37,12 +40,26 @@ const card = (title: string, icon: string, ...body: (Node | string)[]) =>
   h('section', { class: 'mg-card' }, h('h3', {}, pixelIcon(icon), ` ${title}`), ...body);
 const row = (label: string, value: string, cls = '') => h('div', { class: `mg-row ${cls}` }, h('span', {}, label), h('strong', {}, value));
 
-export function openManagement(ctx: SocialCtx, links: ManageLinks): void {
+/**
+ * Lo que se paga a fin de mes, aproximado: los gastos del mes pasado (o el
+ * mantenimiento, si aún no hay mes cerrado) más lo que sube el mantenimiento
+ * del ayuntamiento con `extraLevels` niveles más (se paga × nivel, tick.ts).
+ */
+export function monthlyCostEstimate(s: GameState, extraLevels = 0): number {
+  const fx = budgetFx(s).maintenance;
+  const hall = s.buildings.find((b) => b.kind === 'townhall' && b.built);
+  const extra = hall ? maintenanceOf(hall) * extraLevels * fx : 0;
+  const last = s.stats.at(-1);
+  const base = last ? last.expenses : s.buildings.filter((b) => b.built).reduce((t, b) => t + maintenanceOf(b) * (b.kind === 'townhall' ? townLevel(s) : 1) * fx, 0);
+  return Math.round(base + extra);
+}
+
+export function openManagement(ctx: SocialCtx, links: ManageLinks, note?: string): void {
   const s = ctx.state();
   const lv = townLevel(s);
   const info = TOWNHALL_LEVELS[lv - 1]!;
   const next = nextLevel(s);
-  const reopen = () => openManagement(ctx, links);
+  const reopen = (msg?: string) => openManagement(ctx, links, msg);
 
   /* --- el ayuntamiento y su ampliación --- */
   // Copia: el sprite está en caché y no puede moverse al DOM.
@@ -55,11 +72,20 @@ export function openManagement(ctx: SocialCtx, links: ManageLinks): void {
     const btn = h('button', { class: 'btn primary mg-upgrade' }, pixelIcon('upgrade'), ` Ampliar a nivel ${next.level} · ${money(next.cost)}`) as HTMLButtonElement;
     btn.disabled = !ok.ok;
     btn.addEventListener('click', async () => {
-      if (await ctx.command({ type: 'UpgradeTownhall' })) reopen();
+      // El aviso va dentro de la hoja: un aviso normal quedaría tapado por la pantalla completa.
+      if (await ctx.command({ type: 'UpgradeTownhall' })) {
+        const after = ctx.state();
+        reopen(`✓ Ayuntamiento ampliado a nivel ${next.level}. Quedan ${money(after.treasury)} en caja; a fin de mes pagas ≈ ${money(due)}.`);
+      }
     });
+    // Antes de pagar: cuánto queda y lo que viene a fin de mes (ronda de pruebas: el tutorial dejaba la caja en ~100 €).
+    const left = s.treasury - next.cost;
+    const due = monthlyCostEstimate(s, 1);
+    const tight = ok.ok && left < due;
     up.push(
       h('p', {}, `Siguiente: `, h('strong', {}, next.name), ` (nivel ${next.level}). Pide ${next.pop} vecinos y ${money(next.cost)}.`),
       h('p', { class: 'muted small' }, `Desbloquea: ${next.unlocks.join(', ')}.`),
+      ok.ok ? h('p', { class: tight ? 'pocket-warn mg-after' : 'muted small mg-after', 'data-test': 'upgrade-after' }, `${tight ? '⚠ ' : ''}Te quedarán ${money(left)}; a fin de mes pagas ≈ ${money(due)}.${tight ? ' Quizá convenga esperar a cobrar.' : ''}`) : '',
       btn,
     );
     if (!ok.ok) up.push(h('p', { class: 'muted small mg-why' }, ok.error));
@@ -68,7 +94,7 @@ export function openManagement(ctx: SocialCtx, links: ManageLinks): void {
     'section',
     { class: 'mg-card mg-hero' },
     pic,
-    h('div', {}, h('h3', {}, info.name), h('p', { class: 'mg-level' }, `Nivel ${lv} de ${TOWNHALL_LEVELS.length}`), ...up),
+    h('div', {}, note ? h('p', { class: 'mg-note', role: 'status', 'data-test': 'upgrade-done' }, note) : '', h('h3', {}, info.name), h('p', { class: 'mg-level' }, `Nivel ${lv} de ${TOWNHALL_LEVELS.length}`), ...up),
   );
 
   /* --- cómo va --- */

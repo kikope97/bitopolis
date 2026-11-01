@@ -989,6 +989,8 @@ html[data-text='200'] .tray-grid { grid-template-columns: repeat(auto-fill, minm
 .mg-chip { padding: 2px 8px; border: 1px solid var(--line); background: var(--panel); }
 .mg-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .mg-why { margin-top: 4px; }
+.mg-note { margin: 0 0 8px; padding: 6px 8px; border-left: 4px solid var(--good); background: var(--panel-2); font-weight: 700; }
+.mg-after { margin: 4px 0; }
 
 /* v1.8: nivel de los servicios en la ficha. */
 .level-box { margin: 8px 0; padding: 8px 12px; border: 2px solid var(--line); background: var(--bg); }
