@@ -39,3 +39,4 @@ export * from './press.ts';
 export * from './fire.ts';
 export * from './rank.ts';
 export * from './trash.ts';
+export * from './farm.ts';

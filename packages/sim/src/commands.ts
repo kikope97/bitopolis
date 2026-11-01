@@ -1,4 +1,5 @@
 import { answerErrand, canAnswerErrand } from './errands.ts';
+import { farmZoneUnlocked } from './farm.ts';
 import { answerPress, canAnswerPress } from './press.ts';
 import { canMeetAssociation, meetAssociation } from './associations.ts';
 import { canUpgradeBuilding, startUpgrade } from './levels.ts';
@@ -56,9 +57,10 @@ export const BUILD_NAMES: Record<string, string> = {
   res: 'Viviendas',
   shop: 'Tienda',
   factory: 'Taller',
+  farm: 'Finca',
 };
 
-const ZONE_VALUE: Record<ZoneKind, number> = { none: Zone.None, R: Zone.R, C: Zone.C, I: Zone.I };
+const ZONE_VALUE: Record<ZoneKind, number> = { none: Zone.None, R: Zone.R, C: Zone.C, I: Zone.I, A: Zone.A };
 
 /** Coste total previsto (materiales + mano de obra al precio de fuera). */
 export function buildCost(kind: BuildKind): number {
@@ -215,6 +217,11 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
     }
     case 'Zone': {
       if (cmd.zone !== 'none' && !zonesUnlocked(state)) return { ok: false, error: 'Las zonas se desbloquean con el ayuntamiento de nivel 2' };
+      // 2.2: la zona agraria pide, además, sus vecinos.
+      if (cmd.zone === 'A') {
+        const farm = farmZoneUnlocked(state);
+        if (!farm.ok) return farm;
+      }
       if (!inBounds(state, cmd.x, cmd.y) || !inBounds(state, cmd.x + cmd.w - 1, cmd.y + cmd.h - 1)) {
         return { ok: false, error: 'Fuera del mapa' };
       }

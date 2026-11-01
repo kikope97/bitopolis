@@ -45,6 +45,7 @@ import {
   dikeSprite,
   fireTruckSprite,
   flamesSprite,
+  farmSprite,
   riskSprite,
 } from './sprites.ts';
 
@@ -62,7 +63,7 @@ export interface Preview {
 }
 
 const P = (i: number) => PALETTE[i]!;
-const ZONE_LETTER: Record<number, 'R' | 'C' | 'I'> = { [Zone.R]: 'R', [Zone.C]: 'C', [Zone.I]: 'I' };
+const ZONE_LETTER: Record<number, 'R' | 'C' | 'I' | 'A'> = { [Zone.R]: 'R', [Zone.C]: 'C', [Zone.I]: 'I', [Zone.A]: 'A' };
 const GRASS_VARIANTS = 8;
 const TREE_VARIANTS = 12;
 
@@ -316,6 +317,8 @@ function bSprite(b: GameState['buildings'][number], tod: TimeOfDay, snowing: boo
   if (b.damaged) return b.damaged.cause === 'fuego' ? burntSprite(b.kind, b.id, tod) : damagedSprite(b.kind, b.id, tod);
   if (b.kind === 'townhall') return townhallSprite(state.townhallLevel ?? 1, tod, snowing);
   if (b.level && b.level > 1) return serviceSprite(b.kind, b.id, b.level, tod, snowing);
+  // 2.2: la finca, según su cultivo.
+  if (b.kind === 'farm' && b.crop) return farmSprite(b.crop, b.id, tod, snowing);
   // 2.1: los tejados de las viviendas cambian con el rango del pueblo.
   return buildingSprite(b.kind, b.id, tod, snowing, state.rank?.level ?? 2);
 }

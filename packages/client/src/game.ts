@@ -1,6 +1,16 @@
 import { tickToDate, type Command } from '@bitopolis/shared';
 import {
   BUILD_NAMES,
+  CROP_HINT,
+  isWater,
+  CROP_TEXT,
+  cropAt,
+  expectedHarvest,
+  FARM,
+  farmOutlook,
+  HARVEST_NAME,
+  harvestMonthOf,
+  MONTH_NAMES,
   type Building,
   salePrice,
   unitValue,
@@ -78,7 +88,7 @@ import { formatDate, money, MONTHS, plural, shortDate, t } from './i18n.ts';
 import { type Camera, type Preview, render, restartAnimations, signSpot } from './render.ts';
 import type { FromWorker, SaveBatch, ToWorker } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
-import { buildingSprite, letterSprite, T } from './sprites.ts';
+import { buildingSprite, letterSprite, T, ZONE_COLOR } from './sprites.ts';
 import { commandFor, costText, isLocked, lockLong, lockShort, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayCost } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
 import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, h, isSheetOpen, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack } from './ui.ts';
@@ -1115,7 +1125,10 @@ export function startGame(opts: GameOptions): void {
       fling = { vx: fling.vx * 0.6 + (dx / dt) * 0.4, vy: fling.vy * 0.6 + (dy / dt) * 0.4, t: now };
     } else if (gesture.mode === 'paint' && gesture.startTile) {
       const t1 = tileAt(e.clientX, e.clientY);
-      if (t1) preview = previewFor(gesture.startTile, t1);
+      if (t1) {
+        preview = previewFor(gesture.startTile, t1);
+        farmHint(gesture.startTile, t1);
+      }
     }
   });
 
@@ -1245,11 +1258,33 @@ export function startGame(opts: GameOptions): void {
     if (cmd.type === 'Zone') {
       const { changed, skipped } = zoneChanges(state, cmd);
       if (cmd.zone === 'none') return `${plural(changed, 'casilla', 'casillas')}, gratis`;
-      return `${plural(changed, 'casilla', 'casillas')}, ${money(changed * ZONE_COST_PER_TILE)}${skipped ? ` (no se cobran ${skipped} ocupadas o ya marcadas; los árboles sí, se talan al construir)` : ''}`;
+      const crops = cmd.zone === 'A' ? ` · ${cropsText(cmd)}` : '';
+      return `${plural(changed, 'casilla', 'casillas')}, ${money(changed * ZONE_COST_PER_TILE)}${skipped ? ` (no se cobran ${skipped} ocupadas o ya marcadas; los árboles sí, se talan al construir)` : ''}${crops}`;
     }
     const n = tilesOf(cmd).filter((t) => state.map.tiles[t.y * state.map.w + t.x] !== Tile.Road && !state.buildings.some((q) => q.x === t.x && q.y === t.y)).length;
     const bridges = bridgeTiles(a, b);
     return `${plural(n, 'casilla nueva', 'casillas nuevas')}, ${money(lineCost(a, b))}${bridges ? ` (con puente de ${plural(bridges, 'casilla', 'casillas')})` : ''}`;
+  }
+
+  /** 2.2: qué se plantaría en la zona agraria: «Aquí: regadío (río)» (o los cultivos que salgan, del más común). */
+  function cropsText(cmd: Extract<Command, { type: 'Zone' }>): string {
+    const n = new Map<string, number>();
+    for (const t of tilesOf(cmd)) {
+      if (t.x < 0 || t.y < 0 || t.x >= state.map.w || t.y >= state.map.h || isWater(state.map.terrain?.[t.y * state.map.w + t.x])) continue;
+      const c = CROP_HINT[cropAt(state, t.x, t.y)];
+      n.set(c, (n.get(c) ?? 0) + 1);
+    }
+    const list = [...n.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c);
+    return list.length ? `Aquí: ${list.join(' y ')}` : '';
+  }
+
+  /** 2.2: mientras se arrastra la zona agraria, la franja dice qué saldría ahí. */
+  function farmHint(a: { x: number; y: number }, b: { x: number; y: number }) {
+    if (tool.zone !== 'A') return;
+    const cmd = commandFor(tool, a, b);
+    if (cmd?.type !== 'Zone') return;
+    $('#tool-info').replaceChildren(h('b', {}, tool.label), `: ${lineText(a, b)}`);
+    refreshStrip();
   }
 
   /** Coste de un tramo de carretera (los puentes, más caros) y cuántas casillas son puente (v1.7). */
@@ -1422,7 +1457,7 @@ export function startGame(opts: GameOptions): void {
       img.getContext('2d')!.drawImage(c, 0, 0);
       wrap.append(img);
     } else if (tl.zone && tl.zone !== 'none') {
-      const color = { R: 6, C: 10, I: 4 }[tl.zone];
+      const color = ZONE_COLOR[tl.zone];
       const img = document.createElement('canvas');
       img.width = 5;
       img.height = 7;
@@ -1737,7 +1772,9 @@ export function startGame(opts: GameOptions): void {
       if (home) content.push(servicesTable(b));
       else {
         const pills: HTMLElement[] = [];
-        if (b.kind !== 'water' && b.kind !== 'power') {
+        // 2.2: la finca no necesita agua ni luz: su ficha cuenta la cosecha.
+        if (b.kind === 'farm') content.push(farmBox(b));
+        else if (b.kind !== 'water' && b.kind !== 'power') {
           pills.push(h('span', { class: `pill ${b.hasWater ? 'good' : 'bad'}` }, b.hasWater ? 'Agua ✓' : `SIN AGUA${b.dryDays ? ` (${plural(b.dryDays, 'día', 'días')})` : ''}`));
           pills.push(h('span', { class: `pill ${b.hasPower ? 'good' : 'bad'}` }, b.hasPower ? 'Luz ✓' : `SIN LUZ${b.darkDays ? ` (${plural(b.darkDays, 'día', 'días')})` : ''}`));
         }
@@ -1816,10 +1853,31 @@ export function startGame(opts: GameOptions): void {
     }
     const owner = b.owner === 0 ? 'Municipal' : b.owner === -1 ? 'Privado (inversor de fuera)' : 'De un vecino';
     content.push(h('p', { class: 'muted' }, owner));
-    inspectSheet = sheet(b.name ?? BUILD_NAMES[b.kind] ?? b.kind, ...content);
+    inspectSheet = sheet(b.name ?? (b.kind === 'farm' && b.crop ? `Finca · ${CROP_TEXT[b.crop]}` : (BUILD_NAMES[b.kind] ?? b.kind)), ...content);
     inspectSheet.classList.add('half');
     const body = document.querySelector('.sheet-body');
     if (body) body.scrollTop = prevScroll;
+  }
+
+  /** 2.2: ficha de la finca: cultivo, mes de la cosecha y cómo viene. */
+  function farmBox(b: Building): HTMLElement {
+    const crop = b.crop ?? cropAt(state, b.x, b.y);
+    const month = harvestMonthOf(crop);
+    const d = tickToDate(state.tick);
+    const done = b.harvested === d.year;
+    const outlook = farmOutlook(b);
+    const why = crop === 'regadio' ? 'junto al río: el agua no le falta y el tiempo le afecta poco' : crop === 'secano' ? 'depende de la lluvia; el calor le quita' : 'en la colina: depende de la lluvia; el calor le quita';
+    const when = done ? `ya cosechada este año; la próxima, en ${MONTH_NAMES[month - 1]}` : d.month === month ? `este mes (${HARVEST_NAME[crop]})` : `en ${MONTH_NAMES[month - 1]} (${HARVEST_NAME[crop]})`;
+    const k = b.books;
+    return h(
+      'div',
+      { class: 'farm-box' },
+      h('p', {}, h('strong', {}, 'Cultivo: '), `${CROP_TEXT[crop]}, ${why}.`),
+      h('p', {}, h('strong', {}, 'Cosecha: '), `${when}.`),
+      h('p', { class: 'farm-outlook' }, h('strong', {}, 'Cosecha prevista: '), h('span', { class: `pill ${outlook === 'buena' ? 'good' : outlook === 'mala' ? 'bad' : ''}` }, outlook), ` · unos ${money(expectedHarvest(b))} si fuera hoy`),
+      h('p', { class: 'muted small' }, `${plural(FARM.jobs, 'empleo fijo', 'empleos fijos')} y ${FARM.seasonal} temporeros en la cosecha (${money(FARM.seasonalWage)} cada uno; primero, vecinos en paro). Solo pide carretera: ni agua ni luz. Paga IBI rústico. Caja: ${money(b.cash)}.`),
+      k && k.sales > 0 ? h('p', {}, `El mes pasado vendió la cosecha: ${money(k.sales)}.`) : '',
+    );
   }
 
   /**

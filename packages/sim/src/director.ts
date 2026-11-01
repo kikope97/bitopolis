@@ -17,6 +17,7 @@ import { homeRobbery, robbery, stationsFor } from './crime.ts';
 import { burnable, fireCovered, ignite, placeName, scare, scareCandidates } from './fire.ts';
 import type { Brewing } from './director-core.ts';
 import { canFound, freeShopLot } from './economy.ts';
+import { FARM_NAME, farmOutlook, feastCandidates, HARVEST_NAME, hail, hailCandidates, harvestFeast } from './farm.ts';
 import { offerErrand } from './errands.ts';
 import { publishEdition } from './press.ts';
 import { hash32 } from './hash.ts';
@@ -32,7 +33,7 @@ import { trashServed, trashStateOf } from './trash-core.ts';
 
 const plural = (n: number) => (n === 1 ? 'un edificio' : `${n} edificios`);
 
-export const DIRECTOR_KINDS = ['robo_tienda', 'robo_casa', 'asociacion', 'manifestacion', 'pelea', 'reconciliacion', 'gratitud', 'rumor', 'oposicion', 'local', 'encuentro', 'ayuda', 'incendio', 'susto', 'ratas'] as const;
+export const DIRECTOR_KINDS = ['robo_tienda', 'robo_casa', 'asociacion', 'manifestacion', 'pelea', 'reconciliacion', 'gratitud', 'rumor', 'oposicion', 'local', 'encuentro', 'ayuda', 'incendio', 'susto', 'ratas', 'cosecha', 'granizo'] as const;
 export type DirectorKind = (typeof DIRECTOR_KINDS)[number];
 
 export interface DirectorCandidate {
@@ -141,6 +142,26 @@ export function directorMenu(state: GameState): DirectorCandidate[] {
           owed: trashStateOf(b) === 'ratas',
         };
       }),
+  );
+
+  // 2.2: el campo. La fiesta de la cosecha (o de la vendimia) en el mes de cosecha; el granizo, solo tras una tormenta.
+  add(
+    feastCandidates(state).map((b) => ({
+      id: `cosecha:${b.id}`,
+      kind: 'cosecha' as const,
+      bad: false,
+      text: `${b.crop === 'vinedo' ? 'Fiesta de la vendimia' : 'Fiesta de la cosecha'} en ${FARM_NAME[b.crop!]}`,
+      why: `es el mes de ${HARVEST_NAME[b.crop!]} y la cosecha viene ${farmOutlook(b)}`,
+    })),
+  );
+  add(
+    hailCandidates(state).map((b) => ({
+      id: `granizo:${b.id}`,
+      kind: 'granizo' as const,
+      bad: true,
+      text: `Una granizada arrasa parte de ${FARM_NAME[b.crop!]}`,
+      why: `ha habido tormenta hace poco y la cosecha sigue en el campo (prevista ${farmOutlook(b)})`,
+    })),
   );
 
   // Asociaciones y manifestaciones.
@@ -340,6 +361,8 @@ function brewingText(c: DirectorCandidate): string {
       return 'Se oyen comentarios en el bar sobre el ayuntamiento';
     case 'incendio':
       return `Huele a humo: ${c.why}`;
+    case 'granizo':
+      return `El cielo amenaza piedra sobre el campo: ${c.why}`;
     default:
       return c.text;
   }
@@ -472,6 +495,16 @@ function perform(state: GameState, c: DirectorCandidate): { id: number; text: st
       }
       pushEvent(state, 'warning', `${c.text}: ${plural(hit.length)} sin recogida de basura`, { ref: b.id, notify: true });
       return { id: people[0]?.id ?? 0, text: c.text };
+    }
+    case 'cosecha': {
+      const b = state.buildings.find((x) => x.id === Number(arg));
+      if (!b || !harvestFeast(state, b)) return null;
+      return { id: state.citizens.find((x) => x.jobId === b.id)?.id ?? 0, text: c.text };
+    }
+    case 'granizo': {
+      const b = state.buildings.find((x) => x.id === Number(arg));
+      if (!b || !hail(state, b)) return null;
+      return { id: state.citizens.find((x) => x.jobId === b.id)?.id ?? 0, text: c.text };
     }
     case 'local': {
       const [a, b] = pair();

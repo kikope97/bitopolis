@@ -186,7 +186,7 @@ describe('basura y punto limpio (2.1)', () => {
     delete old.trash;
     delete old.fields.dirt;
     const m = migrate(old);
-    expect(m.formatVersion).toBe(14);
+    expect(m.formatVersion).toBeGreaterThanOrEqual(14);
     expect(m.trash).toEqual({ start: -1, graceUntil: 5_000 + TRASH.graceDays * TICKS_PER_DAY });
     expect(m.fields.dirt).toHaveLength(m.map.w * m.map.h);
     m.townhallLevel = 2;

@@ -32,6 +32,11 @@ const FIRST_KINDS: Record<string, string> = {
   sports: 'Abre el polideportivo',
 };
 
+/** 2.2: un momento que no sale de los sucesos del día (la primera cosecha se vende al cerrar el mes). */
+export function addMoment(state: GameState, kind: string, text: string, at: { x: number; y: number }, unique = true): void {
+  if (state.album) add(state, kind, text, at, unique);
+}
+
 function add(state: GameState, kind: string, text: string, at: { x: number; y: number }, unique: boolean): void {
   if (unique && state.album.some((m) => m.kind === kind)) return;
   state.album.push({ tick: state.tick, kind, text, x: at.x, y: at.y });

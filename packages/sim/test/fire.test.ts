@@ -343,7 +343,7 @@ describe('formato 14 y determinismo (2.1)', () => {
     delete old.dikes;
     delete old.emergencies;
     const m = migrate(old);
-    expect(m.formatVersion).toBe(14);
+    expect(m.formatVersion).toBeGreaterThanOrEqual(14);
     expect(m.dikes).toEqual([]);
     expect(m.emergencies).toEqual({ fires: 0, putOut: 0, saved: 0, floodsAvoided: 0 });
     expect(typeof MIGRATIONS[13]).toBe('function');

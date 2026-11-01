@@ -97,6 +97,10 @@ export const MEMORY_KINDS = [
   'ratas',
   'tiro_basura',
   'vio_tirar_basura',
+  // 2.2: el campo.
+  'temporada',
+  'buena_cosecha',
+  'granizo',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -352,6 +356,12 @@ export function memoryText(state: GameState, m: Memory): string {
       return 'Tiró la basura al monte porque no pasa el camión';
     case 'vio_tirar_basura':
       return `Vio a ${who} tirar la basura al monte`;
+    case 'temporada':
+      return 'Trabajó de temporero en la cosecha';
+    case 'buena_cosecha':
+      return 'Celebró una buena cosecha en el pueblo';
+    case 'granizo':
+      return 'El granizo arruinó parte de la cosecha';
   }
 }
 
@@ -707,7 +717,7 @@ function needBaseline(state: GameState, need: Need): number {
   if (need === 'empleo') return state.citizens.filter((c) => c.jobId === null).length;
   if (need === 'bajar_tasas') return LEVEL[taxLevels(state).tasas];
   if (need === 'bajar_ibi') return LEVEL[taxLevels(state).ibi];
-  return state.buildings.filter((b) => b.built && (!b.hasWater || !b.hasPower)).length;
+  return state.buildings.filter((b) => b.built && b.kind !== 'farm' && (!b.hasWater || !b.hasPower)).length;
 }
 
 function needMet(state: GameState, p: PromiseRecord): boolean {

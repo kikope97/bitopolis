@@ -77,6 +77,8 @@ export const JOBS: Record<BuildingKind, number> = {
   res: 0,
   shop: 3,
   factory: 5,
+  // 2.2: un empleo fijo (los temporeros van aparte, en el mes de cosecha).
+  farm: 1,
 };
 
 export const HOMES: Partial<Record<BuildingKind, number>> = { house: 3, res: 4 };
@@ -105,6 +107,7 @@ export const MAINTENANCE: Record<BuildingKind, number> = {
   res: 0,
   shop: 0,
   factory: 0,
+  farm: 0,
 };
 
 /** Radio de cobertura de los servicios (tiles) y su efecto en la felicidad. */
@@ -240,7 +243,7 @@ export const GRUDGE_DECAY = 0.997;
 export const GRUDGE_MAX = 40;
 
 /** Valor base de una vivienda, local o nave (antes de barrio y demanda). */
-export const PROPERTY_VALUE: Partial<Record<BuildingKind, number>> = { house: 7_000, res: 9_000, shop: 20_000, factory: 30_000 };
+export const PROPERTY_VALUE: Partial<Record<BuildingKind, number>> = { house: 7_000, res: 9_000, shop: 20_000, factory: 30_000, farm: 12_000 };
 /** Entrada mínima para comprar (resto con hipoteca) y cuota mensual. */
 export const DOWN_PAYMENT = 0.2;
 export const MORTGAGE_MONTHS = 120;
@@ -766,4 +769,66 @@ export const TRASH = {
   plagueRadius: 3,
   /** Días entre avisos de ratas. */
   warnEveryDays: 7,
+} as const;
+
+/**
+ * 2.2: el campo (zona A, fincas). Cosecha = base anual × factor del año; el
+ * factor empieza en `start` tras cada cosecha y se acumula cada día con el
+ * tiempo (lluvia suma, calor resta; el regadío lo nota poco). En el mes de
+ * cosecha, cada tormenta quita un 15 %; una riada, un 60 % al regadío.
+ * Ronda de la 2.2: la base del plan (2.400–4.200 €/año) no pagaba ni el
+ * sueldo del empleo fijo (900 €/mes); se sube para que la finca viva de lo suyo.
+ */
+export const FARM = {
+  /** Vecinos y nivel del ayuntamiento para pintar zona A. */
+  unlockPop: 20,
+  level: 2,
+  jobs: 1,
+  /** Temporeros en el mes de cosecha y lo que cobra cada uno por la temporada. */
+  seasonal: 3,
+  seasonalWage: 450,
+  /** Venta anual con un año normal (factor 1), por cultivo. */
+  base: { secano: 12_500, regadio: 17_500, olivar: 15_000, vinedo: 16_000 },
+  /** Mes de la cosecha (1–12): secano julio, huerta agosto, vendimia septiembre, aceituna noviembre. */
+  harvestMonth: { secano: 7, regadio: 8, vinedo: 9, olivar: 11 },
+  /** Factor del año: de dónde parte y lo que suma cada día de lluvia o resta cada día de calor. */
+  start: 1,
+  /** Lo que se seca la tierra cada día (compensa la lluvia media del año). */
+  dry: -0.0012,
+  rain: 0.02,
+  heat: -0.015,
+  /** El regadío nota el tiempo a esta parte. */
+  irrigated: 0.3,
+  /** Tormenta en el mes de cosecha y riada (regadío), multiplicativos. */
+  storm: -0.15,
+  flood: -0.6,
+  /** Granizo (suceso del director, solo tras una tormenta reciente sobre la finca). */
+  hail: -0.3,
+  hailDays: 21,
+  /** Fiesta de la cosecha (suceso bueno del director): un poco más de venta y alegría. */
+  feast: 0.05,
+  feastReach: 8,
+  min: 0.4,
+  max: 1.3,
+  /** El factor se acumula sin recortar (hasta este tope); al vender, se recorta a min–max. */
+  cap: 2,
+  /** IBI rústico: el de una finca es esta parte del normal. */
+  ibiRustic: 0.3,
+  /** Regadío a esta distancia del río (casillas, también en diagonal). */
+  riverReach: 2,
+  /** Cosecha prevista: buena desde aquí, mala por debajo de `badBelow`. */
+  goodFrom: 1.05,
+  badBelow: 0.8,
+  /** Crecimiento: probabilidad diaria con solar libre, y una finca por cada tantos vecinos (más una). */
+  growChance: 0.25,
+  popPerFarm: 20,
+  /** Y no más de tantas por taller (más una): el campo no pasa a la industria. */
+  perFactory: 3,
+  growth: { workers: 2, days: 2 },
+  /** Caja inicial: sueldos hasta la primera cosecha y un colchón. */
+  seedExtra: 1_000,
+  /** Caja que guarda (el resto, dividendos): un año de sueldos. */
+  cashCap: 12_000,
+  /** No cierra por un mes malo: solo tras tantos meses seguidos sin pagar el sueldo. */
+  closeAfter: 6,
 } as const;

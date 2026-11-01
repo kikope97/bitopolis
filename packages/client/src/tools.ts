@@ -1,5 +1,5 @@
 import type { BuildKind, Command, ZoneKind } from '@bitopolis/shared';
-import { BUILD, BUILD_LEVEL, buildCost, CIVIL, type GameState, TERRAIN, TOWNHALL_LEVELS, townLevel, ZONE_COST_PER_TILE } from '@bitopolis/sim';
+import { BUILD, BUILD_LEVEL, buildCost, CIVIL, FARM, type GameState, TERRAIN, TOWNHALL_LEVELS, townLevel, ZONE_COST_PER_TILE } from '@bitopolis/sim';
 import { money } from './i18n.ts';
 
 export type ToolId =
@@ -11,6 +11,7 @@ export type ToolId =
   | 'zoneR'
   | 'zoneC'
   | 'zoneI'
+  | 'zoneA'
   | 'dezone'
   | 'park'
   | 'school'
@@ -50,6 +51,8 @@ export const TOOLS: Tool[] = [
   { id: 'zoneR', label: 'Zona R', shape: 'rect', zone: 'R', key: '5', help: 'Residencial: aquí se construyen viviendas solas.' },
   { id: 'zoneC', label: 'Zona C', shape: 'rect', zone: 'C', key: '6', help: 'Comercial: tiendas que dan empleo y venden a los vecinos.' },
   { id: 'zoneI', label: 'Zona I', shape: 'rect', zone: 'I', key: '7', help: 'Industrial: talleres con empleo. Contaminan cerca.' },
+  // 2.2: el campo.
+  { id: 'zoneA', label: 'Zona agraria', shape: 'rect', zone: 'A', key: 'c', help: 'Fincas con un empleo y temporeros en la cosecha. Solo piden carretera (ni agua ni luz). Junto al río, huerta de regadío; en la colina, olivar o viñedo; en el resto, cereal de secano.' },
   { id: 'park', label: 'Parque', shape: 'tap', build: 'park', key: '8', help: 'Más felicidad en 5 casillas a la redonda.' },
   { id: 'school', label: 'Colegio', shape: 'tap', build: 'school', key: '9', help: 'Más felicidad en 8 casillas. 3 empleos.' },
   { id: 'clinic', label: 'Salud', shape: 'tap', build: 'clinic', key: 'h', help: 'Centro de salud: más felicidad en 8 casillas.' },
@@ -76,6 +79,7 @@ export const TOOLS: Tool[] = [
 
 /** Vecinos del hito (Plaza Mayor y Mercado). */
 export function unlockPop(tool: Tool): number {
+  if (tool.zone === 'A') return FARM.unlockPop;
   return tool.build ? BUILD[tool.build].unlockPop : 0;
 }
 
@@ -83,6 +87,7 @@ export function unlockPop(tool: Tool): number {
 export function toolLevel(tool: Tool): number {
   if (tool.build) return BUILD_LEVEL[tool.build];
   if (tool.id === 'dike') return BUILD_LEVEL.civilprotection;
+  if (tool.zone === 'A') return FARM.level;
   if (tool.zone && tool.zone !== 'none') return 2;
   return 1;
 }
@@ -126,7 +131,7 @@ export function trayCost(tool: Tool): string {
 /** Categorías de la bandeja «Construir»; Mirar, Carretera y Derribar van en las pestañas. */
 export const TRAY: { title: string; tools: ToolId[] }[] = [
   { title: 'Lo básico', tools: ['house', 'water', 'power'] },
-  { title: 'Zonas (los vecinos construyen)', tools: ['zoneR', 'zoneC', 'zoneI', 'dezone'] },
+  { title: 'Zonas (los vecinos construyen)', tools: ['zoneR', 'zoneC', 'zoneI', 'zoneA', 'dezone'] },
   { title: 'Servicios', tools: ['park', 'school', 'clinic', 'police', 'cleanpoint', 'jail'] },
   { title: 'Vida social', tools: ['bar', 'chapel', 'cemetery', 'library', 'sports'] },
   { title: 'Emergencias', tools: ['firestation', 'civilprotection', 'dike'] },

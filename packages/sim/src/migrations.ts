@@ -4,7 +4,7 @@ import { emptyPolitics } from './politics-core.ts';
 import { FORMAT_VERSION, type GameState } from './state.ts';
 import { emptyRank } from './rank-core.ts';
 import { levelForPop } from './townhall.ts';
-import { RANKS, TRASH } from './balance.ts';
+import { FARM, RANKS, TRASH } from './balance.ts';
 
 /**
  * Migraciones encadenadas: MIGRATIONS[n] convierte un estado de formatVersion
@@ -160,7 +160,21 @@ export const MIGRATIONS: Record<number, Migration> = {
   }),
   // 2.1: emergencias, encargos y periódico (cada parte, en su función).
   13: (s) => ({ ...migrate14Trash(migrate14Rank(migrate14Errands(migrate14Fire(s)))), formatVersion: 14 }),
+  // 2.2: cada parte, en su función (el campo: migrate15Farm).
+  14: (s) => ({ ...migrate15Farm(s), formatVersion: 15 }),
 };
+
+/**
+ * 2.2 (el campo): no había fincas ni zona agraria, así que el mapa y los
+ * edificios no cambian. Solo se asegura la forma por si acaso (una finca sin
+ * factor empieza el año con el factor inicial).
+ */
+export function migrate15Farm(s: Record<string, any>): Record<string, any> {
+  return {
+    ...s,
+    buildings: Array.isArray(s.buildings) ? s.buildings.map((b: Record<string, any>) => (b.kind === 'farm' && b.yieldFx === undefined ? { ...b, yieldFx: FARM.start } : b)) : s.buildings,
+  };
+}
 
 /** 2.1: encargos del pueblo y El Eco de Bitópolis, vacíos (el primero, en unos días). */
 function migrate14Errands(s: Record<string, any>): Record<string, any> {

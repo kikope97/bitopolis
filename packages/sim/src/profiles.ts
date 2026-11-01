@@ -5,6 +5,7 @@ import { buildCost, validateCommand } from './commands.ts';
 import { chance, type RngState, seedRng } from './prng.ts';
 import { buildingAt, DIRS, type GameState, hasAdjacentRoad, Tile, tileIndex, Zone } from './state.ts';
 import { freeHomes } from './tick.ts';
+import { farmZoneUnlocked } from './farm.ts';
 
 /**
  * Perfiles de jugador automático para el CLI headless. Cada perfil tiene su
@@ -26,6 +27,8 @@ interface PlannerOpts {
   municipalHousing: boolean;
   /** Un servicio de cada tipo por cada N vecinos (por defecto, solo uno). */
   servicesPer?: number;
+  /** 2.2: fincas que quiere tener (pinta zona agraria lejos del centro). */
+  farms?: number;
 }
 
 /** Solares libres junto a carretera, ordenados por distancia al centro. */
@@ -125,7 +128,7 @@ function planner(name: string, o: PlannerOpts): Profile {
       if (!has("water")) { tryBuild("water"); return out; }
       if (!has("power")) { tryBuild("power"); return out; }
       // Ampliar la red si algún edificio terminado se queda sin agua o luz.
-      const built = state.buildings.filter((b) => b.built && b.kind !== 'water' && b.kind !== 'power');
+      const built = state.buildings.filter((b) => b.built && b.kind !== 'water' && b.kind !== 'power' && b.kind !== 'farm');
       // No más plantas de las que el pueblo necesita (una nueva mal conectada no arregla nada).
       const enough = (k: 'water' | 'power') => state.buildings.filter((b) => b.kind === k).length >= Math.ceil(built.length / (PLANT_CAPACITY[k] * 0.75)) + 1;
       if (built.some((b) => !b.hasWater) && !enough('water') && !state.projects.some((p) => buildingKindOf(state, p.buildingId) === 'water')) {
@@ -187,6 +190,16 @@ function planner(name: string, o: PlannerOpts): Profile {
           [Zone.I, 'I', state.demand.I],
         ];
         const taken = new Set<string>();
+        // 2.2: el campo, lejos del centro (de dos en dos, según crecen las fincas).
+        if (o.farms && farmZoneUnlocked(state).ok) {
+          const farms = state.buildings.filter((b) => b.kind === 'farm').length;
+          if (farms + zoned(Zone.A) < o.farms && zoned(Zone.A) < 2) {
+            for (const s of [...unzoned].reverse().slice(0, 2)) {
+              taken.add(`${s.x},${s.y}`);
+              out.push({ type: 'Zone', zone: 'A', x: s.x, y: s.y, w: 1, h: 1 });
+            }
+          }
+        }
         for (const [z, zone, demand] of want) {
           if (demand <= 15 || zoned(z) >= 3) continue;
           // La industria, lejos del centro.
@@ -209,6 +222,8 @@ function planner(name: string, o: PlannerOpts): Profile {
 export const PROFILES: Record<string, Profile> = {
   pasivo: { name: 'pasivo', decide: () => [] },
   casual: planner('casual', { tax: 'medium', reserve: 3_000, activity: 0.3, services: ['park'], municipalHousing: false }),
+  // 2.2: un jugador casual que además pinta zona agraria (para medir el campo).
+  campo: planner('campo', { tax: 'medium', reserve: 3_000, activity: 0.3, services: ['park'], municipalHousing: false, farms: 8 }),
   ahorrador: planner('ahorrador', { tax: 'low', reserve: 4_000, activity: 0.5, services: ['park'], municipalHousing: false }),
   agresivo: planner('agresivo', { tax: 'high', reserve: 2_000, activity: 0.6, services: ['park'], municipalHousing: false }),
   derrochador: planner('derrochador', {
