@@ -77,7 +77,7 @@ describe('la comarca (2.5, bloque I)', () => {
     // Sin diferencia de atractivo no se va nadie.
     const s2 = town(3, { pop: 50 });
     for (const c of s2.citizens) c.happiness = 60;
-    for (const x of s2.comarca.towns) x.happiness = 60;
+    for (const x of s2.comarca.towns) x.happiness = 60 - COMARCA.attractBase; // ronda 21: con su base, el mismo atractivo
     let left = 0;
     comarcaMonth(s2, () => left++);
     expect(left).toBe(0);
@@ -94,7 +94,7 @@ describe('la comarca (2.5, bloque I)', () => {
     s.tick = o.until;
     comarcaDay(s);
     expect(o.resolved).toBe('expired');
-    expect(t.relation).toBe(0);
+    expect(t.relation).toBe(1 + COMARCA.expireRelation); // ronda 21: dejarla caducar resta 2
     expect(validateCommand(s, { type: 'AnswerNeighbor', id: o.id, accept: true }).ok).toBe(false);
   });
 

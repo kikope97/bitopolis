@@ -17,7 +17,7 @@ import { TICKS_PER_MONTH, tickToDate } from '@bitopolis/shared';
 import { COOP, DEBT } from './balance.ts';
 import { FARM_NAME, harvestMonthOf, isFarm } from './farm.ts';
 import { hash32 } from './hash.ts';
-import { charge, totalDebt } from './household.ts';
+import { totalDebt } from './household.ts';
 import { levelOf } from './levels.ts';
 import { OUTSIDE, transfer } from './money.ts';
 import type { Building, Citizen, GameState } from './state.ts';
@@ -228,7 +228,8 @@ export function coopFees(state: GameState): void {
   for (const id of [...state.coop.members]) {
     const c = state.citizens.find((x) => x.id === id);
     if (!c) continue;
-    const paid = charge(state, c, b.id, COOP.fee, 'cooperativa');
+    // Ronda 21: sin deuda con el banco: `arrears` lleva la cuenta y da de baja a los 3 meses.
+    const paid = transfer(state, c.id, b.id, COOP.fee, 'cooperativa');
     if (paid >= COOP.fee) delete arrears[key(id)];
     else arrears[key(id)] = (arrears[key(id)] ?? 0) + 1;
   }

@@ -157,6 +157,9 @@ const VISITOR_BAND = (n: number) => band(n, [1, 50, 200, 500], ['ninguno', 'poco
 function bigGoals(state: GameState) {
   const r = state.region;
   const out: Record<string, unknown> = {};
+  // Ronda 21: los pueblos vecinos, en palabras (igual en todos los lotes).
+  const vec = (state.comarca?.towns ?? []).map((t) => `${t.name}: ${t.relation < 0 ? 'relación tensa' : t.relation > 0 ? 'buena relación' : 'relación normal'}${(t.taxCutUntil ?? -1) > state.tick ? ', ha bajado impuestos' : ''}${t.downstream && state.comarca.riverAngry ? ', enfadado por el río' : ''}`);
+  if (vec.length) out.pueblos_vecinos = vec;
   if (r) out.comarca = `${PHASE_NAME[r.phase]}${r.warned && r.next && r.next !== r.phase ? `; en unos 2 meses, ${PHASE_NAME[r.next]}` : ''}`;
   const works = state.landmarks
     .filter((l) => state.buildings.some((b) => b.id === l.buildingId))

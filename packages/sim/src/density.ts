@@ -120,7 +120,7 @@ export function vpoPool(state: GameState): Citizen[] {
   const jailed = detained(state);
   const all = state.citizens.filter((c) => vpoEligible(state, c, jailed)).sort((a, b) => incomeOf(a) - incomeOf(b) || a.id - b.id);
   const low = new Set(all.slice(0, VPO.pool));
-  return all.filter((c) => low.has(c) || askedVpo(state, c));
+  return all.filter((c) => low.has(c) || (askedVpo(state, c) && incomeOf(c) <= VPO.maxIncome));
 }
 
 /** Orden del sorteo (hash de la partida, el mes, el edificio y el vecino): igual en todos los motores. */
@@ -181,7 +181,7 @@ export function vpoTenants(state: GameState, b: Building): { citizen: Citizen; r
 
 /** ¿Puede pedir una VPO? Hay pisos libres (o casi), opta y no lo pidió ya. */
 export function canAskVpo(state: GameState, c: Citizen): boolean {
-  if (state.politics.mayor === c.id || askedVpo(state, c)) return false;
+  if (state.politics.mayor === c.id || askedVpo(state, c) || incomeOf(c) > VPO.maxIncome) return false;
   if (!vpoFree(state).some((x) => x.free > 0)) return false;
   return vpoEligible(state, c);
 }

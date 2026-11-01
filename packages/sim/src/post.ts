@@ -77,6 +77,7 @@ export function letterTie(state: GameState, from: number, to: number): LetterTie
   if (fam && [...fam.parents, ...fam.children, ...fam.siblings, ...fam.grandchildren].some((k) => k.id === from)) return 'familia';
   const c = state.citizens.find((x) => x.id === to);
   if (c?.memories.some((m) => (m.kind === 'se_fue_amigo' || m.kind === 'paso_pagina' || m.kind === 'carta') && m.about.includes(from))) return 'amistad';
+  if ((state.departed ?? []).find((d) => d.id === from)?.friends?.includes(to)) return 'amistad';
   return null;
 }
 

@@ -137,7 +137,7 @@ export function toolLevel(tool: Tool): number {
   if (tool.id === 'dike') return BUILD_LEVEL.civilprotection;
   if (tool.zone === 'A') return FARM.level;
   if (tool.zone && tool.zone !== 'none') return 2;
-  if (tool.density !== undefined) return Math.max(2, DENSITY.townhall[tool.density]!);
+  if (tool.density !== undefined) return DENSITY.townhall[tool.density] ?? 1;
   return 1;
 }
 

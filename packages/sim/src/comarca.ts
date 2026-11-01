@@ -13,6 +13,8 @@
  *   IA (neighbor-prompt.ts) y el resultado entra con el comando `NeighborTurn`.
  *   Si vence sin respuesta (`COMARCA.turnDays`), deciden las reglas.
  */
+import { sellCoopSurplus } from './coop.ts';
+import { isFemaleName } from './names.ts';
 import { TICKS_PER_DAY, TICKS_PER_MONTH, tickToDate } from '@bitopolis/shared';
 import { COMARCA } from './balance.ts';
 import type { CommandResult } from './commands.ts';
@@ -58,6 +60,7 @@ export const OFFER_KINDS: readonly NeighborOfferKind[] = ['agua', 'luz', 'autobu
 
 export const SPECIALTY_TEXT: Record<NeighborSpecialty, string> = { campo: 'el campo', industria: 'la industria', turismo: 'el turismo', servicios: 'los servicios' };
 export const PERSONALITY_TEXT: Record<NeighborPersonality, string> = { cooperador: 'dialogante', competidor: 'competitivo', populista: 'populista', prudente: 'prudente' };
+const SPECIALTY_DEAL: Record<NeighborSpecialty, NeighborOfferKind> = { industria: 'luz', campo: 'cosecha', turismo: 'autobus', servicios: 'agua' };
 export const OFFER_TEXT: Record<NeighborOfferKind, string> = { agua: 'agua', luz: 'luz', autobus: 'autobús', cosecha: 'cosecha' };
 /** Qué significa cada acuerdo para el pueblo (la ficha lo enseña antes de aceptar). */
 export function offerEffect(kind: NeighborOfferKind): string {
@@ -165,7 +168,8 @@ export function ourAttract(state: GameState): number {
 }
 
 export function townAttract(state: GameState, t: NeighborTown): number {
-  return Math.round(t.happiness + ((t.taxCutUntil ?? -1) > state.tick ? COMARCA.taxCut.attract : 0));
+  // Ronda 21: base propia (trabajo, casas más baratas…): si no, ningún vecino atraía nunca a los nuestros.
+  return Math.round(t.happiness + COMARCA.attractBase + ((t.taxCutUntil ?? -1) > state.tick ? COMARCA.taxCut.attract : 0));
 }
 
 /** El vecino que más tira de los nuestros, si supera el atractivo en más de `pullGap`. */
@@ -310,11 +314,12 @@ export function comarcaFair(state: GameState, shops: Building[]): void {
   }
   // Premio del motor.
   const farms = state.buildings.filter((b) => isFarm(b) && b.built).length;
-  const oursScore = avgHappiness(state) + 2 * Math.min(10, shops.length + farms) + (hash32(state.seed, d.year, 0) % 10);
+  // Ronda 21: puntuaciones comparables (antes ganaba siempre el jugador).
+  const oursScore = avgHappiness(state) / 2 + 2 * Math.min(10, shops.length + farms) + (hash32(state.seed, d.year, 0) % 20);
   let winner = 0;
   let best = oursScore;
   for (const t of towns) {
-    const s = t.happiness + (t.specialty === 'campo' || t.specialty === 'turismo' ? 6 : 0) + (hash32(state.seed, d.year, t.id) % 10);
+    const s = t.happiness / 2 + Math.min(20, t.pop / 15) + (t.specialty === 'campo' || t.specialty === 'turismo' ? 6 : 0) + (hash32(state.seed, d.year, t.id) % 20);
     if (s > best) {
       best = s;
       winner = t.id;
@@ -341,9 +346,12 @@ export function neighborMenu(state: GameState, t: NeighborTown): string[] {
   if ((t.grantClaims ?? 0) < 2) menu.push('pedir_subvencion');
   const offers = state.comarca.offers;
   const openFromTown = offers.some((o) => o.townId === t.id && !o.resolved);
-  if (!openFromTown && t.relation >= -1) {
+  // Ronda 21: en la oposición no se puede contestar, así que no llegan ofertas.
+  if (!openFromTown && t.relation >= -1 && state.politics.mayor === 'player') {
     for (const k of OFFER_KINDS) {
       if (offers.some((o) => o.kind === k && !o.resolved) || activeDeal(state, k)) continue;
+      // Ronda 21: lo que rechazaste (o dejaste caducar) no vuelve del mismo pueblo en unos meses.
+      if (offers.some((o) => o.townId === t.id && o.kind === k && (o.resolved === 'rejected' || o.resolved === 'expired') && state.tick - o.until < COMARCA.offerCooldownMonths * TICKS_PER_MONTH)) continue;
       if (!offerUseful(state, k)) continue;
       menu.push(`ofrecer_acuerdo:${k}`);
     }
@@ -374,7 +382,8 @@ export function offerUseful(state: GameState, k: NeighborOfferKind): boolean {
 /** Reglas por personalidad (Modo normal, sin respuesta de la IA, o en ahorro). Deterministas. */
 export function ruleNeighborPick(state: GameState, t: NeighborTown, menu = neighborMenu(state, t)): string {
   const has = (a: string) => menu.includes(a);
-  const deal = menu.find((a) => a.startsWith('ofrecer_acuerdo:'));
+  // Ronda 21: cada pueblo ofrece primero lo suyo (antes era casi siempre agua).
+  const deal = menu.find((a) => a === `ofrecer_acuerdo:${SPECIALTY_DEAL[t.specialty]}`) ?? menu.find((a) => a.startsWith('ofrecer_acuerdo:'));
   const m = monthIndex(state);
   const ours = ourAttract(state);
   const angry = !!t.downstream && !!state.comarca.riverAngry;
@@ -387,7 +396,8 @@ export function ruleNeighborPick(state: GameState, t: NeighborTown, menu = neigh
       return 'nada';
     case 'competidor':
       if (has('bajar_impuestos') && townAttract(state, t) <= ours + COMARCA.pullGap) return 'bajar_impuestos';
-      if (has('criticar') && (angry || ours > t.happiness)) return 'criticar';
+      // Ronda 21: critica cuando le saca mucha ventaja (antes, ser buen alcalde enemistaba siempre).
+      if (has('criticar') && (angry || (ours > townAttract(state, t) + COMARCA.pullGap && m % 3 === 0))) return 'criticar';
       if (deal && m % 4 === 0) return deal;
       return 'nada';
     case 'populista':
@@ -450,7 +460,7 @@ export function applyNeighborAct(state: GameState, t: NeighborTown, accion: stri
   t.said = said;
   t.saidBy = by;
   t.saidTick = state.tick;
-  const who = `${t.mayor.name}, alcalde de ${t.name}`;
+  const who = `${t.mayor.name}, ${isFemaleName(t.mayor.name) ? 'alcaldesa' : 'alcalde'} de ${t.name}`;
   switch (act) {
     case 'bajar_impuestos':
       t.taxCutUntil = state.tick + COMARCA.taxCut.months * TICKS_PER_MONTH;
@@ -464,7 +474,11 @@ export function applyNeighborAct(state: GameState, t: NeighborTown, accion: stri
       const until = state.tick + COMARCA.offerDays * TICKS_PER_DAY;
       const o: NeighborOffer = { id: nextOfferId(state), townId: t.id, kind: arg, tick: state.tick, until };
       state.comarca.offers.push(o);
-      if (state.comarca.offers.length > 30) state.comarca.offers.splice(0, state.comarca.offers.length - 30);
+      // Ronda 21: se olvidan las más viejas, pero nunca un acuerdo en vigor.
+      if (state.comarca.offers.length > 30) {
+        let extra = state.comarca.offers.length - 30;
+        state.comarca.offers = state.comarca.offers.filter((o) => extra <= 0 || !o.resolved || (o.resolved === 'accepted' && (o.dealUntil ?? -1) > state.tick) || (extra--, false));
+      }
       const d = tickToDate(until);
       pushEvent(state, 'info', `${who}, ofrece un acuerdo de ${OFFER_TEXT[arg]}. Responde antes del ${d.day}/${d.month} en Pueblo › Comarca. «${said}»`, { notify: true });
       break;
@@ -583,6 +597,8 @@ export function comarcaHarvest(state: GameState): void {
     b.sales = (b.sales ?? 0) + extra;
     total += extra;
   }
+  // Ronda 21: con acuerdo de cosecha, el vecino compra también los excedentes de la cooperativa.
+  total += sellCoopSurplus(state, 1 + COMARCA.deals.cosecha.bonus);
   const t = state.comarca.towns.find((x) => x.id === activeDeal(state, 'cosecha')?.townId);
   if (total > 0) pushEvent(state, 'business', `${t?.name ?? 'Un pueblo vecino'} compra la cosecha: ${fmt(total)} € más para las fincas`);
 }
@@ -601,6 +617,8 @@ export function comarcaMonth(state: GameState, leave: (c: Citizen) => void): voi
   }
   ensureFair(state);
   for (const t of cm.towns) simulateTown(state, t);
+  // Ronda 21: las relaciones vuelven poco a poco hacia normal (ni el −2 ni el +2 son para siempre).
+  if (monthIndex(state) % COMARCA.relationDriftMonths === 0) for (const t of cm.towns) if (t.relation !== 0 && !(t.downstream && cm.riverAngry)) t.relation += t.relation > 0 ? -1 : 1;
   competition(state, leave);
   riverMonth(state);
   dealsMonth(state);

@@ -108,7 +108,7 @@ export const JOBS: Record<BuildingKind, number> = {
   solar: 0,
   wind: 0,
   vpo: 0,
-  coop: 2,
+  coop: 0,
   post: 1,
 };
 
@@ -156,7 +156,7 @@ export const MAINTENANCE: Record<BuildingKind, number> = {
   solar: 120,
   wind: 300,
   vpo: 150,
-  coop: 200,
+  coop: 80,
   post: 120,
 };
 
@@ -1455,6 +1455,8 @@ export const DENSITY = {
  * por sorteo (hash, sin dados) entre quienes la pidieron y los `pool` que menos ganan.
  */
 export const VPO = {
+  /** Ronda 21: solo pide (y entra en el sorteo por pedirla) quien gana menos de esto al mes. */
+  maxIncome: 1_400,
   homes: 6,
   rent: 120,
   pool: 6,
@@ -1476,8 +1478,9 @@ export const VPO = {
  */
 export const COOP = {
   /** Sobre el precio de la cosecha de cada socio (nivel 1; nivel 2, almazara o bodega). */
-  priceFx: 0.15,
-  priceFxLevel2: 0.25,
+  // Ronda 21: algo menos para los socios (cobraban 10 veces su cuota).
+  priceFx: 0.1,
+  priceFxLevel2: 0.18,
   /** Cuota mensual de cada socio (con `charge()`: lo impagado queda como deuda). */
   fee: 20,
   /** Meses seguidos sin pagar la cuota hasta que la cooperativa le da de baja. */
@@ -1527,6 +1530,11 @@ export const COMARCA = {
   towns: 3,
   /** Diferencia de atractivo que hace que se vayan vecinos (2 % al mes). */
   pullGap: 10,
+  /** Ronda 21: lo que atrae un pueblo vecino además de su felicidad. */
+  attractBase: 12,
+  /** Ronda 21: meses sin repetir una oferta rechazada o caducada; las relaciones vuelven 1 hacia 0 cada tantos meses. */
+  offerCooldownMonths: 6,
+  relationDriftMonths: 6,
   pullShare: 0.02,
   grantMonths: 6,
   fairMonth: 9,
@@ -1559,19 +1567,20 @@ export const COMARCA = {
   /** Acuerdos: duran `months`; luz y agua, € por edificio sobrante al mes; autobús, cuota al mes y felicidad; cosecha, % sobre la venta. */
   deals: {
     months: 12,
-    luz: { perBuilding: 3 },
-    agua: { perBuilding: 2 },
+    luz: { perBuilding: 8 },
+    agua: { perBuilding: 6 },
     autobus: { fee: 120, happiness: 2 },
     cosecha: { bonus: 0.1 },
   },
   /** Responder a una oferta mueve la relación; ignorarla, también. */
   acceptRelation: 1,
-  rejectRelation: -1,
-  expireRelation: -1,
+  // Ronda 21: rechazar es mejor que dejarla caducar.
+  rejectRelation: 0,
+  expireRelation: -2,
   /** Río a la salida por encima de esto: el pueblo de abajo se enfada (cada mes, −1 de relación cada 3). */
   riverAngry: 45,
   /** Feria comarcal: gasto de los forasteros (por pueblo que va) y premio del motor. */
-  fair: { spendPerTown: 600, prize: 400, prizeHappiness: 3 },
+  fair: { spendPerTown: 600, prize: 2_000, prizeHappiness: 3 },
   /** Turno de los alcaldes (Modo IA): días que espera a la IA antes de que decidan las reglas. */
   turnDays: 5,
   /** Declaración de un alcalde, como mucho. */

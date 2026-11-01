@@ -143,7 +143,7 @@ describe('cooperativa agraria (2.5, bloque G)', () => {
     expect(checkInvariants(s)).toEqual([]);
   });
 
-  it('la cuota impagada queda como deuda; tras unos meses, baja', () => {
+  it('la cuota impagada no es deuda (ronda 21): se apunta y, tras unos meses, baja', () => {
     const s = fixture();
     const coop = coopAt(s);
     const f = farmAt(s, 10, 11);
@@ -157,8 +157,8 @@ describe('cooperativa agraria (2.5, bloque G)', () => {
     expect(moneyDrift(s)).toBe(before);
     expect(coop.cash).toBe(5);
     expect(c.money).toBe(0);
-    expect(totalDebt(c)).toBe(COOP.fee - 5);
-    expect(s.debtLedger.created - created).toBe(COOP.fee - 5);
+    expect(totalDebt(c)).toBe(0);
+    expect(s.debtLedger.created - created).toBe(0);
     for (let k = 1; k < COOP.dropAfter; k++) coopFees(s);
     expect(s.coop.members).not.toContain(c.id);
     expect(s.coop.presidentId).toBeNull();

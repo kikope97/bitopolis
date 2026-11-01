@@ -14,6 +14,8 @@ export interface Departed {
   /** Cuándo se fue. */
   tick: number;
   reason: 'fallecio' | 'se_fue';
+  /** Ronda 21: amistades que dejó en el pueblo (le pueden escribir). */
+  friends?: number[];
 }
 
 const DEPARTED_MAX = 200;
@@ -23,8 +25,10 @@ export function rememberDeparted(state: GameState, c: Citizen, reason: Departed[
   if (!state.departed) return;
   const partner = c.relations.find((r) => r.kind === 'pareja')?.id;
   const hasFamily = !!c.parents?.length || partner !== undefined || state.citizens.some((x) => x.parents?.includes(c.id));
-  if (!c.named && !hasFamily) return;
-  state.departed.push({ id: c.id, name: c.name, age: c.age, ...(c.parents?.length ? { parents: c.parents } : {}), ...(partner !== undefined ? { partnerId: partner } : {}), tick: state.tick, reason });
+  // Ronda 21: también quien deja amistades (si no, casi nadie podía escribir cartas).
+  const friends = c.relations.filter((r) => r.kind === 'amistad').slice(0, 3).map((r) => r.id);
+  if (!c.named && !hasFamily && !friends.length) return;
+  state.departed.push({ id: c.id, name: c.name, age: c.age, ...(c.parents?.length ? { parents: c.parents } : {}), ...(partner !== undefined ? { partnerId: partner } : {}), ...(friends.length ? { friends } : {}), tick: state.tick, reason });
   if (state.departed.length > DEPARTED_MAX) {
     // 2.2: quien tiene calle no se olvida (la placa sigue diciendo su nombre).
     const keep = new Set((state.streetNames ?? []).map((s) => s.citizenId));

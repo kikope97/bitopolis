@@ -176,7 +176,8 @@ describe('vivienda protegida (2.5)', () => {
     const all = people(s, 14);
     all.forEach((c, k) => (c.last = { in: 400 + k * 100, out: 0, repaid: 0 }));
     const rich = all.at(-1)!;
-    rich.vpoAsk = s.tick; // pidió: entra en el bombo aunque gane más
+    rich.vpoAsk = s.tick; // pidió y gana poco (por debajo del tope): entra en el bombo
+    rich.last = { in: VPO.maxIncome, out: 0, repaid: 0 };
     const pool = vpoPool(s);
     expect(pool).toHaveLength(VPO.pool + 1);
     expect(pool.slice(0, VPO.pool)).toEqual(all.slice(0, VPO.pool));

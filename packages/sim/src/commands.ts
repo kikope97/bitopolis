@@ -533,6 +533,8 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
           if (isWater(state.map.terrain?.[i]) || hasDike(state, x, y)) continue;
           if (state.map.zones[i] === value) continue;
           state.map.zones[i] = value;
+          // Ronda 21: al cambiar de zona se olvida la densidad pedida.
+          if (state.map.density) state.map.density[i] = 0;
           changed++;
         }
       }

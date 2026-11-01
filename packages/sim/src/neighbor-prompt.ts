@@ -15,7 +15,7 @@ import type { GameState } from './state.ts';
 import { hasRiver, riverExit } from './waterworks.ts';
 
 /** Sube si cambia el prompt o el esquema (la grabación de `ai-eval` deja de valer). */
-export const NEIGHBOR_PROMPT_VERSION = 1;
+export const NEIGHBOR_PROMPT_VERSION = 2;
 
 /** Cabecera del mensaje (el LLM falso de los e2e la busca). */
 export const NEIGHBOR_HEADER = 'Alcaldes de la comarca';
@@ -51,7 +51,32 @@ export const NEIGHBOR_SYSTEM = `${TEXT_SYSTEM}
 - Interpretas a los alcaldes de los pueblos vecinos de Bitópolis, en la misma comarca. Cada uno elige UNA acción de su "menu" (exactamente como está escrita) y dice una declaración breve en primera persona (máx. ${COMARCA.maxSaid} caracteres) que cuadre con lo que hace.
 - Actúa según su personalidad y su facción. Un alcalde con relación mala no felicita sin motivo; uno río abajo con el río muy sucio se queja.
 - Las cifras y el dinero los decide el juego: no pongas números en la declaración. No nombres a nadie que no esté en los datos.
+- Personalidades: el dialogante busca acuerdos y felicita; el competitivo baja impuestos y critica cuando Bitópolis le saca ventaja; el populista pide a la Diputación y critica cuando le conviene; el prudente apenas hace ruido.
+- Mira "su_ultima_oferta" y "dijo_el_mes_pasado": no repitas lo mismo si Bitópolis ya dijo que no.
 - Devuelve un objeto por pueblo en "alcaldes", con la clave de cada pueblo.`;
+
+function lastOfferText(state: GameState, townId: number): string {
+  const o = [...state.comarca.offers].reverse().find((x) => x.townId === townId);
+  if (!o) return 'ninguna';
+  const what = `acuerdo de ${OFFER_TEXT[o.kind]}`;
+  return o.resolved === 'accepted' ? `${what}: Bitópolis la aceptó` : o.resolved === 'rejected' ? `${what}: Bitópolis la rechazó` : o.resolved === 'expired' ? `${what}: Bitópolis la dejó caducar` : `${what}: esperando respuesta`;
+}
+
+/**
+ * Ronda 21: las declaraciones no llevan cifras, y los nombres propios (con mayúscula
+ * que no empieza frase) tienen que estar en los datos: ni pueblos ni personas inventadas.
+ */
+export function inventedProper(text: string, user: string): boolean {
+  if (/\d/.test(text)) return true;
+  const words = text.split(/\s+/);
+  for (let i = 1; i < words.length; i++) {
+    const prev = words[i - 1]!;
+    const w = words[i]!.replace(/^[«"¿¡(]+|[».,;:!?")]+$/g, '');
+    if (!/^[A-ZÁÉÍÓÚÑ]/.test(w) || /[.!?:]$/.test(prev)) continue;
+    if (!user.includes(w)) return true;
+  }
+  return false;
+}
 
 /** Petición mensual: solo datos del motor en bandas, nunca texto del jugador. */
 export function buildNeighborRequest(state: GameState): NeighborRequest {
@@ -90,6 +115,9 @@ export function buildNeighborRequest(state: GameState): NeighborRequest {
         atrae_vecinos: gap > COMARCA.pullGap ? 'mucho más que Bitópolis' : gap > 0 ? 'algo más que Bitópolis' : 'menos que Bitópolis',
         rio_abajo: !!t.downstream,
         ultima_accion: t.lastAct ? actText(t.lastAct) : 'ninguna',
+        // Ronda 21: qué pasó con su última oferta y lo que dijo (para no repetirse a ciegas).
+        su_ultima_oferta: lastOfferText(state, t.id),
+        dijo_el_mes_pasado: t.said ?? '',
         menu: menu.map((a) => ({ accion: a, que_es: actText(a) })),
       };
     }),
@@ -139,7 +167,8 @@ export function parseNeighbors(raw: string, req: NeighborRequest): { picks: Neig
       invalid.push(Number(id));
       continue;
     }
-    const said = typeof p.declaracion === 'string' ? parseText(JSON.stringify({ texto: p.declaracion }), req) : null;
+    const said0 = typeof p.declaracion === 'string' ? parseText(JSON.stringify({ texto: p.declaracion }), req) : null;
+    const said = said0 && !inventedProper(said0, req.user) ? said0 : null;
     // Una declaración que no vale va vacía: el motor pone la plantilla.
     picks.push({ pueblo: Number(id), accion: p.accion, declaracion: said && said.length <= COMARCA.maxSaid ? said : '' });
   }
