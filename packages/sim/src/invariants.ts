@@ -1,4 +1,5 @@
 import { HOMES } from './balance.ts';
+import { loanInvariants } from './invariants-loans.ts';
 import { totalInternalMoney } from './money.ts';
 import type { GameState } from './state.ts';
 
@@ -48,6 +49,8 @@ export function checkInvariants(state: GameState): string[] {
     if (c.homeId !== null && !buildingIds.has(c.homeId)) errors.push(`casa inexistente en ${c.id}`);
     if (c.jobId !== null && !buildingIds.has(c.jobId)) errors.push(`trabajo inexistente en ${c.id}`);
   }
+  // 2.2: préstamos municipales.
+  errors.push(...loanInvariants(state));
   return errors;
 }
 

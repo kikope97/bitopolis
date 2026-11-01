@@ -160,7 +160,22 @@ export const MIGRATIONS: Record<number, Migration> = {
   }),
   // 2.1: emergencias, encargos y periódico (cada parte, en su función).
   13: (s) => ({ ...migrate14Trash(migrate14Rank(migrate14Errands(migrate14Fire(s)))), formatVersion: 14 }),
+  // 2.2: economía y política (cada parte, en su función; al juntar las partes se encadenan).
+  14: (s) => ({ ...migrate15Loans(s), formatVersion: 15 }),
 };
+
+/**
+ * 2.2 (préstamos municipales): sin préstamos y con nota B. Una caja negativa
+ * heredada no se toca: al siguiente fin de mes pasa sola a un préstamo de tesorería.
+ */
+export function migrate15Loans(s: Record<string, any>): Record<string, any> {
+  return {
+    ...s,
+    loans: Array.isArray(s.loans) ? s.loans : [],
+    rating: s.rating ?? 'B',
+    loanLedger: s.loanLedger ?? { lent: 0, repaid: 0, interest: 0, treasuryTicks: [] },
+  };
+}
 
 /** 2.1: encargos del pueblo y El Eco de Bitópolis, vacíos (el primero, en unos días). */
 function migrate14Errands(s: Record<string, any>): Record<string, any> {

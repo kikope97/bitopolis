@@ -39,3 +39,5 @@ export * from './press.ts';
 export * from './fire.ts';
 export * from './rank.ts';
 export * from './trash.ts';
+export * from './loans.ts';
+export * from './invariants-loans.ts';

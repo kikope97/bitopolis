@@ -15,7 +15,7 @@ import {
 
 /** Pueblo sin colegio: los vecinos con nombre comparten la queja. */
 function town(): GameState {
-  const { state: s } = runSimulation({ seed: 3, days: 400, profile: 'constructor' });
+  const { state: s } = runSimulation({ seed: 5, days: 400, profile: 'constructor' });
   transfer(s, OUTSIDE, TREASURY, 60_000, 'subvencion');
   const schools = new Set(s.buildings.filter((b) => b.kind === 'school').map((b) => b.id));
   s.buildings = s.buildings.filter((b) => !schools.has(b.id));

@@ -207,12 +207,37 @@ export const RIVAL_PROMISE_MONTHS = 12;
 export const MOTION_MONTHS = 6;
 /** Apoyo extra al gobierno recién elegido (se apaga en 12 meses). */
 export const HONEYMOON = 0.25;
-/** Interés mensual de la deuda: 1 % hasta 5.000 € y 3 % por encima. */
-export const DEBT_INTEREST = 0.01;
-export const DEBT_INTEREST_HIGH = 0.03;
-export const DEBT_INTEREST_STEP = 5_000;
-/** Los intereses de un mes no superan esta parte de lo ingresado ese mes (ronda 07). */
-export const DEBT_INTEREST_CAP = 0.25;
+/**
+ * 2.2: préstamos municipales con calificación A–D (loans.ts). Sustituyen a los
+ * intereses del descubierto: lo que pide el alcalde se devuelve en cuota fija y,
+ * si a fin de mes la caja sigue en negativo, el hueco pasa solo a un préstamo de
+ * tesorería a 12 meses con recargo (y la nota baja). Carga = cuotas del mes ÷
+ * ingresos medios de 12 meses (sin contar lo prestado).
+ */
+export const LOANS = {
+  /** Interés mensual según la nota (A ≈ 4,9 % TAE … D ≈ 26,8 % TAE). */
+  rate: { A: 0.004, B: 0.007, C: 0.012, D: 0.02 },
+  /** Lo que se puede deber en total, en veces los ingresos anuales (con D no se presta). */
+  maxRatio: { A: 2, B: 1.2, C: 0.6, D: 0 },
+  /** Plazos en meses. */
+  terms: [12, 24, 48],
+  /** Importe: múltiplos de 1.000 € entre min y max. */
+  step: 1_000,
+  min: 1_000,
+  max: 200_000,
+  /** Comisión por amortizar antes de tiempo (sobre lo amortizado). */
+  earlyFee: 0.01,
+  /** Préstamo de tesorería: plazo y recargo sobre el tipo de la nota. */
+  treasuryMonths: 12,
+  treasuryPenalty: 1.5,
+  /** Préstamos pedidos a la vez como mucho (más uno de tesorería). */
+  maxLoans: 4,
+  /** Umbrales de la carga para cada nota y meses de superávit para la A. */
+  load: { A: 0.1, B: 0.2, C: 0.35 },
+  surplusMonths: 6,
+  /** Con la carga por encima, el 💰 de la barra se pone en ámbar. */
+  warnLoad: 0.25,
+} as const;
 
 /* ---------------- v0.3: tributos y vivienda ---------------- */
 
