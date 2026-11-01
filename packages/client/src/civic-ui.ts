@@ -1,5 +1,5 @@
 import { tickToDate } from '@bitopolis/shared';
-import { ASSOCIATIONS, attraction, BUDGET_TEXT, BUILD, BUILD_LEVEL, type BudgetPlan, CAUSE_ASK, canHoldFestival, FESTIVAL, type GameState, grantTerms, GRANT_NAME, HERITAGE_NAMES, heritageOf, heritageVariant, kidsCount, ruralHomes, ruralShare, TOURISM, touristified } from '@bitopolis/sim';
+import { ASSOCIATIONS, attraction, BUDGET_TEXT, BUILD, BUILD_LEVEL, type BudgetPlan, CAUSE_ASK, canHoldFestival, FESTIVAL, type GameState, grantTerms, HERITAGE_NAMES, heritageOf, heritageVariant, kidsCount, ruralHomes, ruralShare, TOURISM, touristified } from '@bitopolis/sim';
 import { formatDate, money } from './i18n.ts';
 import type { SocialCtx } from './social-ui.ts';
 import { confirmDialog, h, sheet } from './ui.ts';
