@@ -72,6 +72,10 @@ const STEPS: Step[] = [
   },
 ];
 
+/** Pasos de obras que se pueden comprobar en el pueblo (agua, luz, casa). */
+const FIRST_BUILD_STEP = 2;
+const LAST_BUILD_STEP = 4;
+
 export class Tutorial {
   private step = 0;
   private ctx: Ctx = { roads0: 0 };
@@ -121,6 +125,13 @@ export class Tutorial {
     this.ctx.roads0 = roadCount(state);
     // v1.6: al volver, se saltan los pasos que el pueblo ya tiene hechos (antes empezaba en «Bienvenido»).
     if (!fromScratch && (has(state, 'water') || has(state, 'power') || has(state, 'house'))) this.step = Math.max(this.step, 2);
+    // El paso guardado nunca va por delante del pueblo: si falta el agua (o la luz, o la casa) de un
+    // paso ya pasado, se vuelve a él (p. ej. una partida que no llegó a guardarse).
+    if (!fromScratch) {
+      const was = this.step;
+      while (this.step > FIRST_BUILD_STEP && this.step <= LAST_BUILD_STEP + 1 && !STEPS[this.step - 1]!.done(state, 'inspect', this.ctx)) this.step--;
+      if (this.step !== was) this.save();
+    }
     while (!fromScratch && this.step > 1 && this.active && this.step < STEPS.length - 1 && STEPS[this.step]!.done(state, 'inspect', this.ctx)) this.step++;
     if (this.active) {
       $('#app').append(this.box, this.arrow);

@@ -19,6 +19,7 @@ import {
   unitValue,
   type GameEvent,
   type GameState,
+  hashState,
   cellsUsed,
   coverageSummary,
   TRASH,
@@ -102,7 +103,7 @@ import { openWhatsHappening, turnHeadline } from './ai-town-ui.ts';
 import { pocketMark } from './money-ui.ts';
 import { formatDate, money, MONTHS, plural, shortDate, t } from './i18n.ts';
 import { busTrips, type Camera, type Preview, render, restartAnimations, signSpot } from './render.ts';
-import type { FromWorker, SaveBatch, ToWorker } from './sim.worker.ts';
+import type { FromWorker, SaveBatch, ToWorker, Unsaved } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
 import { buildingSprite, landmarkSprite, letterSprite, resSprite, T, ZONE_COLOR } from './sprites.ts';
 import { bigCompanyContent, landmarkContent, openRegion, regionAttention, regionSummary } from './landmarks-ui.ts';
@@ -181,42 +182,95 @@ export function startGame(opts: GameOptions): void {
   const tutorial = new Tutorial(`bitopolis.tut.${token}`);
 
   /* ---------- guardado ---------- */
+  // Los lotes del worker van en cadena (cada uno empieza donde acabó el anterior) y se mandan en orden.
   const queue: (SaveBatch & { live: boolean })[] = [];
   let saving = false;
-  async function flushQueue(keepalive = false) {
+  let saveError = false;
+  /** Fin del último lote recibido: el siguiente tiene que empezar ahí (si no, es de antes de un `init`). */
+  let lastBatchTo = state.tick;
+  /** Lo que el worker ha aplicado sin lote todavía (llega con cada estado; sirve para guardar al cerrar). */
+  let unsaved: Unsaved | null = null;
+
+  /** ¿Queda alguna orden (o, en pausa, algo del reloj) sin confirmar por el servidor? */
+  const savePending = () =>
+    queue.length > 0 || saving || (unsaved !== null && (unsaved.commands.length > 0 || (speed === 0 && state.tick !== unsaved.from)));
+  function paintSaved() {
+    const el = $('#saved');
+    const text = saveError ? t('saveFailed') : savePending() ? t('saving') : el.textContent ? t('saved') : '';
+    if (el.textContent !== text) el.textContent = text;
+    el.classList.toggle('err', saveError);
+    el.dataset.pending = String(savePending());
+  }
+  function mergeBatches(list: SaveBatch[]) {
+    return { fromTick: list[0]!.fromTick, toTick: list.at(-1)!.toTick, commands: list.flatMap((b) => b.commands), hash: list.at(-1)!.hash };
+  }
+  function resetSave(s: GameState) {
+    queue.length = 0;
+    unsaved = null;
+    lastBatchTo = s.tick;
+    saveError = false;
+  }
+
+  async function flushQueue() {
     if (saving || queue.length === 0 || lost) return;
     saving = true;
+    const n = queue.length;
     const merged = {
-      fromTick: queue[0]!.fromTick,
-      toTick: queue.at(-1)!.toTick,
-      commands: queue.flatMap((b) => b.commands),
-      hash: queue.at(-1)!.hash,
+      ...mergeBatches(queue),
       // Solo se pide a la IA si se está jugando (no en pausa ni oculto).
       live: queue.some((b) => b.live) && speed > 0 && !document.hidden,
     };
-    const n = queue.length;
     try {
-      await api.save(token, sessionId, merged, keepalive);
+      await api.save(token, sessionId, merged);
       queue.splice(0, n);
-      const el = $('#saved');
-      el.textContent = t('saved');
-      el.classList.remove('err');
+      saveError = false;
+      // La primera vez que se guarda ya sale «Guardado» (antes de eso, la franja va vacía).
+      $('#saved').textContent ||= t('saved');
     } catch (e) {
       if (e instanceof ApiError && e.status === 423) {
         loseLease();
       } else if (e instanceof ApiError && e.status === 409 && e.body?.state) {
-        queue.length = 0;
+        resetSave(e.body.state);
         send({ type: 'init', state: e.body.state });
         toast(t('desync'), { kind: 'warn' });
       } else {
-        const el = $('#saved');
-        el.textContent = t('saveFailed');
-        el.classList.add('err');
+        saveError = true;
         setTimeout(() => flushQueue(), 5000);
       }
     } finally {
       saving = false;
-      if (queue.length > 0 && !lost) void flushQueue();
+      paintSaved();
+      if (queue.length > 0 && !lost && !saveError) void flushQueue();
+    }
+  }
+
+  /**
+   * Al cerrar o recargar la página no da tiempo a pedirle al worker un lote (llegaría con la página ya
+   * cerrada): se monta aquí con toda la cola y lo que el worker tenía sin lote en su último estado (con
+   * el hash de ese estado), y sale con `sendBeacon`. Si una petición iba en camino, este guardado la
+   * repite; `parts` deja al servidor saltarse lo que ya tenga. Devuelve si mandó algo.
+   */
+  function saveOnHide(): boolean {
+    if (lost) return false;
+    const all: SaveBatch[] = [...queue];
+    const u = unsaved;
+    if (u && u.from === lastBatchTo && (u.commands.length > 0 || state.tick > u.from)) {
+      all.push({ fromTick: u.from, toTick: state.tick, commands: u.commands, hash: hashState(state) });
+    }
+    // Lo que va en camino se repite (puede perderse al cerrar): el servidor se salta lo que ya tenga.
+    if (all.length === 0) return false;
+    const parts = all.map((b) => ({ toTick: b.toTick, hash: b.hash, n: b.commands.length }));
+    // `release`: el servidor suelta la partida después de guardar (si no, otra pestaña esperaría 90 s).
+    api.saveOnExit(token, sessionId, { ...mergeBatches(all), live: false, release: true, parts });
+    return true;
+  }
+
+  /** Espera (como mucho `ms`) a que no quede nada por guardar. */
+  async function whenSaved(ms = 4000) {
+    const end = performance.now() + ms;
+    while ((saving || queue.length > 0) && !lost && !saveError && performance.now() < end) {
+      void flushQueue();
+      await new Promise((r) => setTimeout(r, 50));
     }
   }
 
@@ -233,7 +287,7 @@ export function startGame(opts: GameOptions): void {
       const r = await api.claim(token, sessionId, true);
       box.remove();
       lost = false;
-      queue.length = 0;
+      resetSave(r.state);
       send({ type: 'init', state: r.state });
     });
     document.body.append(box);
@@ -245,14 +299,21 @@ export function startGame(opts: GameOptions): void {
   worker.onmessage = (e: MessageEvent<FromWorker>) => {
     const m = e.data;
     if (m.type === 'state') {
-      state = m.state;
+      state = JSON.parse(m.json) as GameState;
+      unsaved = m.unsaved;
       onState();
+      paintSaved();
     } else if (m.type === 'result') {
       pendingResults.get(m.id)?.(m.ok, m.error);
       pendingResults.delete(m.id);
     } else if (m.type === 'save') {
+      // Un lote que no sigue al anterior es de antes de recargar el estado (409, «Jugar aquí»): fuera.
+      if (m.batch.fromTick !== lastBatchTo) return;
+      lastBatchTo = m.batch.toTick;
+      unsaved = null;
       queue.push({ ...m.batch, live: !m.flush && speed > 0 && !document.hidden });
       void flushQueue();
+      paintSaved();
     } else if (m.type === 'thinking') {
       // 2.0: el reloj espera al turno del pueblo.
       thinkingN = m.n;
@@ -374,9 +435,9 @@ export function startGame(opts: GameOptions): void {
     cal.querySelector('.cal-m')!.textContent = `${MONTHS[d.month - 1]!.toLowerCase()} A${d.year}`;
     cal.querySelector('.cal-d')!.textContent = String(d.day);
     if (!reducedMotion()) {
-      cal.classList.remove('flip');
-      void cal.offsetWidth;
-      cal.classList.add('flip');
+      const a = cal.classList.contains('flip-a');
+      cal.classList.toggle('flip-a', !a);
+      cal.classList.toggle('flip-b', a);
     }
   }
   /** Desliza la cámara de `from` al destino que calcula `to` (en 1 s). */
@@ -626,7 +687,8 @@ export function startGame(opts: GameOptions): void {
     }
     $('#game').classList.toggle('opposition', state.politics.mayor !== 'player');
     updateDemand();
-    updateToolLocks();
+    // La bandeja solo se ve abierta (al abrirla se pone al día): cerrada, recalcularla en cada estado costaba a x10.
+    if (!$('#tray').hidden) updateToolLocks();
     renderObjectives(state);
     announceEvents();
     tutorial.update(state, tool.id);
@@ -2595,9 +2657,7 @@ export function startGame(opts: GameOptions): void {
   };
   const onPageHide = () => {
     rememberSeen(token, state);
-    send({ type: 'flush' });
-    void flushQueue(true);
-    void api.release(token, sessionId);
+    if (!saveOnHide()) void api.release(token, sessionId);
   };
   document.addEventListener('visibilitychange', onVisibility);
   window.addEventListener('pagehide', onPageHide);
@@ -2624,7 +2684,7 @@ export function startGame(opts: GameOptions): void {
     setSpeed(0);
     send({ type: 'flush' });
     setTimeout(() => {
-      void flushQueue().then(() => {
+      void whenSaved().then(() => {
         worker.terminate();
         clearInterval(heartbeat);
         clearInterval(decisionTimer);

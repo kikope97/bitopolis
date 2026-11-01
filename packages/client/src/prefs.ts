@@ -66,8 +66,11 @@ export function onPrefs(fn: (p: Prefs) => void): () => void {
 }
 
 /** Movimiento reducido: por el sistema, por preferencia o por el modo tranquilo. */
+/** Una sola consulta (sigue al sistema en vivo); crear una por llamada costaba en cada fotograma. */
+let reduceQuery: MediaQueryList | null = null;
 export function lowMotion(): boolean {
-  return current.motion === 'reducido' || current.calm || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  reduceQuery ??= window.matchMedia('(prefers-reduced-motion: reduce)');
+  return current.motion === 'reducido' || current.calm || reduceQuery.matches;
 }
 
 export function apply(): void {

@@ -1,5 +1,5 @@
 import { gunzipSync, gzipSync } from 'node:zlib';
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyBaseLogger, FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { GameToken, ScenarioId, TerrainShape, TimedCommand, tickToDate } from '@bitopolis/shared';
 import {
@@ -35,6 +35,13 @@ const SaveBody = z.object({
   hash: z.string().regex(/^[0-9a-f]{16}$/),
   /** false en pausa, con la pestaña oculta o al salir: entonces no se llama a la IA. */
   live: z.boolean().optional(),
+  /** Al cerrar la página: tras guardar, suelta la partida (como `/release`, pero en orden). */
+  release: z.boolean().optional(),
+  /**
+   * Al cerrar la página: los lotes que van juntos en esta petición (fin, hash y nº de órdenes de
+   * cada uno). Si el servidor ya tiene alguno (llegó la petición que iba en camino), se lo salta.
+   */
+  parts: z.array(z.object({ toTick: z.number().int().min(0), hash: z.string().regex(/^[0-9a-f]{16}$/), n: z.number().int().min(0) })).max(500).optional(),
 });
 
 export interface ExportFile {
@@ -68,6 +75,20 @@ export function replayOnto(state: GameState, commands: z.infer<typeof TimedComma
   }
   while (i < sorted.length && sorted[i]!.tick === state.tick) applyCommand(state, sorted[i++]!.cmd);
   return state;
+}
+
+/**
+ * Los guardados de una misma partida se atienden de uno en uno: al cerrar la página, el cliente puede
+ * mandar el último lote mientras el anterior aún va en camino (los dos con `keepalive`).
+ */
+const saveLocks = new Map<string, Promise<unknown>>();
+export function serialized<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const prev = saveLocks.get(key) ?? Promise.resolve();
+  const run = prev.then(fn, fn);
+  const tail = run.catch(() => null);
+  saveLocks.set(key, tail);
+  void tail.then(() => saveLocks.get(key) === tail && saveLocks.delete(key));
+  return run;
 }
 
 export async function registerGameRoutes(app: FastifyInstance, db: Db, store: SettingsStore, ai: AiService): Promise<void> {
@@ -120,7 +141,8 @@ export async function registerGameRoutes(app: FastifyInstance, db: Db, store: Se
     const p = TokenParams.safeParse(req.params);
     const b = ClaimBody.safeParse(req.body);
     if (!p.success || !b.success) return bad(reply, 'petición no válida');
-    const row = await load(p.data.token);
+    // Tras el guardado que salió al cerrar o recargar la página (si no, al recargar volvía el estado de antes).
+    const row = await serialized(p.data.token, () => load(p.data.token));
     if (!row) return bad(reply, 'no existe', 404);
     const held = row.lease_session && row.lease_session !== b.data.sessionId && row.lease_until > now();
     if (held && !b.data.force) return reply.code(423).send({ error: 'Partida abierta en otro dispositivo', busy: true });
@@ -136,12 +158,10 @@ export async function registerGameRoutes(app: FastifyInstance, db: Db, store: Se
     const p = TokenParams.safeParse(req.params);
     const b = ClaimBody.safeParse(typeof req.body === 'string' ? JSON.parse(req.body) : req.body);
     if (!p.success || !b.success) return { ok: false };
-    await db
-      .updateTable('games')
-      .set({ lease_until: 0 })
-      .where('token', '=', p.data.token)
-      .where('lease_session', '=', b.data.sessionId)
-      .execute();
+    // Después de los guardados que estén en camino (si no, uno de ellos volvía a tomar la partida).
+    await serialized(p.data.token, () =>
+      db.updateTable('games').set({ lease_until: 0 }).where('token', '=', p.data.token).where('lease_session', '=', b.data.sessionId).execute(),
+    );
     return { ok: true };
   });
 
@@ -150,18 +170,44 @@ export async function registerGameRoutes(app: FastifyInstance, db: Db, store: Se
    * el hash del estado al que ha llegado. El servidor los reproduce y, si el
    * hash coincide, guarda. Así el servidor es la fuente de verdad.
    */
-  app.put('/api/games/:token/save', async (req, reply) => {
+  // POST: el mismo guardado con `navigator.sendBeacon` al cerrar la página (un `fetch` con
+  // `keepalive` se perdía a veces con el service worker activo; el beacon no pasa por él).
+  app.route({ method: ['PUT', 'POST'], url: '/api/games/:token/save', handler: async (req, reply) => {
     const p = TokenParams.safeParse(req.params);
     const b = SaveBody.safeParse(req.body);
     if (!p.success || !b.success) return bad(reply, 'petición no válida');
-    const { sessionId, fromTick, toTick, commands, hash, live } = b.data;
+    const { fromTick, toTick, commands, parts } = b.data;
     if (toTick < fromTick || toTick - fromTick > MAX_TICKS_PER_SAVE) return bad(reply, 'rango de ticks no válido');
-    const row = await load(p.data.token);
+    if (parts && (parts.reduce((s, x) => s + x.n, 0) !== commands.length || parts.some((x, i) => x.toTick < (parts[i - 1]?.toTick ?? fromTick) || x.toTick > toTick))) {
+      return bad(reply, 'lotes no válidos');
+    }
+    return serialized(p.data.token, () => saveBatch(p.data.token, reply, req.log, b.data));
+  } });
+
+  async function saveBatch(token: string, reply: FastifyReply, log: FastifyBaseLogger, body: z.infer<typeof SaveBody>) {
+    const { sessionId, toTick, hash, live, release, parts } = body;
+    let { fromTick, commands } = body;
+    const row = await load(token);
     if (!row) return bad(reply, 'no existe', 404);
     if (row.lease_session !== sessionId && row.lease_until > now()) {
       return reply.code(423).send({ error: 'Partida abierta en otro dispositivo', busy: true });
     }
     const state = migrate(JSON.parse(row.state));
+    // Al cerrar la página, el último guardado puede repetir lotes que iban en camino: los que el
+    // servidor ya tiene (su hash es el del estado guardado) se saltan.
+    if (parts) {
+      const cur = hashState(state);
+      let done = -1;
+      parts.forEach((x, i) => x.toTick === state.tick && x.hash === cur && (done = i));
+      if (done >= 0) {
+        commands = commands.slice(parts.slice(0, done + 1).reduce((s, x) => s + x.n, 0));
+        fromTick = parts[done]!.toTick;
+        if (done === parts.length - 1) {
+          if (release) await db.updateTable('games').set({ lease_until: 0 }).where('id', '=', row.id).execute();
+          return { ok: true, tick: state.tick };
+        }
+      }
+    }
     if (state.tick !== fromTick) return reply.code(409).send({ error: 'desincronizado', state });
     // 2.0: con la IA del servidor, el % de vecinos con IA lo fija /admin (la partida no lo cambia).
     // 409 (no 403): el cliente recarga el estado bueno y sigue guardando (ronda 16).
@@ -186,7 +232,7 @@ export async function registerGameRoutes(app: FastifyInstance, db: Db, store: Se
     });
     replayOnto(state, trusted, toTick);
     if (hashState(state) !== hash) {
-      req.log.warn({ token: '…', fromTick, toTick }, 'hash distinto en el guardado');
+      log.warn({ token: '…', fromTick, toTick }, 'hash distinto en el guardado');
       const fresh = migrate(JSON.parse(row.state));
       return reply.code(409).send({ error: 'desincronizado', state: fresh });
     }
@@ -197,14 +243,14 @@ export async function registerGameRoutes(app: FastifyInstance, db: Db, store: Se
         updated_at: new Date().toISOString(),
         format_version: FORMAT_VERSION,
         lease_session: sessionId,
-        lease_until: now() + LEASE_MS,
+        lease_until: release ? 0 : now() + LEASE_MS,
       })
       .where('id', '=', row.id)
       .execute();
     // Petición anticipada: al cerrar el día N se piden las decisiones del N+1.
     if (row.mode === 'ai' && live) void ai.onSaved(row.id, state);
     return { ok: true, tick: state.tick };
-  });
+  }
 
   app.post('/api/games/:token/regenerate', async (req, reply) => {
     const p = TokenParams.safeParse(req.params);

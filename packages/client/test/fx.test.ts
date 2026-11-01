@@ -1,8 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 
-// fx.ts consulta el «movimiento reducido» del sistema: en Node se simula.
+// fx.ts consulta el «movimiento reducido» del sistema: en Node se simula. Como un MediaQueryList
+// de verdad, `matches` sigue al sistema en vivo (prefs.ts guarda la consulta, 2.5.1).
 let reduced = false;
-vi.stubGlobal('window', { matchMedia: () => ({ matches: reduced }) });
+vi.stubGlobal('window', {
+  matchMedia: () => ({
+    get matches() {
+      return reduced;
+    },
+  }),
+});
 const { shake, shakeOffset } = await import('../src/fx.ts');
 
 describe('sacudida de cámara', () => {

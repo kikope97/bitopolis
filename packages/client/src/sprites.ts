@@ -3046,20 +3046,39 @@ export function toCanvas(p: Pix, tod: TimeOfDay = 'day'): HTMLCanvasElement {
   return c;
 }
 
+/** Color RGBA empaquetado (Uint32) de cada índice, por momento del día. */
+const PACKED: Record<TimeOfDay, Uint32Array> = {
+  day: packed('day'),
+  dusk: packed('dusk'),
+  night: packed('night'),
+};
+function packed(tod: TimeOfDay): Uint32Array {
+  // Los 4 bytes en orden RGBA leídos como Uint32 de la plataforma (vale con cualquier endianness).
+  const bytes = new Uint8Array(REMAP[tod].length * 4);
+  REMAP[tod].forEach((c, i) => bytes.set([...RGB[c]!, 255], i * 4));
+  return new Uint32Array(bytes.buffer);
+}
+/** Un ImageData por tamaño, reutilizado (2.5.1: crear uno por casilla daba tirones y basura al repintar el suelo). */
+const scratch = new Map<number, { img: ImageData; px: Uint32Array }>();
+
 /** Pinta un Pix opaco directamente en un contexto (sin canvas intermedio). */
 export function putPix(ctx: CanvasRenderingContext2D, p: Pix, dx: number, dy: number, tod: TimeOfDay = 'day'): void {
-  const img = ctx.createImageData(p.w, p.h);
-  const map = REMAP[tod];
-  for (let i = 0; i < p.data.length; i++) {
-    const idx = p.data[i]!;
-    if (idx === NONE) continue;
-    const [r, g, b] = RGB[map[idx]!]!;
-    img.data[i * 4] = r;
-    img.data[i * 4 + 1] = g;
-    img.data[i * 4 + 2] = b;
-    img.data[i * 4 + 3] = 255;
+  const k = p.w * 65536 + p.h;
+  let s = scratch.get(k);
+  if (!s) {
+    const img = ctx.createImageData(p.w, p.h);
+    s = { img, px: new Uint32Array(img.data.buffer) };
+    scratch.set(k, s);
   }
-  ctx.putImageData(img, dx, dy);
+  const map = PACKED[tod];
+  const { px } = s;
+  const d = p.data;
+  for (let i = 0; i < d.length; i++) {
+    const idx = d[i]!;
+    // putImageData copia tal cual: lo transparente (NONE) queda transparente, como con un ImageData nuevo.
+    px[i] = idx === NONE ? 0 : map[idx]!;
+  }
+  ctx.putImageData(s.img, dx, dy);
 }
 
 export function sprite(key: string, make: () => Pix, tod: TimeOfDay = 'day'): HTMLCanvasElement {
