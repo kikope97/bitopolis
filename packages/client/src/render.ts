@@ -1,5 +1,5 @@
-import { ambulanceFor, type GameState, isWater, streetSegment, Terrain, Tile, trashStateOf, truckRoutes, Zone } from '@bitopolis/sim';
-import { happinessMarks, type LayerId, layerCanvas, missingMarks, NEED_ICON } from './layers.ts';
+import { ambulanceFor, buildingAt, type GameState, heritageVariant, isWater, streetSegment, Terrain, Tile, trashStateOf, truckRoutes, Zone } from '@bitopolis/sim';
+import { happinessMarks, type LayerId, layerCanvas, missingMarks, NEED_ICON, ruralMarks } from './layers.ts';
 import { pixelIcon } from './icons.ts';
 
 /** Iconos de la capa «Qué falta», creados una vez. */
@@ -11,6 +11,7 @@ import { C, PALETTE } from './palette.ts';
 import {
   BH,
   buildingSprite,
+  landmarkSprite,
   constructionSprite,
   grassTile,
   hash,
@@ -46,6 +47,7 @@ import {
   fireTruckSprite,
   flamesSprite,
   farmSprite,
+  heritageSprite,
   riskSprite,
 } from './sprites.ts';
 
@@ -319,6 +321,8 @@ function bSprite(b: GameState['buildings'][number], tod: TimeOfDay, snowing: boo
   if (b.level && b.level > 1) return serviceSprite(b.kind, b.id, b.level, tod, snowing);
   // 2.2: la finca, según su cultivo.
   if (b.kind === 'farm' && b.crop) return farmSprite(b.crop, b.id, tod, snowing);
+  // 2.3: el patrimonio, con la forma que le da el terreno.
+  if (b.kind === 'heritage') return heritageSprite(heritageVariant(state, b.x, b.y), tod, snowing);
   // 2.1: los tejados de las viviendas cambian con el rango del pueblo.
   return buildingSprite(b.kind, b.id, tod, snowing, state.rank?.level ?? 2);
 }
@@ -474,7 +478,9 @@ export function render(
 
   const sign = signSpot(state, mapSig);
   const byTile = new Map<number, GameState['buildings'][number]>();
-  for (const b of state.buildings) byTile.set(b.y * w + b.x, b);
+  // 2.3: los 2×2 se dibujan al pasar por su fila de abajo (lo de detrás ya está pintado).
+  for (const b of state.buildings) byTile.set((b.y + (b.size ?? 1) - 1) * w + b.x, b);
+  const lmPhase = new Map(state.landmarks.map((l) => [l.buildingId, l]));
   // 2.1: diques en la orilla.
   const dikes = new Set(state.dikes ?? []);
   const projects = new Map(state.projects.map((p) => [p.buildingId, p]));
@@ -508,6 +514,26 @@ export function render(
           // Viento: la copa se mece con un desfase por árbol.
           const frame = still ? 0 : Math.floor(opts.time / 900 + hash(x, y, 4) * 4) % 2;
           ctx.drawImage(treeSprite(Math.floor(hash(x, y, 3) * TREE_VARIANTS), frame, tod, snowing), px, py, ts, BH * z);
+        }
+        continue;
+      }
+      // 2.3: grandes obras (andamios según las fases) y la fábrica de la gran empresa.
+      const lm = lmPhase.get(b.id);
+      if (lm || b.kind === 'bigfactory') {
+        const n = b.size ?? 1;
+        const done = lm ? lm.phase : b.built ? 1 : 0;
+        const phases = lm ? lm.phases : 1;
+        const ter = state.map.terrain ?? [];
+        const horizontal = isWater(ter[(b.y - 1) * w + b.x]) || isWater(ter[(b.y + 1) * w + b.x]);
+        const img = landmarkSprite(b.kind, done, phases, tod, snowing, horizontal);
+        ctx.drawImage(img, b.x * ts - cam.x, (b.y * T - (BH - T)) * z - cam.y, n * ts, (BH + (n - 1) * T) * z);
+        if (b.kind === 'bigfactory' && b.built && !b.damaged) {
+          for (const cx of [10, 20]) {
+            for (let k = 0; k < 3; k++) {
+              const life = still ? (k + 0.5) / 3 : ((opts.time / 2600 + k / 3 + hash(b.id, k, cx) * 0.2) % 1);
+              puffs.push({ x: b.x * T + cx + Math.round(life * 4 + Math.sin(life * 6 + b.id) * 1.5), y: b.y * T - (BH - T) - Math.round(life * 16), size: Math.min(2, Math.floor(life * 3)) });
+            }
+          }
         }
         continue;
       }
@@ -617,6 +643,26 @@ export function render(
     }
   }
 
+  if (layer === 'rural') {
+    // Ronda 19: casa rural = cuadro azul lleno con tejado; alquiler caro = rayas naranjas (forma y color distintos).
+    for (const m of ruralMarks(state)) {
+      const px = m.x * ts - cam.x + 11 * z;
+      const py = (m.y * T - (BH - T)) * z - cam.y + 2 * z;
+      ctx.fillStyle = P(0);
+      ctx.fillRect(px - z, py - z, 12 * z, 12 * z);
+      if (m.kind === 'rural') {
+        ctx.fillStyle = P(10);
+        ctx.fillRect(px, py + 4 * z, 10 * z, 6 * z);
+        for (let k = 0; k < 5; k++) ctx.fillRect(px + k * z, py + (4 - k) * z, (10 - 2 * k) * z, z);
+        ctx.fillStyle = P(12);
+        ctx.fillRect(px + 4 * z, py + 6 * z, 2 * z, 4 * z);
+      } else {
+        ctx.fillStyle = P(3);
+        for (let y = 0; y < 10; y++) for (let x = 0; x < 10; x++) if ((x + y) % 4 < 2) ctx.fillRect(px + x * z, py + y * z, z, z);
+      }
+    }
+  }
+
   if (layer === 'missing') {
     // Ronda 13: sobre cada vivienda (o solar R), UN icono: lo que más falta, con marco rojo
     // (falta) o amarillo a trazos (llega, pero lleno), y «+N» si hay más. Muy alejado, solo un punto.
@@ -624,7 +670,7 @@ export function render(
     for (const m of missingMarks(state)) {
       if (!m.needs.length) continue;
       const top = m.needs[0]!;
-      const built = state.buildings.some((b) => b.x === m.x && b.y === m.y);
+      const built = !!buildingAt(state, m.x, m.y);
       const falta = top.status === 'falta';
       if (cssTile < 22) {
         // Punto de 10×10 con borde claro: rojo lleno si falta, amarillo con hueco si está lleno.
@@ -839,6 +885,8 @@ function roadPath(state: GameState, from: { x: number; y: number }, to: { x: num
 
 /** Punto (en píxeles de sprite) a `d` casillas del inicio del camino, y hacia dónde mira. */
 function along(path: { x: number; y: number }[], d: number): { fx: number; fy: number; dir: 1 | -1 } {
+  if (!path.length) return { fx: -999, fy: -999, dir: 1 };
+  if (!Number.isFinite(d)) d = 0;
   const k = Math.max(0, Math.min(path.length - 1, d));
   const i = Math.floor(k);
   const a = path[i]!;
@@ -990,7 +1038,8 @@ export function truckPaths(state: GameState): { x: number; y: number }[][] {
         if (stack.length) walk.push(stack[stack.length - 1]!);
       }
     }
-    paths.push(walk.map((i) => ({ x: i % w, y: Math.floor(i / w) })));
+    // Un recorrido de una sola casilla no se anima (con nieve salía vacío y rompía el dibujo).
+    if (walk.length >= 2) paths.push(walk.map((i) => ({ x: i % w, y: Math.floor(i / w) })));
   }
   truckCache = { key, paths };
   return paths;

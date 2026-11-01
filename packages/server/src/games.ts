@@ -1,7 +1,7 @@
 import { gunzipSync, gzipSync } from 'node:zlib';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { GameToken, TimedCommand, tickToDate } from '@bitopolis/shared';
+import { GameToken, ScenarioId, TerrainShape, TimedCommand, tickToDate } from '@bitopolis/shared';
 import {
   applyCommand,
   averageHappiness,
@@ -24,7 +24,8 @@ const MAX_TICKS_PER_SAVE = 24 * 30;
 
 const TokenParams = z.object({ token: GameToken });
 const SessionId = z.string().min(8).max(64).regex(/^[A-Za-z0-9_-]+$/);
-const CreateBody = z.object({ mode: z.enum(['normal', 'ai']), sessionId: SessionId });
+// 2.3: escenario y forma del terreno, opcionales (sin ellos, Libre y aleatorio: lo de siempre).
+const CreateBody = z.object({ mode: z.enum(['normal', 'ai']), sessionId: SessionId, scenario: ScenarioId.optional(), terrain: TerrainShape.optional() });
 const ClaimBody = z.object({ sessionId: SessionId, force: z.boolean().optional() });
 const SaveBody = z.object({
   sessionId: SessionId,
@@ -94,7 +95,8 @@ export async function registerGameRoutes(app: FastifyInstance, db: Db, store: Se
     const mode = b.data.mode;
     if (mode === 'ai' && !(await ai.settings(null)).configured) return bad(reply, 'Configura la IA antes de jugar en Modo IA');
     const seed = newSeed();
-    const state = createInitialState({ seed, aiMode: mode === 'ai', namedLimit: store.get().ai.maxCitizens, aiShare: store.get().ai.aiShare ?? 50 });
+    const { scenario, terrain } = b.data;
+    const state = createInitialState({ seed, aiMode: mode === 'ai', namedLimit: store.get().ai.maxCitizens, aiShare: store.get().ai.aiShare ?? 50, scenario, terrain });
     const ts = new Date().toISOString();
     await db
       .insertInto('games')
@@ -106,6 +108,7 @@ export async function registerGameRoutes(app: FastifyInstance, db: Db, store: Se
         format_version: FORMAT_VERSION,
         state: JSON.stringify(state),
         seed,
+        scenario: state.scenario.id,
         lease_session: b.data.sessionId,
         lease_until: now() + LEASE_MS,
       })
@@ -263,6 +266,7 @@ export async function registerGameRoutes(app: FastifyInstance, db: Db, store: Se
         format_version: FORMAT_VERSION,
         state: JSON.stringify({ ...state, aiMode: false }),
         seed: state.seed,
+        scenario: state.scenario?.id ?? 'libre',
         lease_session: null,
         lease_until: 0,
       })

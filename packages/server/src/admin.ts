@@ -269,7 +269,7 @@ export async function registerAdminRoutes(
 
   app.get('/api/admin/games', async () => {
     const monthKey = new Date().toISOString().slice(0, 7);
-    const rows = await db.selectFrom('games').select(['id', 'token', 'mode', 'created_at', 'updated_at', 'state']).orderBy('updated_at', 'desc').limit(500).execute();
+    const rows = await db.selectFrom('games').select(['id', 'token', 'mode', 'created_at', 'updated_at', 'state', 'scenario']).orderBy('updated_at', 'desc').limit(500).execute();
     const spend = await db.selectFrom('ai_usage').select(['game_id', (eb) => eb.fn.sum<number>('eur').as('eur')]).where('month', '=', monthKey).groupBy('game_id').execute();
     const byGame = new Map(spend.map((r) => [r.game_id, Number(r.eur)]));
     return rows.map((r) => {
@@ -282,7 +282,7 @@ export async function registerAdminRoutes(
       } catch {
         /* partida dañada: se lista igualmente para poder borrarla */
       }
-      return { token: r.token, mode: r.mode, createdAt: r.created_at, updatedAt: r.updated_at, population, date, aiMonthEur: byGame.get(r.id) ?? 0 };
+      return { token: r.token, mode: r.mode, scenario: r.scenario ?? 'libre', createdAt: r.created_at, updatedAt: r.updated_at, population, date, aiMonthEur: byGame.get(r.id) ?? 0 };
     });
   });
 

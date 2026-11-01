@@ -1,4 +1,4 @@
-import { coverageCtx, type GameState, homeSites, missingServices, pocketOf, radiusOf, type CoverageNeed, type NeedKey, SERVICE, trashServed, trashStateOf, truckRoutes } from '@bitopolis/sim';
+import { coverageCtx, type GameState, protectedHeritage, TOURISM, touristified, homeSites, missingServices, pocketOf, radiusOf, type CoverageNeed, type NeedKey, SERVICE, trashServed, trashStateOf, truckRoutes } from '@bitopolis/sim';
 import { PALETTE } from './palette.ts';
 import { prefs } from './prefs.ts';
 import { T } from './sprites.ts';
@@ -8,7 +8,7 @@ import { T } from './sprites.ts';
  * servicios y contaminación. Cada nivel usa una trama distinta además del
  * color, para que el color nunca sea la única señal.
  */
-export type LayerId = 'none' | 'missing' | 'happiness' | 'pocket' | 'land' | 'services' | 'pollution' | 'clean';
+export type LayerId = 'none' | 'missing' | 'happiness' | 'pocket' | 'land' | 'services' | 'pollution' | 'clean' | 'rural';
 
 interface LayerDef {
   id: LayerId;
@@ -42,6 +42,8 @@ export const LAYERS: LayerDef[] = [
   { id: 'pollution', label: 'Contaminación', colors: BAD, legend: legend(['Limpio', 'Algo', 'Bastante', 'Mucha'], 'bad') },
   // 2.1: basura. Por dónde pasa el camión y cómo está cada edificio.
   { id: 'clean', label: 'Limpieza', colors: GOOD, legend: legend(['Ratas', 'Bolsas en la calle', 'Sin camión', 'Pasa el camión'], 'good') },
+  // 2.3: turismo. Casas rurales, el patrimonio con su entorno y quién paga más alquiler por ellas.
+  { id: 'rural', label: 'Casas rurales', colors: GOOD, legend: legend(['Alquiler más caro', 'Vivienda', 'Patrimonio y entorno', 'Casa rural'], 'good') },
 ];
 
 function legend(names: string[], kind: string) {
@@ -74,6 +76,24 @@ function values(state: GameState, layer: LayerId): (number | null)[] {
       if (!b.built || (!people.has(b.id) && !b.trash)) continue;
       const st = trashStateOf(b);
       out[b.y * w + b.x] = st === 'ratas' ? 0 : st === 'bolsas' ? 30 : served.has(b.id) ? 100 : 60;
+    }
+    return out;
+  }
+  if (layer === 'rural') {
+    const out: (number | null)[] = new Array(n).fill(null);
+    const her = protectedHeritage(state);
+    if (her) {
+      const r = TOURISM.protect.radius;
+      for (let y = Math.max(0, her.y - r); y <= Math.min(h - 1, her.y + r); y++) {
+        for (let x = Math.max(0, her.x - r); x <= Math.min(w - 1, her.x + r); x++) if (Math.abs(x - her.x) + Math.abs(y - her.y) <= r) out[y * w + x] = 60;
+      }
+    }
+    const dear = touristified(state);
+    const renters = new Set(state.citizens.filter((c) => !c.owns && c.homeId !== null).map((c) => c.homeId));
+    for (const b of state.buildings) {
+      if (b.kind === 'heritage') out[b.y * w + b.x] = 60;
+      if (!b.built || (b.kind !== 'house' && b.kind !== 'res')) continue;
+      out[b.y * w + b.x] = b.rural ? 100 : dear && b.kind === 'res' && renters.has(b.id) ? 0 : 30;
     }
     return out;
   }
@@ -117,7 +137,7 @@ let cache: { key: string; canvas: HTMLCanvasElement } | null = null;
 /** Capa a escala 1 (una trama por casilla); se rehace cada día de juego. */
 export function layerCanvas(state: GameState, layer: LayerId): HTMLCanvasElement | null {
   if (layer === 'none') return null;
-  const key = `${layer}:${Math.floor(state.tick / 24)}:${state.buildings.length}:${prefs().colorblind}`;
+  const key = `${layer}:${Math.floor(state.tick / 24)}:${state.buildings.length}:${layer === 'rural' ? `${state.buildings.filter((b) => b.rural).length}:${state.tourism?.protectedId ?? ''}:` : ''}${prefs().colorblind}`;
   if (cache?.key === key) return cache.canvas;
   const def = LAYERS.find((l) => l.id === layer)!;
   const { w, h } = state.map;
@@ -159,6 +179,19 @@ export function happinessMarks(state: GameState): { x: number; y: number; lv: nu
     const lv = v < 25 ? 0 : v < 50 ? 1 : v < 75 ? 2 : 3;
     out.push({ x: i % w, y: Math.floor(i / w), lv, color: levelColor(GOOD, lv) });
   });
+  return out;
+}
+
+/** Ronda 19: la capa «Casas rurales» se marca encima de los tejados (bajo los edificios no se veía). */
+export function ruralMarks(state: GameState): { x: number; y: number; kind: 'rural' | 'caro' }[] {
+  const out: { x: number; y: number; kind: 'rural' | 'caro' }[] = [];
+  const dear = touristified(state);
+  const renters = new Set(state.citizens.filter((c) => !c.owns && c.homeId !== null).map((c) => c.homeId));
+  for (const b of state.buildings) {
+    if (!b.built || (b.kind !== 'house' && b.kind !== 'res')) continue;
+    if (b.rural) out.push({ x: b.x, y: b.y, kind: 'rural' });
+    else if (dear && b.kind === 'res' && renters.has(b.id)) out.push({ x: b.x, y: b.y, kind: 'caro' });
+  }
   return out;
 }
 

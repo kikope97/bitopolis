@@ -4,6 +4,7 @@ import {
   applyCommand,
   businessTaxes,
   checkInvariants,
+  FORMAT_VERSION,
   createInitialState,
   cropAt,
   directorMenu,
@@ -240,7 +241,7 @@ describe('el campo (2.2)', () => {
     const s = createInitialState({ seed: 3 }) as unknown as Record<string, unknown>;
     const old = { ...structuredClone(s), formatVersion: 14 };
     const m = migrate(old);
-    expect(m.formatVersion).toBe(15);
+    expect(m.formatVersion).toBe(FORMAT_VERSION);
     expect(m.buildings).toEqual((s as unknown as GameState).buildings);
     // Una finca sin factor (por si acaso) empieza con el inicial.
     const odd = { ...structuredClone(s), formatVersion: 14, buildings: [{ id: 1, kind: 'farm', crop: 'secano' }] };

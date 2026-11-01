@@ -12,8 +12,9 @@ import {
   OPPOSITION_APPROVAL,
   OPPOSITION_POP,
   POLL_WARN_MONTHS,
-  VOTE_ABSTENTION_BASE, TURN, TRASH, LISTS, RIVAL_PROMISES } from './balance.ts';
+  VOTE_ABSTENTION_BASE, TURN, TRASH, LISTS, RIVAL_PROMISES, TOURISM } from './balance.ts';
 import { levelOf } from './levels.ts';
+import { protectedHeritage } from './tourism.ts';
 import { BUILD_NAMES, buildCost, governmentCommand } from './commands.ts';
 import { rivalBudget } from './civic.ts';
 import { felt, saturated, taxLevels, updateFeltTaxes } from './economy.ts';
@@ -114,7 +115,9 @@ export function updateFactions(state: GameState): void {
     const bonus =
       (state.politics.mayor !== 'player' && state.politics.party?.faction === f ? 10 : 0) +
       // 2.1: el reciclaje (punto limpio de nivel 2 o más) contenta a los ecologistas.
-      (f === 'ecologistas' && state.buildings.some((b) => b.kind === 'cleanpoint' && b.built && levelOf(b) >= 2) ? TRASH.recyclingFaction : 0);
+      (f === 'ecologistas' && state.buildings.some((b) => b.kind === 'cleanpoint' && b.built && levelOf(b) >= 2) ? TRASH.recyclingFaction : 0) +
+      // 2.3: el entorno protegido del patrimonio no gusta a los empresarios (sin industria nueva).
+      (f === 'empresarios' && protectedHeritage(state) ? TOURISM.protect.ownerMood : 0);
     const satisfaction = Math.max(0, Math.min(100, Math.round(happy * 0.6 + 40 - unmet.length * 14 + bonus)));
     state.politics.factions[f] = { satisfaction, demand: unmet[0] ?? null, demands: unmet.slice(0, 2), unmet, members: members.length };
   }

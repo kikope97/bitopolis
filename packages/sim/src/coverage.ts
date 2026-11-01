@@ -4,7 +4,7 @@ import { Terrain } from './terrain.ts';
 import { isUnlocked } from './townhall.ts';
 import { levelOf, radiusOf, truckRouteOf } from './levels.ts';
 import { serviceSaturation } from './economy.ts';
-import { DIRS, type GameState, inBounds, terrainAt, Tile, tileIndex, Zone } from './state.ts';
+import { buildingAt, DIRS, footprint, type GameState, inBounds, terrainAt, Tile, tileIndex, Zone } from './state.ts';
 import { truckRoutes } from './trash-core.ts';
 
 /**
@@ -114,7 +114,7 @@ export function coverageCtx(state: GameState): CoverageCtx {
  */
 export function missingServices(state: GameState, x: number, y: number, ctx: CoverageCtx = coverageCtx(state)): CoverageNeed[] {
   const out: CoverageNeed[] = [];
-  const b = state.buildings.find((q) => q.x === x && q.y === y);
+  const b = buildingAt(state, x, y);
   const roadNear = (set: Set<number>) =>
     DIRS.some(([dx, dy]) => inBounds(state, x + dx, y + dy) && set.has(tileIndex(state, x + dx, y + dy)));
   for (const key of ctx.active) {
@@ -150,8 +150,11 @@ export function homeSites(state: GameState): { x: number; y: number }[] {
       homes.add(b.y * state.map.w + b.x);
     }
   }
+  // 2.3: casillas ocupadas por algún edificio (los 2×2 ocupan 4).
+  const taken = new Set<number>();
+  for (const b of state.buildings) for (const [x, y] of footprint(b)) taken.add(y * state.map.w + x);
   state.map.zones.forEach((z, i) => {
-    if (z === Zone.R && !homes.has(i) && state.map.tiles[i] !== Tile.Road && !state.buildings.some((b) => b.y * state.map.w + b.x === i)) {
+    if (z === Zone.R && !homes.has(i) && state.map.tiles[i] !== Tile.Road && !taken.has(i)) {
       out.push({ x: i % state.map.w, y: Math.floor(i / state.map.w) });
     }
   });

@@ -1,3 +1,4 @@
+import type { TerrainShape } from '@bitopolis/shared';
 import { chance, nextInt, type RngState } from './prng.ts';
 
 /**
@@ -14,8 +15,14 @@ export const isWater = (t: number | undefined) => t === Terrain.River || t === T
  * Genera el terreno de un pueblo nuevo. El centro (ayuntamiento y primera
  * calle, con margen) queda siempre en llano para que el comienzo sea igual de
  * fácil en todas las semillas.
+ *
+ * 2.3: `shape` fuerza o quita costa, río y lomas. «aleatorio» es lo de siempre
+ * (mismos dados en el mismo orden: misma semilla, mismo mapa). Las demás tiran
+ * los mismos dados y luego deciden: «rio» (río seguro, sin mar), «costa» (mar
+ * seguro), «colina» (sin mar, más lomas y más grandes) y «llano» (ni agua ni
+ * lomas). `opts.river` obliga a que haya río (escenario «Tras la riada»).
  */
-export function generateTerrain(rng: RngState, w: number, h: number): number[] {
+export function generateTerrain(rng: RngState, w: number, h: number, shape: TerrainShape = 'aleatorio', opts: { river?: boolean } = {}): number[] {
   const t = new Array<number>(w * h).fill(Terrain.Flat);
   const cx = Math.floor(w / 2);
   const cy = Math.floor(h / 2);
@@ -26,7 +33,8 @@ export function generateTerrain(rng: RngState, w: number, h: number): number[] {
 
   // Costa: a veces el pueblo da al mar por uno de sus lados.
   let seaSide = -1;
-  if (chance(rng, 0.4)) {
+  const seaDice = chance(rng, 0.4);
+  if (shape === 'costa' || (shape === 'aleatorio' && seaDice)) {
     seaSide = nextInt(rng, 0, 3); // 0 norte, 1 este, 2 sur, 3 oeste
     let depth = nextInt(rng, 3, 5);
     const len = seaSide % 2 === 0 ? w : h;
@@ -42,7 +50,8 @@ export function generateTerrain(rng: RngState, w: number, h: number): number[] {
   }
 
   // Río: cruza el mapa serpenteando (hacia el mar, si lo hay). Dos casillas de ancho.
-  if (chance(rng, 0.85)) {
+  const riverDice = chance(rng, 0.85);
+  if (opts.river || shape === 'rio' || ((shape === 'aleatorio' || shape === 'costa' || shape === 'colina') && riverDice)) {
     // Eje del río: si hay mar, perpendicular a su costa y desembocando en ella.
     const vertical = seaSide === -1 ? chance(rng, 0.5) : seaSide % 2 === 0;
     const len = vertical ? h : w;
@@ -78,7 +87,8 @@ export function generateTerrain(rng: RngState, w: number, h: number): number[] {
   }
 
   // Colinas: de una a tres lomas, lejos del centro y fuera del agua.
-  const hills = nextInt(rng, 1, 3);
+  const hillDice = nextInt(rng, 1, 3);
+  const hills = shape === 'llano' ? 0 : shape === 'colina' ? hillDice + 2 : hillDice;
   for (let n = 0; n < hills; n++) {
     let hx = 0;
     let hy = 0;
@@ -87,7 +97,7 @@ export function generateTerrain(rng: RngState, w: number, h: number): number[] {
       hy = nextInt(rng, 3, h - 4);
       if (Math.abs(hx - cx) > 10 || Math.abs(hy - cy) > 8) break;
     }
-    const r = nextInt(rng, 2, 4);
+    const r = nextInt(rng, 2, 4) + (shape === 'colina' ? 1 : 0);
     for (let y = hy - r - 1; y <= hy + r + 1; y++) {
       for (let x = hx - r - 1; x <= hx + r + 1; x++) {
         if (x < 0 || y < 0 || x >= w || y >= h || t[y * w + x] !== Terrain.Flat) continue;

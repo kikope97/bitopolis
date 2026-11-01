@@ -33,10 +33,13 @@ import { BUILD_NAMES } from './commands.ts';
 import { trashServed, trashStateOf } from './trash-core.ts';
 import { rumoredTenders, scandal, worksName } from './tenders.ts';
 import { streetCandidates } from './streets.ts';
+import { applyVolunteers, LANDMARK_NAMES, landmarksInProgress } from './landmarks.ts';
+import { applyTouristNoise, applyTvReport, HERITAGE_NAMES, heritageOf, heritageVariant, ruralHomes, touristNoiseCandidate, tvReportCandidate } from './tourism.ts';
+import { announceEre, bigFactory, ereCandidate, hireBatch, hireCandidates } from './region.ts';
 
 const plural = (n: number) => (n === 1 ? 'un edificio' : `${n} edificios`);
 
-export const DIRECTOR_KINDS = ['robo_tienda', 'robo_casa', 'asociacion', 'manifestacion', 'pelea', 'reconciliacion', 'gratitud', 'rumor', 'oposicion', 'local', 'encuentro', 'ayuda', 'incendio', 'susto', 'ratas', 'licitacion', 'homenaje', 'cosecha', 'granizo'] as const;
+export const DIRECTOR_KINDS = ['robo_tienda', 'robo_casa', 'asociacion', 'manifestacion', 'pelea', 'reconciliacion', 'gratitud', 'rumor', 'oposicion', 'local', 'encuentro', 'ayuda', 'incendio', 'susto', 'ratas', 'licitacion', 'homenaje', 'cosecha', 'granizo', 'voluntarios_obra', 'polemica_obra', 'reportaje_tv', 'turistas_ruido', 'ere_gran_empresa', 'contrata_vecinos'] as const;
 export type DirectorKind = (typeof DIRECTOR_KINDS)[number];
 
 export interface DirectorCandidate {
@@ -274,11 +277,80 @@ export function directorMenu(state: GameState): DirectorCandidate[] {
     );
   }
 
+  // 2.3: metas grandes (obras, turismo y la gran empresa).
+  // La comarca y la gran empresa van primero: con varias obras en marcha no se quedan sin hueco (ronda 19).
+  const goals = bigGoalCandidates(state);
+  const works = (c: DirectorCandidate) => c.kind === 'voluntarios_obra' || c.kind === 'polemica_obra';
+  out.push(...[...goals.filter((c) => !works(c)), ...goals.filter(works)].slice(0, DIRECTOR.perKind * 3));
+
   // Una historia: dos vecinos quieren el único local libre.
   const founders = named.filter((c) => canFound(state, c));
   if (founders.length >= 2 && freeShopLot(state) !== null && state.hooks.length < 3) {
     const [a, b] = founders;
     if (relation(a!, b!.id)?.kind !== 'pareja') out.push({ id: `local:${pairId(a!.id, b!.id)}`, kind: 'local', bad: false, text: `${first(a!)} y ${first(b!)} quieren el mismo local para abrir un negocio`, why: 'solo queda un local libre' });
+  }
+  return out;
+}
+
+/** Impuestos altos (alguno) o la caja justa: lo que hace discutir lo que cuesta una obra. */
+function moneyTight(state: GameState): string | null {
+  const high = state.taxesSplit ? (['ibi', 'tasas', 'plusvalia'] as const).some((k) => state.taxes[k] === 'high') : state.taxLevel === 'high';
+  if (high) return 'los impuestos están altos';
+  if (state.treasury < DIRECTOR.tightTreasury) return 'la caja del ayuntamiento va justa';
+  return null;
+}
+
+/** La facción (con vecinos con nombre) que más pagó el mes pasado, y cuánto. */
+function payingFaction(state: GameState): { f: Faction; members: Citizen[] } | null {
+  const by = new Map<Faction, { paid: number; members: Citizen[] }>();
+  for (const c of state.citizens) {
+    if (!c.named) continue;
+    const f = factionOf(state, c);
+    const e = by.get(f) ?? { paid: 0, members: [] };
+    e.paid += c.last?.out ?? 0;
+    e.members.push(c);
+    by.set(f, e);
+  }
+  const best = [...by.entries()].filter(([, e]) => e.members.length >= 2).sort((a, b) => b[1].paid - a[1].paid || FACTIONS.indexOf(a[0]) - FACTIONS.indexOf(b[0]))[0];
+  return best ? { f: best[0], members: best[1].members } : null;
+}
+
+/** 2.3: sucesos de las grandes obras, el turismo y la gran empresa (con datos reales). */
+function bigGoalCandidates(state: GameState): DirectorCandidate[] {
+  const out: DirectorCandidate[] = [];
+  const unemployed = state.citizens.filter((c) => c.jobId === null && c.unemployedSince !== undefined).length;
+  for (const lm of landmarksInProgress(state)) {
+    const name = LANDMARK_NAMES[lm.kind].toLowerCase();
+    const inWorks = lm.phaseUntil !== -1 && !lm.paused;
+    // Voluntarios: una vez por fase (la fase en obra va más rápida o la siguiente sale más barata).
+    if (lm.helped !== lm.phase && (inWorks || lm.phase > 0) && !lm.discount) {
+      out.push({ id: `voluntarios_obra:${lm.id}`, kind: 'voluntarios_obra', bad: false, text: `Vecinos voluntarios echan una mano en ${name}`, why: `${inWorks ? `la fase ${lm.phase + 1} de ${lm.phases} está en obra` : `van ${lm.phase} de ${lm.phases} fases`}${unemployed ? ` y hay ${unemployed} vecinos en paro` : ''}` });
+    }
+    // Polémica: solo con algo ya gastado y el dinero justo (o impuestos altos); una vez por fase.
+    const tight = moneyTight(state);
+    const payer = tight && lm.spent > 0 && lm.polemic !== lm.phase ? payingFaction(state) : null;
+    if (payer) {
+      out.push({ id: `polemica_obra:${lm.id}`, kind: 'polemica_obra', bad: true, text: `Polémica en el pueblo por lo que cuesta ${name}`, why: `lleva ${lm.spent} € del ayuntamiento, ${tight} y quienes más pagan son los ${FACTION_TEXT[payer.f].toLowerCase()}` });
+    }
+  }
+  const her = heritageOf(state);
+  if (her && tvReportCandidate(state)) {
+    out.push({ id: `reportaje_tv:${her.id}`, kind: 'reportaje_tv', bad: false, text: `La tele hace un reportaje sobre ${HERITAGE_NAMES[heritageVariant(state, her.x, her.y)]}`, why: `el pueblo tiene patrimonio${state.tourism.visitors ? ` y ya vienen visitantes (${state.tourism.visitors} el mes pasado)` : ''}` });
+  }
+  if (touristNoiseCandidate(state)) {
+    const n = ruralHomes(state).length;
+    out.push({ id: 'turistas_ruido:casas', kind: 'turistas_ruido', bad: true, text: 'Los vecinos de las casas rurales se quejan del ruido de los turistas', why: `${n === 1 ? 'una casa rural' : `${n} casas rurales`} y ${state.tourism.visitors} visitantes el mes pasado` });
+  }
+  const r = state.region;
+  const ere = ereCandidate(state);
+  const crisis = r?.phase === 'crisis' || (r?.warned && r.next === 'crisis');
+  const fab = bigFactory(state);
+  if (ere && crisis && fab) {
+    out.push({ id: `ere_gran_empresa:${fab.id}`, kind: 'ere_gran_empresa', bad: true, text: `${ere.company} anuncia un ERE (la mitad de la plantilla, en unos meses)`, why: r?.phase === 'crisis' ? 'crisis en la comarca: las fábricas venden menos' : 'se acerca una crisis en la comarca', owed: r?.phase === 'crisis' });
+  }
+  const hire = hireCandidates(state);
+  if (fab && hire.free > 0 && hire.citizenIds.length) {
+    out.push({ id: `contrata_vecinos:${fab.id}`, kind: 'contrata_vecinos', bad: false, text: `${state.bigCompany!.name} contrata a vecinos del pueblo`, why: `tiene ${hire.free} puestos libres y hay ${hire.citizenIds.length} vecinos sin trabajo en el pueblo` });
   }
   return out;
 }
@@ -401,6 +473,12 @@ function brewingText(c: DirectorCandidate): string {
       return `Hay quien hace preguntas en el bar: ${c.why}`;
     case 'granizo':
       return `El cielo amenaza piedra sobre el campo: ${c.why}`;
+    case 'polemica_obra':
+      return `Se murmura en el bar sobre lo que cuesta la obra: ${c.why}`;
+    case 'turistas_ruido':
+      return `Hay vecinos hartos del jaleo de los turistas (${c.why})`;
+    case 'ere_gran_empresa':
+      return `En la fábrica grande se habla de recortes: ${c.why}`;
     default:
       return c.text;
   }
@@ -558,6 +636,49 @@ function perform(state: GameState, c: DirectorCandidate): { id: number; text: st
       const b = state.buildings.find((x) => x.id === Number(arg));
       if (!b || !hail(state, b)) return null;
       return { id: state.citizens.find((x) => x.jobId === b.id)?.id ?? 0, text: c.text };
+    }
+    case 'voluntarios_obra': {
+      const lm = landmarksInProgress(state).find((l) => l.id === Number(arg));
+      if (!lm || lm.helped === lm.phase || lm.discount || !applyVolunteers(state, lm.id)) return null;
+      lm.helped = lm.phase;
+      // Ayudan los que están en paro (y les sube el ánimo).
+      const who = state.citizens.filter((x) => x.named && x.jobId === null && x.unemployedSince !== undefined).slice(0, 4);
+      for (const x of who) addMemory(state, x, 'obra_voluntario', 3, 3);
+      return { id: who[0]?.id ?? 0, text: c.text };
+    }
+    case 'polemica_obra': {
+      const lm = landmarksInProgress(state).find((l) => l.id === Number(arg));
+      const payer = payingFaction(state);
+      if (!lm || lm.polemic === lm.phase || !payer) return null;
+      lm.polemic = lm.phase;
+      // Actitud −1 en la facción que paga más (y lo recuerdan).
+      for (const x of payer.members) {
+        x.attitude = Math.max(-2, (x.attitude ?? 0) - 1);
+        x.grudge = Math.min(20, x.grudge + 1);
+        addMemory(state, x, 'rumor', 3, -2);
+      }
+      pushEvent(state, 'politics', `${c.text}: los ${FACTION_TEXT[payer.f].toLowerCase()} dicen que la pagan ellos`, { ref: lm.buildingId });
+      return { id: payer.members[0]?.id ?? 0, text: c.text };
+    }
+    case 'reportaje_tv': {
+      if (!tvReportCandidate(state)) return null;
+      applyTvReport(state);
+      return { id: 0, text: c.text };
+    }
+    case 'turistas_ruido': {
+      if (!touristNoiseCandidate(state)) return null;
+      applyTouristNoise(state);
+      return { id: 0, text: c.text };
+    }
+    case 'ere_gran_empresa': {
+      if (!announceEre(state)) return null;
+      const w = state.citizens.find((x) => x.jobId === Number(arg));
+      return { id: w?.id ?? 0, text: c.text };
+    }
+    case 'contrata_vecinos': {
+      const before = new Set(state.citizens.filter((x) => x.jobId === Number(arg)).map((x) => x.id));
+      if (!hireBatch(state, DIRECTOR.hireBatch)) return null;
+      return { id: state.citizens.find((x) => x.jobId === Number(arg) && !before.has(x.id))?.id ?? 0, text: c.text };
     }
     case 'local': {
       const [a, b] = pair();

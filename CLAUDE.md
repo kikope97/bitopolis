@@ -140,3 +140,15 @@ pnpm e2e                            # Playwright, viewport móvil y escritorio; 
 - IA: biografía mensual (`turn.monthly`, `acts[].biografia`, `Citizen.bio`), pies de foto (`director.pies`, `Moment.caption`), `cuentas` en `turnShared`. Turno mensual en lotes de `TURN_BATCH_MONTHLY` (8). `DirectorOut` recorta listas y descarta solo el campo extra que esté mal.
 - Perfiles del simulador: `campo`, `endeudado` (`borrow`), `keepRoads`; `report.sales` y `report.loans`.
 - e2e: `prestamos`, `licitaciones`, `campo`, `elecciones-listas`.
+
+## Metas grandes (2.3) — formato de partida 16, TURN_PROMPT_VERSION 12
+- Edificios de varias casillas: `Building.size`, `occupies`/`sizeOf`/`footprint` y `buildingAt` (state.ts); usa siempre `buildingAt` para saber qué hay en una casilla.
+- `sim/src/landmarks.ts`: grandes obras 2×2 por fases (`StartLandmark`, `FundLandmarkPhase`, `PauseLandmark`; `LANDMARKS`), cofinanciación (`grantTerms`, civic.ts) y FEDER (`offerFeder`, `federRepair`), donaciones de vecinos (`donar_obra`), mantenimiento del 1 %. Al terminar, foto en el álbum.
+- `sim/src/region.ts`: comarca (bonanza/normal/crisis por cadena de Markov, `REGION`), gran empresa (`AnswerBigCompany`, `bigFactorySpot`, ERE, `hireBatch`); con director, `directorOwns` apaga el ERE y la contratación por reglas.
+- `sim/src/tourism.ts`: patrimonio (`heritage`, variantes por terreno), `attraction`, visitantes, `SetTouristTax`, `ProtectArea` (`protectedAt`), casas rurales (`ruralDemand`, `ruralShare`), turistificación y ruido. `TOURISM` en balance.ts.
+- `sim/src/scenarios.ts`: `applyScenario` (quiebra, vaciado, riada; `SCENARIOS`), `scenarioStatus`; terrenos en `generateTerrain`. Servidor: `CreateBody` con `scenario`/`terrain`; CLI `--scenario`/`--terrain`. La medalla del escenario la da `achievementsMonth`.
+- `sim/src/achievements.ts`: 36 medallas (`ACHIEVEMENTS`), `historyMonth` (`state.history`), récords (`newRecordLine`). Cliente: `charts-ui.ts`, `medals-ui.ts`.
+- Compartir: `sim/src/view.ts` (`viewSnapshot`, lista blanca con test), `server/src/share.ts` (`/api/games/:token/share`, `GET /api/view/:viewToken`, 30/min), cliente `share-ui.ts`, `postcard.ts`, `viewer.ts` (`/v/<token>`). **Decisión del creador**: la vista compartida no pide la contraseña de acceso (ya lleva su token secreto; `auth.ts`).
+- IA: bloque `metas` en `turnShared`; acciones `donar_obra:<id>`, `abrir_casa_rural`, `quejarse_turistas`, `aceptar_trabajo:<fab>`; director `voluntarios_obra`, `polemica_obra`, `reportaje_tv`, `turistas_ruido`, `ere_gran_empresa`, `contrata_vecinos` (la comarca y la empresa van antes que las obras en el menú). `mayorText` cuenta las metas grandes.
+- Textos que entran en el estado: cifras con `fmt()` (loans.ts), nunca `toLocaleString` (cambia el hash entre motores).
+- e2e: `grandes-obras`, `turismo`, `escenarios`, `historia`, `compartir`.

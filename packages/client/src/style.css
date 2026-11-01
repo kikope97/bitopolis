@@ -104,6 +104,18 @@ button, input, select { font: inherit; color: inherit; }
 .stats-card dt { color: var(--muted); }
 .stats-card dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
 .stats-card .headline { font-weight: 400; font-style: italic; }
+/* 2.3: escenario y terreno de la partida nueva (plegado bajo el modo). */
+.scenario-picker { margin-top: 12px; padding: 0 12px; background: var(--panel); border: 2px solid var(--line); border-radius: 4px; }
+.scenario-picker summary { min-height: 48px; display: flex; align-items: center; flex-wrap: wrap; gap: 0 8px; cursor: pointer; font-weight: 600; list-style: none; }
+.scenario-picker summary::-webkit-details-marker { display: none; }
+.scenario-picker[open] .chev { display: inline-block; transform: rotate(180deg); }
+.scenario-picker[open] { padding-bottom: 12px; }
+.scenario-picker .btn.choice span { overflow-wrap: anywhere; }
+.scenario-picker .small-title { margin: 12px 0 6px; font-size: 1rem; }
+.terrain-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.terrain-chip { min-height: 44px; min-width: 44px; padding: 6px 12px; background: var(--bg); color: var(--text); border: 2px solid var(--line); border-radius: 22px; font: inherit; cursor: pointer; }
+.terrain-chip[aria-checked='true'] { border-color: var(--accent); color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+.terrain-chip:focus-visible, .scenario-picker summary:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .login { display: flex; flex-direction: column; gap: 12px; margin-top: 24px; }
 .login input { width: 100%; min-height: 48px; padding: 8px; background: var(--panel); border: 2px solid var(--line); border-radius: 4px; }
 
@@ -970,7 +982,7 @@ html[data-text='200'] .tray-grid { grid-template-columns: repeat(auto-fill, minm
 .level-box h3 { display: flex; align-items: center; gap: 6px; margin-top: 0; }
 .reqs { list-style: none; padding: 0; margin: 4px 0 8px; }
 .reqs li { padding: 2px 0; }
-.reqs li.ok { color: var(--good); }
+.reqs li.ok { color: #a7f070; } /* ronda 19: 8:1 sobre el panel */
 .reqs li.no { color: var(--bad); }
 
 /* Ronda 14: con texto grande o pantalla estrecha, el dibujo del ayuntamiento va arriba y nada se sale. */
@@ -1148,3 +1160,52 @@ body.placing .tut-arrow { visibility: hidden; }
 .loan-item.tesoreria { border-left: 6px solid var(--accent); }
 .loan-item p { margin: 4px 0; }
 .loan-repay { width: 100%; margin-top: 4px; }
+
+/* ---------- 2.3: compartir el pueblo y vista de solo lectura (/v/) ---------- */
+.share-section { margin-bottom: 8px; }
+.share-url { width: 100%; min-height: 44px; padding: 8px; border: 2px solid var(--line); background: var(--bg); font-size: 0.9rem; }
+.share-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.share-row .btn { flex: 1 1 auto; }
+.share-on { margin: 4px 0 8px; }
+.viewer { position: fixed; inset: 0; display: flex; flex-direction: column; }
+.viewer-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 6px 10px; padding-top: max(6px, env(safe-area-inset-top)); background: var(--panel); border-bottom: 2px solid var(--line); }
+.viewer-title { margin: 0; flex: 1 1 12rem; min-width: 0; overflow-wrap: anywhere; }
+.viewer-cta { display: inline-flex; align-items: center; min-height: 44px; padding: 6px 12px; background: var(--accent); color: var(--bg); font-weight: 700; text-decoration: none; border: 2px solid #eea160; }
+.viewer-map { position: relative; flex: 1; min-height: 0; }
+#view-map { width: 100%; height: 100%; display: block; image-rendering: pixelated; touch-action: none; cursor: grab; }
+.viewer-btns { position: absolute; right: 10px; bottom: max(10px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px; }
+.viewer-btns .fab { width: 48px; height: 48px; }
+.viewer-gone { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 24px; text-align: center; }
+/* ---------- 2.3: Historia (charts-ui.ts) y medallas (medals-ui.ts) ---------- */
+.history-series, .history-range { margin: 8px 0; }
+.history-series .seg-btn, .history-range .seg-btn { padding: 6px 10px; }
+.history-wrap { max-width: 328px; border: 2px solid var(--line); background: var(--bg); }
+.history-chart { display: block; width: 100%; aspect-ratio: 328 / 160; height: auto; touch-action: none; image-rendering: auto; }
+.history-readout { min-height: 1.5em; margin: 6px 0 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.history-note:empty { display: none; }
+.history-records { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.history-record { padding: 6px 10px; border: 2px solid var(--line); background: var(--bg); }
+.medal-grid { display: grid; grid-template-columns: repeat(4, 72px); gap: 8px; justify-content: start; margin-top: 8px; }
+.medal-cell { width: 72px; height: 72px; padding: 0; display: flex; align-items: center; justify-content: center; border: 2px solid var(--line); background: var(--bg); cursor: pointer; }
+.medal-cell .medal-icon { width: 48px; height: 48px; margin: 0; }
+.medal-cell.missing { border-style: dashed; }
+.medal-cell.tier-oro { border-color: var(--accent); }
+.medal-cell[aria-pressed='true'] { outline: 3px solid var(--accent); outline-offset: -3px; }
+.medal-detail { min-height: 5.5em; padding: 6px 10px; border: 2px solid var(--line); background: var(--panel); }
+.medal-detail p { margin: 4px 0; }
+.medal-title::before { content: none; }
+.medal-title { display: flex; align-items: center; gap: 8px; margin: 2px 0; }
+.medal-title .px-icon { width: 24px; height: 24px; flex: 0 0 auto; margin: 0; }
+@media (max-width: 340px) { .medal-grid { grid-template-columns: repeat(4, minmax(56px, 1fr)); } .medal-cell { width: auto; } }
+/* 2.3: grandes obras (barra de fases de la ficha, icono 2×2 de la bandeja) y la gran empresa. */
+.tool-icon canvas.wide { width: 40px; height: 50px; margin-bottom: -4px; }
+.phase-bar { display: flex; gap: 4px; margin: 8px 0; }
+.phase-seg { position: relative; flex: 1; min-height: 28px; border: 2px solid var(--line); background: var(--bg); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.phase-seg.done { background: var(--good); border-color: var(--good); color: var(--bg); }
+.phase-seg.doing { border-color: var(--accent); }
+.phase-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); opacity: 0.55; }
+.phase-num { position: relative; font-weight: 700; }
+.landmark-sheet .btn.wide { margin-top: 6px; }
+.bc-opt { margin: 6px 0; }
+.bc-opt p { margin: 2px 0 0; }
+

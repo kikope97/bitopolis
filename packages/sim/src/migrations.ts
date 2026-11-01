@@ -1,10 +1,12 @@
+import { checkMedalsSilently } from './achievements.ts';
 import { emptyErrands } from './errands.ts';
 import { emptyPress } from './press.ts';
 import { emptyPolitics, FACTION_STYLE, type Faction } from './politics-core.ts';
 import { FORMAT_VERSION, type GameState } from './state.ts';
 import { emptyRank } from './rank-core.ts';
 import { levelForPop } from './townhall.ts';
-import { FARM, RANKS, TRASH } from './balance.ts';
+import { FARM, RANKS, REGION, TRASH } from './balance.ts';
+import { TICKS_PER_MONTH } from '@bitopolis/shared';
 
 /**
  * Migraciones encadenadas: MIGRATIONS[n] convierte un estado de formatVersion
@@ -162,7 +164,91 @@ export const MIGRATIONS: Record<number, Migration> = {
   13: (s) => ({ ...migrate14Trash(migrate14Rank(migrate14Errands(migrate14Fire(s)))), formatVersion: 14 }),
   // 2.2: licitaciones y calles (cada parte de la 2.2, en su función).
   14: (s) => ({ ...migrate15Loans(migrate15Politics(migrate15Farm(migrate15Tenders(s)))), formatVersion: 15 }),
+  // 15 → 16 (2.3, metas grandes): cada parte en su función.
+  15: (s) => ({ ...migrate16Medals(migrate16History(migrate16Region(migrate16Scenario(migrate16Tourism(migrate16Landmarks(s)))))), formatVersion: 16 }),
 };
+
+/** 2.3 (15 → 16), grandes obras: ninguna en marcha (ningún edificio era 2×2). */
+export function migrate16Landmarks(s: Record<string, any>): Record<string, any> {
+  return { ...s, landmarks: Array.isArray(s.landmarks) ? s.landmarks : [] };
+}
+
+/** 2.3, turismo: sin visitantes todavía y sin tasa turística. */
+export function migrate16Tourism(s: Record<string, any>): Record<string, any> {
+  return { ...s, tourism: s.tourism ?? { visitors: 0, lastIncome: 0, tax: 0 } };
+}
+
+/** 2.3, escenarios: una partida de antes es Libre (sin meta). */
+export function migrate16Scenario(s: Record<string, any>): Record<string, any> {
+  return { ...s, scenario: s.scenario ?? { id: 'libre', done: true } };
+}
+
+/**
+ * 2.3, ciclo comarcal: empieza en normal durante `REGION.firstMonths` desde
+ * ahora (sin crisis de golpe al cargar) y sin gran empresa.
+ */
+export function migrate16Region(s: Record<string, any>): Record<string, any> {
+  return {
+    ...s,
+    region: s.region ?? { phase: 'normal', until: (s.tick ?? 0) + REGION.firstMonths * TICKS_PER_MONTH, warned: false },
+    bigCompany: s.bigCompany ?? null,
+  };
+}
+
+type Mam = { min: number; avg: number; max: number };
+const mam = (vals: number[]): Mam => ({ min: Math.min(...vals), avg: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length), max: Math.max(...vals) });
+
+/**
+ * 2.3, historia y récords: se reconstruyen desde `stats` (los últimos 120
+ * meses; lo anterior ya no está). `stats[i].month` cuenta los meses cerrados,
+ * así que el mes m es del año ⌊(m − 1) / 12⌋ + 1. Sin visitantes (no había turismo).
+ */
+export function migrate16History(s: Record<string, any>): Record<string, any> {
+  if (Array.isArray(s.history) && s.records) return s;
+  const stats: Record<string, any>[] = Array.isArray(s.stats) ? s.stats : [];
+  const byYear = new Map<number, Record<string, any>[]>();
+  for (const m of stats) {
+    const year = Math.floor((Math.max(1, m.month ?? 1) - 1) / 12) + 1;
+    if (!byYear.has(year)) byYear.set(year, []);
+    byYear.get(year)!.push(m);
+  }
+  const history = [...byYear.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([year, ms]) => ({
+      year,
+      months: ms.length,
+      population: mam(ms.map((m) => m.population ?? 0)),
+      treasury: mam(ms.map((m) => m.treasury ?? 0)),
+      happiness: mam(ms.map((m) => m.happiness ?? 0)),
+      jobless: mam(ms.map((m) => m.jobless ?? 0)),
+      businesses: mam(ms.map((m) => m.businesses ?? 0)),
+      visitors: { min: 0, avg: 0, max: 0 },
+    }));
+  const records: Record<string, { v: number; tick: number }> = {};
+  for (const m of stats) {
+    const tick = (m.month ?? 0) * TICKS_PER_MONTH;
+    const seen: [string, number | undefined][] = [
+      ['population', m.population],
+      ['treasury', m.treasury],
+      ['happiness', m.happiness],
+      ['businesses', m.businesses],
+      ['income', m.income],
+    ];
+    for (const [k, v] of seen) {
+      if (typeof v !== 'number') continue;
+      if (!records[k] || v > records[k].v) records[k] = { v, tick };
+    }
+  }
+  return { ...s, history: Array.isArray(s.history) ? s.history : history, records: s.records ?? records };
+}
+
+/** 2.3, medallas: las que ya se cumplen se dan en silencio (sin avisos ni momentos del álbum). */
+export function migrate16Medals(s: Record<string, any>): Record<string, any> {
+  if (Array.isArray(s.medals)) return s;
+  const out: Record<string, any> = { ...s, medals: [] };
+  checkMedalsSilently(out as GameState);
+  return out;
+}
 
 /**
  * 2.2 (14 → 15), licitaciones y calles con nombre: sin licitaciones y sin

@@ -1,3 +1,6 @@
+import { canFundLandmarkPhase, canPauseLandmark, canStartLandmark, fundLandmarkPhase, pauseLandmark, startLandmark } from './landmarks.ts';
+import { canBuildHeritage, canProtectArea, canSetTouristTax, canZoneProtected, protectArea, setTouristTax } from './tourism.ts';
+import { answerBigCompany, canAnswerBigCompany } from './region.ts';
 import { canRepayLoan, canRequestLoan, repayLoan, requestLoan } from './loans.ts';
 import { answerErrand, canAnswerErrand } from './errands.ts';
 import { farmZoneUnlocked } from './farm.ts';
@@ -12,7 +15,7 @@ import { applyTownTurn, canApplyTurn, mayorText, noteMayor, setAiShare } from '.
 import { canMicrocredit, canSettleDebt, grantMicrocredit, settleDebt } from './household.ts';
 import { serviceCounts } from './economy.ts';
 import { BUILD_LEVEL, canUpgradeTownhall, plenoUnlocked, townLevel, upgradeTownhall, zonesUnlocked } from './townhall.ts';
-import { answerGrant, canAnswerGrant, canHoldFestival, canProposeBudget, holdFestival, materialsCost, proposeBudget } from './civic.ts';
+import { answerGrant, canAnswerGrant, canHoldFestival, canProposeBudget, federRepair, holdFestival, materialsCost, proposeBudget } from './civic.ts';
 import { Command, TICKS_PER_DAY, tickToDate, type BuildKind, type ZoneKind } from '@bitopolis/shared';
 import { ASSOCIATIONS, BUILD, CIVIL, STREETS, DEBT_LIMIT, FIRE, MICROCREDIT, MIN_WAGE, MIN_WAGE_FX, MIN_WAGE_STEP, TERRAIN, WAGE_OUTSIDE, ZONE_COST_PER_TILE } from './balance.ts';
 import { isWater, Terrain } from './terrain.ts';
@@ -53,6 +56,7 @@ export const BUILD_NAMES: Record<string, string> = {
   firestation: 'Parque de bomberos',
   civilprotection: 'Protección civil',
   cleanpoint: 'Punto limpio',
+  heritage: 'Patrimonio',
   clinic: 'Centro de salud',
   police: 'Comisaría',
   plaza: 'Plaza Mayor',
@@ -61,6 +65,13 @@ export const BUILD_NAMES: Record<string, string> = {
   shop: 'Tienda',
   factory: 'Taller',
   farm: 'Finca',
+  // 2.3: grandes obras y la gran empresa.
+  bridge: 'Puente de piedra',
+  station: 'Estación de tren',
+  fair: 'Feria regional',
+  stadium: 'Estadio',
+  cathedral: 'Catedral',
+  bigfactory: 'Fábrica',
 };
 
 const ZONE_VALUE: Record<ZoneKind, number> = { none: Zone.None, R: Zone.R, C: Zone.C, I: Zone.I, A: Zone.A };
@@ -218,6 +229,11 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       if (t === Tile.Road || buildingAt(state, cmd.x, cmd.y)) return { ok: false, error: 'Ese sitio está ocupado' };
       if (hasDike(state, cmd.x, cmd.y)) return { ok: false, error: 'Ahí hay un dique' };
       if (!hasAdjacentRoad(state, cmd.x, cmd.y)) return { ok: false, error: 'Necesita una carretera al lado' };
+      // 2.3: el patrimonio, uno por partida.
+      if (cmd.kind === 'heritage') {
+        const h = canBuildHeritage(state);
+        if (!h.ok) return h;
+      }
       // 2.2: licitación (la local es la de siempre: mismo coste y misma validación).
       if (cmd.offer && cmd.offer !== 'local') {
         const o = canOffer(state, cmd.kind, cmd.x, cmd.y, cmd.offer);
@@ -247,6 +263,9 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       if (!inBounds(state, cmd.x, cmd.y) || !inBounds(state, cmd.x + cmd.w - 1, cmd.y + cmd.h - 1)) {
         return { ok: false, error: 'Fuera del mapa' };
       }
+      // 2.3: sin industria en el entorno protegido del patrimonio.
+      const prot = canZoneProtected(state, cmd.zone, cmd.x, cmd.y, cmd.w, cmd.h);
+      if (!prot.ok) return prot;
       // Pintar zonas es la salida de una crisis: se permite con deuda hasta el límite.
       if (cmd.zone !== 'none' && state.treasury - zoneChanges(state, cmd).changed * ZONE_COST_PER_TILE < -DEBT_LIMIT) return { ok: false, error: 'No hay dinero suficiente' };
       return { ok: true };
@@ -341,6 +360,19 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       return state.pleno ? { ok: true } : { ok: false, error: 'No hay pleno abierto' };
     case 'TalkTo':
       return state.citizens.some((c) => c.id === cmd.citizenId && c.named) ? { ok: true } : { ok: false, error: 'Ese vecino no está' };
+    // 2.3: metas grandes (cada bloque valida en su archivo).
+    case 'StartLandmark':
+      return canStartLandmark(state, cmd.kind, cmd.x, cmd.y);
+    case 'FundLandmarkPhase':
+      return canFundLandmarkPhase(state, cmd.id);
+    case 'PauseLandmark':
+      return canPauseLandmark(state, cmd.id);
+    case 'SetTouristTax':
+      return canSetTouristTax(state, cmd.level);
+    case 'ProtectArea':
+      return canProtectArea(state, cmd.heritageId);
+    case 'AnswerBigCompany':
+      return canAnswerBigCompany(state, cmd.accept, cmd.incentive);
   }
 }
 
@@ -531,7 +563,11 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       const b = buildingById(state, cmd.buildingId)!;
       const fire = b.damaged!.cause === 'fuego';
       const days = fire ? FIRE.repairDays : ASSOCIATIONS.repairDays;
-      transfer(state, TREASURY, OUTSIDE, b.damaged!.cost, fire ? 'reparaciones (incendio)' : 'reparaciones (disturbios)');
+      // 2.3: lo que destrozó la riada del escenario.
+      const why = fire ? 'reparaciones (incendio)' : b.damaged!.cause === 'riada' ? 'reparaciones (riada)' : 'reparaciones (disturbios)';
+      transfer(state, TREASURY, OUTSIDE, b.damaged!.cost, why);
+      // 2.3: en crisis, el FEDER puede pagar parte.
+      federRepair(state, b.damaged!.cost);
       b.damaged!.repairUntil = state.tick + days * TICKS_PER_DAY;
       pushEvent(state, 'info', `Empieza la reparación de ${b.name ?? BUILD_NAMES[b.kind]?.toLowerCase()}: abrirá en ${days} días`, { ref: b.id });
       break;
@@ -576,6 +612,24 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       break;
     case 'TalkTo':
       talkTo(state, state.citizens.find((c) => c.id === cmd.citizenId)!);
+      break;
+    case 'StartLandmark':
+      startLandmark(state, cmd.kind, cmd.x, cmd.y);
+      break;
+    case 'FundLandmarkPhase':
+      fundLandmarkPhase(state, cmd.id);
+      break;
+    case 'PauseLandmark':
+      pauseLandmark(state, cmd.id);
+      break;
+    case 'SetTouristTax':
+      setTouristTax(state, cmd.level);
+      break;
+    case 'ProtectArea':
+      protectArea(state, cmd.heritageId);
+      break;
+    case 'AnswerBigCompany':
+      answerBigCompany(state, cmd.accept, cmd.incentive);
       break;
   }
   if (mayor) noteMayor(state, mayor.text, mayor.big);

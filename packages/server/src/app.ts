@@ -12,6 +12,7 @@ import { registerAuth } from './auth.ts';
 import { registerAiRoutes } from './ai/routes.ts';
 import { AiService } from './ai/service.ts';
 import { registerGameRoutes } from './games.ts';
+import { registerShareRoutes } from './share.ts';
 import { SettingsStore } from './settings.ts';
 import { newGameToken } from './tokens.ts';
 
@@ -43,7 +44,7 @@ export async function buildApp(config: Config, db: Db, deps: AppDeps = {}): Prom
     logger: {
       level: process.env.LOG_LEVEL ?? 'info',
       // La URL de la partida es una contraseña: no se escribe en los logs.
-      serializers: { req: (req) => ({ method: req.method, url: req.url.replace(/\/p\/[^/?]+|\/api\/games\/[^/?]+/g, (m) => m.replace(/[^/]+$/, '…')) }) },
+      serializers: { req: (req) => ({ method: req.method, url: req.url.replace(/\/[pv]\/[^/?]+|\/api\/(games|view)\/[^/?]+/g, (m) => m.replace(/[^/]+$/, '…')) }) },
     },
     // Solo se cree X-Forwarded-For si viene de un proxy local (Docker, LAN): desde fuera se podría falsear la IP.
     trustProxy: ['loopback', 'linklocal', 'uniquelocal'],
@@ -71,6 +72,7 @@ export async function buildApp(config: Config, db: Db, deps: AppDeps = {}): Prom
     return reply.redirect(`/p/${newGameToken()}`);
   });
   await registerGameRoutes(app, db, store, ai);
+  await registerShareRoutes(app, db);
   await registerAiRoutes(app, db, config, ai, store);
   await registerAdminRoutes(app, { db, raw: deps.raw, config, store, ai });
 

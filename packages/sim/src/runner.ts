@@ -1,4 +1,4 @@
-import { type Command, DAYS_PER_YEAR, TICKS_PER_DAY, TICKS_PER_MONTH, type TimedCommand } from '@bitopolis/shared';
+import { type Command, DAYS_PER_YEAR, type ScenarioId, type TerrainShape, TICKS_PER_DAY, TICKS_PER_MONTH, type TimedCommand } from '@bitopolis/shared';
 import { applyCommand } from './commands.ts';
 import { hashState } from './hash.ts';
 import { checkInvariants, moneyDrift } from './invariants.ts';
@@ -6,6 +6,7 @@ import { PROFILES, profileRng } from './profiles.ts';
 import { loanLoad, RATINGS, totalOwed } from './loans.ts';
 import { createInitialState, type GameState, type Rating } from './state.ts';
 import { averageHappiness, step } from './tick.ts';
+import { ruralHomes, ruralShare } from './tourism.ts';
 
 export interface RunOptions {
   seed: number;
@@ -18,6 +19,9 @@ export interface RunOptions {
   aiShare?: number;
   /** 2.0: responde a un turno abierto (IA simulada o grabada); null = no responde (deciden las reglas). */
   onTurn?: (state: GameState) => Command | null;
+  /** 2.3: escenario y forma del terreno (por defecto, Libre y aleatorio: lo de siempre). */
+  scenario?: ScenarioId;
+  terrain?: TerrainShape;
 }
 
 export interface SimReport {
@@ -41,6 +45,10 @@ export interface SimReport {
   sales: { year: number; shop: number; factory: number; farm: number; farms: number; income: number; farmShare: number; farmShareIn: number }[];
   /** 2.2: préstamos municipales. */
   loans: LoanMetrics;
+  /** 2.3: escenario (y si se ganó, y en qué mes). */
+  scenario: { id: ScenarioId; terrain: TerrainShape; done: boolean; won: boolean; month: number | null };
+  /** 2.3: turismo por año: visitantes, lo que dejaron (tasa y casas rurales) y casas rurales (% de las viviendas, máximo del año). */
+  tourism: { year: number; visitors: number; tax: number; rural: number; houses: number; ruralPct: number }[];
 }
 
 export interface LoanMetrics {
@@ -62,7 +70,8 @@ export interface LoanMetrics {
 export function runSimulation(opts: RunOptions): { state: GameState; report: SimReport } {
   const profile = PROFILES[opts.profile];
   if (!profile) throw new Error(`perfil desconocido: ${opts.profile}`);
-  const state = createInitialState({ seed: opts.seed, aiMode: opts.aiMode, aiShare: opts.aiShare });
+  const state = createInitialState({ seed: opts.seed, aiMode: opts.aiMode, aiShare: opts.aiShare, scenario: opts.scenario, terrain: opts.terrain });
+  let scenarioMonth: number | null = null;
   const prng = profileRng(opts.seed);
   const commands: TimedCommand[] = [];
   const invariantErrors: string[] = [];
@@ -70,6 +79,7 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
   let populationAt1Year: number | null = null;
   const eventCounts: Record<string, number> = {};
   const sales: SimReport['sales'] = [];
+  const tourism: SimReport['tourism'] = [];
   let lastIn = state.ledger.externalIn;
   const loans: LoanMetrics = { rating: state.rating, worst: state.rating, months: { A: 0, B: 0, C: 0, D: 0 }, maxLoadPct: 0, requested: 0, requestedAmount: 0, treasury: 0, owed: 0, interest: 0 };
   let statsSeen = 0;
@@ -108,6 +118,14 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
       const total = row.shop + row.factory + row.farm;
       row.farmShare = total ? Math.round((row.farm / total) * 1000) / 10 : 0;
       row.farmShareIn = row.income ? Math.round((row.farm / row.income) * 1000) / 10 : 0;
+      // 2.3: turismo del mes que acaba de cerrar.
+      let t = tourism.find((r) => r.year === year);
+      if (!t) tourism.push((t = { year, visitors: 0, tax: 0, rural: 0, houses: 0, ruralPct: 0 }));
+      t.visitors += state.tourism.visitors;
+      t.tax += state.tourism.lastTax ?? 0;
+      t.rural += state.tourism.lastRural ?? 0;
+      t.houses = Math.max(t.houses, ruralHomes(state).length);
+      t.ruralPct = Math.max(t.ruralPct, Math.round(ruralShare(state) * 1000) / 10);
     }
     // 2.2: al cerrar cada mes, la nota y la carga.
     for (const t of state.loanLedger.treasuryTicks) {
@@ -124,6 +142,7 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
       const load = loanLoad(state);
       if (Number.isFinite(load)) loans.maxLoadPct = Math.max(loans.maxLoadPct, Math.round(load * 100));
     }
+    if (scenarioMonth === null && state.scenario.won) scenarioMonth = Math.round(state.tick / TICKS_PER_MONTH);
     if (day + 1 === DAYS_PER_YEAR) populationAt1Year = state.citizens.length;
     if (opts.checkEveryDay) {
       for (const e of checkInvariants(state)) invariantErrors.push(`día ${day + 1}: ${e}`);
@@ -161,13 +180,15 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
       monthly: state.stats,
       sales,
       loans,
+      scenario: { id: state.scenario.id, terrain: opts.terrain ?? 'aleatorio', done: state.scenario.done, won: !!state.scenario.won, month: scenarioMonth },
+      tourism,
     },
   };
 }
 
 /** Reproduce una partida a partir de semilla + comandos. */
-export function replay(seed: number, commands: readonly TimedCommand[], untilTick: number): GameState {
-  const state = createInitialState({ seed });
+export function replay(seed: number, commands: readonly TimedCommand[], untilTick: number, start: { scenario?: ScenarioId; terrain?: TerrainShape } = {}): GameState {
+  const state = createInitialState({ seed, ...start });
   let i = 0;
   while (state.tick < untilTick) {
     while (i < commands.length && commands[i]!.tick === state.tick) applyCommand(state, commands[i++]!.cmd);

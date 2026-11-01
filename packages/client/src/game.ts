@@ -1,6 +1,9 @@
 import { tickToDate, type Command } from '@bitopolis/shared';
 import {
   BUILD_NAMES,
+  buildingAt,
+  isLandmarkKind,
+  LANDMARKS,
   CROP_HINT,
   isWater,
   CROP_TEXT,
@@ -72,6 +75,9 @@ import {
   tenderApplies,
   streetSegment,
   STREETS,
+  HERITAGE_NAMES,
+  heritageVariant,
+  touristified,
 } from '@bitopolis/sim';
 import { contractBox, openTender } from './tender-ui.ts';
 import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
@@ -93,15 +99,19 @@ import { formatDate, money, MONTHS, plural, shortDate, t } from './i18n.ts';
 import { type Camera, type Preview, render, restartAnimations, signSpot } from './render.ts';
 import type { FromWorker, SaveBatch, ToWorker } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
-import { buildingSprite, letterSprite, T, ZONE_COLOR } from './sprites.ts';
+import { buildingSprite, landmarkSprite, letterSprite, T, ZONE_COLOR } from './sprites.ts';
+import { bigCompanyContent, landmarkContent, openRegion, regionAttention, regionSummary } from './landmarks-ui.ts';
 import { commandFor, costText, isLocked, lockLong, lockShort, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayCost } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
 import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, h, isSheetOpen, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack } from './ui.ts';
 import { pixelIcon } from './icons.ts';
+import { openHistory } from './charts-ui.ts';
+import { medalCount, openMedals } from './medals-ui.ts';
 import { duck, sfx, startAmbience, startMusic, stopMusic, unlockAudio } from './audio.ts';
 import { coins, dust, pop, shake, shakeOffset } from './fx.ts';
 import { onPrefs, prefs } from './prefs.ts';
 import { openSettings } from './settings-ui.ts';
+import { shareBlock } from './share-ui.ts';
 import { openElectionNight, openPolitics, renderPollChip } from './politics-ui.ts';
 import { timeOfDay } from './render.ts';
 
@@ -711,6 +721,10 @@ export function startGame(opts: GameOptions): void {
         vibrate(150);
         calmPause();
         openElectionNight(social);
+      } else if (/quiere montar|Fondos europeos|ofrece pagar el/.test(e.text)) {
+        // Ronda 19: la gran empresa, el FEDER y la cofinanciación son decisiones con plazo: aviso fijo y se frena.
+        toast(e.text, { kind: 'warn', sticky: true, onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+        calmPause();
       } else if (e.kind === 'info' && /Diputación|fiestas|Subvención/.test(e.text)) {
         // v1.5: ofertas de subvención y fiestas: llevan a su sección del Ayuntamiento.
         // Si hay que decidir algo con plazo, el juego baja a x1 para que dé tiempo (ronda 11).
@@ -1065,8 +1079,9 @@ export function startGame(opts: GameOptions): void {
    */
   function pickTile(cx: number, cy: number, t: { x: number; y: number }): { x: number; y: number } {
     if ((tool.id !== 'inspect' && tool.id !== 'demolish') || dedicating) return t;
-    const here = state.buildings.some((b) => b.x === t.x && b.y === t.y);
-    const below = state.buildings.some((b) => b.x === t.x && b.y === t.y + 1);
+    // 2.3: `occupies` (vía buildingAt) cuenta las 4 casillas de los edificios 2×2.
+    const here = !!buildingAt(state, t.x, t.y);
+    const below = !!buildingAt(state, t.x, t.y + 1);
     if (here || !below) return t;
     const r = canvas.getBoundingClientRect();
     const fy = (((cy - r.top) * dpr() + cam.y) / tileSize()) % 1;
@@ -1205,7 +1220,7 @@ export function startGame(opts: GameOptions): void {
     }
     if (tool.id === 'demolish') {
       // v1.6: se confirma en la franja de abajo, en rojo (antes, una ventana que tapaba el mapa).
-      const b = state.buildings.find((x) => x.x === tile.x && x.y === tile.y);
+      const b = buildingAt(state, tile.x, tile.y);
       const onRiver = terrainAt(state, tile.x, tile.y) === Terrain.River;
       const what = b ? (b.name ?? BUILD_NAMES[b.kind]) : state.map.tiles[tile.y * state.map.w + tile.x] === Tile.Road ? (onRiver ? 'Puente' : 'Carretera') : hasDike(state, tile.x, tile.y) ? 'Dique' : null;
       if (!what) {
@@ -1257,7 +1272,7 @@ export function startGame(opts: GameOptions): void {
       await command(line);
       return;
     }
-    if (touchInput && (tool.build || tool.id === 'dike')) {
+    if (touchInput && (tool.build || tool.id === 'dike' || tool.landmark)) {
       // Con el dedo solo construye el botón «Construir»: un doble toque no gasta (ronda 10).
       return proposePlace(tile, tile);
     }
@@ -1270,6 +1285,17 @@ export function startGame(opts: GameOptions): void {
    * ofertas (la local, la de siempre, va primero). El resto, directo.
    */
   function placeBuild(cmd: Command): Promise<boolean> {
+    // 2.3: al marcar el solar de una gran obra, se abre su ficha (para pagar la primera fase).
+    if (cmd.type === 'StartLandmark') {
+      return command(cmd).then((ok) => {
+        const lm = ok ? state.landmarks.find((l) => l.kind === cmd.kind) : undefined;
+        if (lm) {
+          selectTool('inspect');
+          focusBuilding(lm.buildingId);
+        }
+        return ok;
+      });
+    }
     if (cmd.type !== 'Build' || cmd.kind === 'road' || cmd.offer || !tenderApplies(state, cmd.kind, cmd.x, cmd.y) || !validateCommand(state, cmd).ok) return command(cmd);
     return new Promise((resolve) => {
       openTender(state, cmd, (offer) => void command({ ...cmd, offer }).then(resolve));
@@ -1342,7 +1368,7 @@ export function startGame(opts: GameOptions): void {
       const crops = cmd.zone === 'A' ? ` · ${cropsText(cmd)}` : '';
       return `${plural(changed, 'casilla', 'casillas')}, ${money(changed * ZONE_COST_PER_TILE)}${skipped ? ` (no se cobran ${skipped} ocupadas o ya marcadas; los árboles sí, se talan al construir)` : ''}${crops}`;
     }
-    const n = tilesOf(cmd).filter((t) => state.map.tiles[t.y * state.map.w + t.x] !== Tile.Road && !state.buildings.some((q) => q.x === t.x && q.y === t.y)).length;
+    const n = tilesOf(cmd).filter((t) => state.map.tiles[t.y * state.map.w + t.x] !== Tile.Road && !buildingAt(state, t.x, t.y)).length;
     const bridges = bridgeTiles(a, b);
     return `${plural(n, 'casilla nueva', 'casillas nuevas')}, ${money(lineCost(a, b))}${bridges ? ` (con puente de ${plural(bridges, 'casilla', 'casillas')})` : ''}`;
   }
@@ -1385,8 +1411,8 @@ export function startGame(opts: GameOptions): void {
     pendingEnd = null;
     preview = previewFor(a, b);
     const v = validateCommand(state, cmd);
-    const hill = tool.build && tool.shape === 'tap' && terrainAt(state, a.x, a.y) === Terrain.Hill;
-    const cost = tool.id === 'dike' ? shortCost(tool) : tool.build && tool.shape === 'tap' ? `${shortCost(tool)}${hill ? ' (colina: materiales +50 %)' : ''}` : lineText(a, b);
+    const hill = (tool.build || tool.landmark) && tool.shape === 'tap' && terrainAt(state, a.x, a.y) === Terrain.Hill;
+    const cost = tool.id === 'dike' ? shortCost(tool) : tool.landmark ? `${shortCost(tool)}${hill ? ' (colina: +50 %)' : ''} · ahora solo el solar` : tool.build && tool.shape === 'tap' ? `${shortCost(tool)}${hill ? ' (colina: materiales +50 %)' : ''}` : lineText(a, b);
     // Ronda 13: el precio va en su propia línea y siempre se ve (también si no se puede: «no hay dinero»).
     const what = demolishText && v.ok ? demolishText : v.ok ? `${tool.label} aquí` : `${tool.label}: no se puede (${v.error})`;
     // v1.9.1: si con lo que falta por pagar de las obras en marcha la caja quedaría en negativo, se avisa (no se bloquea).
@@ -1395,7 +1421,7 @@ export function startGame(opts: GameOptions): void {
     $('#confirm-text').replaceChildren(h('span', { class: 'cc-what' }, what), demolishText || !cost ? '' : h('span', { class: 'cc-cost' }, v.ok ? cost : `Cuesta ${cost}`), warn);
     $('#confirm-bar').classList.toggle('warn', after < 0);
     const yes = $('#confirm-yes') as HTMLButtonElement;
-    yes.textContent = demolishText ? 'Derribar' : tool.zone ? (tool.zone === 'none' ? 'Quitar zona' : 'Marcar zona') : 'Construir';
+    yes.textContent = demolishText ? 'Derribar' : tool.zone ? (tool.zone === 'none' ? 'Quitar zona' : 'Marcar zona') : tool.landmark ? 'Marcar el solar' : 'Construir';
     yes.className = demolishText ? 'btn danger' : 'btn primary';
     yes.disabled = !v.ok;
     // Si no se puede, no se ofrece «Construir»: solo el motivo y ✕ (ronda 11).
@@ -1444,7 +1470,7 @@ export function startGame(opts: GameOptions): void {
 
   /** Qué hay en una casilla (para el lector de pantalla). */
   function describeTile(t: { x: number; y: number }): string {
-    const b = state.buildings.find((x) => x.x === t.x && x.y === t.y);
+    const b = buildingAt(state, t.x, t.y);
     const i = t.y * state.map.w + t.x;
     const ter = state.map.terrain?.[i] ?? 0;
     const road = state.map.tiles[i] === Tile.Road;
@@ -1532,7 +1558,16 @@ export function startGame(opts: GameOptions): void {
   /* ---------- herramientas (v1.6: cinco pestañas y la bandeja «Construir») ---------- */
   function toolIcon(tl: Tool): HTMLElement {
     const wrap = h('span', { class: 'tool-icon', 'aria-hidden': 'true' });
-    if ((tl.build && tl.build !== 'road') || tl.id === 'dike') {
+    if (tl.landmark) {
+      // 2.3: la gran obra terminada (2×2, más ancha).
+      const c = landmarkSprite(tl.landmark, LANDMARKS.specs[tl.landmark].phases, LANDMARKS.specs[tl.landmark].phases);
+      const img = document.createElement('canvas');
+      img.width = c.width;
+      img.height = c.height;
+      img.getContext('2d')!.drawImage(c, 0, 0);
+      if (LANDMARKS.specs[tl.landmark].size === 2) img.classList.add('wide');
+      wrap.append(img);
+    } else if ((tl.build && tl.build !== 'road') || tl.id === 'dike') {
       const c = buildingSprite(tl.build ?? tl.id, 1);
       const img = document.createElement('canvas');
       img.width = c.width;
@@ -1586,7 +1621,7 @@ export function startGame(opts: GameOptions): void {
       const tl = TOOLS.find((x) => x.id === id)!;
       const btn = h(
         'button',
-        { class: 'tool', 'data-tool': tl.id, 'aria-pressed': 'false', title: `${tl.label} (${tl.key})` },
+        { class: 'tool', 'data-tool': tl.id, 'aria-pressed': 'false', title: tl.key ? `${tl.label} (${tl.key})` : tl.label },
         toolIcon(tl),
         h('span', { class: 'tool-label' }, tl.label),
         h('span', { class: 'tool-cost' }, trayCost(tl)),
@@ -1695,7 +1730,7 @@ export function startGame(opts: GameOptions): void {
 
   function inspect(tile: { x: number; y: number }) {
     selected = tile;
-    const b = state.buildings.find((x) => x.x === tile.x && x.y === tile.y);
+    const b = buildingAt(state, tile.x, tile.y);
     openInspect = () => {
       const fresh = state.buildings.find((x) => x.id === b?.id);
       if (b && !fresh) {
@@ -1803,7 +1838,17 @@ export function startGame(opts: GameOptions): void {
       inspectSheet = currentSheet();
       return;
     }
+    // 2.3: las grandes obras tienen su ficha (barra de fases, «Pagar fase N», parar y la cofinanciación).
+    if (isLandmarkKind(b.kind)) {
+      inspectSheet = sheet(b.name ?? BUILD_NAMES[b.kind] ?? b.kind, ...landmarkContent(state, b, command, () => inspect({ x: b.x, y: b.y })));
+      inspectSheet.classList.add('half', 'landmark-sheet');
+      const body = document.querySelector('.sheet-body');
+      if (body) body.scrollTop = prevScroll;
+      return;
+    }
     const content: (Node | string)[] = [];
+    // 2.3: la fábrica de la gran empresa (y sus avisos).
+    if (b.kind === 'bigfactory') content.push(...bigCompanyContent(state, command, () => inspect({ x: b.x, y: b.y })));
     // 2.2: el contrato de la obra (fuera o el primo) y «Revisar el contrato» si hay rumor.
     const contract = contractBox(state, b, command, () => inspect({ x: b.x, y: b.y }));
     if (contract) content.push(contract);
@@ -1906,6 +1951,14 @@ export function startGame(opts: GameOptions): void {
         if (levelOf(b) >= 2) content.push(h('p', {}, `Reciclaje: la tasa de basuras es un ${Math.round(TRASH.recyclingDiscount * 100)} % más barata para los suyos, y los ecologistas lo agradecen.`));
         if (levelOf(b) >= 3) content.push(h('p', {}, `Compostaje: vende el abono fuera (${money(TRASH.compostPerResident)} por vecino atendido al mes).`));
       }
+      // 2.3: el patrimonio (su forma sale del terreno) y la casa rural.
+      if (b.kind === 'heritage') {
+        content.push(h('p', {}, `${HERITAGE_NAMES[heritageVariant(state, b.x, b.y)].replace(/^el /, 'El ')}: atrae visitantes. El mes pasado vinieron ${state.tourism.visitors}.${state.tourism.protectedId === b.id ? ' Su entorno está protegido.' : ''}`));
+        const go = h('button', { class: 'btn wide', id: 'heritage-tourism' }, 'Turismo: tasa y entorno');
+        go.addEventListener('click', () => withBack('Ficha', () => focusBuilding(b.id), () => openTownHall(social, 'tourism')));
+        content.push(go);
+      }
+      if (b.rural && (b.kind === 'house' || b.kind === 'res')) content.push(h('p', { class: 'muted small' }, 'Casa rural: su dueño alquila plazas a los visitantes.'));
       // v1.8 (petición del creador): los servicios suben de nivel.
       if (UPGRADABLE.includes(b.kind)) content.push(levelBox(b));
       const res = occupants(state, b);
@@ -2059,9 +2112,17 @@ export function startGame(opts: GameOptions): void {
   let aiShareLocked = true;
   if (state.aiMode) void api.aiMeta().then((m) => (aiShareLocked = m.serverKey)).catch(() => undefined);
   const openSettingsGame = () =>
-    openSettings(state.aiMode && state.ai ? { share: state.ai.share, locked: aiShareLocked, set: (share) => command({ type: 'SetAiShare', share }) } : undefined);
+    openSettings(
+      state.aiMode && state.ai ? { share: state.ai.share, locked: aiShareLocked, set: (share) => command({ type: 'SetAiShare', share }) } : undefined,
+      shareBlock(token, sessionId, () => state),
+    );
   const openHappening = () => openWhatsHappening(social, (id) => withBack('Qué está pasando', openHappening, () => openCitizen(social, id)));
   const openAccounts = () => openReport(state);
+  const openRegionSheet = () =>
+    openRegion(state, command, (b) => {
+      closeSheet();
+      focusBuilding(b.id);
+    }, () => withBack('Pueblo', openHub, openRegionSheet));
   const openErrandsSheet = () => openErrands(social, (id) => withBack('Encargos del pueblo', openErrandsSheet, () => openCitizen(social, id)));
   const openPressSheet = () =>
     openPress(social, (ref) => {
@@ -2119,6 +2180,8 @@ export function startGame(opts: GameOptions): void {
         // v1.9.1: el ayuntamiento cuesta de encontrar en el mapa; desde aquí se llega a «Gestión del pueblo».
         item(`Nivel ${townLevel(state)} · ${townLevel(state) >= TOWNHALL_LEVELS.length ? 'Gestión' : 'Ampliar'}`, go(openHall), canUpgradeTownhall(state).ok),
         item('Presupuesto y fiestas', go(() => openTownHall(social)), budgetOpen || offers > 0 || protest),
+        // 2.3: turismo (desde el nivel 3 o en cuanto hay visitantes).
+        ...(townLevel(state) >= 3 || state.tourism.visitors > 0 ? [item(`Turismo · ${plural(state.tourism.visitors, 'visitante', 'visitantes')}`, go(() => openTownHall(social, 'tourism')), touristified(state))] : []),
         item('Pleno municipal', go(() => openPleno(social))),
         item('Política y elecciones', go(() => openPolitics(social))),
         item('Consejero', go(() => openAdvisor(social))),
@@ -2132,7 +2195,11 @@ export function startGame(opts: GameOptions): void {
         item('Felicidad', go(openHappiness)),
         item('Diario del pueblo', go(() => openDiary(social))),
         item('Álbum del pueblo', go(() => openAlbum(social))),
+        // 2.3: gráficas por años y récords.
+        item('Historia', go(() => openHistory(state))),
       ),
+      // 2.3: la comarca (bonanza o crisis), la gran empresa y las grandes obras.
+      card('town', 'Comarca', [regionSummary(state)], item('Comarca y grandes obras', go(openRegionSheet), regionAttention(state))),
       // 2.1: encargos del pueblo y El Eco de Bitópolis.
       card(
         'inspect',
@@ -2141,7 +2208,14 @@ export function startGame(opts: GameOptions): void {
         item('Encargos del pueblo', go(openErrandsSheet), !!state.errands?.list.some((e) => e.status === 'ofrecido')),
         item('El Eco de Bitópolis', go(openPressSheet), !!state.press?.editions.at(-1) && !state.press.editions.at(-1)!.answered),
       ),
-      h('section', { class: 'hub-card' }, h('h3', {}, pixelIcon('smile'), 'Objetivos'), objectivesNode(state)),
+      h(
+        'section',
+        { class: 'hub-card' },
+        h('h3', {}, pixelIcon('smile'), 'Objetivos'),
+        objectivesNode(state),
+        // 2.3: medallas (logros del pueblo, también los encargos).
+        h('div', { class: 'hub-grid' }, item(`Medallas · ${medalCount(state).have} de ${medalCount(state).total}`, go(() => openMedals(state)))),
+      ),
       ...(state.aiMode
         ? [card('inspect', 'IA', ['Los vecinos con nombre deciden con la IA.'], item('Gasto de la IA', () => void openUsage(token)), item('Qué se envía a la IA', () => void openPreview(token)))]
         : []),

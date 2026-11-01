@@ -1,4 +1,5 @@
 import { TICKS_PER_DAY, tickToDate } from '@bitopolis/shared';
+import { bridgeFloodFx } from './landmarks.ts';
 import { BUILD, WEATHER } from './balance.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance, nextInt, type RngState } from './prng.ts';
@@ -6,6 +7,7 @@ import { addMemory } from './social.ts';
 import { type Citizen, type GameState, inBounds, pushEvent, terrainAt } from './state.ts';
 import { Terrain } from './terrain.ts';
 import { floodChanceAt, floodRepairFactor, snowRoads } from './fire.ts';
+import { scenarioFx } from './scenarios.ts';
 import { farmWeatherDay, floodFarm } from './farm.ts';
 
 /**
@@ -110,18 +112,23 @@ export function riverBuildings(state: GameState): GameState['buildings'] {
 
 /** La tormenta puede desbordar el río: los edificios de la orilla se anegan y el ayuntamiento repara. */
 export function flood(state: GameState): void {
-  const near = riverBuildings(state).filter((b) => b.built);
+  // 2.3: el puente de piedra no se anega, y terminado deja las riadas a la mitad en la orilla.
+  const near = riverBuildings(state).filter((b) => b.built && b.kind !== 'bridge');
+  const bridge = bridgeFloodFx(state);
   if (!near.length) return;
   // 2.1: los diques y la protección civil frenan la riada (se tira el mismo dado para todos).
   const hit: GameState['buildings'] = [];
   let avoided = 0;
   for (const b of near) {
-    if (!chance(state.rng, WEATHER.floodChance)) continue;
+    // 2.3: el puente de piedra frena las riadas; «Tras la riada», el primer año el río se desborda más (scenarioFx).
+    if (!chance(state.rng, Math.min(1, WEATHER.floodChance * bridge * scenarioFx(state).flood))) continue;
     // El dado ya salió: lo que lo evita es la protección (determinista con el mismo dado del motor).
     if (floodChanceAt(state, b, 1) < 1 && !chance(state.rng, floodChanceAt(state, b, 1))) avoided++;
     else hit.push(b);
   }
   if (avoided && state.emergencies) state.emergencies.floodsAvoided += avoided;
+  // 2.3: una riada más para los logros (achievements.ts).
+  if ((avoided || hit.length) && state.emergencies) state.emergencies.floods = (state.emergencies.floods ?? 0) + 1;
   if (!hit.length) {
     pushEvent(state, 'info', avoided ? `El río crece con la tormenta: los diques y la protección civil evitan que se aneguen ${avoided === 1 ? 'un edificio' : `${avoided} edificios`}` : 'El río crece con la tormenta, pero no se desborda');
     return;

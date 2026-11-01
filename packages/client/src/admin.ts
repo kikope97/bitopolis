@@ -43,6 +43,8 @@ interface View {
 interface GameRow {
   token: string;
   mode: string;
+  /** 2.3: escenario con el que empezó. */
+  scenario: string;
   createdAt: string;
   updatedAt: string;
   population: number;
@@ -74,6 +76,8 @@ async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
 
 const body = () => $('#admin-body');
 const eur = (n: number) => `${n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} €`;
+/** 2.3: escenarios de la lista de partidas (los nombres, como en la pantalla de inicio). */
+const SCENARIO_LABEL: Record<string, string> = { quiebra: 'Pueblo en quiebra', vaciado: 'El pueblo que se vacía', riada: 'Tras la riada' };
 const PROVIDER_LABEL: Record<string, string> = { anthropic: 'Anthropic', openai: 'OpenAI', 'openai-compatible': 'Endpoint propio (compatible con OpenAI)' };
 
 function input(attrs: Record<string, string | boolean>): HTMLInputElement {
@@ -477,7 +481,7 @@ action('Guardar la IA', async () => (await saveAi(), 'IA guardada'), 'btn primar
               'li',
               {},
               h('a', { href: `${base}/p/${g.token}`, class: 'mono small', target: '_blank', rel: 'noopener' }, `…/p/${g.token.slice(0, 6)}…`),
-              h('span', { class: 'small' }, `${g.mode === 'ai' ? 'IA' : 'Normal'} · ${g.population} ${g.population === 1 ? 'vecino' : 'vecinos'}${g.date ? ` · ${formatDate(g.date)}` : ''}${g.aiMonthEur ? ` · ${eur(g.aiMonthEur)} este mes` : ''}`),
+              h('span', { class: 'small' }, `${g.mode === 'ai' ? 'IA' : 'Normal'}${g.scenario && g.scenario !== 'libre' ? ` · ${SCENARIO_LABEL[g.scenario] ?? g.scenario}` : ''} · ${g.population} ${g.population === 1 ? 'vecino' : 'vecinos'}${g.date ? ` · ${formatDate(g.date)}` : ''}${g.aiMonthEur ? ` · ${eur(g.aiMonthEur)} este mes` : ''}`),
               h('span', { class: 'muted small' }, `Última partida: ${new Date(g.updatedAt).toLocaleString('es-ES')}`),
             );
             const row = h('div', { class: 'row' }, h('a', { class: 'btn small', href: `/api/games/${g.token}/export`, download: '' }, 'Exportar'));

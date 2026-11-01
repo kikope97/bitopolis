@@ -77,7 +77,8 @@ export interface AiShareCtl {
   set: (share: number) => Promise<boolean>;
 }
 
-export function openSettings(ai?: AiShareCtl): void {
+/** `share` (2.3): el bloque «Compartir el pueblo» (solo dentro de una partida). */
+export function openSettings(ai?: AiShareCtl, share?: Node): void {
   const p = prefs();
   const aiBlock: (Node | string)[] = [];
   if (ai) {
@@ -93,6 +94,7 @@ export function openSettings(ai?: AiShareCtl): void {
   }
   sheet(
     'Ajustes',
+    ...(share ? [share] : []),
     ...aiBlock,
     h('h3', {}, 'Sonido'),
     toggle('Efectos de sonido', 'sfx'),

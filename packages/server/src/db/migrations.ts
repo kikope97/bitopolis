@@ -86,6 +86,29 @@ const migrations: Record<string, Migration> = {
       await db.schema.dropTable('settings').execute();
     },
   },
+  // 2.3: escenario de la partida (para la lista de /admin).
+  '0005_scenario': {
+    async up(db: Kysely<unknown>) {
+      await db.schema.alterTable('games').addColumn('scenario', 'varchar(16)').execute();
+    },
+    async down(db: Kysely<unknown>) {
+      await db.schema.alterTable('games').dropColumn('scenario').execute();
+    },
+  },
+  // 2.3: enlace de solo lectura (/v/<token>), independiente del token de juego. SQLite no admite
+  // UNIQUE en ADD COLUMN: va en un índice único (admite varios NULL).
+  '0006_view': {
+    async up(db: Kysely<unknown>) {
+      await db.schema.alterTable('games').addColumn('view_token', 'varchar(32)').execute();
+      await db.schema.alterTable('games').addColumn('view_created_at', 'varchar(32)').execute();
+      await db.schema.createIndex('games_view_token').unique().on('games').column('view_token').execute();
+    },
+    async down(db: Kysely<unknown>) {
+      await db.schema.dropIndex('games_view_token').execute();
+      await db.schema.alterTable('games').dropColumn('view_created_at').execute();
+      await db.schema.alterTable('games').dropColumn('view_token').execute();
+    },
+  },
 };
 
 class InCodeProvider implements MigrationProvider {

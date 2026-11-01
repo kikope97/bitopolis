@@ -46,7 +46,9 @@ createServer((req, res) => {
     const dir = whole.indexOf('Director de la semana');
     if (dir >= 0) {
       const d = JSON.parse(whole.slice(whole.indexOf('\n', dir) + 1));
-      const good = d.menu.filter((m) => !m.malo).slice(0, 1);
+      // 2.3: lo bueno de las metas grandes primero (voluntarios, reportaje, contrata), si lo hay.
+      const goals = ['voluntarios_obra', 'reportaje_tv', 'contrata_vecinos'];
+      const good = [...d.menu.filter((m) => !m.malo && goals.includes(m.tipo)), ...d.menu.filter((m) => !m.malo && !goals.includes(m.tipo))].slice(0, 1);
       const out = {
         sucesos: [...good, ...d.menu.filter((m) => m.malo && m.avisado).slice(0, d.presupuesto_drama.sucesos_malos_que_caben)].map((m) => ({ id: m.id, motivo: 'Es lo que toca esta semana en el pueblo.' })),
         avisos: d.menu.filter((m) => m.malo && !m.avisado).slice(0, 2).map((m) => ({ id: m.id, motivo: 'Se nota en la calle.' })),
@@ -57,6 +59,7 @@ createServer((req, res) => {
           return { seccion: sec, sobre: n?.id ?? '', texto: n ? `Lo que se cuenta: ${n.texto.split(/[.:(]/)[0]}` : 'Semana tranquila en el pueblo' };
         }),
         pies: (d.fotos ?? []).map((f) => ({ id: f.id, texto: 'Un día que el pueblo no olvidará' })),
+        gobierno_rival: d.gobierno_rival ? { picks: (d.gobierno_rival.opciones ?? []).slice(0, 1).map((o) => o.id), discurso: 'Gobernamos para todo el pueblo.' } : { picks: [], discurso: '' },
         encargo: d.encargos_posibles?.[0] ? { id: d.encargos_posibles[0].id, carta: 'Alcalde, se lo pido de corazón: nos haría mucha falta en el pueblo.' } : { id: '', carta: '' },
       };
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -68,7 +71,8 @@ createServer((req, res) => {
       const list = JSON.parse(whole.slice(whole.indexOf('\n', lote) + 1));
       const decisiones = list.map((v, i) => {
         const acciones = v.acciones.map((a) => a.split(' ')[0]);
-        const accion = acciones.find((a) => a.startsWith('pedir:')) ?? acciones[0];
+        // 2.3: si puede donar a una gran obra o abrir una casa rural, lo hace (para probar las metas grandes).
+        const accion = acciones.find((a) => a.startsWith('donar_obra:') || a === 'abrir_casa_rural') ?? acciones.find((a) => a.startsWith('pedir:')) ?? acciones[0];
         return {
           vecino: v.vecino,
           accion,

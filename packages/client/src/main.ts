@@ -3,6 +3,7 @@ import { apply as applyPrefs } from './prefs.ts';
 import { drawPixelIcons } from './icons.ts';
 import { drawSkyline } from './skyline.ts';
 import { showStart } from './start.ts';
+import { showViewer } from './viewer.ts';
 import './style.css';
 
 applyPrefs();
@@ -16,6 +17,8 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 }
 
 /** Rutas: /p/<token> es una partida; cualquier otra crea una URL nueva. */
+// 2.3: /v/<token> es la vista de solo lectura de un pueblo compartido (sin worker ni partida).
+const view = location.pathname.match(/^\/v\/([0-9A-Za-z]{22})\/?$/);
 const m = location.pathname.match(/^\/p\/([0-9A-Za-z]{22})\/?$/);
 const last = (() => {
   try {
@@ -24,7 +27,9 @@ const last = (() => {
     return null;
   }
 })();
-if (m) {
+if (view) {
+  void showViewer(view[1]!);
+} else if (m) {
   try {
     localStorage.setItem('bitopolis.last', m[1]!);
   } catch {

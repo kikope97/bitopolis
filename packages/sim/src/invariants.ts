@@ -1,4 +1,5 @@
 import { HOMES, LISTS } from './balance.ts';
+import { isLandmarkKind } from './landmarks.ts';
 import { farmInvariants } from './farm.ts';
 import { loanInvariants } from './invariants-loans.ts';
 import { totalInternalMoney } from './money.ts';
@@ -21,7 +22,8 @@ export function checkInvariants(state: GameState): string[] {
     if (b.cash < 0 || !Number.isInteger(b.cash)) errors.push(`empresa ${b.id} con caja inválida`);
   }
   for (const p of state.projects) {
-    if (!state.buildings.some((b) => b.id === p.buildingId && !b.built)) errors.push(`obra huérfana ${p.buildingId}`);
+    // 2.3: las grandes obras siguen en pie mientras se hace la fase siguiente.
+    if (!state.buildings.some((b) => b.id === p.buildingId && (!b.built || isLandmarkKind(b.kind)))) errors.push(`obra huérfana ${p.buildingId}`);
   }
   const homeUse = new Map<number, number>();
   for (const c of state.citizens) if (c.homeId !== null) homeUse.set(c.homeId, (homeUse.get(c.homeId) ?? 0) + 1);

@@ -1,5 +1,5 @@
 import { tickToDate } from '@bitopolis/shared';
-import { ASSOCIATIONS, BUDGET_TEXT, type BudgetPlan, CAUSE_ASK, canHoldFestival, FESTIVAL, GRANT_NAME, kidsCount } from '@bitopolis/sim';
+import { ASSOCIATIONS, attraction, BUDGET_TEXT, BUILD, BUILD_LEVEL, type BudgetPlan, CAUSE_ASK, canHoldFestival, FESTIVAL, type GameState, grantTerms, HERITAGE_NAMES, heritageOf, heritageVariant, kidsCount, ruralHomes, ruralShare, TOURISM, touristified } from '@bitopolis/sim';
 import { formatDate, money } from './i18n.ts';
 import type { SocialCtx } from './social-ui.ts';
 import { confirmDialog, h, sheet } from './ui.ts';
@@ -11,11 +11,11 @@ import { confirmDialog, h, sheet } from './ui.ts';
 const STATUS: Record<string, string> = { open: 'por aprobar (enero)', approved: 'aprobado', prorrogado: 'prorrogado' };
 const SIZE: Record<string, string> = { none: 'aún no', pequena: 'pequeñas', grande: 'grandes', popular: 'populares (las montaron los vecinos)' };
 
-export function openTownHall(ctx: SocialCtx, focus?: 'budget' | 'festival' | 'grants' | 'associations'): void {
+export function openTownHall(ctx: SocialCtx, focus?: 'budget' | 'festival' | 'grants' | 'associations' | 'tourism'): void {
   const s = ctx.state();
   const b = s.budget;
   const d = tickToDate(s.tick);
-  const reopen = () => openTownHall(ctx);
+  const reopen = () => openTownHall(ctx, focus === 'tourism' ? 'tourism' : undefined);
   // Lo que cuesta al mes lo que cambia cada plan (con el último parte).
   const last = s.stats.at(-1)?.breakdown ?? {};
   const maint = Math.abs(last['mantenimiento'] ?? 0);
@@ -70,7 +70,8 @@ export function openTownHall(ctx: SocialCtx, focus?: 'budget' | 'festival' | 'gr
   const live = s.grants.filter((g) => g.status === 'offered' || g.status === 'accepted');
   if (!live.length) grants.push(h('p', { class: 'muted' }, 'Ahora mismo no hay ofertas. Llegan de vez en cuando (desde 10 vecinos).'));
   for (const g of live) {
-    const what = GRANT_NAME[g.kind] ?? g.kind;
+    // 2.3: las de las grandes obras y el FEDER tienen sus condiciones (grantTerms).
+    const terms = grantTerms(g);
     if (g.status === 'offered') {
       const yes = h('button', { class: 'btn primary' }, 'Aceptar');
       const no = h('button', { class: 'btn' }, 'Rechazar');
@@ -82,13 +83,13 @@ export function openTownHall(ctx: SocialCtx, focus?: 'budget' | 'festival' | 'gr
       });
       grants.push(
         h('div', { class: 'petition' },
-          h('p', {}, `Pagan el ${Math.round(g.share * 100)} % de ${what} si se termina en 6 meses.`),
-          h('p', { class: 'muted small' }, 'Al aceptar cobras un anticipo del 30 %. Si no lo terminas a tiempo, lo devuelves con un 10 % de recargo.'),
+          h('p', {}, terms.offer),
+          h('p', { class: 'muted small' }, terms.terms),
           h('div', { class: 'row' }, yes, no),
         ),
       );
     } else {
-      grants.push(h('p', {}, `Aceptada: ${what}, ${Math.round(g.share * 100)} %. Anticipo cobrado: ${money(g.advance)}. Plazo hasta el ${formatDate(tickToDate(g.deadline))}.`));
+      grants.push(h('p', {}, terms.accepted));
     }
   }
 
@@ -119,7 +120,69 @@ export function openTownHall(ctx: SocialCtx, focus?: 'budget' | 'festival' | 'gr
   const kids = kidsCount(s);
   const census = h('p', { class: 'muted small' }, `${s.citizens.length} adultos y ${kids} ${kids === 1 ? 'niño' : 'niños'} (los niños van al colegio y a los 18 se independizan).`);
 
-  const el = sheet('Ayuntamiento', ...budget, ...assoc, ...fest, ...grants, h('h3', {}, 'Censo'), census);
+  const el = sheet('Ayuntamiento', ...budget, ...assoc, ...fest, ...tourismSection(ctx, s, reopen), ...grants, h('h3', {}, 'Censo'), census);
   // Desde un aviso, directo a su sección (ronda 11: «Aceptar» quedaba fuera de la pantalla).
   if (focus) el.querySelector(`#th-${focus}`)?.scrollIntoView({ block: 'start' });
+}
+
+/**
+ * 2.3: turismo. Visitantes e ingresos del mes, tasa turística (0, 1 o 2 € por
+ * noche, tres botones de 44 px), proteger el entorno del patrimonio y la parte
+ * de viviendas que son casas rurales (por encima del 15 %, suben los alquileres).
+ */
+/** Decimales con coma. */
+const dec = (v: number) => String(v).replace('.', ',');
+
+function tourismSection(ctx: SocialCtx, s: GameState, reopen: () => void): (Node | string)[] {
+  const t = s.tourism;
+  const her = heritageOf(s);
+  const out: (Node | string)[] = [h('h3', { id: 'th-tourism' }, 'Turismo')];
+  const a = attraction(s);
+  if (!her) {
+    out.push(h('p', { class: 'muted' }, `El pueblo aún no tiene patrimonio. Constrúyelo en Construir › Turismo (ayuntamiento de nivel ${BUILD_LEVEL.heritage} y ${BUILD.heritage.unlockPop} vecinos; ${TOURISM.heritage.attract} de atractivo): según el terreno será un faro, un molino, un castillo o un rollo con plaza porticada.`));
+  } else {
+    const name = HERITAGE_NAMES[heritageVariant(s, her.x, her.y)];
+    out.push(h('p', {}, her.built ? `Patrimonio: ${name}.` : `Patrimonio: ${name} (en obras).`));
+  }
+  out.push(
+    h('p', { 'data-test': 'tourism-month' }, t.visitors === 0 && a.total >= TOURISM.minAttract ? 'Aún sin datos: los primeros visitantes llegan al cerrar el mes.' : `El mes pasado: ${t.visitors} ${t.visitors === 1 ? 'visitante' : 'visitantes'}; dejaron ${money(t.lastIncome)} (${money(t.lastTax ?? 0)} de tasa para el ayuntamiento y ${money(t.lastRural ?? 0)} para las casas rurales).`),
+    h('p', { class: 'muted small' }, `Atractivo ${dec(a.total)}: patrimonio ${dec(a.heritage)}, grandes obras ${dec(a.landmarks)}, fiestas ${dec(a.festival)}, parques y árboles ${dec(a.green)}, contaminación −${dec(a.pollution)}${a.protect > 1 ? `, entorno protegido ×${dec(a.protect)}` : ''}. Por debajo de ${TOURISM.minAttract} no viene nadie.`),
+  );
+  // Tasa turística: tres botones.
+  out.push(h('p', {}, h('strong', {}, 'Tasa turística'), ` · cada nivel quita un ${Math.round(TOURISM.taxDrop * 100)} % de visitantes; cada visitante pasa ${TOURISM.nights} noches.`));
+  const seg = h('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Tasa turística' });
+  for (const level of [0, 1, 2] as const) {
+    const on = t.tax === level;
+    const b = h('button', { class: 'seg-btn', role: 'radio', 'aria-checked': String(on), 'data-tax': String(level) }, level === 0 ? 'Sin tasa' : `${level} € por noche`);
+    b.addEventListener('click', async () => {
+      if (on) return;
+      if (await ctx.command({ type: 'SetTouristTax', level })) reopen();
+    });
+    seg.append(b);
+  }
+  out.push(seg);
+  // Entorno protegido.
+  const prot = !!her && t.protectedId === her.id;
+  out.push(
+    h('p', {}, h('strong', {}, 'Entorno protegido'), prot ? ' · sí' : ' · no'),
+    h('p', { class: 'muted small' }, `A ${TOURISM.protect.radius} casillas del patrimonio, ni zona industrial ni talleres nuevos; el atractivo sube un ${Math.round((TOURISM.protect.attract - 1) * 100)} %. A los empresarios no les gusta (−${Math.abs(TOURISM.protect.ownerMood)} de satisfacción).`),
+  );
+  const can = !!her?.built;
+  const pb = h('button', { class: 'btn wide', id: 'protect-area', ...(can ? {} : { 'aria-disabled': 'true' }) }, prot ? 'Levantar la protección' : 'Proteger el entorno');
+  pb.addEventListener('click', async () => {
+    if (!her || !can) return;
+    if (!prot && !(await confirmDialog('Proteger el entorno', 'Las casillas vacías de zona industrial alrededor del patrimonio dejan de serlo.', 'Proteger'))) return;
+    if (await ctx.command({ type: 'ProtectArea', heritageId: her.id })) reopen();
+  });
+  out.push(pb);
+  if (!can) out.push(h('p', { class: 'muted small' }, 'Se puede cuando el patrimonio esté terminado.'));
+  // Casas rurales.
+  const n = ruralHomes(s).length;
+  const pct = Math.round(ruralShare(s) * 100);
+  out.push(
+    h('p', { 'data-test': 'rural-share' }, h('strong', {}, 'Casas rurales'), ` · ${n} (${pct} % de las viviendas). Cada una tiene ${TOURISM.rural.beds} plazas y su dueño gana hasta ${money(TOURISM.rural.maxMonth)} al mes.`),
+  );
+  if (touristified(s)) out.push(h('p', { class: 'pol-tag' }, `Más del ${Math.round(TOURISM.touristified.share * 100)} %: los alquileres privados suben un ${Math.round(TOURISM.touristified.rent * 100)} % y los inquilinos están más descontentos (−${Math.abs(TOURISM.touristified.renterMood)} de felicidad). Una tasa más alta trae menos visitantes y frena las casas nuevas.`));
+  else out.push(h('p', { class: 'muted small' }, `Las abren propietarios con ganas de negocio cuando hay visitantes de sobra. Por encima del ${Math.round(TOURISM.touristified.share * 100)} % de las viviendas, suben los alquileres. Mira la capa «Casas rurales».`));
+  return out;
 }

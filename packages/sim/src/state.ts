@@ -2,12 +2,14 @@ import type { MinWageLevel } from './balance.ts';
 import type { TownAi } from './turns.ts';
 import type { ErrandsState } from './errands.ts';
 import type { PressState } from './press.ts';
-import { TICKS_PER_DAY, type TaxLevel } from '@bitopolis/shared';
+import { type BigCompanyIncentive, type LandmarkKind, type ScenarioId, type TerrainShape, TICKS_PER_DAY, TICKS_PER_MONTH, type TaxLevel } from '@bitopolis/shared';
+import { REGION } from './balance.ts';
 import { emptyFields, type Fields } from './fields.ts';
 import { chance, nextInt, type RngState, seedRng } from './prng.ts';
 import type { Goal, Hook, Memory, Pleno, PromiseRecord, Relation } from './social.ts';
 import { emptyPolitics, type Politics } from './politics-core.ts';
 import { generateTerrain, isWater, Terrain } from './terrain.ts';
+import { applyScenario } from './scenarios.ts';
 import type { Weather } from './weather.ts';
 import type { Association } from './associations.ts';
 import type { Moment } from './album.ts';
@@ -19,7 +21,7 @@ import type { Tender } from './tenders.ts';
 import type { StreetName } from './streets.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
-export const FORMAT_VERSION = 15;
+export const FORMAT_VERSION = 16;
 
 export const MAP_W = 48;
 export const MAP_H = 48;
@@ -60,7 +62,13 @@ export type BuildingKind =
   | 'shop'
   | 'factory'
   /** 2.2: finca (crece sola sobre zona agraria). */
-  | 'farm';
+  | 'farm'
+  /** 2.3: grandes obras por fases (landmarks.ts; todas 2×2 salvo el puente). */
+  | LandmarkKind
+  /** 2.3: patrimonio (uno por partida; su forma sale del terreno, tourism.ts). */
+  | 'heritage'
+  /** 2.3: fábrica 2×2 de la gran empresa (region.ts). */
+  | 'bigfactory';
 
 export interface Building {
   id: number;
@@ -85,7 +93,7 @@ export interface Building {
   dryDays?: number;
   darkDays?: number;
   /** v1.8: dañado en unos disturbios (o, en la 2.1, por el fuego): no funciona hasta que se repara. */
-  damaged?: { cost: number; repairUntil: number; cause?: 'fuego' };
+  damaged?: { cost: number; repairUntil: number; cause?: 'fuego' | 'riada' };
   /** 2.1: en riesgo de incendio (desde cuándo y por qué) y ardiendo (hasta cuándo; con bomberos en su radio o no). */
   risk?: { since: number; why: string };
   fire?: { since: number; until: number; covered: boolean };
@@ -108,6 +116,10 @@ export interface Building {
   /** 2.2: año (de juego) de la última cosecha vendida y última tormenta sobre la finca (tick). */
   harvested?: number;
   stormed?: number;
+  /** 2.3: lado en casillas (sin definir = 1). Las grandes obras son 2×2: ver `occupies`. */
+  size?: 2;
+  /** 2.3: vivienda en propiedad convertida en casa rural (turismo, tourism.ts). */
+  rural?: boolean;
 }
 
 /** 2.2: cultivos de las fincas (ver farm.ts). */
@@ -427,6 +439,18 @@ export interface GameState {
   loans: Loan[];
   rating: Rating;
   loanLedger: LoanLedger;
+  /** 2.3: grandes obras, turismo, escenario, ciclo comarcal y gran empresa. */
+  landmarks: Landmark[];
+  tourism: Tourism;
+  scenario: Scenario;
+  region: Region;
+  bigCompany: BigCompany | null;
+  /** 2.3: historia por años, récords y medallas. */
+  history: YearStat[];
+  records: Records;
+  medals: Medal[];
+  /** 2.3: lo que necesitan recordar los logros entre meses (achievements.ts); se crea al primer cierre de mes. */
+  medalTrack?: MedalTrack;
 }
 
 /** 2.2: nota de las cuentas del ayuntamiento (A la mejor). */
@@ -465,6 +489,8 @@ export interface Emergencies {
   saved: number;
   /** Riadas que no llegaron a pasar por la protección civil o un dique. */
   floodsAvoided: number;
+  /** 2.3: riadas (el río se desbordó o lo frenaron los diques) para los logros. */
+  floods?: number;
   /** Último susto del director por vecino (para no repetirlo). */
   scares?: Record<number, number>;
 }
@@ -499,6 +525,144 @@ export interface Grant {
   advance: number;
   /** Solo cuentan las obras empezadas después de aceptar (ids desde aquí). */
   minId: number;
+  /** 2.3: cofinanciación de una gran obra (id del `Landmark`; se paga por fase). */
+  landmark?: number;
+  /** 2.3: fondos europeos (FEDER) en tiempo de crisis comarcal. */
+  feder?: boolean;
+  /** 2.3: ayuda de emergencia del escenario «Tras la riada» (total en €; la cobra y la reintegra scenarios.ts). */
+  emergency?: number;
+  /** 2.3: a qué va el FEDER: las fases de la estación (`kind: 'station'`) o las reparaciones. */
+  federFor?: 'station' | 'repair';
+}
+
+/**
+ * 2.3: gran obra por fases (landmarks.ts). Cada fase es un `Project` del
+ * edificio `buildingId`; entre fases puede quedarse parada sin perder nada.
+ */
+export interface Landmark {
+  id: number;
+  kind: LandmarkKind;
+  buildingId: number;
+  /** Fases terminadas (0…phases); cada una ya da su parte del efecto. */
+  phase: number;
+  phases: number;
+  /** Fin previsto de la fase en obra (tick), o −1 si no hay ninguna en marcha. */
+  phaseUntil: number;
+  /** Lo que lleva gastado el ayuntamiento (el mantenimiento es un % de esto). */
+  spent: number;
+  /** Subvención que la cofinancia (`Grant.landmark`). */
+  grantId?: number;
+  /** Parada por el alcalde entre fases. */
+  paused?: boolean;
+  /** Rebaja de la fase siguiente (voluntarios, 0–1). */
+  discount?: number;
+  /** 2.3 (director): fase en la que ya ayudaron los voluntarios y en la que ya hubo polémica (una vez por fase). */
+  helped?: number;
+  polemic?: number;
+}
+
+/** 2.3: turismo (tourism.ts). `tax` en € por noche; `protectedId`: patrimonio con entorno protegido. */
+export interface Tourism {
+  /** Visitantes del mes pasado y lo que dejaron (casas rurales y tasa). */
+  visitors: number;
+  lastIncome: number;
+  tax: 0 | 1 | 2;
+  protectedId?: number;
+  /** De lo que dejaron: tasa (al ayuntamiento) y casas rurales (a sus dueños). */
+  lastTax?: number;
+  lastRural?: number;
+  /** Media de visitantes del último año (media móvil): decide si abre otra casa rural. */
+  avg?: number;
+  /** IA (director): reportaje de la tele y turistas ruidosos, hasta este tick. */
+  tvUntil?: number;
+  noiseUntil?: number;
+}
+
+/** 2.3: escenario de la partida (scenarios.ts). Al cumplirse (o al vencer) queda `done` y sigue como Libre. */
+export interface Scenario {
+  id: ScenarioId;
+  /** Meta medible: superávit (meses seguidos), vecinos o reparar lo destrozado (y llegar a `target` vecinos). */
+  goal?: { kind: 'superavit' | 'vecinos' | 'reparar'; target: number; progress?: number };
+  /** Tick límite para cumplirla. */
+  deadline?: number;
+  done: boolean;
+  /** Se cumplió (si no, venció sin cumplirse). */
+  won?: boolean;
+}
+
+/** 2.3: ciclo comarcal (region.ts): bonanza, normal o crisis hasta `until`; `warned`: ya se avisó del cambio. */
+export interface Region {
+  phase: 'normal' | 'bonanza' | 'crisis';
+  until: number;
+  warned: boolean;
+  /** Fase que viene (se decide al avisar, 2 meses antes). */
+  next?: 'normal' | 'bonanza' | 'crisis';
+}
+
+/** 2.3: la gran empresa (region.ts): primero una oferta; si se acepta, su fábrica 2×2. */
+export interface BigCompany {
+  /** Nombre generado por el motor («Conservas del Norte»). */
+  name: string;
+  status: 'oferta' | 'abierta' | 'rechazada' | 'ere' | 'se_va' | 'cerrada';
+  offeredTick: number;
+  /** Hasta cuándo vale la oferta (tick). */
+  deadline: number;
+  incentive?: BigCompanyIncentive;
+  /** Fábrica (`bigfactory`) cuando ya está. */
+  buildingId?: number;
+  jobs: number;
+  /** Aviso de ERE o deslocalización: pasa en este tick. */
+  warnUntil?: number;
+}
+
+/** 2.3: mínimo, media y máximo de una serie a lo largo de un año. */
+export interface MinAvgMax {
+  min: number;
+  avg: number;
+  max: number;
+}
+
+/**
+ * 2.3: resumen anual (sin tope, a diferencia de `stats`). Un elemento por año
+ * con algún mes cerrado; el del año en curso se actualiza al cerrar cada mes.
+ */
+export interface YearStat {
+  year: number;
+  /** Meses que resume (12 en los años cerrados). */
+  months: number;
+  population: MinAvgMax;
+  treasury: MinAvgMax;
+  happiness: MinAvgMax;
+  jobless: MinAvgMax;
+  businesses: MinAvgMax;
+  visitors: MinAvgMax;
+}
+
+export type RecordKey = 'population' | 'treasury' | 'happiness' | 'businesses' | 'visitors' | 'income';
+/** 2.3: récords del pueblo (máximo y cuándo). */
+export type Records = Partial<Record<RecordKey, { v: number; tick: number }>>;
+
+/** 2.3: medalla conseguida (achievements.ts). */
+export interface Medal {
+  id: string;
+  tick: number;
+}
+
+/** 2.3: memoria de los logros (achievements.ts): lo que no se puede leer del estado de un solo mes. */
+export interface MedalTrack {
+  /** Último aviso de récord (tick). */
+  lastRecord?: number;
+  /** Promesas cumplidas ya contadas (ids; `state.promises` solo guarda las 30 últimas). */
+  kept?: number[];
+  /** Presupuestos aprobados seguidos hasta `year`. */
+  budget?: { year: number; streak: number };
+  /** Crisis comarcal en curso (cierres de empresas durante ella) y crisis superadas sin cierres. */
+  crisis?: { closures: number } | null;
+  cleanCrises?: number;
+  /** Grandes obras que se pararon alguna vez. */
+  paused?: number[];
+  /** Meses seguidos con el entorno protegido y sin turistificar. */
+  protectedMonths?: number;
 }
 
 export interface NewGameOptions {
@@ -507,16 +671,19 @@ export interface NewGameOptions {
   namedLimit?: number;
   /** 2.0: % de vecinos con IA (Modo IA). */
   aiShare?: number;
+  /** 2.3: escenario (por defecto, Libre) y forma del terreno (por defecto, aleatorio: lo de siempre). */
+  scenario?: ScenarioId;
+  terrain?: TerrainShape;
 }
 
 export const INITIAL_SUBSIDY = 30_000;
 
-export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiShare = 50 }: NewGameOptions): GameState {
+export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiShare = 50, scenario = 'libre', terrain: shape = 'aleatorio' }: NewGameOptions): GameState {
   const rng = seedRng(seed);
   const tiles = new Array<number>(MAP_W * MAP_H).fill(Tile.Grass);
   const zones = new Array<number>(MAP_W * MAP_H).fill(Zone.None);
-  // v1.7: río, costa y colinas (el centro queda en llano).
-  const terrain = generateTerrain(rng, MAP_W, MAP_H);
+  // v1.7: río, costa y colinas (el centro queda en llano). 2.3: con forma elegida; tras la riada, siempre con río.
+  const terrain = generateTerrain(rng, MAP_W, MAP_H, shape, { river: scenario === 'riada' });
   const state: GameState = {
     formatVersion: FORMAT_VERSION,
     seed,
@@ -578,6 +745,15 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiSh
     loans: [],
     rating: 'B',
     loanLedger: { lent: 0, repaid: 0, interest: 0, treasuryTicks: [] },
+    // 2.3: metas grandes (el escenario lo prepara `applyScenario` al final).
+    landmarks: [],
+    tourism: { visitors: 0, lastIncome: 0, tax: 0 },
+    scenario: { id: scenario, done: scenario === 'libre' },
+    region: { phase: 'normal', until: REGION.firstMonths * TICKS_PER_MONTH, warned: false },
+    bigCompany: null,
+    history: [],
+    records: {},
+    medals: [],
   };
   // Árboles dispersos (se talan gratis al construir encima).
   for (let i = 0; i < tiles.length; i++) {
@@ -620,6 +796,8 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiSh
   state.treasury = INITIAL_SUBSIDY;
   state.ledger.initialTotal = INITIAL_SUBSIDY + first.money;
   pushEvent(state, 'info', 'La región aporta una subvención inicial de 30.000 €');
+  // 2.3: escenario (Libre no cambia nada).
+  applyScenario(state);
   return state;
 }
 
@@ -648,8 +826,31 @@ export function inBounds(state: GameState, x: number, y: number): boolean {
   return x >= 0 && y >= 0 && x < state.map.w && y < state.map.h;
 }
 
+/** 2.3: lado del edificio en casillas (1, o 2 en las grandes obras 2×2). */
+export function sizeOf(b: { x: number; y: number; size?: number }): number {
+  return b.size ?? 1;
+}
+
+/**
+ * 2.3: ¿ocupa el edificio la casilla (x, y)? Un edificio 2×2 se ancla en su
+ * casilla (x, y) y ocupa también las 3 de la derecha y de abajo. Es el único
+ * sitio donde se decide: úsalo en vez de comparar `b.x === x && b.y === y`.
+ */
+export function occupies(b: { x: number; y: number; size?: number }, x: number, y: number): boolean {
+  const n = b.size ?? 1;
+  return x >= b.x && y >= b.y && x < b.x + n && y < b.y + n;
+}
+
+/** 2.3: casillas que ocupa un edificio (la del ancla primero). */
+export function footprint(b: { x: number; y: number; size?: number }): [number, number][] {
+  const n = b.size ?? 1;
+  const out: [number, number][] = [];
+  for (let dy = 0; dy < n; dy++) for (let dx = 0; dx < n; dx++) out.push([b.x + dx, b.y + dy]);
+  return out;
+}
+
 export function buildingAt(state: GameState, x: number, y: number): Building | undefined {
-  return state.buildings.find((b) => b.x === x && b.y === y);
+  return state.buildings.find((b) => occupies(b, x, y));
 }
 
 export function buildingById(state: GameState, id: number): Building | undefined {
