@@ -5,7 +5,7 @@ import { runSimulation } from '../packages/sim/src/index.ts';
 
 /** Pueblo a 10 días de votar con dos candidaturas en la oposición (semilla medida). */
 function town() {
-  const { state } = runSimulation({ seed: 1, days: 1430, profile: 'agresivo' });
+  const { state } = runSimulation({ seed: 4, days: 1430, profile: 'agresivo' });
   return { state, file: gzipSync(JSON.stringify({ bitopolis: 1, formatVersion: state.formatVersion, exportedAt: '', mode: 'normal', state })) };
 }
 

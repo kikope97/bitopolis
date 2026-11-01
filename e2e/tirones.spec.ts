@@ -17,7 +17,7 @@ const SIZES = [
 let file: Buffer | null = null;
 function town() {
   if (!file) {
-    const { state } = runSimulation({ seed: 1, days: 1430, profile: 'agresivo' });
+    const { state } = runSimulation({ seed: 4, days: 1430, profile: 'agresivo' });
     file = gzipSync(JSON.stringify({ bitopolis: 1, formatVersion: state.formatVersion, exportedAt: '', mode: 'normal', state }));
   }
   return file;

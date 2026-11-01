@@ -18,7 +18,7 @@ function town(): Buffer {
   const file = process.env.PW_TOWN_CACHE;
   if (file && existsSync(file)) return (cached = readFileSync(file));
   // Pueblo crecido, a 10 días de votar (como e2e/elecciones-listas.spec.ts).
-  const { state } = runSimulation({ seed: 1, days: 1430, profile: 'agresivo' });
+  const { state } = runSimulation({ seed: 4, days: 1430, profile: 'agresivo' });
   cached = gzipSync(JSON.stringify({ bitopolis: 1, formatVersion: state.formatVersion, exportedAt: '', mode: 'normal', state }));
   if (file) writeFileSync(file, cached);
   return cached;
