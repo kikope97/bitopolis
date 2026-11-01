@@ -30,6 +30,8 @@ import {
   plenoUnlocked,
   STREETS,
   streetCandidates,
+  plenoLines,
+  PLENO_REACTION_TEXT,
 } from '@bitopolis/sim';
 import { tickToDate } from '@bitopolis/shared';
 import { api } from './api.ts';
@@ -252,7 +254,64 @@ export function openPleno(ctx: SocialCtx): void {
     toast('Pleno cerrado. Las promesas quedan registradas.', { kind: 'good' });
     reopen();
   });
-  sheet('Pleno municipal', h('p', { class: 'muted' }, 'El pleno se cierra solo a los 2 días; lo que no respondas queda sin respuesta.'), list, streetCard(ctx), close, h('h3', {}, 'Promesas'), promiseList);
+  sheet('Pleno municipal', h('p', { class: 'muted' }, 'El pleno se cierra solo a los 2 días; lo que no respondas queda sin respuesta.'), plenoTalk(ctx), list, streetCard(ctx), close, h('h3', {}, 'Promesas'), promiseList);
+}
+
+/** 2.4: lo que se ha oído en este pleno (texto fuera del estado: caché por pleno). */
+const plenoHeard = new Map<string, { id: number; linea: string }[]>();
+const STANCE_TEXT: Record<string, string> = { a_favor: 'a favor', en_contra: 'en contra', matiz: 'con matices' };
+
+/**
+ * 2.4: intervenciones del pleno en bocadillos, en columna. Primero las
+ * plantillas del motor; en Modo IA se piden al servidor (una vez por pleno) y
+ * se cambian las que lleguen bien.
+ */
+function plenoTalk(ctx: SocialCtx): HTMLElement | string {
+  const state = ctx.state();
+  const pleno = state.pleno;
+  if (!pleno?.speakers?.length) return '';
+  const key = `${ctx.token}:${pleno.tick}`;
+  const box = h('section', { class: 'pleno-talk', 'aria-label': 'Intervenciones del pleno', 'aria-live': 'polite' });
+  const paint = (ai: { id: number; linea: string }[]) => {
+    const s = ctx.state();
+    if (!s.pleno) return;
+    box.replaceChildren(
+      h('h3', {}, 'Intervenciones'),
+      ...plenoLines(s, s.pleno, ai).map((l) => {
+        const sp = s.pleno!.speakers!.find((x) => x.id === l.id);
+        const name = s.citizens.find((c) => c.id === l.id)?.name ?? 'Un vecino';
+        const who = h('button', { class: 'pleno-who', 'aria-label': `Ver la ficha de ${name}` }, name);
+        who.addEventListener('click', () => withBack('Pleno', () => openPleno(ctx), () => openCitizen(ctx, l.id)));
+        return h(
+          'div',
+          { class: `pleno-bubble ${l.postura}` },
+          h('p', { class: 'pleno-bubble-head' }, who, h('span', { class: 'muted small' }, ` · ${STANCE_TEXT[l.postura] ?? ''}`), sp?.reaction ? h('span', { class: 'pill' }, ` ${PLENO_REACTION_TEXT[sp.reaction]}`) : ''),
+          h('p', { class: 'pleno-line' }, `«${l.linea}» `, l.source === 'ia' ? h('span', { class: 'ai-badge' }, 'IA') : ''),
+        );
+      }),
+    );
+  };
+  const heard = plenoHeard.get(key);
+  paint(heard ?? []);
+  if (state.aiMode && !heard) {
+    plenoHeard.set(key, []);
+    box.classList.add('thinking');
+    void api
+      .pleno(ctx.token, {
+        tick: pleno.tick,
+        petitions: pleno.petitions.map((p) => ({ id: p.id, citizenId: p.citizenId, need: p.need, yes: p.yes, no: p.no, ...(p.opposition ? { opposition: true } : {}) })),
+        speakers: pleno.speakers.map((x) => ({ id: x.id, role: x.role, postura: x.postura, petitionId: x.petitionId })),
+      })
+      .then((r) => {
+        if (r.lines?.length) {
+          plenoHeard.set(key, r.lines);
+          paint(r.lines);
+        }
+      })
+      .catch(() => plenoHeard.delete(key))
+      .finally(() => box.classList.remove('thinking'));
+  }
+  return box;
 }
 
 /** 2.2: «Dedicar una calle»: los candidatos del motor; al elegir uno, se toca la calle en el mapa. */

@@ -88,6 +88,7 @@ import { openTownHall } from './civic-ui.ts';
 import { openAlbum, snapMoments } from './album-ui.ts';
 import { openAway } from './away-ui.ts';
 import { openRank, rankCard } from './rank-ui.ts';
+import { dilemmaSpot, openDilemmaSheet, type DilemmaCtx } from './dilemma-ui.ts';
 import { objectivesNode, openAdvisor, openCitizen, openDiary, openPleno, portraitCanvas, rememberSeen, renderObjectives, resumeSummary, type SocialCtx } from './social-ui.ts';
 import { api, ApiError } from './api.ts';
 import { nextHint } from './hints.ts';
@@ -689,6 +690,15 @@ export function startGame(opts: GameOptions): void {
         sfx.warn();
         calmPause();
         toast(e.text, { kind: 'warn', sticky: true, onClick: () => focusBuilding(e.ref!) });
+      } else if (e.kind === 'warning' && e.text.startsWith('Un asunto difícil')) {
+        // 2.4: un dilema con plazo: destello en el sitio, vuelta a x1 y aviso fijo que abre la hoja.
+        const d = state.dilemmas.find((x) => !x.resolved);
+        sfx.warn();
+        calmPause();
+        attention(d ? dilemmaSpot(state, d.id) : undefined);
+        toast(e.text, { kind: 'warn', sticky: true, onClick: d ? () => openDilemmaSheet(dilemmaCtx, d.id) : undefined });
+      } else if (e.kind === 'warning' && e.text.startsWith('No decidiste a tiempo')) {
+        toast(e.text, { kind: 'warn' });
       } else if (e.kind === 'bankrupt' || e.kind === 'warning') {
         sfx.warn();
         duck(1.5);
@@ -2106,6 +2116,17 @@ export function startGame(opts: GameOptions): void {
 
   /* ---------- menú, impuestos y cuentas ---------- */
   const social: SocialCtx = { token, state: () => state, command, pickStreet: (id, name) => startDedication(id, name) };
+  // 2.4: el dilema abierto (o el último de ese vecino) para volver desde su ficha.
+  const backToDilemma = (id: number) => {
+    const d = [...state.dilemmas].reverse().find((x) => x.citizenIds.includes(id));
+    if (d) openDilemmaSheet(dilemmaCtx, d.id);
+  };
+  const dilemmaCtx: DilemmaCtx = {
+    state: () => state,
+    command,
+    reveal: (x, y) => revealTile({ x, y }),
+    openCitizen: (id) => withBack('Dilema', () => backToDilemma(id), () => openCitizen(social, id)),
+  };
   const openTaxes = () => openTaxesSheet(() => state, command);
   const openLoansSheet = () => openLoans(() => state, command);
   // 2.0: el % de vecinos con IA se cambia en Ajustes (con key del servidor, lo fija /admin).
@@ -2182,6 +2203,7 @@ export function startGame(opts: GameOptions): void {
         item('Presupuesto y fiestas', go(() => openTownHall(social)), budgetOpen || offers > 0 || protest),
         // 2.3: turismo (desde el nivel 3 o en cuanto hay visitantes).
         ...(townLevel(state) >= 3 || state.tourism.visitors > 0 ? [item(`Turismo · ${plural(state.tourism.visitors, 'visitante', 'visitantes')}`, go(() => openTownHall(social, 'tourism')), touristified(state))] : []),
+        ...(state.dilemmas.some((d) => !d.resolved) ? [item('Un asunto difícil', go(() => openDilemmaSheet(dilemmaCtx, state.dilemmas.find((d) => !d.resolved)!.id)), true)] : []),
         item('Pleno municipal', go(() => openPleno(social))),
         item('Política y elecciones', go(() => openPolitics(social))),
         item('Consejero', go(() => openAdvisor(social))),

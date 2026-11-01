@@ -1209,3 +1209,18 @@ body.placing .tut-arrow { visibility: hidden; }
 .bc-opt { margin: 6px 0; }
 .bc-opt p { margin: 2px 0 0; }
 
+
+/* 2.4: pleno hablado (bocadillos en columna) y dilemas. */
+.pleno-talk { display: flex; flex-direction: column; gap: 10px; margin: 8px 0 12px; }
+.pleno-talk.thinking .pleno-line { opacity: 0.75; }
+.pleno-bubble { position: relative; max-width: 92%; padding: 8px 10px; background: #f4f4f4; color: #1a1c2c; border: 3px solid #1a1c2c; border-radius: 4px; box-shadow: 3px 3px 0 #333c57; }
+.pleno-bubble.en_contra { align-self: flex-end; border-color: #b13e53; }
+.pleno-bubble.matiz { border-color: #3b5dc9; }
+.pleno-bubble-head { margin: 0 0 4px; }
+.pleno-line { margin: 0; line-height: 1.35; }
+.pleno-who { min-height: 44px; padding: 0 4px; font: inherit; font-weight: 700; color: #b13e53; background: none; border: 0; text-decoration: underline; cursor: pointer; }
+.pleno-bubble .pill { color: #1a1c2c; border-color: #1a1c2c; margin-left: 6px; }
+.dilemma-people { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.dilemma-options { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.dilemma-options .btn { width: 100%; min-height: 44px; text-align: left; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.dilemma-options .btn .small { font-weight: 400; }
