@@ -770,6 +770,10 @@ body.in-game .toast-close { margin: 0; min-width: 44px; min-height: 44px; }
 .person-row .p-name { font-weight: 700; }
 .person-row .p-sub { display: block; color: var(--muted); font-size: 0.85em; }
 .person-row .p-mood { font-variant-numeric: tabular-nums; font-weight: 700; }
+/* Ronda 21: en la lista de vecinos, el detalle va a lo ancho (antes caía en la columna de 28 px y salía palabra a palabra). */
+.people .person-row > .p-sub { grid-column: 2 / -1; }
+.people .person-row .p-main { min-width: 0; grid-column: 2 / -1; overflow-wrap: anywhere; line-height: 1.3; }
+.people .person-row .p-face { font-size: 1.1em; line-height: 1; text-align: center; }
 .p-mood.good { color: var(--good); }
 .p-mood.bad { color: var(--bad); }
 .status-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }

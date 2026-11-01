@@ -260,13 +260,17 @@ export function openNeighbours(state: GameState, onPick: (c: Citizen) => void, o
     const btn = h(
       'button',
       { class: 'person-row' },
-      h('span', { 'aria-hidden': 'true' }, `${mood[0]} `),
-      h('strong', {}, c.name),
-      // 2.0: en Modo IA, los vecinos con nombre piensan con IA.
-      state.aiMode && state.ai ? h('span', { class: 'ai-mark', title: 'Piensa con IA' }, ' ✦') : '',
-      h('span', {}, ` (${mood[1]})`),
-      // Ronda 15: todo el detalle en una línea propia (la rejilla tiene 3 columnas).
-      h('span', { class: 'p-sub muted' }, `${c.age} años · ${job ? (job.name ?? BUILD_NAMES[job.kind]) : c.unemployedSince !== undefined ? 'en paro' : 'trabaja fuera'}${c.owns ? ' · propietario' : ''}`, totalDebt(c) > 0 ? h('span', { class: 'pocket-warn' }, ` · debe ${money(totalDebt(c))}`) : ''),
+      h('span', { class: 'p-face', 'aria-hidden': 'true' }, mood[0]),
+      // Ronda 21: nombre y detalle juntos en la columna ancha (antes el detalle caía en la de 28 px y salía palabra a palabra).
+      h(
+        'span',
+        { class: 'p-main' },
+        h('strong', {}, c.name),
+        // 2.0: en Modo IA, los vecinos con nombre piensan con IA.
+        state.aiMode && state.ai ? h('span', { class: 'ai-mark', title: 'Piensa con IA' }, ' ✦') : '',
+        h('span', {}, ` (${mood[1]})`),
+        h('span', { class: 'p-sub muted' }, `${c.age} años · ${job ? (job.name ?? BUILD_NAMES[job.kind]) : c.unemployedSince !== undefined ? 'en paro' : 'trabaja fuera'}${c.owns ? ' · propietario' : ''}`, totalDebt(c) > 0 ? h('span', { class: 'pocket-warn' }, ` · debe ${money(totalDebt(c))}`) : ''),
+      ),
     );
     btn.addEventListener('click', () => onPick(c));
     ul.append(h('li', {}, btn));
