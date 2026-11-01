@@ -414,7 +414,7 @@ export function startGame(opts: GameOptions): void {
    */
   let highlight: { x: number; y: number; since: number } | null = null;
   let lastAttention = -Infinity;
-  function attention(at: { x: number; y: number } | undefined, force = false) {
+  function attention(at: { x: number; y: number } | undefined, force = false, why?: string) {
     const now = performance.now();
     if (at) highlight = { x: at.x, y: at.y, since: now };
     if (force && speed >= 3) lastAttention = -Infinity;
@@ -423,7 +423,11 @@ export function startGame(opts: GameOptions): void {
     const sameBatch = now - lastAttention < 2_000;
     if (!sameBatch && (speed < 3 || now - lastAttention < 45_000)) return;
     lastAttention = now;
-    if (speed >= 3) setSpeed(1);
+    if (speed >= 3) {
+      const before = speed;
+      setSpeed(1);
+      slowNote(before, why);
+    }
     shake(5, 450);
     vibrate(100);
     if (!at) return;
@@ -450,7 +454,7 @@ export function startGame(opts: GameOptions): void {
     vibrate(150);
     const at = signSpot(state) ?? hallSpot();
     if (at) highlight = { x: at.x, y: at.y, since: performance.now() };
-    slowDown();
+    slowDown('el nuevo rango');
     calmPause();
     toast(`${text}. Toca para ver el escudo.`, { kind: 'good', sticky: true, onClick: () => withBack('Pueblo', openHub, () => openRank(state)) });
     $('#sr-live').textContent = text;
@@ -458,11 +462,38 @@ export function startGame(opts: GameOptions): void {
     if (th) coins(...screenOf(th.x, th.y), 12);
   }
   /** Una oferta con plazo baja a x1 (sin temblor) y cuenta como parada (ronda 14). */
-  function slowDown() {
+  function slowDown(why?: string) {
     if (speed < 3) return;
+    const before = speed;
     setSpeed(1);
+    slowNote(before, why);
     lastAttention = performance.now();
   }
+  /**
+   * Pruebas 2.5: la vuelta a x1 no se notaba (solo cambiaba el «x1» de arriba).
+   * Ahora se dice por qué y hay un botón para volver a la velocidad de antes.
+   * Se quita sola a los 15 s o cuando el jugador cambia la velocidad.
+   */
+  let slowTimer = 0;
+  let slowFrom = 0;
+  function slowNote(before: number, why?: string) {
+    const note = $('#slow-note');
+    slowFrom = before;
+    note.querySelector('.slow-text')!.textContent = `Bajo a x1${why ? ` por ${why}` : ' para que lo veas'}.`;
+    $('#slow-back').textContent = `Volver a x${before}`;
+    note.hidden = false;
+    clearTimeout(slowTimer);
+    slowTimer = window.setTimeout(hideSlowNote, 15_000);
+  }
+  function hideSlowNote() {
+    clearTimeout(slowTimer);
+    $('#slow-note').hidden = true;
+  }
+  $('#slow-back').addEventListener('click', () => {
+    const to = slowFrom;
+    hideSlowNote();
+    if (to > 1) setSpeed(to);
+  });
   const hallSpot = () => state.buildings.find((b) => b.kind === 'townhall');
   // v1.9.1: en el paso del tutorial «Toca el ayuntamiento…», el ayuntamiento destella y la cámara va a él.
   tutorial.onFocus = () => {
@@ -709,7 +740,7 @@ export function startGame(opts: GameOptions): void {
         const d = [...state.dilemmas].reverse().find((x) => !x.resolved && (e.ref === undefined || x.citizenIds[0] === e.ref));
         sfx.warn();
         calmPause();
-        attention(d ? dilemmaSpot(state, d.id) : undefined, true);
+        attention(d ? dilemmaSpot(state, d.id) : undefined, true, 'un asunto difícil');
         toast(e.text, { kind: 'warn', sticky: true, onClick: d ? () => openDilemmaSheet(dilemmaCtx, d.id) : undefined });
       } else if (e.kind === 'warning' && e.text.startsWith('No decidiste a tiempo')) {
         toast(e.text, { kind: 'warn', sticky: true });
@@ -748,7 +779,7 @@ export function startGame(opts: GameOptions): void {
       } else if (e.kind === 'info' && /ofrece un acuerdo de/.test(e.text)) {
         // 2.5: oferta de un pueblo vecino con plazo: aviso fijo que lleva a «Comarca», y se frena.
         toast(e.text, { kind: 'warn', sticky: true, onClick: () => withBack('Pueblo', openHub, openComarcaSheet) });
-        slowDown();
+        slowDown('la oferta de un pueblo vecino');
         calmPause();
       } else if (/quiere montar|Fondos europeos|ofrece pagar el/.test(e.text)) {
         // Ronda 19: la gran empresa, el FEDER y la cofinanciación son decisiones con plazo: aviso fijo y se frena.
@@ -758,7 +789,7 @@ export function startGame(opts: GameOptions): void {
         // v1.5: ofertas de subvención y fiestas: llevan a su sección del Ayuntamiento.
         // Si hay que decidir algo con plazo, el juego baja a x1 para que dé tiempo (ronda 11).
         const decide = /Responde antes|puedes organizarlas/.test(e.text);
-        if (decide) slowDown();
+        if (decide) slowDown(/fiestas/i.test(e.text) ? 'las fiestas' : 'la subvención');
         toast(e.text, { kind: 'info', sticky: decide, onClick: () => openTownHall(social, /fiestas/i.test(e.text) ? 'festival' : 'grants') });
       } else if (e.kind === 'info' && /^(Nieva|Ola de calor|Tormenta sobre|El río crece)/.test(e.text)) {
         // v1.7: el tiempo que cambia algo (no el sol ni las nubes).
@@ -770,7 +801,7 @@ export function startGame(opts: GameOptions): void {
         sfx.warn();
         vibrate(80);
         calmPause();
-        attention(refSpot(e.ref));
+        attention(refSpot(e.ref), false, 'la riada');
         toast(e.text, { kind: 'warn', sticky: true, onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
       } else if (e.kind === 'crime') {
         // v1.8: robos, detenciones, calabozos llenos y disturbios.
@@ -787,7 +818,7 @@ export function startGame(opts: GameOptions): void {
         if (bad) {
           sfx.warn();
           calmPause();
-          if (/Disturbios|llenos|^Escándalo/.test(e.text)) attention(refSpot(e.ref) ?? state.buildings.find((b) => b.kind === 'police' && b.built));
+          if (/Disturbios|llenos|^Escándalo/.test(e.text)) attention(refSpot(e.ref) ?? state.buildings.find((b) => b.kind === 'police' && b.built), false, /Disturbios/.test(e.text) ? 'los disturbios' : /llenos/.test(e.text) ? 'los calabozos llenos' : 'el escándalo');
         }
         toast(e.text, { kind: bad ? 'warn' : 'good', sticky: /Disturbios|llenos|^Escándalo/.test(e.text), onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
       } else if (e.kind === 'fire') {
@@ -797,7 +828,7 @@ export function startGame(opts: GameOptions): void {
           sfx.warn();
           duck(1.5);
           calmPause();
-          attention(refSpot(e.ref));
+          attention(refSpot(e.ref), false, 'el incendio');
           toast(e.text, { kind: 'warn', sticky: true, onClick: go });
         } else if (e.text.startsWith('El fuego deja')) {
           sfx.warn();
@@ -811,23 +842,23 @@ export function startGame(opts: GameOptions): void {
         sfx.warn();
         duck(1.5);
         calmPause();
-        attention(hallSpot());
+        attention(hallSpot(), false, 'la manifestación');
         toast(e.text, { kind: 'warn', sticky: true, onClick: () => openTownHall(social, 'associations') });
       } else if (e.kind === 'politics' && /Asociación|asociación/.test(e.text)) {
         // v1.7: asociaciones. Si convocan una manifestación, hay 3 días para reunirse con ellos: baja a x1.
         const urgent = e.text.includes('convoca una manifestación');
         if (urgent) {
           const a = state.associations?.find((x) => x.id === e.ref);
-          attention(a?.x !== undefined && a.y !== undefined ? { x: a.x, y: a.y } : hallSpot());
+          attention(a?.x !== undefined && a.y !== undefined ? { x: a.x, y: a.y } : hallSpot(), false, 'la manifestación convocada');
         }
         toast(e.text, { kind: urgent ? 'warn' : 'info', sticky: urgent || e.text.startsWith('Nace'), onClick: () => openTownHall(social, 'associations') });
       } else if (e.kind === 'politics' && /comisión de festejos/.test(e.text)) {
         // 2.4: la comisión de festejos pide presupuesto: aviso fijo que lleva a su sección.
-        slowDown();
+        slowDown('la comisión de festejos');
         toast(e.text, { kind: 'info', sticky: true, onClick: () => openTownHall(social, 'seasons') });
       } else if (e.kind === 'politics' && /presupuesto/i.test(e.text)) {
         const decide = e.text.startsWith('Toca presentar');
-        if (decide) slowDown();
+        if (decide) slowDown('el presupuesto');
         toast(e.text, { kind: e.text.includes('rechaza') ? 'warn' : 'info', sticky: decide, onClick: () => openTownHall(social, 'budget') });
       } else if (e.kind === 'politics' && /, alcalde de |baja los impuestos: atraerá/.test(e.text)) {
         // 2.5: lo que dicen los alcaldes vecinos (lleva a «Comarca»; a x10, nada).
@@ -2558,6 +2589,8 @@ export function startGame(opts: GameOptions): void {
       );
     }
     speed = s;
+    // Otra velocidad (no la x1 del suceso): la nota «Bajo a x1…» ya no hace falta.
+    if (s !== 1) hideSlowNote();
     syncTurnPace(s);
     if (s > 0) lastSpeed = s;
     send({ type: 'speed', speed: s });

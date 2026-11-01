@@ -257,6 +257,8 @@ pre.prompt { white-space: pre-wrap; word-break: break-word; max-height: 40vh; ov
 .bubble-text { display: block; }
 .ai-badge { margin-left: 8px; vertical-align: middle; padding: 0 4px; font-size: 0.7rem; font-weight: 700; color: #f4f4f4; background: #3b5dc9; border-radius: 2px; }
 .ai-mark { color: #ffcd75; }
+.slow-note { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); z-index: 3; display: flex; align-items: center; gap: 8px; max-width: calc(100% - 16px); padding: 6px 8px 6px 12px; background: var(--panel); border: 2px solid var(--accent); border-radius: 4px; box-shadow: 2px 2px 0 #1a1c2c; font-weight: 700; }
+.slow-note[hidden] { display: none; }
 .ai-banner { position: absolute; left: 8px; right: 72px; top: 8px; margin: 0; padding: 8px 12px; background: #ef7d57; color: #1a1c2c; font-weight: 700; border-radius: 4px; }
 .quote { color: var(--accent); }
 @media (prefers-reduced-motion: no-preference) {
