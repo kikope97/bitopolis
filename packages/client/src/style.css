@@ -1164,3 +1164,24 @@ body.placing .tut-arrow { visibility: hidden; }
 .viewer-btns { position: absolute; right: 10px; bottom: max(10px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px; }
 .viewer-btns .fab { width: 48px; height: 48px; }
 .viewer-gone { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 24px; text-align: center; }
+/* ---------- 2.3: Historia (charts-ui.ts) y medallas (medals-ui.ts) ---------- */
+.history-series, .history-range { margin: 8px 0; }
+.history-series .seg-btn, .history-range .seg-btn { padding: 6px 10px; }
+.history-wrap { max-width: 328px; border: 2px solid var(--line); background: var(--bg); }
+.history-chart { display: block; width: 100%; aspect-ratio: 328 / 160; height: auto; touch-action: none; image-rendering: auto; }
+.history-readout { min-height: 1.5em; margin: 6px 0 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.history-note:empty { display: none; }
+.history-records { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.history-record { padding: 6px 10px; border: 2px solid var(--line); background: var(--bg); }
+.medal-grid { display: grid; grid-template-columns: repeat(4, 72px); gap: 8px; justify-content: start; margin-top: 8px; }
+.medal-cell { width: 72px; height: 72px; padding: 0; display: flex; align-items: center; justify-content: center; border: 2px solid var(--line); background: var(--bg); cursor: pointer; }
+.medal-cell .medal-icon { width: 48px; height: 48px; margin: 0; }
+.medal-cell.missing { border-style: dashed; }
+.medal-cell.tier-oro { border-color: var(--accent); }
+.medal-cell[aria-pressed='true'] { outline: 3px solid var(--accent); outline-offset: -3px; }
+.medal-detail { min-height: 5.5em; padding: 6px 10px; border: 2px solid var(--line); background: var(--panel); }
+.medal-detail p { margin: 4px 0; }
+.medal-title::before { content: none; }
+.medal-title { display: flex; align-items: center; gap: 8px; margin: 2px 0; }
+.medal-title .px-icon { width: 24px; height: 24px; flex: 0 0 auto; margin: 0; }
+@media (max-width: 340px) { .medal-grid { grid-template-columns: repeat(4, minmax(56px, 1fr)); } .medal-cell { width: auto; } }

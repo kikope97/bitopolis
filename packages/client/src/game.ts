@@ -99,6 +99,8 @@ import { commandFor, costText, isLocked, lockLong, lockShort, shortCost, type To
 import { Tutorial } from './tutorial.ts';
 import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, h, isSheetOpen, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack } from './ui.ts';
 import { pixelIcon } from './icons.ts';
+import { openHistory } from './charts-ui.ts';
+import { medalCount, openMedals } from './medals-ui.ts';
 import { duck, sfx, startAmbience, startMusic, stopMusic, unlockAudio } from './audio.ts';
 import { coins, dust, pop, shake, shakeOffset } from './fx.ts';
 import { onPrefs, prefs } from './prefs.ts';
@@ -2138,6 +2140,8 @@ export function startGame(opts: GameOptions): void {
         item('Felicidad', go(openHappiness)),
         item('Diario del pueblo', go(() => openDiary(social))),
         item('Álbum del pueblo', go(() => openAlbum(social))),
+        // 2.3: gráficas por años y récords.
+        item('Historia', go(() => openHistory(state))),
       ),
       // 2.1: encargos del pueblo y El Eco de Bitópolis.
       card(
@@ -2147,7 +2151,14 @@ export function startGame(opts: GameOptions): void {
         item('Encargos del pueblo', go(openErrandsSheet), !!state.errands?.list.some((e) => e.status === 'ofrecido')),
         item('El Eco de Bitópolis', go(openPressSheet), !!state.press?.editions.at(-1) && !state.press.editions.at(-1)!.answered),
       ),
-      h('section', { class: 'hub-card' }, h('h3', {}, pixelIcon('smile'), 'Objetivos'), objectivesNode(state)),
+      h(
+        'section',
+        { class: 'hub-card' },
+        h('h3', {}, pixelIcon('smile'), 'Objetivos'),
+        objectivesNode(state),
+        // 2.3: medallas (logros del pueblo, también los encargos).
+        h('div', { class: 'hub-grid' }, item(`Medallas · ${medalCount(state).have} de ${medalCount(state).total}`, go(() => openMedals(state)))),
+      ),
       ...(state.aiMode
         ? [card('inspect', 'IA', ['Los vecinos con nombre deciden con la IA.'], item('Gasto de la IA', () => void openUsage(token)), item('Qué se envía a la IA', () => void openPreview(token)))]
         : []),

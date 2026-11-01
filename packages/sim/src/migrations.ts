@@ -1,3 +1,4 @@
+import { checkMedalsSilently } from './achievements.ts';
 import { emptyErrands } from './errands.ts';
 import { emptyPress } from './press.ts';
 import { emptyPolitics, FACTION_STYLE, type Faction } from './politics-core.ts';
@@ -241,9 +242,12 @@ export function migrate16History(s: Record<string, any>): Record<string, any> {
   return { ...s, history: Array.isArray(s.history) ? s.history : history, records: s.records ?? records };
 }
 
-/** 2.3, medallas: vacías (las que ya se tenían se comprobarán en silencio cuando existan los logros). */
+/** 2.3, medallas: las que ya se cumplen se dan en silencio (sin avisos ni momentos del álbum). */
 export function migrate16Medals(s: Record<string, any>): Record<string, any> {
-  return { ...s, medals: Array.isArray(s.medals) ? s.medals : [] };
+  if (Array.isArray(s.medals)) return s;
+  const out: Record<string, any> = { ...s, medals: [] };
+  checkMedalsSilently(out as GameState);
+  return out;
 }
 
 /**

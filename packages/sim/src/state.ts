@@ -448,6 +448,8 @@ export interface GameState {
   history: YearStat[];
   records: Records;
   medals: Medal[];
+  /** 2.3: lo que necesitan recordar los logros entre meses (achievements.ts); se crea al primer cierre de mes. */
+  medalTrack?: MedalTrack;
 }
 
 /** 2.2: nota de las cuentas del ayuntamiento (A la mejor). */
@@ -486,6 +488,8 @@ export interface Emergencies {
   saved: number;
   /** Riadas que no llegaron a pasar por la protección civil o un dique. */
   floodsAvoided: number;
+  /** 2.3: riadas (el río se desbordó o lo frenaron los diques) para los logros. */
+  floods?: number;
   /** Último susto del director por vecino (para no repetirlo). */
   scares?: Record<number, number>;
 }
@@ -624,6 +628,23 @@ export type Records = Partial<Record<RecordKey, { v: number; tick: number }>>;
 export interface Medal {
   id: string;
   tick: number;
+}
+
+/** 2.3: memoria de los logros (achievements.ts): lo que no se puede leer del estado de un solo mes. */
+export interface MedalTrack {
+  /** Último aviso de récord (tick). */
+  lastRecord?: number;
+  /** Promesas cumplidas ya contadas (ids; `state.promises` solo guarda las 30 últimas). */
+  kept?: number[];
+  /** Presupuestos aprobados seguidos hasta `year`. */
+  budget?: { year: number; streak: number };
+  /** Crisis comarcal en curso (cierres de empresas durante ella) y crisis superadas sin cierres. */
+  crisis?: { closures: number } | null;
+  cleanCrises?: number;
+  /** Grandes obras que se pararon alguna vez. */
+  paused?: number[];
+  /** Meses seguidos con el entorno protegido y sin turistificar. */
+  protectedMonths?: number;
 }
 
 export interface NewGameOptions {
