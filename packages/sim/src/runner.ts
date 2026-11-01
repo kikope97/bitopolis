@@ -6,6 +6,7 @@ import { PROFILES, profileRng } from './profiles.ts';
 import { loanLoad, RATINGS, totalOwed } from './loans.ts';
 import { createInitialState, type GameState, type Rating } from './state.ts';
 import { averageHappiness, step } from './tick.ts';
+import { ruralHomes, ruralShare } from './tourism.ts';
 
 export interface RunOptions {
   seed: number;
@@ -46,6 +47,8 @@ export interface SimReport {
   loans: LoanMetrics;
   /** 2.3: escenario (y si se ganó, y en qué mes). */
   scenario: { id: ScenarioId; terrain: TerrainShape; done: boolean; won: boolean; month: number | null };
+  /** 2.3: turismo por año: visitantes, lo que dejaron (tasa y casas rurales) y casas rurales (% de las viviendas, máximo del año). */
+  tourism: { year: number; visitors: number; tax: number; rural: number; houses: number; ruralPct: number }[];
 }
 
 export interface LoanMetrics {
@@ -76,6 +79,7 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
   let populationAt1Year: number | null = null;
   const eventCounts: Record<string, number> = {};
   const sales: SimReport['sales'] = [];
+  const tourism: SimReport['tourism'] = [];
   let lastIn = state.ledger.externalIn;
   const loans: LoanMetrics = { rating: state.rating, worst: state.rating, months: { A: 0, B: 0, C: 0, D: 0 }, maxLoadPct: 0, requested: 0, requestedAmount: 0, treasury: 0, owed: 0, interest: 0 };
   let statsSeen = 0;
@@ -114,6 +118,14 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
       const total = row.shop + row.factory + row.farm;
       row.farmShare = total ? Math.round((row.farm / total) * 1000) / 10 : 0;
       row.farmShareIn = row.income ? Math.round((row.farm / row.income) * 1000) / 10 : 0;
+      // 2.3: turismo del mes que acaba de cerrar.
+      let t = tourism.find((r) => r.year === year);
+      if (!t) tourism.push((t = { year, visitors: 0, tax: 0, rural: 0, houses: 0, ruralPct: 0 }));
+      t.visitors += state.tourism.visitors;
+      t.tax += state.tourism.lastTax ?? 0;
+      t.rural += state.tourism.lastRural ?? 0;
+      t.houses = Math.max(t.houses, ruralHomes(state).length);
+      t.ruralPct = Math.max(t.ruralPct, Math.round(ruralShare(state) * 1000) / 10);
     }
     // 2.2: al cerrar cada mes, la nota y la carga.
     for (const t of state.loanLedger.treasuryTicks) {
@@ -169,6 +181,7 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
       sales,
       loans,
       scenario: { id: state.scenario.id, terrain: opts.terrain ?? 'aleatorio', done: state.scenario.done, won: !!state.scenario.won, month: scenarioMonth },
+      tourism,
     },
   };
 }

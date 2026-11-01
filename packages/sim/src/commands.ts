@@ -1,5 +1,5 @@
 import { canFundLandmarkPhase, canPauseLandmark, canStartLandmark, fundLandmarkPhase, pauseLandmark, startLandmark } from './landmarks.ts';
-import { canProtectArea, canSetTouristTax, protectArea, setTouristTax } from './tourism.ts';
+import { canBuildHeritage, canProtectArea, canSetTouristTax, canZoneProtected, protectArea, setTouristTax } from './tourism.ts';
 import { answerBigCompany, canAnswerBigCompany } from './region.ts';
 import { canRepayLoan, canRequestLoan, repayLoan, requestLoan } from './loans.ts';
 import { answerErrand, canAnswerErrand } from './errands.ts';
@@ -56,6 +56,7 @@ export const BUILD_NAMES: Record<string, string> = {
   firestation: 'Parque de bomberos',
   civilprotection: 'Protección civil',
   cleanpoint: 'Punto limpio',
+  heritage: 'Patrimonio',
   clinic: 'Centro de salud',
   police: 'Comisaría',
   plaza: 'Plaza Mayor',
@@ -221,6 +222,11 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       if (t === Tile.Road || buildingAt(state, cmd.x, cmd.y)) return { ok: false, error: 'Ese sitio está ocupado' };
       if (hasDike(state, cmd.x, cmd.y)) return { ok: false, error: 'Ahí hay un dique' };
       if (!hasAdjacentRoad(state, cmd.x, cmd.y)) return { ok: false, error: 'Necesita una carretera al lado' };
+      // 2.3: el patrimonio, uno por partida.
+      if (cmd.kind === 'heritage') {
+        const h = canBuildHeritage(state);
+        if (!h.ok) return h;
+      }
       // 2.2: licitación (la local es la de siempre: mismo coste y misma validación).
       if (cmd.offer && cmd.offer !== 'local') {
         const o = canOffer(state, cmd.kind, cmd.x, cmd.y, cmd.offer);
@@ -250,6 +256,9 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       if (!inBounds(state, cmd.x, cmd.y) || !inBounds(state, cmd.x + cmd.w - 1, cmd.y + cmd.h - 1)) {
         return { ok: false, error: 'Fuera del mapa' };
       }
+      // 2.3: sin industria en el entorno protegido del patrimonio.
+      const prot = canZoneProtected(state, cmd.zone, cmd.x, cmd.y, cmd.w, cmd.h);
+      if (!prot.ok) return prot;
       // Pintar zonas es la salida de una crisis: se permite con deuda hasta el límite.
       if (cmd.zone !== 'none' && state.treasury - zoneChanges(state, cmd).changed * ZONE_COST_PER_TILE < -DEBT_LIMIT) return { ok: false, error: 'No hay dinero suficiente' };
       return { ok: true };

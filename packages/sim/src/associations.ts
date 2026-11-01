@@ -8,14 +8,15 @@ import { directorOwns } from './director-core.ts';
 import { stationsFor, tryArrest, cellsUsed } from './crime.ts';
 import { chance } from './prng.ts';
 import { type Building, type Citizen, type GameState, pushEvent } from './state.ts';
-import { CRIME, TRASH } from './balance.ts';
+import { ruralShare, touristified } from './tourism.ts';
+import { CRIME, TOURISM, TRASH } from './balance.ts';
 
 /**
  * v1.7: asociaciones vecinales y protestas. Cuando varios vecinos con nombre
  * comparten la misma queja, se organizan, piden una cosa concreta y, si nadie
  * les hace caso, se manifiestan ante el ayuntamiento. Todo determinista.
  */
-export type Cause = NeedKey | 'ruido' | 'contaminacion' | 'inseguridad' | 'impuestos';
+export type Cause = NeedKey | 'ruido' | 'contaminacion' | 'inseguridad' | 'impuestos' | 'vivienda';
 // Sin depender de otros módulos al cargar (hay importaciones circulares entre decisiones y asociaciones).
 export const CAUSE_TEXT: Record<Cause, string> = {
   agua: 'agua',
@@ -30,6 +31,7 @@ export const CAUSE_TEXT: Record<Cause, string> = {
   inseguridad: 'más seguridad',
   impuestos: 'impuestos más bajos',
   basuras: 'recogida de basura',
+  vivienda: 'alquileres asequibles',
 };
 /** Qué piden (una frase) y cómo se llaman. */
 export const CAUSE_ASK: Record<Cause, string> = {
@@ -45,6 +47,7 @@ export const CAUSE_ASK: Record<Cause, string> = {
   inseguridad: 'policía en el barrio',
   impuestos: 'que bajen los impuestos',
   basuras: 'que pase el camión de la basura por sus calles',
+  vivienda: 'que no suban más los alquileres por las casas rurales',
 };
 
 export interface Association {
@@ -82,6 +85,7 @@ export const LEMA: Record<Cause, string> = {
   inseguridad: '¡Barrio seguro!',
   impuestos: '¡No más impuestos!',
   basuras: '¡Fuera las ratas!',
+  vivienda: '¡Casas para vivir, no para turistas!',
 };
 
 /** Centro de las casas de unos vecinos (el barrio de la asociación). */
@@ -114,6 +118,8 @@ export function grievanceOf(state: GameState, c: Citizen, ctx = coverageCtx(stat
   if (dirt >= TRASH.dirtyField) scored.push(['basuras', 3 + dirt / 10]);
   const lv = felt(state);
   if (lv.ibi === 'high' && lv.tasas === 'high') scored.push(['impuestos', 4 + c.grudge]);
+  // 2.3: con demasiadas casas rurales, el alquiler privado sube (inquilinos de viviendas privadas).
+  if (!c.owns && home.kind === 'res' && touristified(state)) scored.push(['vivienda', 4 + (ruralShare(state) - TOURISM.touristified.share) * 40]);
   if (!scored.length) return null;
   scored.sort((a, b) => b[1] - a[1]);
   return scored[0]![0];

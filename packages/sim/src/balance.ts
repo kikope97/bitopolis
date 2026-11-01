@@ -37,6 +37,8 @@ export const BUILD: Record<BuildKind, BuildSpec> = {
   civilprotection: { materials: 2_500, workers: 3, days: 2, unlockPop: 30 },
   // 2.1: punto limpio con camión de la basura.
   cleanpoint: { materials: 2_500, workers: 3, days: 3, unlockPop: 30 }, // ronda 17: con 20 frenaba el crecimiento
+  // 2.3: patrimonio (uno por partida, nivel 3; su forma sale del terreno). Atractivo en TOURISM.heritage.
+  heritage: { materials: 9_000, workers: 5, days: 5, unlockPop: 40 },
 };
 
 /** Obras que crecen solas sobre zonas (las paga un inversor de fuera). */
@@ -116,13 +118,13 @@ export const MAINTENANCE: Record<BuildingKind, number> = {
   shop: 0,
   factory: 0,
   farm: 0,
-  // 2.3: las grandes obras pagan un % de lo gastado (LANDMARKS.upkeep, landmarks.ts); el patrimonio, TOURISM.heritage.upkeep.
+  // 2.3: las grandes obras pagan un % de lo gastado (LANDMARKS.upkeep, landmarks.ts); el patrimonio, aquí.
   bridge: 0,
   station: 0,
   fair: 0,
   stadium: 0,
   cathedral: 0,
-  heritage: 0,
+  heritage: 60,
   bigfactory: 0,
 };
 
@@ -1039,17 +1041,24 @@ export const LANDMARKS = {
  * × el factor de la comarca (`REGION.fx[fase].visitors`).
  */
 export const TOURISM = {
-  /** Patrimonio (uno por partida; su forma sale del terreno). */
-  heritage: { pop: 40, townhall: 3, cost: 9_000, workers: 5, days: 5, attract: 10, upkeep: 60 },
+  /**
+   * Patrimonio (uno por partida; su forma sale del terreno: mar o río a
+   * `nearWater` casillas, colina o llano). La obra, en BUILD.heritage; el
+   * mantenimiento, en MAINTENANCE.heritage; el nivel, en BUILD_LEVEL.
+   */
+  heritage: { attract: 10, nearWater: 2 },
   festivalAttract: 5,
-  /** Atractivo por cada árbol del mapa, con tope. */
+  /** Atractivo por cada árbol del mapa y por parque, con tope entre los dos. */
   perTree: 0.02,
+  perPark: 1,
   treesMax: 6,
-  /** Lo que resta la contaminación media (0–100). */
-  pollution: 0.3,
+  /** Por debajo de este atractivo no viene nadie. */
+  minAttract: 8,
+  /** Lo que resta la contaminación media (0–100) en las casillas con edificio. Con 0,3, un pueblo con talleres no tenía turistas. */
+  pollution: 0.1,
   perAttract: 6,
   /** Casas rurales (vivienda en propiedad con `rural`): plazas, lo que gana el dueño por visitante y tope al mes. */
-  rural: { beds: 3, perVisitor: 40, maxMonth: 600 },
+  rural: { beds: 3, perVisitor: 40, maxMonth: 600, openCost: 1_500, minVisitors: 40 },
   /** Noches por visitante; la tasa (€/noche por nivel) quita esta parte de visitantes por nivel. */
   nights: 2,
   taxDrop: 0.12,
@@ -1061,6 +1070,8 @@ export const TOURISM = {
   tvReport: 1.5,
   ruralChance: 0.05,
   ruralAmbition: 60,
+  /** IA (`turistas_ruido`): un mes de mal humor a esta distancia de las casas rurales. */
+  noise: { mood: -3, radius: 4, minVisitors: 60 },
 } as const;
 
 /**

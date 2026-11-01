@@ -1,3 +1,4 @@
+import { ruralShare } from './tourism.ts';
 import { TICKS_PER_MONTH } from '@bitopolis/shared';
 import type { LandmarkKind, ScenarioId } from '@bitopolis/shared';
 import { addMoment } from './album.ts';
@@ -90,17 +91,6 @@ export function generations(state: GameState): number {
 
 export const reelections = (state: GameState): number => state.politics.history.filter((e) => e.winner === 'player').length;
 
-/** Parte de las viviendas que son casas rurales (0–1). */
-export function ruralShare(state: GameState): number {
-  let homes = 0;
-  let rural = 0;
-  for (const b of state.buildings) {
-    if (!b.built || (b.kind !== 'res' && b.kind !== 'house')) continue;
-    homes++;
-    if (b.rural) rural++;
-  }
-  return homes ? rural / homes : 0;
-}
 
 const landmarkDone = (state: GameState, kind: LandmarkKind) => (state.landmarks ?? []).some((l) => l.kind === kind && l.phase >= l.phases);
 const scenarioWon = (state: GameState, id: ScenarioId) => state.scenario?.id === id && state.scenario.won === true;
