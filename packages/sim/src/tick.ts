@@ -2,7 +2,8 @@ import { loansMonth } from './loans.ts';
 import { landmarksDay, landmarksMonth } from './landmarks.ts';
 import { tourismMonth } from './tourism.ts';
 import { regionMonth } from './region.ts';
-import { scenariosMonth } from './scenarios.ts';
+import { scenarioFx, scenariosMonth } from './scenarios.ts';
+import { newResident } from './resident.ts';
 import { achievementsMonth, historyMonth } from './achievements.ts';
 import { errandsDay } from './errands.ts';
 import { pressDay } from './press.ts';
@@ -30,7 +31,6 @@ import {
   CRIME,
   SOCIAL_PLACES,
   TERRAIN,
-  TURN,
   CIVIL,
   FARM,
   FIRE,
@@ -68,25 +68,20 @@ import { townLevel, zonesUnlocked } from './townhall.ts';
 import { finishUpgrades, jobsOf, maintenanceOf, plantCapacityOf, radiusOf, serviceHappiness } from './levels.ts';
 import { lifeDay, lifeMonth, lifeYear } from './lifecycle.ts';
 import { burntDown, fireDay, fireTick, volunteersMonth } from './fire.ts';
-import { aiByShare, plansDay, turnsTick } from './turns.ts';
+import { plansDay, turnsTick } from './turns.ts';
 import { ruleTurn } from './decisions.ts';
 import { basicLiving, drownedInDebt, economyStats, outsideJobsMonth, settleMonth, totalDebt, unansweredDeferrals } from './household.ts';
-import { FIRST_NAMES, SURNAMES } from './names.ts';
 import { tenderDay, tenderDone, tenderPace } from './tenders.ts';
-import { addMemory, goalFor, memoryMood, onCitizenLeaves, PROFESSIONS, relationMood, socialDay } from './social.ts';
+import { addMemory, memoryMood, onCitizenLeaves, relationMood, socialDay } from './social.ts';
 import { politicsDay, politicsPrune } from './politics.ts';
 import {
   type Building,
   buildingAt,
   type Citizen,
   DIRS,
-  DESIRES,
-  FEARS,
   type GameState,
   inBounds,
-  randomTraits,
   newBuilding,
-  NO_PROPERTY,
   pushEvent,
   terrainAt,
   Tile,
@@ -103,13 +98,14 @@ export function isBusiness(b: Building): boolean {
 
 export function homeCapacity(b: Building): number {
   // 2.1: una casa destrozada por el fuego no admite a nadie nuevo hasta repararla.
-  return b.built && !burntDown(b) ? (HOMES[b.kind] ?? 0) : 0;
+  // 2.3: tampoco lo que destrozó la riada del escenario.
+  return b.built && !burntDown(b) && b.damaged?.cause !== 'riada' ? (HOMES[b.kind] ?? 0) : 0;
 }
 
 export function jobCapacity(b: Building): number {
   // Ronda 15: una empresa que pierde dinero recorta plantilla (b.staff) antes de cerrar.
   // 2.1: lo destrozado por el fuego no contrata hasta repararlo.
-  return b.built && !burntDown(b) ? Math.min(jobsOf(b), b.staff ?? Infinity) : 0;
+  return b.built && !burntDown(b) && b.damaged?.cause !== 'riada' ? Math.min(jobsOf(b), b.staff ?? Infinity) : 0;
 }
 
 export function occupants(state: GameState, b: Building): Citizen[] {
@@ -233,7 +229,8 @@ export function computeDemand(state: GameState): GameState['demand'] {
   const happy = averageHappiness(state);
   const clamp = (v: number) => Math.round(Math.max(-100, Math.min(100, v)));
   const zones = zonesUnlocked(state);
-  const R = 40 + vacancies(state) * 5 - Math.max(0, free - 8) * 1.5 + (happy - 55) + averageTaxMood(state) - (zones ? jobless * 2 : 0);
+  // 2.3: «El pueblo que se vacía» resta demanda el primer año (scenarioFx).
+  const R = 40 + vacancies(state) * 5 - Math.max(0, free - 8) * 1.5 + (happy - 55) + averageTaxMood(state) - (zones ? jobless * 2 : 0) + scenarioFx(state).demandR;
   // v1.9: con sueldo mínimo alto, las empresas suben precios y hay algo menos de demanda comercial.
   const C = !zones ? 0 : (pop / 12 - shops) * 25 - MIN_WAGE_STEP[state.minWage ?? 'none'] * MIN_WAGE_FX.demandC;
   const I = !zones ? 0 : jobless * 6 - factories * 10 + 20;
@@ -431,15 +428,6 @@ function growZones(state: GameState, served: { water: Set<number>; power: Set<nu
 
 /* ---------- vecinos ---------- */
 
-function uniqueName(state: GameState): string {
-  const used = new Set(state.citizens.map((c) => c.name));
-  for (let i = 0; i < 20; i++) {
-    const n = `${pick(state.rng, FIRST_NAMES)} ${pick(state.rng, SURNAMES)}`;
-    if (!used.has(n)) return n;
-  }
-  return `${pick(state.rng, FIRST_NAMES)} ${pick(state.rng, SURNAMES)} ${state.nextId}`;
-}
-
 function assignHomesAndJobs(state: GameState): void {
   const homeUse = new Map<number, number>();
   const jobUse = new Map<number, number>();
@@ -488,47 +476,8 @@ function arrivals(state: GameState): void {
   }
 }
 
-/** Vecino nuevo (llega de fuera o se independiza de su familia, v1.5). No lo añade al pueblo. */
-export function newResident(state: GameState, opts: { age: number; surname?: string }): Citizen {
-  {
-    // 2.0: en Modo IA, el % de vecinos con IA decide quién tiene nombre (y piensa con IA).
-    const namedCount = state.citizens.filter((x) => x.named).length;
-    const named = state.aiMode && state.ai ? namedCount < TURN.maxNamed && aiByShare(state, state.nextId) : namedCount < state.namedLimit;
-    let name = uniqueName(state);
-    // Con el apellido de la familia, que no se repita el nombre completo (ronda 11).
-    if (opts.surname) {
-      const used = new Set(state.citizens.map((x) => x.name));
-      for (let i = 0; i < 20 && (i === 0 || used.has(name)); i++) name = `${uniqueName(state).split(' ')[0]} ${opts.surname}`;
-      if (used.has(name)) name = `${name} ${state.nextId}`;
-    }
-    const c: Citizen = {
-      id: state.nextId++,
-      name,
-      age: opts.age,
-      money: 0,
-      homeId: null,
-      jobId: null,
-      happiness: 55,
-      arrivedMonth: Math.floor(state.tick / TICKS_PER_MONTH),
-      named,
-      traits: named ? randomTraits(state.rng) : { terco: 50, ahorro: 50, social: 50, ambicion: 50 },
-      desire: named ? pick(state.rng, DESIRES) : 'prosperar',
-      fear: named ? pick(state.rng, FEARS) : 'paro',
-      cooldownUntil: 0,
-      ...NO_PROPERTY,
-      profession: named ? pick(state.rng, PROFESSIONS) : '',
-      goal: 'ahorrar',
-      relations: [],
-      memories: [],
-      summary: '',
-    };
-    if (named) {
-      c.goal = goalFor(c.desire);
-      c.memories.push({ tick: state.tick, kind: 'llego', about: [], importance: 2, valence: 1 });
-    }
-    return c;
-  }
-}
+// 2.3: `newResident` vive en resident.ts (sin el ciclo de carga, para los escenarios de createInitialState).
+export { newResident };
 
 /** Un vecino se va del pueblo por su propio pie (vende lo que tenga). */
 export function leaveVoluntarily(state: GameState, c: Citizen): void {

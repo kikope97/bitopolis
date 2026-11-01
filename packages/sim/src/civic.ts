@@ -204,7 +204,7 @@ export function answerGrant(state: GameState, grantId: number, accept: boolean):
 
 /** Al terminar una obra: si cumple una subvención aceptada y en plazo, se cobra el resto. */
 export function onBuildingDone(state: GameState, b: Building): void {
-  const g = state.grants.find((x) => x.status === 'accepted' && x.kind === b.kind && b.id >= x.minId && state.tick <= x.deadline);
+  const g = state.grants.find((x) => x.status === 'accepted' && !x.emergency && x.kind === b.kind && b.id >= x.minId && state.tick <= x.deadline);
   if (!g) return;
   const rest = Math.max(0, Math.round(estimatedCost(state, g.kind) * g.share) - g.advance);
   transfer(state, OUTSIDE, TREASURY, rest, 'subvenciones');
@@ -246,7 +246,8 @@ export function civicDay(state: GameState): void {
   // Subvenciones: las ofertas caducan; las aceptadas fuera de plazo se devuelven con recargo.
   for (const g of state.grants) {
     if (g.status === 'offered' && state.tick - g.offeredTick > GRANT_OFFER_DAYS * TICKS_PER_DAY) g.status = 'declined';
-    if (g.status === 'accepted' && state.tick > g.deadline) {
+    // 2.3: la ayuda de emergencia de la riada la lleva scenarios.ts.
+    if (g.status === 'accepted' && !g.emergency && state.tick > g.deadline) {
       g.status = 'expired';
       const back = Math.round(g.advance * (1 + GRANT_PENALTY));
       transfer(state, TREASURY, OUTSIDE, back, 'reintegro de subvención');
