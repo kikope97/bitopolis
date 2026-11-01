@@ -21,7 +21,7 @@ import { ASSOCIATIONS, BUILD, CIVIL, STREETS, DEBT_LIMIT, FIRE, MICROCREDIT, MIN
 import { isWater, Terrain } from './terrain.ts';
 import { applyDecision, canApplyDecision } from './decisions.ts';
 import { canSetCareFee, setCareFee } from './care.ts';
-import { answerNeighbor, canAnswerNeighbor } from './comarca.ts';
+import { answerNeighbor, applyNeighborTurn, canAnswerNeighbor, canApplyNeighborTurn } from './comarca.ts';
 import { canSetZoneDensity, setZoneDensity } from './density.ts';
 import { canResolveDilemma, resolveDilemma } from './dilemmas.ts';
 import { approveFestival, canApproveFestival } from './seasons.ts';
@@ -211,7 +211,7 @@ export function validateAsGovernment(state: GameState, cmd: unknown): CommandRes
 
 /** En la oposición el jugador solo puede hablar con los vecinos (y la IA decidir). */
 // Ronda 17: el turno del pueblo (IA) y los votos no son órdenes del alcalde: valen también en la oposición.
-const OPPOSITION_ALLOWED = new Set(['TalkTo', 'NotifyProject', 'CitizenAct', 'Campaign', 'Motion', 'TownTurn', 'ChooseCrest']);
+const OPPOSITION_ALLOWED = new Set(['TalkTo', 'NotifyProject', 'CitizenAct', 'Campaign', 'Motion', 'TownTurn', 'ChooseCrest', 'NeighborTurn']);
 
 export function validateCommand(state: GameState, raw: unknown): CommandResult {
   const parsed = Command.safeParse(raw);
@@ -412,6 +412,8 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       return canSetZoneDensity(state, cmd.x, cmd.y, cmd.w, cmd.h, cmd.level);
     case 'AnswerNeighbor':
       return canAnswerNeighbor(state, cmd.id, cmd.accept);
+    case 'NeighborTurn':
+      return canApplyNeighborTurn(state, cmd.month);
   }
 }
 
@@ -687,6 +689,9 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       break;
     case 'AnswerNeighbor':
       answerNeighbor(state, cmd.id, cmd.accept);
+      break;
+    case 'NeighborTurn':
+      applyNeighborTurn(state, cmd.month, cmd.picks);
       break;
   }
   if (mayor) noteMayor(state, mayor.text, mayor.big);

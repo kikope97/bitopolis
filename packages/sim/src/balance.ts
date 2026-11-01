@@ -1452,4 +1452,49 @@ export const COMARCA = {
   grantMonths: 6,
   fairMonth: 9,
   offerDays: 30,
+  /** Población inicial de los pueblos vecinos (entre min y max) y sus límites. */
+  startPop: { min: 60, max: 220 },
+  popLimits: { min: 30, max: 3_000 },
+  /** Felicidad base de los vecinos y lo que la mueve la fase de la comarca según su especialidad. */
+  baseHappiness: 55,
+  phaseHappiness: {
+    campo: { bonanza: 2, normal: 0, crisis: -3 },
+    industria: { bonanza: 8, normal: 0, crisis: -10 },
+    turismo: { bonanza: 5, normal: 0, crisis: -5 },
+    servicios: { bonanza: 3, normal: 0, crisis: -3 },
+  },
+  /** Cuánto se acerca la felicidad del vecino a su objetivo cada mes. */
+  happinessPull: 0.2,
+  /** Crecimiento mensual: (felicidad − 50) × growth × población. */
+  growth: 0.002,
+  /** Caja de los vecinos (resumen, no es dinero del juego): ingresos por vecino y mes. */
+  incomePerPop: 3,
+  /** Atractivo: impuestos bajos/altos del pueblo y bajada de impuestos de un vecino. */
+  taxAttract: { low: 5, medium: 0, high: -6 },
+  taxCut: { attract: 8, months: 6, happiness: 3, costPerPop: 1, minTreasury: 2_000 },
+  /** Con menos de estos vecinos no se va nadie a otro pueblo (pueblo recién empezado). */
+  pullMinPop: 20,
+  /** Bolsa semestral de la Diputación (se reparte por puntuación). */
+  grantPool: 6_000,
+  grantClaimScore: 4,
+  /** Acuerdos: duran `months`; luz y agua, € por edificio sobrante al mes; autobús, cuota al mes y felicidad; cosecha, % sobre la venta. */
+  deals: {
+    months: 12,
+    luz: { perBuilding: 3 },
+    agua: { perBuilding: 2 },
+    autobus: { fee: 120, happiness: 2 },
+    cosecha: { bonus: 0.1 },
+  },
+  /** Responder a una oferta mueve la relación; ignorarla, también. */
+  acceptRelation: 1,
+  rejectRelation: -1,
+  expireRelation: -1,
+  /** Río a la salida por encima de esto: el pueblo de abajo se enfada (cada mes, −1 de relación cada 3). */
+  riverAngry: 45,
+  /** Feria comarcal: gasto de los forasteros (por pueblo que va) y premio del motor. */
+  fair: { spendPerTown: 600, prize: 400, prizeHappiness: 3 },
+  /** Turno de los alcaldes (Modo IA): días que espera a la IA antes de que decidan las reglas. */
+  turnDays: 5,
+  /** Declaración de un alcalde, como mucho. */
+  maxSaid: 140,
 };
