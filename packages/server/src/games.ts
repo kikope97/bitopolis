@@ -174,6 +174,11 @@ export async function registerGameRoutes(app: FastifyInstance, db: Db, store: Se
     const trusted = commands.flatMap((c) => {
       // 2.1: los votos del escudo son de la IA de los vecinos: el cliente no los manda (se descartan).
       if (c.cmd.type === 'ChooseCrest') return [];
+      // 2.5: igual que el turno del pueblo, el de los alcaldes vecinos solo vale si lo respondió la IA del servidor.
+      if (c.cmd.type === 'NeighborTurn') {
+        const nr = ai.neighborTurn(row.id, c.cmd.month);
+        return nr && nr.status === 'ready' ? [{ tick: c.tick, cmd: { type: 'NeighborTurn' as const, month: nr.month, picks: nr.picks } }] : [];
+      }
       if (c.cmd.type !== 'TownTurn') return [c];
       const r = ai.turn(row.id, c.cmd.n);
       if (!r || r.status !== 'ready') return [];
