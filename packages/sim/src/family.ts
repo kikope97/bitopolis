@@ -25,7 +25,12 @@ export function rememberDeparted(state: GameState, c: Citizen, reason: Departed[
   const hasFamily = !!c.parents?.length || partner !== undefined || state.citizens.some((x) => x.parents?.includes(c.id));
   if (!c.named && !hasFamily) return;
   state.departed.push({ id: c.id, name: c.name, age: c.age, ...(c.parents?.length ? { parents: c.parents } : {}), ...(partner !== undefined ? { partnerId: partner } : {}), tick: state.tick, reason });
-  if (state.departed.length > DEPARTED_MAX) state.departed.splice(0, state.departed.length - DEPARTED_MAX);
+  if (state.departed.length > DEPARTED_MAX) {
+    // 2.2: quien tiene calle no se olvida (la placa sigue diciendo su nombre).
+    const keep = new Set((state.streetNames ?? []).map((s) => s.citizenId));
+    let extra = state.departed.length - DEPARTED_MAX;
+    state.departed = state.departed.filter((d) => extra <= 0 || keep.has(d.id) || (extra--, false));
+  }
 }
 
 export interface Kin {

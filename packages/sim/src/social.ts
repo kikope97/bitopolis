@@ -8,6 +8,8 @@ import { hash32 } from './hash.ts';
 import { radiusOf } from './levels.ts';
 import { isFemaleName } from './names.ts';
 import { leaveTown } from './household.ts';
+import { streetCandidates } from './streets.ts';
+import { tendersForget } from './tenders.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance, pick } from './prng.ts';
 import type { Building, Citizen, GameState } from './state.ts';
@@ -97,6 +99,11 @@ export const MEMORY_KINDS = [
   'ratas',
   'tiro_basura',
   'vio_tirar_basura',
+  // 2.2: licitaciones y calles.
+  'obra_de_fuera',
+  'escandalo',
+  'contrato_revisado',
+  'homenaje',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -182,6 +189,8 @@ export interface Petition {
 export interface Pleno {
   tick: number;
   petitions: Petition[];
+  /** 2.2: «Dedicar una calle»: los candidatos del motor y si ya se dedicó en este pleno. */
+  street?: { candidates: number[]; done: boolean };
 }
 export interface PromiseRecord {
   id: number;
@@ -352,6 +361,14 @@ export function memoryText(state: GameState, m: Memory): string {
       return 'Tiró la basura al monte porque no pasa el camión';
     case 'vio_tirar_basura':
       return `Vio a ${who} tirar la basura al monte`;
+    case 'obra_de_fuera':
+      return 'Una obra del pueblo se la dieron a una empresa de fuera';
+    case 'escandalo':
+      return m.about.length ? `Se destapó el escándalo de la obra del primo de ${who}` : 'Se destapó el escándalo de una obra del ayuntamiento';
+    case 'contrato_revisado':
+      return 'El alcalde le revisó el contrato de una obra';
+    case 'homenaje':
+      return m.about.length ? `El pueblo dedicó una calle a ${who}` : 'El pueblo le dedicó una calle';
   }
 }
 
@@ -543,6 +560,7 @@ export function onCitizenLeaves(state: GameState, leaving: Citizen): void {
   // v1.9: salda lo que pueda; lo que deba y no pague se da por perdido.
   leaveTown(state, leaving);
   rememberDeparted(state, leaving, 'se_fue');
+  tendersForget(state, leaving.id);
   for (const c of state.citizens) {
     const r = relation(c, leaving.id);
     if (!r) continue;
@@ -813,7 +831,9 @@ export function convenePleno(state: GameState): void {
       petitions.push({ id: state.nextId++, citizenId: leader.id, need, yes, no: state.citizens.length - yes, supporters, answer: null, opposition: true });
     }
   }
-  state.pleno = { tick: state.tick, petitions };
+  // 2.2: una calle por pleno, entre los candidatos que propone el motor.
+  const street = streetCandidates(state).map((c) => c.id);
+  state.pleno = { tick: state.tick, petitions, ...(street.length ? { street: { candidates: street, done: false } } : {}) };
   pushEvent(state, 'info', `Pleno municipal: ${petitions.length} peticiones${leader ? ', una de la oposición' : ' de los vecinos'}`);
 }
 

@@ -29,10 +29,12 @@ import { type Citizen, type GameState, pushEvent } from './state.ts';
 import { setDirectorImpl, type TurnLog } from './turns.ts';
 import { BUILD_NAMES } from './commands.ts';
 import { trashServed, trashStateOf } from './trash-core.ts';
+import { rumoredTenders, scandal, worksName } from './tenders.ts';
+import { streetCandidates } from './streets.ts';
 
 const plural = (n: number) => (n === 1 ? 'un edificio' : `${n} edificios`);
 
-export const DIRECTOR_KINDS = ['robo_tienda', 'robo_casa', 'asociacion', 'manifestacion', 'pelea', 'reconciliacion', 'gratitud', 'rumor', 'oposicion', 'local', 'encuentro', 'ayuda', 'incendio', 'susto', 'ratas'] as const;
+export const DIRECTOR_KINDS = ['robo_tienda', 'robo_casa', 'asociacion', 'manifestacion', 'pelea', 'reconciliacion', 'gratitud', 'rumor', 'oposicion', 'local', 'encuentro', 'ayuda', 'incendio', 'susto', 'ratas', 'licitacion', 'homenaje'] as const;
 export type DirectorKind = (typeof DIRECTOR_KINDS)[number];
 
 export interface DirectorCandidate {
@@ -222,6 +224,30 @@ export function directorMenu(state: GameState): DirectorCandidate[] {
     out.push({ id: `oposicion:${f}`, kind: 'oposicion', bad: true, text: `«${p.party.name}» da un mitin entre ${FACTION_TEXT[f].toLowerCase()}`, why: `es la facción más descontenta (${Math.round(p.factions[f].satisfaction)})` });
   }
 
+  // 2.2: el escándalo de la obra del primo (solo con el rumor ya corriendo en el bar).
+  add(
+    rumoredTenders(state).map((t) => {
+      const councillor = byId(state, t.councillorId ?? -1);
+      return {
+        id: `licitacion:${t.buildingId}`,
+        kind: 'licitacion' as const,
+        bad: true,
+        text: `Estalla el escándalo de la obra de ${worksName(t.kind)}`,
+        why: `la obra fue para el negocio de un amigo del concejal${councillor ? ` ${first(councillor)}` : ''} y ya se comenta en el bar`,
+        owed: state.tick >= (t.revealAt ?? 0),
+      };
+    }),
+  );
+  // 2.2: homenaje: con el pleno abierto y la calle sin dedicar, el pueblo pide un nombre.
+  const st = state.pleno?.street;
+  if (st && !st.done) {
+    add(
+      streetCandidates(state)
+        .filter((c) => st.candidates.includes(c.id) && st.candidates[0] !== c.id)
+        .map((c) => ({ id: `homenaje:${c.id}`, kind: 'homenaje' as const, bad: false, text: `El pueblo pide una calle para ${c.name}`, why: c.why.toLowerCase() })),
+    );
+  }
+
   // Una historia: dos vecinos quieren el único local libre.
   const founders = named.filter((c) => canFound(state, c));
   if (founders.length >= 2 && freeShopLot(state) !== null && state.hooks.length < 3) {
@@ -340,6 +366,8 @@ function brewingText(c: DirectorCandidate): string {
       return 'Se oyen comentarios en el bar sobre el ayuntamiento';
     case 'incendio':
       return `Huele a humo: ${c.why}`;
+    case 'licitacion':
+      return `Hay quien hace preguntas en el bar: ${c.why}`;
     default:
       return c.text;
   }
@@ -472,6 +500,21 @@ function perform(state: GameState, c: DirectorCandidate): { id: number; text: st
       }
       pushEvent(state, 'warning', `${c.text}: ${plural(hit.length)} sin recogida de basura`, { ref: b.id, notify: true });
       return { id: people[0]?.id ?? 0, text: c.text };
+    }
+    case 'licitacion': {
+      const t = rumoredTenders(state).find((x) => x.buildingId === Number(arg));
+      if (!t || !scandal(state, t)) return null;
+      return { id: t.councillorId ?? 0, text: c.text };
+    }
+    case 'homenaje': {
+      const st = state.pleno?.street;
+      const id = Number(arg);
+      if (!st || st.done || !st.candidates.includes(id)) return null;
+      // Pasa a ser el primero de la lista del pleno.
+      st.candidates = [id, ...st.candidates.filter((x) => x !== id)];
+      const name = state.citizens.find((x) => x.id === id)?.name ?? state.departed?.find((x) => x.id === id)?.name ?? 'un vecino';
+      pushEvent(state, 'info', `En el bar se pide que una calle lleve el nombre de ${name}`, { ref: id });
+      return { id, text: c.text };
     }
     case 'local': {
       const [a, b] = pair();

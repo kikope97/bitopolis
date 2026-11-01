@@ -24,6 +24,7 @@ import {
   SERVICE_SALARY,
   WAGE_LOCAL,
   WAGE_OUTSIDE,
+  TENDER,
   CRIME,
   SOCIAL_PLACES,
   TERRAIN,
@@ -67,6 +68,7 @@ import { aiByShare, plansDay, turnsTick } from './turns.ts';
 import { ruleTurn } from './decisions.ts';
 import { basicLiving, drownedInDebt, economyStats, outsideJobsMonth, settleMonth, totalDebt, unansweredDeferrals } from './household.ts';
 import { FIRST_NAMES, SURNAMES } from './names.ts';
+import { tenderDay, tenderDone, tenderPace } from './tenders.ts';
 import { addMemory, goalFor, memoryMood, onCitizenLeaves, PROFESSIONS, relationMood, socialDay } from './social.ts';
 import { politicsDay } from './politics.ts';
 import {
@@ -330,7 +332,8 @@ function progressProjects(state: GameState): void {
   const busy = new Set<number>();
   for (const p of state.projects) {
     p.crew = [];
-    for (const c of state.citizens) {
+    // 2.2: la empresa de fuera trae su cuadrilla (los parados del pueblo no cobran).
+    for (const c of p.offer === 'fuera' ? [] : state.citizens) {
       if (p.crew.length >= p.workersNeeded) break;
       if (c.jobId === null && !busy.has(c.id)) {
         p.crew.push(c.id);
@@ -340,9 +343,9 @@ function progressProjects(state: GameState): void {
     // Nunca se bloquea: lo que falte se contrata fuera, más caro.
     p.outsideToday = p.workersNeeded - p.crew.length;
     for (const id of p.crew) transfer(state, p.payer, id, WAGE_LOCAL, 'obras');
-    transfer(state, p.payer, OUTSIDE, p.outsideToday * WAGE_OUTSIDE, 'obras');
-    // v1.7: con nieve, las obras avanzan a la mitad (los sueldos se pagan igual).
-    p.workerDaysDone += p.workersNeeded * weatherFx(state).build;
+    transfer(state, p.payer, OUTSIDE, p.outsideToday * (p.offer === 'fuera' ? TENDER.cheap.wage : WAGE_OUTSIDE), 'obras');
+    // v1.7: con nieve, las obras avanzan a la mitad (los sueldos se pagan igual). 2.2: el ritmo de la oferta.
+    p.workerDaysDone += p.offer ? p.workersNeeded * weatherFx(state).build * tenderPace(p) : p.workersNeeded * weatherFx(state).build;
   }
   for (const p of [...state.projects]) {
     if (p.workerDaysDone < p.workerDaysNeeded) continue;
@@ -352,7 +355,10 @@ function progressProjects(state: GameState): void {
     b.built = true;
     pushEvent(state, 'built', `Terminada la obra: ${BUILD_NAMES[b.kind]}`, { ref: b.id, notify: p.notify });
     onBuildingDone(state, b);
+    if (p.offer) tenderDone(state, b);
   }
+  // 2.2: rumores y escándalos de las licitaciones.
+  tenderDay(state);
   // Quien trabajó hoy en una obra no cobra como commuter.
   for (const c of state.citizens) {
     // v1.9: quien está en paro no cobra (cobra la prestación al mes).

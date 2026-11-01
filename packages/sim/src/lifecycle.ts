@@ -22,6 +22,7 @@ import type { Citizen, GameState } from './state.ts';
 import { pushEvent } from './state.ts';
 import { freeHomes, newResident } from './tick.ts';
 import { tryAmbulance } from './fire.ts';
+import { tendersForget } from './tenders.ts';
 
 /**
  * Ciclo vital (v1.5): cumpleaños, nacimientos, hijos que se independizan,
@@ -84,6 +85,7 @@ export function dies(state: GameState, c: Citizen): void {
   }
   state.pending = state.pending.filter((p) => p.citizenId !== c.id);
   rememberDeparted(state, c, 'fallecio');
+  tendersForget(state, c.id);
   state.citizens = state.citizens.filter((x) => x !== c);
   const keeps = heir && heir.owns && heir.homeId === c.homeId ? `Su casa queda con ${first(heir)}` : heir ? `Lo suyo queda con ${first(heir)}` : 'Lo deja todo a su familia de fuera';
   pushEvent(state, 'departure', `Nos ha dejado ${c.name}, a los ${c.age} años. El pueblo le despide ${cemetery ? 'en el cementerio' : 'en la plaza'}. ${keeps}`, heir ? { ref: heir.id } : {});

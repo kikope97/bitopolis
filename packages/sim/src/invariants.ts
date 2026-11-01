@@ -1,6 +1,8 @@
 import { HOMES } from './balance.ts';
 import { totalInternalMoney } from './money.ts';
 import type { GameState } from './state.ts';
+import { streetErrors } from './streets.ts';
+import { tenderErrors } from './tenders.ts';
 
 /** Devuelve la lista de invariantes rotas (vacía si todo cuadra). */
 export function checkInvariants(state: GameState): string[] {
@@ -48,6 +50,8 @@ export function checkInvariants(state: GameState): string[] {
     if (c.homeId !== null && !buildingIds.has(c.homeId)) errors.push(`casa inexistente en ${c.id}`);
     if (c.jobId !== null && !buildingIds.has(c.jobId)) errors.push(`trabajo inexistente en ${c.id}`);
   }
+  // 2.2: licitaciones (oferta válida, ids del contrato) y calles (sobre carretera o plaza).
+  errors.push(...tenderErrors(state), ...streetErrors(state));
   return errors;
 }
 

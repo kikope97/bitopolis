@@ -21,7 +21,12 @@ export const Command = z.discriminatedUnion('type', [
   z.object({ type: z.literal('SetTaxes'), ibi: TaxLevel.optional(), tasas: TaxLevel.optional(), plusvalia: TaxLevel.optional() }),
   /** Casas municipales: en alquiler o a la venta. */
   z.object({ type: z.literal('SetHousingMode'), buildingId: z.number().int().min(1), mode: z.enum(['rent', 'sale']) }),
-  z.object({ type: z.literal('Build'), kind: BuildKind, x: Coord, y: Coord }),
+  /** 2.2: `offer` elige la licitación (obras grandes); sin ella, la local de siempre. */
+  z.object({ type: z.literal('Build'), kind: BuildKind, x: Coord, y: Coord, offer: z.enum(['local', 'fuera', 'primo']).optional() }),
+  /** 2.2: revisar el contrato de la obra del primo mientras hay rumor (lo anula pagando). */
+  z.object({ type: z.literal('ReviewContract'), buildingId: z.number().int().min(1) }),
+  /** 2.2: dedicar una calle o plaza a un vecino candidato del pleno (el nombre lo pone el motor). */
+  z.object({ type: z.literal('DedicateStreet'), citizenId: z.number().int().min(1), x: Coord, y: Coord }),
   /** Carretera en línea recta de (x,y) a (x2,y2): horizontal o vertical. */
   z.object({ type: z.literal('BuildRoad'), x: Coord, y: Coord, x2: Coord, y2: Coord }),
   z.object({ type: z.literal('Zone'), zone: ZoneKind, x: Coord, y: Coord, w: Size, h: Size }),
