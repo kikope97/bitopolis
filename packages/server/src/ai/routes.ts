@@ -365,7 +365,7 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
     // Ronda 20: si el estado guardado ya tiene este pleno, mandan sus datos (no los del cliente).
     const srv = st.pleno && st.pleno.tick === body.tick && st.pleno.speakers?.length ? (st.pleno as unknown as PlenoTalkInput) : null;
     const petitions = srv ? srv.petitions : body.petitions.filter((p) => st.citizens.some((c) => c.id === p.citizenId));
-    const speakers = (srv ? srv.speakers : body.speakers).filter((s, i, a) => a.findIndex((x) => x.id === s.id) === i && petitions.some((p) => p.id === s.petitionId) && st.citizens.some((c) => c.id === s.id && c.named));
+    const speakers = (srv?.speakers ?? body.speakers).filter((s, i, a) => a.findIndex((x) => x.id === s.id) === i && petitions.some((p) => p.id === s.petitionId) && st.citizens.some((c) => c.id === s.id && c.named));
     if (!speakers.length) return { lines: null, reason: 'nadie habla' };
     const pleno: PlenoTalkInput = { tick: body.tick, petitions, speakers };
     lastPleno.set(g.row.id, body.tick);
