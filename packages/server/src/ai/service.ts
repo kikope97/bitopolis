@@ -83,7 +83,8 @@ const TURN_TIMEOUT_MS = 30_000;
 const TURN_DEADLINE_MS = 40_000;
 /** Sin este margen, no se hace la segunda pregunta. */
 const TURN_RETRY_MIN_MS = 8_000;
-const TURN_OUT_PER_CITIZEN = 320;
+// Ronda 17: el modelo razona antes de responder y eso cuenta en el tope; con 320 se cortaban lotes enteros.
+const TURN_OUT_PER_CITIZEN = 600;
 /** Tokens de salida del director (sucesos, avisos, foco y crónica). */
 const DIRECTOR_OUT = 1400;
 
@@ -297,7 +298,7 @@ export class AiService {
       try {
         const provider = this.providerOverride ? this.providerOverride(s) : makeProvider(s.provider, s.key, s.baseUrl);
         const r = await provider.complete(
-          { system: req.system, shared: req.shared, user: req.user, schema: req.schema, model, maxTokens: 300 + ids.length * TURN_OUT_PER_CITIZEN },
+          { system: req.system, shared: req.shared, user: req.user, schema: req.schema, model, maxTokens: 1000 + ids.length * TURN_OUT_PER_CITIZEN },
           AbortSignal.timeout(timeLeft()),
         );
         if (r.truncated) status = 'truncated';

@@ -151,7 +151,7 @@ for (let seed = 1; seed <= Number(values.seeds); seed++) {
         else totals.retries++;
         try {
           const t0 = performance.now();
-          const r = await llm.complete({ system: req.system, shared: req.shared, user: req.user, schema: req.schema, model, maxTokens: 400 + ids.length * 320 });
+          const r = await llm.complete({ system: req.system, shared: req.shared, user: req.user, schema: req.schema, model, maxTokens: 1000 + ids.length * 600 });
           totals.latencyMs.push(performance.now() - t0);
           if (values.record) recordings.set(ReplayProvider.key({ system: req.system, shared: req.shared, user: req.user }), r);
           totals.tokensIn += r.usage.in || tokens(req.system + req.shared + req.user);
@@ -174,6 +174,11 @@ for (let seed = 1; seed <= Number(values.seeds); seed++) {
           acts.push(...parsed.acts);
           // Como el servidor: a los que se deja, una segunda pregunta.
           if (retry && parsed.missing.length && parsed.missing.length < ids.length) queue.push({ ids: parsed.missing, retry: false });
+          else if (retry && parsed.missing.length === ids.length && ids.length > 1) {
+            // Como el servidor: el lote entero falló (cortado): dos mitades.
+            const half = Math.ceil(ids.length / 2);
+            queue.push({ ids: ids.slice(0, half), retry: false }, { ids: ids.slice(half), retry: false });
+          }
         } catch (e) {
           totals.errors++;
           if (totals.errors <= 3) console.error('error de la IA:', (e as Error).message);
@@ -185,7 +190,7 @@ for (let seed = 1; seed <= Number(values.seeds); seed++) {
         const req = buildDirectorRequest(state, shared);
         dir.calls++;
         try {
-          const r = await llm.complete({ system: req.system, shared: req.shared, user: req.user, schema: req.schema, model: directorModel, maxTokens: 900 });
+          const r = await llm.complete({ system: req.system, shared: req.shared, user: req.user, schema: req.schema, model: directorModel, maxTokens: 1400 });
           if (values.record) recordings.set(ReplayProvider.key({ system: req.system, shared: req.shared, user: req.user }), r);
           dir.tokensIn += r.usage.in || tokens(req.system + req.shared + req.user);
           dir.tokensCached += r.usage.cachedIn;
