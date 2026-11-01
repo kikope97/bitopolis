@@ -12,7 +12,7 @@ import { newGameToken } from './tokens.ts';
  * - La vista solo busca por `view_token` y devuelve `viewSnapshot` (lista blanca del motor):
  *   sin estado interno, vecinos, IA, token de juego ni nada de `ai_config`.
  * - Crear o quitar el enlace exige el token de juego y la sesión que tiene la partida (como /save).
- * - Con la contraseña de acceso activa (auth.ts), /v/ y /api/view/ también la piden (no son públicas).
+ * - Con la contraseña de acceso activa (auth.ts), /v/ y /api/view/ no la piden: el token de vista ya es secreto (decisión del creador).
  */
 const TokenParams = z.object({ token: GameToken });
 const ViewParams = z.object({ viewToken: GameToken });

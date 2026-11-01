@@ -115,14 +115,17 @@ describe('compartir el pueblo (solo lectura)', () => {
     expect((await view("x' OR '1'='1")).statusCode).toBe(404);
   });
 
-  it('con la contraseña de acceso activa, la vista también la pide', async () => {
+  it('con la contraseña de acceso activa, la vista no la pide (su token ya es secreto) y el juego sí', async () => {
     const { token } = await create();
     const v = (await share(token)).json().viewToken as string;
     const hash = await hashPassword('amigos');
     await store.update((s) => ({ ...s, access: { enabled: true, hash } }));
     try {
-      expect((await view(v)).statusCode).toBe(401);
-      expect((await app.inject({ method: 'GET', url: `/v/${v}` })).statusCode).toBe(302);
+      expect((await view(v)).statusCode).toBe(200);
+      // Sin el cliente compilado en los tests da 404, pero nunca manda a iniciar sesión.
+      expect([200, 404]).toContain((await app.inject({ method: 'GET', url: `/v/${v}` })).statusCode);
+      expect((await app.inject({ method: 'GET', url: `/p/${token}` })).statusCode).toBe(302);
+      expect((await app.inject({ method: 'GET', url: `/api/games/${token}` })).statusCode).toBe(401);
     } finally {
       await store.update((s) => ({ ...s, access: { enabled: false, hash: '' } }));
     }

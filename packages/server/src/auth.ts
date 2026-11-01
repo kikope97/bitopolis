@@ -26,6 +26,9 @@ const PUBLIC = [
   // El panel tiene su propio inicio de sesión.
   /^\/admin(\.html)?\/?$/,
   /^\/api\/admin\//,
+  // 2.3 (decisión del creador): la vista compartida ya va con su token secreto; no pide contraseña.
+  /^\/v\/[A-Za-z0-9]{1,64}$/,
+  /^\/api\/view\/(:viewToken|[A-Za-z0-9]{1,64})$/,
 ];
 
 /** Ruta para decidir permisos: el patrón de la ruta resuelta o, si no hay, la ruta decodificada. */
