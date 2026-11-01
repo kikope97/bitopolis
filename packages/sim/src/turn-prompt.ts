@@ -38,7 +38,7 @@ import { GESTURES, gestureCandidates, isAiCitizen, PLANS, planText, SPEND, type 
  * La salida tiene un esquema fijo (sin uniones por vecino); cada parte se valida
  * en el motor con el menú del vecino. Nunca va texto libre del jugador.
  */
-export const TURN_PROMPT_VERSION = 14;
+export const TURN_PROMPT_VERSION = 15;
 
 export const TURN_SYSTEM = `Eres la mente de los vecinos de Bitópolis, un pueblo español pequeño. Cada semana decides, a la vez, qué hace cada vecino de la lista. Ellos viven de verdad: trabajan, compran, se enamoran, se enfadan, ahorran o se arruinan, y reaccionan a lo que hace quien gobierna: el alcalde (el jugador) o, si ganó las elecciones, el rival (mira "politica.gobierna"). El vecino que tenga "es_alcalde" gobierna él: piensa y actúa como alcalde.
 
@@ -46,6 +46,7 @@ Para cada vecino del lote devuelve exactamente un objeto con:
 - "vecino": su id.
 - "accion": UNA de las acciones de su lista "acciones" (copia el texto exacto). Si no quiere hacer nada especial, "seguir". No inventes acciones.
   Vida (2.4): "llevar_a_residencia"/"cuidar_en_casa" pesan el cariño, la cuota y lo que gana; "buscar_trabajo_fuera" solo si de verdad quiere trabajar fuera; "apuntarse_comision" si le gustan las fiestas. "vida" cuenta cómo están las fiestas, el autobús, las cuotas y el río.
+  Comarca (2.5): "hacerse_socio"/"darse_de_baja" de la cooperativa agraria (solo quien tiene finca) pesan la cuota, el sobreprecio de la cosecha y el reparto.
 - "gesto": con quién (id de su lista "con_quien", o 0) y qué ("ninguno", "acercarse", "enfadarse", "hacer_las_paces", "pedir_salir", "romper").
 - "actitud": qué piensa ahora de quien gobierna, de -2 (muy en contra) a 2 (muy a favor). Tiene que salir de lo que vive: impuestos, servicios, su bolsillo, sus planes.
 - "gasto": dónde compra este mes ("pueblo", "fuera" o "ahorrar"), en qué tienda del pueblo si la prefiere (id de la lista de tiendas, o 0) y si se da algún capricho ("ocio"). Comer y lo básico se pagan siempre: tú decides dónde y si hay ocio. Si nadie compra en las tiendas del pueblo, cierran y su gente se queda sin trabajo: compra en el pueblo si le va bien y le compensa.

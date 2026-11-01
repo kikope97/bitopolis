@@ -22,6 +22,7 @@ import { bigFactory, hireCandidates } from './region.ts';
 import { canJoinCommittee, joinCommittee, proposeProgram, seasonName } from './seasons.ts';
 import { careAction, careMenu } from './care.ts';
 import { searchJobOutside, transitMenu } from './transit.ts';
+import { coopAction, coopMenu } from './coop.ts';
 import { type Building, buildingAt, type Citizen, DESIRES, FEARS, type GameState, pushEvent, type Trigger } from './state.ts';
 
 /**
@@ -290,6 +291,8 @@ export function turnMenu(state: GameState, c: Citizen): MenuItem[] {
   // 2.4: cuidados de un padre o una madre mayor (plazas y cuota reales) y trabajo fuera en autobús.
   out.push(...careMenu(state, c));
   out.push(...transitMenu(state, c));
+  // 2.5: la cooperativa agraria (quien tiene finca).
+  out.push(...coopMenu(state, c));
   return out;
 }
 
@@ -424,6 +427,9 @@ export function extraAction(state: GameState, c: Citizen, verb: string, arg: str
       return careAction(state, c, verb, arg);
     case 'buscar_trabajo_fuera':
       return searchJobOutside(state, c);
+    case 'hacerse_socio':
+    case 'darse_de_baja':
+      return coopAction(state, c, verb);
     case 'robar': {
       if (!desperate(c)) return 'se lo piensa mejor y no roba';
       const targets = state.buildings.filter((b) => (b.kind === 'house' || b.kind === 'res') && b.built && b.id !== c.homeId);
