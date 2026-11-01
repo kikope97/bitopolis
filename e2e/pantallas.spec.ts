@@ -117,8 +117,9 @@ for (const d of DEVICES) {
         }));
         for (const r of rows) {
           if (r.sub) expect.soft(r.sub, 'el detalle ocupa casi toda la fila').toBeGreaterThan(r.w * 0.6);
-          // Como mucho unas cuatro líneas de texto (al 200 % la letra base es de 32 px).
-          expect.soft(r.h, 'fila compacta').toBeLessThanOrEqual(r.rem * 5.5);
+          // Como mucho unas cinco líneas de texto (al 200 % la letra base es de 32 px): una palabra por línea daba
+          // el doble o más; con detalles largos en el panel lateral de tableta puede ocupar una línea más.
+          expect.soft(r.h, 'fila compacta').toBeLessThanOrEqual(r.rem * 7);
         }
         const sheetOverflow = await page.locator('.sheet').evaluate((el) => el.scrollWidth - el.clientWidth);
         expect.soft(sheetOverflow, 'la hoja no se sale por el lado').toBeLessThanOrEqual(1);
