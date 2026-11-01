@@ -55,6 +55,21 @@ export function placeName(b: Building): string {
   return b.name ?? ARTICLE[b.kind] ?? (BUILD_NAMES[b.kind] ?? b.kind).toLowerCase();
 }
 
+/**
+ * Género y número del nombre de un sitio, por su artículo («unas viviendas» →
+ * fem. plural), para concordar «destrozadas» y «repararlas». Sin artículo, masculino singular.
+ */
+export function placeAgreement(name: string): { fem: boolean; plural: boolean } {
+  const w = name.split(' ')[0]!.toLowerCase();
+  return { fem: ['una', 'la', 'unas', 'las'].includes(w), plural: ['unos', 'los', 'unas', 'las'].includes(w) };
+}
+
+/** «destrozado», «destrozada», «destrozados» o «destrozadas» según el sitio. */
+export function destroyedWord(name: string): string {
+  const a = placeAgreement(name);
+  return `destrozad${a.fem ? 'a' : 'o'}${a.plural ? 's' : ''}`;
+}
+
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 const first = (c: Citizen) => c.name.split(' ')[0]!;
 
@@ -187,7 +202,10 @@ function putOut(state: GameState, b: Building): void {
   const cost = Math.max(FIRE.repairMin, Math.round((spec?.materials ?? 2_000) * FIRE.repair));
   b.damaged = { cost, repairUntil: -1, cause: 'fuego' };
   const home = b.kind === 'house' || b.kind === 'res';
-  pushEvent(state, 'fire', `El fuego deja ${placeName(b)} destrozado tras ${hours} horas${home && people.length ? `: ${people.length === 1 ? 'una familia se queda' : `${people.length} vecinos se quedan`} sin casa` : ''}. Repararlo cuesta ${cost} €`, { ref: b.id, notify: true });
+  const where = placeName(b);
+  const ag = placeAgreement(where);
+  const it = `l${ag.fem ? 'a' : 'o'}${ag.plural ? 's' : ''}`;
+  pushEvent(state, 'fire', `El fuego deja ${where} ${destroyedWord(where)} tras ${hours} horas${home && people.length ? `: ${people.length === 1 ? 'una familia se queda' : `${people.length} vecinos se quedan`} sin casa` : ''}. Reparar${it} cuesta ${cost} €`, { ref: b.id, notify: true });
   // Modo normal (y vecinos sin IA): los vecinos generosos de cerca echan una mano a quien se ha quedado sin casa.
   if (home) helpVictims(state, b, people);
 }

@@ -9,6 +9,8 @@ import {
   parsePleno,
   PLENO_TALK,
   plenoLines,
+  plenoPlan,
+  plenoRuleLine,
   plenoReactionMenu,
   runSimulation,
   TREASURY,
@@ -138,5 +140,32 @@ describe('plenos hablados (2.4)', () => {
     // Sin respuesta de la IA: al cerrar el pleno, reglas.
     closePleno(s);
     expect(sp.reaction).toBeTruthy();
+  }, 120_000);
+});
+
+describe('pleno: vista previa y plantilla de la oposición', () => {
+  it('«Hoy pedirían» es justo lo que trae el pleno al convocarlo', () => {
+    const s = town();
+    const plan = plenoPlan(s);
+    expect(plan.length).toBeGreaterThan(0);
+    expect(applyCommand(s, { type: 'ConvenePleno' }).ok).toBe(true);
+    expect(s.pleno!.petitions.map((p) => ({ citizenId: p.citizenId, need: p.need, ...(p.opposition ? { opposition: true } : {}) }))).toEqual(plan);
+  }, 120_000);
+
+  it('la oposición habla en primera persona y sin comillas anidadas', () => {
+    const s = town();
+    const leader = s.citizens.find((c) => c.named)!;
+    s.politics.party = { leaderId: leader.id, leaderName: leader.name, name: 'Jóvenes por Bitópolis', faction: 'jovenes', founded: s.tick, promises: [], style: 'populista' };
+    s.politics.mayor = 'player';
+    const plan = plenoPlan(s);
+    expect(plan.some((p) => p.opposition)).toBe(true);
+    expect(applyCommand(s, { type: 'ConvenePleno' }).ok).toBe(true);
+    const opp = s.pleno!.petitions.find((p) => p.opposition)!;
+    for (let t = 0; t < 6; t++) {
+      const line = plenoRuleLine(s, { ...s.pleno!, tick: s.pleno!.tick + t }, { id: leader.id, role: 'oposicion', postura: 'matiz', petitionId: opp.id });
+      expect(line).not.toContain('«');
+      expect(line).not.toContain(' pregunta al alcalde');
+      expect(line).toMatch(/preguntamos|queremos/);
+    }
   }, 120_000);
 });

@@ -54,6 +54,7 @@ import {
   seasonOf,
   WEATHER_TEXT,
   happinessFactors,
+  worriesOf,
   missingServices,
   NEED_LABEL,
   occupants,
@@ -2184,7 +2185,7 @@ export function startGame(opts: GameOptions): void {
     const list = all.filter((c) => c.named);
     const others = all.length - list.length;
     for (const c of list) {
-      const worry = happinessFactors(state, c).filter((f) => f.value < 0).sort((x, y) => x.value - y.value)[0];
+      const worry = worriesOf(state, c)[0];
       const moodText = c.happiness >= 65 ? 'contento' : c.happiness >= 40 ? 'regular' : 'descontento';
       const last = [...state.decisionLog].reverse().find((d) => d.citizenId === c.id);
       const btn = h(
@@ -2390,8 +2391,8 @@ export function startGame(opts: GameOptions): void {
     const list = h('ul', { class: 'accounts' }, ...rows.map((r) => h('li', { class: r.v < 0 ? 'neg' : 'pos' }, h('span', {}, r.label), h('span', {}, `${r.v > 0 ? '+' : ''}${Math.round(r.v)}`))));
     const sadList = h('ul', { class: 'people' });
     for (const c of sad) {
-      const worry = happinessFactors(state, c).filter((f) => f.value < 0).sort((x, y) => x.value - y.value)[0];
-      const btn = h('button', { class: 'person-row' }, portraitCanvas(c.id, 2, 'mini-portrait'), h('span', {}, h('span', { class: 'p-name' }, c.name), h('span', { class: 'p-sub' }, worry ? `le preocupa ${worry.label.toLowerCase()}` : 'sin quejas concretas')), h('span', { class: `p-mood ${c.happiness < 40 ? 'bad' : ''}` }, String(Math.round(c.happiness))));
+      const worry = worriesOf(state, c)[0];
+      const btn = h('button', { class: 'person-row' }, portraitCanvas(c.id, 2, 'mini-portrait'), h('span', {}, h('span', { class: 'p-name' }, c.name), h('span', { class: 'p-sub' }, worry ? `le preocupa ${lowerFirst(worry.label)}` : 'sin quejas concretas')), h('span', { class: `p-mood ${c.happiness < 40 ? 'bad' : ''}` }, String(Math.round(c.happiness))));
       btn.addEventListener('click', () => withBack('Felicidad', () => withBack('Pueblo', openHub, openHappiness), () => openCitizen(social, c.id)));
       sadList.append(h('li', {}, btn));
     }

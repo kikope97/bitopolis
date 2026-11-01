@@ -12,7 +12,7 @@ import {
   politicsActive,
   goalDone,
   type GameState,
-  happinessFactors,
+  worriesOf,
   HOOK_TEXT,
   hookFor,
   memoryText,
@@ -26,7 +26,7 @@ import {
   QUESTIONS,
   ruleAdvice,
   ruleAnswer,
-  topNeeds,
+  plenoPlan,
   plenoUnlocked,
   STREETS,
   streetCandidates,
@@ -81,9 +81,7 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
       h('li', {}, h('span', {}, TRAIT_TEXT[k] ?? k), h('progress', { max: '100', value: String(v), 'aria-label': `${TRAIT_TEXT[k]}: ${v} de 100` })),
     ),
   );
-  const worries = happinessFactors(state, c)
-    .filter((f) => f.value < 0)
-    .map((f) => f.label);
+  const worries = worriesOf(state, c).map((f) => f.label);
   const answer = h('p', { class: 'answer', 'aria-live': 'polite' });
   const ask = h('div', { class: 'ask' });
   for (const q of QUESTIONS) {
@@ -107,7 +105,12 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
     });
     ask.append(b);
   }
-  const last = [...state.decisionLog].reverse().filter((d) => d.citizenId === c.id).slice(0, 3);
+  // Sin repetir: la misma frase dicha varias veces sale una sola vez.
+  const last = [...state.decisionLog]
+    .reverse()
+    .filter((d) => d.citizenId === c.id)
+    .filter((d, i, all) => all.findIndex((x) => x.motivo === d.motivo) === i)
+    .slice(0, 3);
   const hook = hookFor(state, c.id);
   // Retrato pixel art (12×18) ampliado ×4.
   const face = portraitCanvas(c.id, 4);
@@ -218,7 +221,8 @@ export function openPleno(ctx: SocialCtx): void {
         reopen();
       }
     });
-    const needs = topNeeds(state).slice(0, 3);
+    // Lo mismo que traerá el pleno al convocarlo (mismo cálculo del motor).
+    const needs = plenoPlan(state).map((p) => `${NEED_TEXT[p.need]}${p.opposition ? ' (la oposición)' : ''}`);
     sheet(
       'Pleno municipal',
       h('p', {}, 'Los vecinos exponen sus peticiones y se vota. Lo que prometas queda registrado: si no lo cumples a tiempo, quien lo apoyó no lo olvidará.'),
