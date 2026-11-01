@@ -10,13 +10,14 @@ import { chance } from './prng.ts';
 import { type Building, type Citizen, type GameState, pushEvent } from './state.ts';
 import { ruralShare, touristified } from './tourism.ts';
 import { CRIME, TOURISM, TRASH } from './balance.ts';
+import { waterGrievances } from './waterworks.ts';
 
 /**
  * v1.7: asociaciones vecinales y protestas. Cuando varios vecinos con nombre
  * comparten la misma queja, se organizan, piden una cosa concreta y, si nadie
  * les hace caso, se manifiestan ante el ayuntamiento. Todo determinista.
  */
-export type Cause = NeedKey | 'ruido' | 'contaminacion' | 'inseguridad' | 'impuestos' | 'vivienda';
+export type Cause = NeedKey | 'ruido' | 'contaminacion' | 'inseguridad' | 'impuestos' | 'vivienda' | 'rio' | 'ruido_molinos';
 // Sin depender de otros módulos al cargar (hay importaciones circulares entre decisiones y asociaciones).
 export const CAUSE_TEXT: Record<Cause, string> = {
   agua: 'agua',
@@ -32,6 +33,8 @@ export const CAUSE_TEXT: Record<Cause, string> = {
   impuestos: 'impuestos más bajos',
   basuras: 'recogida de basura',
   vivienda: 'alquileres asequibles',
+  rio: 'un río limpio',
+  ruido_molinos: 'menos ruido de los molinos',
 };
 /** Qué piden (una frase) y cómo se llaman. */
 export const CAUSE_ASK: Record<Cause, string> = {
@@ -48,6 +51,8 @@ export const CAUSE_ASK: Record<Cause, string> = {
   impuestos: 'que bajen los impuestos',
   basuras: 'que pase el camión de la basura por sus calles',
   vivienda: 'que no suban más los alquileres por las casas rurales',
+  rio: 'una depuradora que limpie el río',
+  ruido_molinos: 'que alejen los molinos de sus casas',
 };
 
 export interface Association {
@@ -86,6 +91,8 @@ export const LEMA: Record<Cause, string> = {
   impuestos: '¡No más impuestos!',
   basuras: '¡Fuera las ratas!',
   vivienda: '¡Casas para vivir, no para turistas!',
+  rio: '¡Salvemos el río!',
+  ruido_molinos: '¡Queremos dormir sin molinos!',
 };
 
 /** Centro de las casas de unos vecinos (el barrio de la asociación). */
@@ -120,6 +127,8 @@ export function grievanceOf(state: GameState, c: Citizen, ctx = coverageCtx(stat
   if (lv.ibi === 'high' && lv.tasas === 'high') scored.push(['impuestos', 4 + c.grudge]);
   // 2.3: con demasiadas casas rurales, el alquiler privado sube (inquilinos de viviendas privadas).
   if (!c.owns && home.kind === 'res' && touristified(state)) scored.push(['vivienda', 4 + (ruralShare(state) - TOURISM.touristified.share) * 40]);
+  // 2.4: el río sucio en la orilla y los molinos junto a los jubilados.
+  scored.push(...waterGrievances(state, c, home));
   if (!scored.length) return null;
   scored.sort((a, b) => b[1] - a[1]);
   return scored[0]![0];
@@ -195,6 +204,8 @@ export function foundAssociation(state: GameState, cause: Cause, cs: Citizen[]):
   // El barrio es el de la casa del líder (la media de todas las casas caía siempre en el centro).
   const at = centerOf(state, [leader.id]);
   let name = `Asociación Vecinal ${barrioOf(state, at.x, at.y)}`;
+  // 2.4: la del río tiene nombre propio.
+  if (cause === 'rio') name = 'Asociación Salvemos el Río';
   if (state.associations.some((x) => x.name === name)) name = `${name} por ${CAUSE_TEXT[cause]}`;
   const a: Association = {
     id: state.nextId++,
