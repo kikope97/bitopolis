@@ -101,6 +101,13 @@ createServer((req, res) => {
       res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ intervenciones }) } }], usage: { prompt_tokens: 1500, completion_tokens: 200 } }));
       return;
     }
+    // 2.5: carta de alguien que se fue (solo con los nombres de los datos).
+    if (parsed.escribe && parsed.para) {
+      const texto = `Hola, ${parsed.para.nombre.split(' ')[0]}: te escribo desde lejos con mucho cariño. Dale recuerdos a todos. Un abrazo, ${parsed.escribe.nombre.split(' ')[0]}.`;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ texto }) } }], usage: { prompt_tokens: 600, completion_tokens: 80 } }));
+      return;
+    }
     const isText = !Array.isArray(parsed.vecinos);
     if (isText) {
       const texto = 'Pues aquí andamos, alcalde, con ganas de que el pueblo siga creciendo.';
