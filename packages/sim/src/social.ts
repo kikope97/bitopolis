@@ -109,6 +109,9 @@ export const MEMORY_KINDS = [
   'temporada',
   'buena_cosecha',
   'granizo',
+  // 2.3: grandes obras.
+  'dono_obra',
+  'obra_voluntario',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -377,6 +380,10 @@ export function memoryText(state: GameState, m: Memory): string {
       return 'Celebró una buena cosecha en el pueblo';
     case 'granizo':
       return 'El granizo arruinó parte de la cosecha';
+    case 'dono_obra':
+      return 'Donó dinero para una gran obra del pueblo';
+    case 'obra_voluntario':
+      return 'Echó una mano como voluntario en una gran obra';
   }
 }
 

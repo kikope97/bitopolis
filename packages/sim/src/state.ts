@@ -556,6 +556,9 @@ export interface Landmark {
   paused?: boolean;
   /** Rebaja de la fase siguiente (voluntarios, 0–1). */
   discount?: number;
+  /** 2.3 (director): fase en la que ya ayudaron los voluntarios y en la que ya hubo polémica (una vez por fase). */
+  helped?: number;
+  polemic?: number;
 }
 
 /** 2.3: turismo (tourism.ts). `tax` en € por noche; `protectedId`: patrimonio con entorno protegido. */
