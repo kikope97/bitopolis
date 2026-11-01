@@ -38,8 +38,13 @@ describe('viewSnapshot (2.3, compartir)', () => {
   });
 
   it('nunca lleva estado interno, vecinos, deudas ni dinero', () => {
-    const keys = allKeys(v);
+    // La historia y los récords del pueblo (caja del ayuntamiento incluida) sí se enseñan: el resto, no.
+    const rest: Record<string, unknown> = { ...v };
+    delete rest.history;
+    delete rest.records;
+    const keys = allKeys(rest);
     for (const k of FORBIDDEN) expect(keys.has(k), k).toBe(false);
+    expect(allKeys(v.history).has('citizens')).toBe(false);
     expect(JSON.stringify(v)).not.toContain('"seed"');
   });
 
