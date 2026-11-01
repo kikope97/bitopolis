@@ -1,7 +1,7 @@
 import { loansMonth } from './loans.ts';
-import { landmarksDay, landmarksMonth } from './landmarks.ts';
+import { fairMonth, isLandmarkKind, landmarkMood, landmarksDay, landmarksMonth, stationCommuterBonus, stationDemandR } from './landmarks.ts';
 import { tourismMonth } from './tourism.ts';
-import { regionMonth } from './region.ts';
+import { regionFx, regionMonth, regionMood } from './region.ts';
 import { scenariosMonth } from './scenarios.ts';
 import { achievementsMonth, historyMonth } from './achievements.ts';
 import { errandsDay } from './errands.ts';
@@ -233,10 +233,11 @@ export function computeDemand(state: GameState): GameState['demand'] {
   const happy = averageHappiness(state);
   const clamp = (v: number) => Math.round(Math.max(-100, Math.min(100, v)));
   const zones = zonesUnlocked(state);
-  const R = 40 + vacancies(state) * 5 - Math.max(0, free - 8) * 1.5 + (happy - 55) + averageTaxMood(state) - (zones ? jobless * 2 : 0);
+  // 2.3: la estación da ganas de vivir aquí; la comarca mueve la demanda industrial.
+  const R = stationDemandR(state) + 40 + vacancies(state) * 5 - Math.max(0, free - 8) * 1.5 + (happy - 55) + averageTaxMood(state) - (zones ? jobless * 2 : 0);
   // v1.9: con sueldo mínimo alto, las empresas suben precios y hay algo menos de demanda comercial.
   const C = !zones ? 0 : (pop / 12 - shops) * 25 - MIN_WAGE_STEP[state.minWage ?? 'none'] * MIN_WAGE_FX.demandC;
-  const I = !zones ? 0 : jobless * 6 - factories * 10 + 20;
+  const I = !zones ? 0 : jobless * 6 - factories * 10 + 20 + regionFx(state).demandI;
   return { R: clamp(R), C: clamp(C), I: clamp(I) };
 }
 
@@ -323,6 +324,8 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
   if (c.volunteer) f.push({ label: 'Voluntario de protección civil', value: CIVIL.volunteerMood });
   // v1.8: el Palacio Municipal (nivel 5) es motivo de orgullo.
   if (townLevel(state) >= 5) f.push({ label: 'Orgullo de su ayuntamiento', value: 2 });
+  // 2.3: grandes obras (estadio, catedral) y la fábrica de la gran empresa.
+  f.push(...landmarkMood(state, home), ...regionMood(state, c, home));
   // v1.7: el calor sin sombra cerca.
   const heat = weatherMood(state, home);
   if (heat) f.push(heat);
@@ -361,16 +364,18 @@ function progressProjects(state: GameState): void {
     state.projects = state.projects.filter((x) => x !== p);
     if (!b) continue;
     b.built = true;
-    pushEvent(state, 'built', `Terminada la obra: ${BUILD_NAMES[b.kind]}`, { ref: b.id, notify: p.notify });
+    // 2.3: las fases de las grandes obras las anuncia landmarksDay.
+    if (!isLandmarkKind(b.kind)) pushEvent(state, 'built', `Terminada la obra: ${BUILD_NAMES[b.kind]}`, { ref: b.id, notify: p.notify });
     onBuildingDone(state, b);
     if (p.offer) tenderDone(state, b);
   }
   // 2.2: rumores y escándalos de las licitaciones.
   tenderDay(state);
-  // Quien trabajó hoy en una obra no cobra como commuter.
+  // Quien trabajó hoy en una obra no cobra como commuter. 2.3: con estación, el viaje sale más barato.
+  const commute = COMMUTER_DAILY + stationCommuterBonus(state);
   for (const c of state.citizens) {
     // v1.9: quien está en paro no cobra (cobra la prestación al mes).
-    if (c.jobId === null && c.unemployedSince === undefined && !busy.has(c.id)) transfer(state, OUTSIDE, c.id, COMMUTER_DAILY, 'commuter');
+    if (c.jobId === null && c.unemployedSince === undefined && !busy.has(c.id)) transfer(state, OUTSIDE, c.id, commute, 'commuter');
   }
 }
 
@@ -636,7 +641,8 @@ function businessPayroll(state: GameState, r: ReturnType<typeof monthRates>): vo
     const workers = state.citizens.filter((c) => c.jobId === b.id);
     if (b.kind === 'factory' && !b.damaged) {
       // Ronda 15: las fábricas repercuten la mitad de la subida del sueldo en sus precios.
-      const rev = workers.length * (FACTORY_REVENUE_PER_WORKER + Math.round(0.5 * (wage - MIN_WAGE.none)));
+      // 2.3: la comarca (bonanza o crisis) mueve lo que venden.
+      const rev = Math.round(workers.length * (FACTORY_REVENUE_PER_WORKER + Math.round(0.5 * (wage - MIN_WAGE.none))) * regionFx(state).factoryRevenue);
       transfer(state, OUTSIDE, b.id, rev);
       b.sales = (b.sales ?? 0) + rev;
     }
@@ -693,7 +699,8 @@ function endOfMonth(state: GameState): void {
   // Nóminas municipales (los sueldos no pagan impuesto municipal).
   for (const c of state.citizens) {
     const job = c.jobId !== null ? state.buildings.find((b) => b.id === c.jobId) : undefined;
-    if (job && !isBusiness(job)) transfer(state, TREASURY, c.id, Math.round((SERVICE[job.kind] ? SERVICE_SALARY : PUBLIC_SALARY) * budgetFx(state).salaries), 'sueldos');
+    // 2.3: a la plantilla de la gran empresa le paga la empresa (region.ts).
+    if (job && !isBusiness(job) && job.kind !== 'bigfactory') transfer(state, TREASURY, c.id, Math.round((SERVICE[job.kind] ? SERVICE_SALARY : PUBLIC_SALARY) * budgetFx(state).salaries), 'sueldos');
   }
   // v1.9: todos los sueldos primero; luego cada vecino paga lo básico, la vivienda y los
   // tributos (lo que no pueda, como deuda), devuelve deudas y, si le sobra, ocio.
@@ -706,6 +713,8 @@ function endOfMonth(state: GameState): void {
   basicLiving(state, shops);
   monthlyHousing(state, r);
   settleMonth(state, shops);
+  // 2.3: en septiembre, la feria regional trae compradores de fuera.
+  fairMonth(state, shops);
   housingTroubles(state);
   payBusinesses(state);
   // 2.3: visitantes, casas rurales y tasa turística.

@@ -1,4 +1,5 @@
 import { TICKS_PER_DAY, tickToDate } from '@bitopolis/shared';
+import { bridgeFloodFx } from './landmarks.ts';
 import { BUILD, WEATHER } from './balance.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance, nextInt, type RngState } from './prng.ts';
@@ -110,13 +111,15 @@ export function riverBuildings(state: GameState): GameState['buildings'] {
 
 /** La tormenta puede desbordar el río: los edificios de la orilla se anegan y el ayuntamiento repara. */
 export function flood(state: GameState): void {
-  const near = riverBuildings(state).filter((b) => b.built);
+  // 2.3: el puente de piedra no se anega, y terminado deja las riadas a la mitad en la orilla.
+  const near = riverBuildings(state).filter((b) => b.built && b.kind !== 'bridge');
+  const bridge = bridgeFloodFx(state);
   if (!near.length) return;
   // 2.1: los diques y la protección civil frenan la riada (se tira el mismo dado para todos).
   const hit: GameState['buildings'] = [];
   let avoided = 0;
   for (const b of near) {
-    if (!chance(state.rng, WEATHER.floodChance)) continue;
+    if (!chance(state.rng, WEATHER.floodChance * bridge)) continue;
     // El dado ya salió: lo que lo evita es la protección (determinista con el mismo dado del motor).
     if (floodChanceAt(state, b, 1) < 1 && !chance(state.rng, floodChanceAt(state, b, 1))) avoided++;
     else hit.push(b);

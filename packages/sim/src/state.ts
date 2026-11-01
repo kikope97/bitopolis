@@ -524,6 +524,8 @@ export interface Grant {
   landmark?: number;
   /** 2.3: fondos europeos (FEDER) en tiempo de crisis comarcal. */
   feder?: boolean;
+  /** 2.3: a qué va el FEDER: las fases de la estación (`kind: 'station'`) o las reparaciones. */
+  federFor?: 'station' | 'repair';
 }
 
 /**
@@ -545,6 +547,8 @@ export interface Landmark {
   grantId?: number;
   /** Parada por el alcalde entre fases. */
   paused?: boolean;
+  /** Rebaja de la fase siguiente (voluntarios, 0–1). */
+  discount?: number;
 }
 
 /** 2.3: turismo (tourism.ts). `tax` en € por noche; `protectedId`: patrimonio con entorno protegido. */

@@ -15,7 +15,7 @@ import { applyTownTurn, canApplyTurn, mayorText, noteMayor, setAiShare } from '.
 import { canMicrocredit, canSettleDebt, grantMicrocredit, settleDebt } from './household.ts';
 import { serviceCounts } from './economy.ts';
 import { BUILD_LEVEL, canUpgradeTownhall, plenoUnlocked, townLevel, upgradeTownhall, zonesUnlocked } from './townhall.ts';
-import { answerGrant, canAnswerGrant, canHoldFestival, canProposeBudget, holdFestival, materialsCost, proposeBudget } from './civic.ts';
+import { answerGrant, canAnswerGrant, canHoldFestival, canProposeBudget, federRepair, holdFestival, materialsCost, proposeBudget } from './civic.ts';
 import { Command, TICKS_PER_DAY, tickToDate, type BuildKind, type ZoneKind } from '@bitopolis/shared';
 import { ASSOCIATIONS, BUILD, CIVIL, STREETS, DEBT_LIMIT, FIRE, MICROCREDIT, MIN_WAGE, MIN_WAGE_FX, MIN_WAGE_STEP, TERRAIN, WAGE_OUTSIDE, ZONE_COST_PER_TILE } from './balance.ts';
 import { isWater, Terrain } from './terrain.ts';
@@ -64,6 +64,13 @@ export const BUILD_NAMES: Record<string, string> = {
   shop: 'Tienda',
   factory: 'Taller',
   farm: 'Finca',
+  // 2.3: grandes obras y la gran empresa.
+  bridge: 'Puente de piedra',
+  station: 'Estación de tren',
+  fair: 'Feria regional',
+  stadium: 'Estadio',
+  cathedral: 'Catedral',
+  bigfactory: 'Fábrica',
 };
 
 const ZONE_VALUE: Record<ZoneKind, number> = { none: Zone.None, R: Zone.R, C: Zone.C, I: Zone.I, A: Zone.A };
@@ -548,6 +555,8 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       const fire = b.damaged!.cause === 'fuego';
       const days = fire ? FIRE.repairDays : ASSOCIATIONS.repairDays;
       transfer(state, TREASURY, OUTSIDE, b.damaged!.cost, fire ? 'reparaciones (incendio)' : 'reparaciones (disturbios)');
+      // 2.3: en crisis, el FEDER puede pagar parte.
+      federRepair(state, b.damaged!.cost);
       b.damaged!.repairUntil = state.tick + days * TICKS_PER_DAY;
       pushEvent(state, 'info', `Empieza la reparación de ${b.name ?? BUILD_NAMES[b.kind]?.toLowerCase()}: abrirá en ${days} días`, { ref: b.id });
       break;

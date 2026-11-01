@@ -1,4 +1,5 @@
 import { TICKS_PER_MONTH, type TaxLevel } from '@bitopolis/shared';
+import { regionFx } from './region.ts';
 import {
   TAX_RELIEF_DAYS,
   BUSINESS_CASH_CAP,
@@ -186,7 +187,8 @@ export function unitValue(state: GameState, b: Building): number {
   const base = PROPERTY_VALUE[b.kind] ?? 0;
   const land = state.fields.land[tileIndex(state, b.x, b.y)] ?? 50;
   const demand = 1 + Math.max(0, Math.min(100, state.demand.R)) / 300;
-  return Math.round((base * (0.6 + (land / 100) * 0.9) * demand) / 10) * 10;
+  // 2.3: la comarca (bonanza ×1,1, crisis ×0,9).
+  return Math.round((base * (0.6 + (land / 100) * 0.9) * demand * regionFx(state).propertyValue) / 10) * 10;
 }
 
 export function salePrice(state: GameState, b: Building): number {

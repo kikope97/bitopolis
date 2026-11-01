@@ -27,7 +27,10 @@ describe('metas grandes (2.3): estado y comandos', () => {
   });
   it('los comandos nuevos están bien formados pero aún no están disponibles', () => {
     const s = createInitialState({ seed: 9 });
-    for (const cmd of NEW_COMMANDS) expect(applyCommand(s, cmd)).toEqual({ ok: false, error: 'Aún no está disponible' });
+    // 2.3 F1: las grandes obras y la gran empresa ya están (landmarks.test.ts, region.test.ts).
+    const mine = ['StartLandmark', 'FundLandmarkPhase', 'PauseLandmark', 'AnswerBigCompany'];
+    for (const cmd of NEW_COMMANDS.filter((c) => !mine.includes(c.type))) expect(applyCommand(s, cmd)).toEqual({ ok: false, error: 'Aún no está disponible' });
+    for (const cmd of NEW_COMMANDS.filter((c) => mine.includes(c.type))) expect(applyCommand(s, cmd).ok).toBe(false);
     expect(validateCommand(s, { type: 'SetTouristTax', level: 3 })).toEqual({ ok: false, error: 'comando mal formado' });
     expect(validateCommand(s, { type: 'StartLandmark', kind: 'castillo', x: 1, y: 1 })).toEqual({ ok: false, error: 'comando mal formado' });
     expect(validateCommand(s, { type: 'AnswerBigCompany', accept: true, incentive: 'regalo' })).toEqual({ ok: false, error: 'comando mal formado' });
