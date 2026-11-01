@@ -19,8 +19,15 @@ export interface SaveBatch {
   hash: string;
 }
 
+/** Lo que el worker ha aplicado y aún no ha salido en un lote (desde `from` hasta `state.tick`). */
+export interface Unsaved {
+  from: number;
+  commands: TimedCommand[];
+}
+
 export type FromWorker =
-  | { type: 'state'; state: GameState }
+  /** `unsaved` va con cada estado: si la página se cierra, el hilo principal monta con él el último lote. */
+  | { type: 'state'; state: GameState; unsaved: Unsaved }
   | { type: 'result'; id: number; ok: boolean; error?: string }
   | { type: 'save'; batch: SaveBatch; flush: boolean }
   /** 2.0: el reloj espera a la IA (turno `n`). */
@@ -39,11 +46,17 @@ const released = new Set<number>();
 let waiting: number | null = null;
 
 const post = (m: FromWorker) => postMessage(m);
+const postState = () => state && post({ type: 'state', state, unsaved: { from: batchFrom, commands: pending } });
 
-function emitSave(flush: boolean) {
+/**
+ * Emite un lote con lo que haya desde el último. Solo el del cierre del día va `live` (el servidor
+ * pide entonces a la IA); `force` (latido, al ocultarse) lo emite aunque esté vacío (renueva la
+ * sesión). Sin `force`, solo si hay ticks u órdenes nuevas.
+ */
+function emitSave(live: boolean, force = false) {
   if (!state) return;
-  if (!flush && state.tick === batchFrom) return;
-  post({ type: 'save', flush, batch: { fromTick: batchFrom, toTick: state.tick, commands: pending, hash: hashState(state) } });
+  if (!force && state.tick === batchFrom && pending.length === 0) return;
+  post({ type: 'save', flush: !live, batch: { fromTick: batchFrom, toTick: state.tick, commands: pending, hash: hashState(state) } });
   pending = [];
   batchFrom = state.tick;
 }
@@ -74,11 +87,11 @@ function loop() {
       acc -= 1;
       dirty = true;
       // Guardado al cerrar cada día de juego.
-      if (state.tick % TICKS_PER_DAY === 0) emitSave(false);
+      if (state.tick % TICKS_PER_DAY === 0) emitSave(true);
     }
   }
   if (state && dirty && now - lastPost > 150) {
-    post({ type: 'state', state });
+    postState();
     dirty = false;
     lastPost = now;
   }
@@ -92,10 +105,12 @@ onmessage = (e: MessageEvent<ToWorker>) => {
     pending = [];
     batchFrom = state.tick;
     acc = 0;
-    post({ type: 'state', state });
+    postState();
   } else if (m.type === 'speed') {
     speed = m.speed;
     last = performance.now();
+    // Al pausar se guarda lo jugado del día (si no, al recargar el reloj volvía al último cierre de día).
+    if (speed === 0) emitSave(false);
   } else if (m.type === 'command' && state) {
     const r = applyCommand(state, m.cmd);
     if (r.ok) {
@@ -107,11 +122,14 @@ onmessage = (e: MessageEvent<ToWorker>) => {
       waiting = null;
       post({ type: 'thinking', n: null });
     }
-    // Primero el estado: quien espera el resultado ya ve el cambio aplicado.
-    post({ type: 'state', state });
+    // Cada orden del jugador sale en un lote en el acto (en pausa no se cierra ningún día, y en marcha
+    // podía pasar un día entero sin guardar). El servidor reproduce un lote con fromTick == toTick.
+    if (r.ok) emitSave(false);
+    // Luego el estado: quien espera el resultado ya ve el cambio aplicado.
+    postState();
     post({ type: 'result', id: m.id, ok: r.ok, error: r.ok ? undefined : r.error });
   } else if (m.type === 'flush') {
-    emitSave(true);
+    emitSave(false, true);
   } else if (m.type === 'release') {
     released.add(m.n);
     if (released.size > 50) released.delete(released.values().next().value!);
