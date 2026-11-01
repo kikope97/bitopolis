@@ -2,6 +2,7 @@ import { TICKS_PER_MONTH } from '@bitopolis/shared';
 import { describe, expect, it } from 'vitest';
 import {
   ACHIEVEMENT_GROUPS,
+  ACHIEVEMENTS,
   ACHIEVEMENT_LIST,
   achievementsMonth,
   checkInvariants,
@@ -14,6 +15,7 @@ import {
   historyMonth,
   migrate,
   newRecordLine,
+  reelections,
   replay,
   runSimulation,
 } from '../src/index.ts';
@@ -105,7 +107,7 @@ describe('medallas', () => {
     achievementsMonth(s);
     expect(s.medalTrack!.budget!.streak).toBe(0);
 
-    s.stats.push({ month: 1, population: 10, treasury: 0, happiness: 50, income: 0, expenses: 0, breakdown: {}, businesses: 4 });
+    s.stats.push({ month: 1, population: 10, treasury: 0, happiness: 50, income: 0, expenses: 0, breakdown: {}, businesses: ACHIEVEMENTS.crisisMinBusinesses + 1 });
     s.region = { phase: 'crisis', until: 0, warned: false };
     s.month.closures = 1;
     achievementsMonth(s);
@@ -141,6 +143,21 @@ describe('medallas', () => {
     expect(debtFreeMonths(s)).toBe(2);
     s.loans = [{ id: 1 } as GameState['loans'][number]];
     expect(debtFreeMonths(s)).toBe(0);
+  });
+
+  it('la caja de 100.000 € no cuenta lo prestado y solo cuentan las elecciones con rival (F3)', () => {
+    const s = createInitialState({ seed: 7 });
+    s.treasury = ACHIEVEMENTS.treasury + 10_000;
+    s.loans = [{ id: 1, principal: 20_000, left: 20_000, quota: 900, rate: 0.005, monthsLeft: 24, kind: 'banco', tick: 0 }];
+    const caja = ACHIEVEMENT_LIST.find((a) => a.id === 'caja_100k')!;
+    expect(caja.check(s)).toBe(false);
+    s.loans = [];
+    expect(caja.check(s)).toBe(true);
+    const won = (unopposed: boolean) => ({ tick: 0, player: 10, rival: unopposed ? 0 : 4, abstention: 0, winner: 'player' as const, rivalName: null, unopposed });
+    s.politics.history = Array.from({ length: ACHIEVEMENTS.reelected }, () => won(true));
+    expect(reelections(s)).toBe(0);
+    s.politics.history = Array.from({ length: ACHIEVEMENTS.reelected }, () => won(false));
+    expect(reelections(s)).toBe(ACHIEVEMENTS.reelected);
   });
 
   it('generaciones: hijo, padres y abuelos (aunque ya no estén)', () => {
