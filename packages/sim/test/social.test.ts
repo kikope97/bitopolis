@@ -14,7 +14,6 @@ import {
   migrate,
   narrativeSummary,
   joinNames,
-  lowerFirst,
   professionOf,
   workplaceText,
   OBJECTIVES,

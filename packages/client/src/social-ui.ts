@@ -215,7 +215,7 @@ export function openPleno(ctx: SocialCtx): void {
     go.addEventListener('click', async () => {
       if (locked) return;
       // Cuesta dinero: se confirma (ronda 10).
-      if (!(await confirmDialog('Convocar pleno', `Cuesta ${money(PLENO_COST)} y solo hay uno al mes.`, 'Convocar'))) return;
+      if (!(await confirmDialog('Convocar pleno', `Cuesta ${money(PLENO_COST)} y solo hay uno al mes.`, 'Convocar', { safe: true }))) return;
       if (await ctx.command({ type: 'ConvenePleno' })) {
         toast(`Pleno convocado: −${money(PLENO_COST)}`, { kind: 'info' });
         reopen();

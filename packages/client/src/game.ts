@@ -1767,7 +1767,33 @@ export function startGame(opts: GameOptions): void {
       });
       grid.append(btn);
     }
-    tray.append(h('h3', {}, cat.title), grid);
+    // Pruebas 2.5: las categorías sin nada disponible salen plegadas («Grandes obras (5 · ayto. nivel 3)»).
+    const head = h('h3', {}, cat.title);
+    const fold = h('details', { class: 'tray-cat', open: '', 'data-cat': cat.title }, h('summary', {}, head), grid) as HTMLDetailsElement;
+    // Si el jugador la abre o la cierra a mano, se respeta (hasta que cambie lo que hay disponible).
+    fold.addEventListener('toggle', () => {
+      if (fold.dataset.auto !== String(fold.open)) fold.dataset.user = '1';
+    });
+    tray.append(fold);
+  }
+  /** Pliega las categorías sin nada disponible y dice cuántas obras tienen y desde cuándo. */
+  function foldTray() {
+    for (const cat of TRAY) {
+      const fold = tray.querySelector<HTMLDetailsElement>(`details[data-cat="${cat.title}"]`);
+      if (!fold) continue;
+      const tools = cat.tools.map((id) => TOOLS.find((x) => x.id === id)!);
+      const free = tools.some((tl) => !isLocked(tl, state));
+      const sig = free ? 'free' : 'locked';
+      if (fold.dataset.sig !== sig) {
+        fold.dataset.sig = sig;
+        delete fold.dataset.user;
+      }
+      const why = free ? '' : (tools.map((tl) => lockText(tl)).find((t) => /nivel/.test(t)) ?? lockText(tools[0]!));
+      fold.querySelector('h3')!.textContent = free ? cat.title : `${cat.title} (${tools.length}${why ? ` · ${why.replace(/^ayto\. nivel/, 'desde nivel')}` : ''})`;
+      if (fold.dataset.user) continue;
+      fold.dataset.auto = String(free);
+      fold.open = free;
+    }
   }
 
   function openTray() {
@@ -1775,6 +1801,7 @@ export function startGame(opts: GameOptions): void {
     trayMsg.textContent = 'Elige qué construir. Los precios incluyen la obra.';
     trayMsg.classList.add('muted');
     updateToolLocks();
+    foldTray();
     tray.hidden = false;
     tabBuild.setAttribute('aria-expanded', 'true');
     document.body.classList.add('tray-open');
@@ -2043,7 +2070,8 @@ export function startGame(opts: GameOptions): void {
           pills.push(h('span', { class: `pill ${b.hasWater ? 'good' : 'bad'}` }, b.hasWater ? 'Agua ✓' : `SIN AGUA${b.dryDays ? ` (${plural(b.dryDays, 'día', 'días')})` : ''}`));
           pills.push(h('span', { class: `pill ${b.hasPower ? 'good' : 'bad'}` }, b.hasPower ? 'Luz ✓' : `SIN LUZ${b.darkDays ? ` (${plural(b.darkDays, 'día', 'días')})` : ''}`));
         }
-        if (b.kind === 'shop' || b.kind === 'factory') pills.push(h('span', { class: 'pill' }, money(unitValue(state, b))));
+        // Pruebas 2.5: la cifra no llevaba rótulo; es lo que vale el local en el mercado.
+        if (b.kind === 'shop' || b.kind === 'factory') pills.push(h('span', { class: 'pill', title: 'Lo que vale el local si se vende' }, `Valor: ${money(unitValue(state, b))}`));
         // 2.1: basura sin recoger.
         const dirty = trashStateOf(b);
         if (dirty !== 'limpio') pills.push(h('span', { class: 'pill bad' }, dirty === 'ratas' ? `RATAS · ${bagsText(b)}` : `Basura: ${bagsText(b)}`));

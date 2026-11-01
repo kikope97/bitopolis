@@ -243,8 +243,19 @@ function rows(bd: Record<string, number>, prev: Record<string, number> | undefin
   if (!entries.length) ul.append(h('li', {}, 'Sin movimientos todavía.'));
   for (const [k, v] of entries) {
     const p = prev?.[k];
-    const trend = p === undefined ? '' : v > p ? ' ↑' : v < p ? ' ↓' : ' =';
-    ul.append(h('li', { class: v < 0 ? 'neg' : 'pos' }, h('span', {}, `${CONCEPT[k] ?? k}${trend}`), h('span', {}, `${v > 0 ? '▲ +' : '▼ '}${money(v)}`)));
+    // Pruebas 2.5: «IBI ↓» junto a «▲ +7924 €» confundía. Un solo signo (+/−) en la cifra
+    // y la comparación con el mes anterior, en palabras y en valor absoluto («más», «menos»).
+    const a = Math.abs(v);
+    const b = p === undefined ? undefined : Math.abs(p);
+    const trend = b === undefined || a === b ? '' : `${a > b ? 'más' : 'menos'} que el mes anterior`;
+    ul.append(
+      h(
+        'li',
+        { class: v < 0 ? 'neg' : 'pos' },
+        h('span', {}, CONCEPT[k] ?? k, trend ? h('span', { class: 'p-sub' }, trend) : ''),
+        h('span', {}, `${v > 0 ? '+' : v < 0 ? '−' : ''}${money(a)}`),
+      ),
+    );
   }
   return ul;
 }

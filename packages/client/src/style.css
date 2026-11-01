@@ -689,6 +689,11 @@ html[data-text='200'] .tab .px-icon, html[data-text='200'] .tab .tab-sprite { wi
   box-shadow: 0 -4px 0 #1a1c2c;
 }
 .tray h3 { margin: 6px 0 4px; font-size: calc(13px * var(--ui)); color: var(--accent); font-family: ui-monospace, 'Cascadia Mono', Menlo, monospace; }
+.tray-cat > summary { display: flex; align-items: center; gap: 6px; min-height: 32px; cursor: pointer; list-style: none; }
+.tray-cat > summary::-webkit-details-marker { display: none; }
+.tray-cat > summary::before { content: '▸'; color: var(--accent); }
+.tray-cat[open] > summary::before { content: '▾'; }
+.tray-cat:not([open]) > summary h3 { color: var(--muted); }
 .tray-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
 .tray .tool {
   position: relative;
@@ -771,8 +776,8 @@ body.in-game .toast-close { margin: 0; min-width: 44px; min-height: 44px; }
 .mini-portrait { width: 28px; height: 42px; image-rendering: pixelated; background: #333c57; }
 .person-row .p-name { font-weight: 700; }
 .person-row .p-sub { display: block; color: var(--muted); font-size: 0.85em; }
-/* Hoja «Qué pide el pueblo»: el título y la explicación en líneas distintas. */
-.demand-list .p-sub { display: block; color: var(--muted); font-size: 0.85em; font-weight: 400; }
+/* Listas de cuentas y demanda: el título y la explicación en líneas distintas. */
+.accounts .p-sub { display: block; color: var(--muted); font-size: 0.85em; font-weight: 400; }
 .person-row .p-mood { font-variant-numeric: tabular-nums; font-weight: 700; }
 .p-mood.good { color: var(--good); }
 .p-mood.bad { color: var(--bad); }
