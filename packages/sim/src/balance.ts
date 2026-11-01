@@ -652,6 +652,10 @@ export const TURN = {
   contagion: 0.6,
   /** Lado (en casillas) de cada barrio para el contagio. */
   barrioSize: 12,
+  /** 2.3: donar a una gran obra o quejarse de los turistas, como mucho una vez en estos días por vecino. */
+  repeatDays: 30,
+  /** 2.3: por reglas (la IA no respondió), probabilidad de quejarse de los turistas en un turno. */
+  ruleComplainChance: 0.15,
 } as const;
 
 /** 2.0: el director del pueblo (sucesos que elige la IA entre los que propone el motor). */
@@ -685,6 +689,10 @@ export const DIRECTOR = {
   helpAmount: 120,
   /** Vecinos a los que llega un rumor. */
   rumorReach: 6,
+  /** 2.3: vecinos en paro que contrata de golpe la gran empresa (`contrata_vecinos`). */
+  hireBatch: 5,
+  /** 2.3: por debajo de esta caja (o con algún impuesto alto) puede haber polémica por lo que cuesta una gran obra. */
+  tightTreasury: 5_000,
 } as const;
 
 /** 2.1: encargos del pueblo (retos semanales que salen del estado real). */
@@ -1127,6 +1135,8 @@ export const REGION = {
     wageFx: 1.1,
     workers: 8,
     days: 10,
+    /** 2.3: sin director (Modo normal o IA caída), vecinos en paro que contrata cada mes por reglas. */
+    hirePerMonth: 4,
   },
 } as const;
 

@@ -213,7 +213,7 @@ export function privateRentFx(state: GameState): number {
 export const ruralCapacity = (): number => Math.floor((TOURISM.rural.beds * 30) / TOURISM.nights);
 
 /** ¿Abriría ahora una casa rural más? (hay visitantes para todas, con la media del año: no por un mes de fiestas) */
-function ruralDemand(state: GameState): boolean {
+export function ruralDemand(state: GameState): boolean {
   const n = ruralHomes(state).length;
   return (state.tourism?.avg ?? 0) / (n + 1) >= TOURISM.rural.minVisitors;
 }

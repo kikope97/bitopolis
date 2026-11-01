@@ -1,6 +1,6 @@
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { protestFor, type Association } from './associations.ts';
-import { DEBT, FIRE, KIDS_MAX, LISTS, TURN } from './balance.ts';
+import { DEBT, FIRE, KIDS_MAX, LISTS, TOURISM, TURN } from './balance.ts';
 import { canPresent, presentCandidacy } from './politics.ts';
 import { BUILD_NAMES, removeBuilding } from './commands.ts';
 import { homeRobbery } from './crime.ts';
@@ -15,6 +15,9 @@ import { addMemory, goalFor, NEED_TEXT, needOf, needsOf, PROFESSIONS, relation, 
 import { transfer } from './money.ts';
 import { canDump, dumpTrash } from './trash.ts';
 import { canSignTemporero, HARVEST_NAME, signTemporero } from './farm.ts';
+import { applyDonation, donorCandidates, LANDMARK_NAMES, landmarksInProgress } from './landmarks.ts';
+import { complainCandidates, complainTourists, openRural, ruralCandidates } from './tourism.ts';
+import { bigFactory, hireCandidates } from './region.ts';
 import { type Building, buildingAt, type Citizen, DESIRES, FEARS, type GameState, pushEvent, type Trigger } from './state.ts';
 
 /**
@@ -175,6 +178,22 @@ function desperate(c: Citizen): boolean {
   return totalDebt(c) >= DEBT.noticeable && c.money === 0 && c.jobId === null;
 }
 
+/** 2.3: la fábrica de la gran empresa, si contrata y este vecino está en paro. */
+export function bigCompanyJob(state: GameState, c: Citizen): Building | undefined {
+  return hireCandidates(state).citizenIds.includes(c.id) ? bigFactory(state) : undefined;
+}
+
+/** 2.3: ¿hizo esta acción hace poco? (donar o quejarse de los turistas, como mucho una vez en `TURN.repeatDays`). */
+export function didLately(state: GameState, c: Citizen, verb: string): boolean {
+  const since = state.tick - TURN.repeatDays * TICKS_PER_DAY;
+  for (let i = state.decisionLog.length - 1; i >= 0; i--) {
+    const d = state.decisionLog[i]!;
+    if (d.tick < since) break;
+    if (d.citizenId === c.id && d.action.split(':')[0] === verb) return true;
+  }
+  return false;
+}
+
 /** Acciones que el motor permite ahora a un vecino (lo que se manda a la IA y se valida al aplicar). */
 export function turnMenu(state: GameState, c: Citizen): MenuItem[] {
   const out: MenuItem[] = [{ accion: 'seguir', detalle: 'seguir con su vida como hasta ahora' }];
@@ -189,6 +208,9 @@ export function turnMenu(state: GameState, c: Citizen): MenuItem[] {
   if (assoc && !governs && c.protest !== assoc.id && c.protest !== -assoc.id) out.push({ accion: 'manifestarse', detalle: `la asociación «${assoc.name}» convoca una manifestación` }, { accion: 'no_ir' });
   // Trabajo.
   for (const b of vacantJobs(state, c)) out.push({ accion: `aceptar_trabajo:${b.id}`, detalle: `empleo en ${(b.name ?? BUILD_NAMES[b.kind] ?? b.kind).toString()}` });
+  // 2.3: la gran empresa, si contrata y está en paro.
+  const big = bigCompanyJob(state, c);
+  if (big) out.push({ accion: `aceptar_trabajo:${big.id}`, detalle: `empleo en la fábrica de ${big.name ?? 'la gran empresa'} (la gran empresa contrata)` });
   if (c.jobId !== null) out.push({ accion: 'dimitir', detalle: 'dejar su trabajo en el pueblo' });
   // Vivienda.
   for (const b of freeHomesFor(state, c)) out.push({ accion: `mudarse:${b.id}`, detalle: `mudarse a ${b.kind === 'house' ? 'una casa' : 'un piso'} libre` });
@@ -213,6 +235,14 @@ export function turnMenu(state: GameState, c: Citizen): MenuItem[] {
     for (const n of needsOf(state, c).slice(0, 2)) out.push({ accion: `pedir:${n}`, detalle: `pedir al alcalde ${NEED_TEXT[n]}` });
     out.push({ accion: 'quejarse', detalle: 'quejarse al ayuntamiento' });
   }
+  // 2.3: grandes obras y turismo. El motor fija la cantidad de la donación; quien gobierna no dona ni se queja.
+  if (!governs && !didLately(state, c, 'donar_obra')) {
+    for (const lm of landmarksInProgress(state).slice(0, 2)) {
+      if (donorCandidates(state, lm.id).some((d) => d.citizenId === c.id)) out.push({ accion: `donar_obra:${lm.id}`, detalle: `donar una pequeña parte de sus ahorros para ${LANDMARK_NAMES[lm.kind].toLowerCase()} (va por la fase ${Math.min(lm.phase + 1, lm.phases)} de ${lm.phases})` });
+    }
+  }
+  if (ruralCandidates(state).includes(c)) out.push({ accion: 'abrir_casa_rural', detalle: `convertir su casa en casa rural para los visitantes (la reforma cuesta ${TOURISM.rural.openCost} €)` });
+  if (!governs && !didLately(state, c, 'quejarse_turistas') && complainCandidates(state).includes(c)) out.push({ accion: 'quejarse_turistas', detalle: 'quejarse de los turistas (ruido de las casas rurales o alquileres más caros)' });
   // 2.1: sin camión y con la basura en la puerta, puede tirarla al monte (contamina y está mal visto).
   if (canDump(state, c)) out.push({ accion: 'tirar_al_monte', detalle: 'tirar la basura al monte: no pasa el camión por su calle (contamina cerca y los vecinos lo verán mal)' });
   // Deudas.
@@ -354,6 +384,16 @@ export function extraAction(state: GameState, c: Citizen, verb: string, arg: str
       return signTemporero(state, c);
     case 'presentarse':
       return presentCandidacy(state, c);
+    case 'donar_obra': {
+      const lm = landmarksInProgress(state).find((l) => l.id === Number(arg));
+      const paid = lm ? applyDonation(state, c.id, lm.id) : 0;
+      if (paid && c.named) addMemory(state, c, 'dono_obra', 3, 2);
+      return paid && lm ? `dona ${paid} € para ${LANDMARK_NAMES[lm.kind].toLowerCase()}` : 'al final no dona para la obra';
+    }
+    case 'abrir_casa_rural':
+      return openRural(state, c) ? 'abre una casa rural en su casa' : 'no llega a abrir la casa rural';
+    case 'quejarse_turistas':
+      return complainTourists(state, c) ? 'se queja de los turistas' : 'al final no se queja de los turistas';
     case 'tirar_al_monte':
       return canDump(state, c) ? dumpTrash(state, c) : 'al final no tira la basura al monte';
     case 'robar': {

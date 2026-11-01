@@ -10,7 +10,12 @@ import { factionOf, voteLean } from './politics.ts';
 import { protestFor } from './associations.ts';
 import { DEBT } from './balance.ts';
 import { totalDebt } from './household.ts';
-import { extraAction, isAiCitizen, setPerformImpl } from './turns.ts';
+import { bigCompanyJob, didLately, extraAction, isAiCitizen, setPerformImpl } from './turns.ts';
+import { donorCandidates, landmarksInProgress } from './landmarks.ts';
+import { complainCandidates, ruralCandidates, ruralDemand } from './tourism.ts';
+import { hireForBigCompany } from './region.ts';
+import { chance } from './prng.ts';
+import { LANDMARKS, TOURISM, TURN } from './balance.ts';
 import {
   type Citizen,
   type DecisionLogEntry,
@@ -63,10 +68,13 @@ function vacantJobs(state: GameState, c: Citizen) {
   const used = new Map<number, number>();
   for (const x of state.citizens) if (x.jobId !== null) used.set(x.jobId, (used.get(x.jobId) ?? 0) + 1);
   const home = state.buildings.find((b) => b.id === c.homeId);
-  return state.buildings
+  const out = state.buildings
     .filter((b) => b.built && JOBS[b.kind] > (used.get(b.id) ?? 0))
     .sort((a, b) => (home ? Math.abs(a.x - home.x) + Math.abs(a.y - home.y) - (Math.abs(b.x - home.x) + Math.abs(b.y - home.y)) : a.id - b.id))
     .slice(0, 3);
+  // 2.3: la gran empresa también, si contrata y está en paro.
+  const big = bigCompanyJob(state, c);
+  return big ? [...out, big] : out;
 }
 
 /** Acciones válidas para un detonante (enum cerrado). */
@@ -187,7 +195,15 @@ export function ruleTurn(state: GameState, ids: number[]): { id: number; text: s
     else if (canFound(state, c) && c.traits.ambicion > 40) trigger = 'emprender';
     else if (canBuyHome(state, c)) trigger = 'comprar_casa';
     else if (c.money > 2_500 + c.traits.ahorro * 30) trigger = 'ahorros';
-    if (!trigger) continue;
+    if (!trigger) {
+      // 2.3: por costumbre también, con moderación y dados: donar a la obra, abrir casa rural o quejarse de los turistas.
+      const extra = ruleExtra(state, c);
+      if (extra) {
+        const motivo = ruleMotivo(state, c, extra);
+        lines.push({ id: c.id, text: `${c.name} ${performAction(state, c, 'opinion', extra, motivo, 'rule')}`, motivo });
+      }
+      continue;
+    }
     const actions = validActions(state, c, trigger);
     if (actions.length < 2) continue;
     const p: Pending = { citizenId: c.id, trigger, actions, createdTick: state.tick, dueTick: state.tick };
@@ -196,6 +212,26 @@ export function ruleTurn(state: GameState, ids: number[]): { id: number; text: s
     lines.push({ id: c.id, text: `${c.name} ${effect}`, motivo: d.motivo });
   }
   return lines;
+}
+
+/**
+ * 2.3: lo nuevo de las metas grandes, por reglas (si la IA no respondió al turno).
+ * Mismas condiciones que el menú de la IA y dados del estado (determinista).
+ */
+function ruleExtra(state: GameState, c: Citizen): string | null {
+  const governs = state.politics.mayor === c.id;
+  if (!governs && !didLately(state, c, 'donar_obra')) {
+    const lm = landmarksInProgress(state).find((l) => donorCandidates(state, l.id).some((d) => d.citizenId === c.id));
+    if (lm && chance(state.rng, LANDMARKS.donateChance)) return `donar_obra:${lm.id}`;
+  }
+  if (c.traits.ambicion >= TOURISM.ruralAmbition && ruralCandidates(state).includes(c) && ruralDemand(state) && chance(state.rng, TOURISM.ruralChance)) return 'abrir_casa_rural';
+  if (!governs && !didLately(state, c, 'quejarse_turistas') && complainCandidates(state).includes(c) && chance(state.rng, TURN.ruleComplainChance)) return 'quejarse_turistas';
+  return null;
+}
+
+function ruleMotivo(state: GameState, c: Citizen, action: string): string {
+  const options = TEMPLATES[action.split(':')[0]!] ?? TEMPLATES.quedarse!;
+  return cleanMotivo(options[hash32(state.seed, c.id, state.tick) % options.length]!);
 }
 
 /* ---------------- aplicar ---------------- */
@@ -240,7 +276,8 @@ export function performAction(state: GameState, c: Citizen, trigger: Trigger, ac
     case 'aceptar_trabajo': {
       const b = state.buildings.find((x) => x.id === Number(arg));
       const used = state.citizens.filter((x) => x.jobId === b?.id).length;
-      if (b && b.built && JOBS[b.kind] > used) {
+      if (b?.kind === 'bigfactory') effect = hireForBigCompany(state, c.id) ? `empieza a trabajar en ${b.name ?? 'la fábrica grande'}` : 'se queda sin el empleo (ya estaba cogido)';
+      else if (b && b.built && JOBS[b.kind] > used) {
         c.jobId = b.id;
         effect = `empieza a trabajar en ${BUILD_NAMES[b.kind]?.toLowerCase()}`;
       } else effect = 'se queda sin el empleo (ya estaba cogido)';
@@ -351,6 +388,9 @@ const TEMPLATES: Record<string, string[]> = {
   manifestarse: ['Si no nos escuchan, que nos vean en la calle.', 'Allí estaré, con la pancarta.', 'Llevamos meses pidiéndolo. Toca plantarse.'],
   no_ir: ['Estoy de acuerdo, pero manifestarme no va conmigo.', 'Ese día trabajo; que vayan otros.', 'Prefiero darle algo más de tiempo al alcalde.'],
   apretarse: ['Nada de caprichos hasta que lo pague todo.', 'Toca apretarse el cinturón unos meses.', 'Debo dinero y lo voy a devolver, aunque cueste.'],
+  donar_obra: ['Es la obra del pueblo y quiero poner mi granito de arena.', 'Lo que se hace para todos también es mío.', 'Poco a poco se levanta, y yo quiero ayudar.'],
+  abrir_casa_rural: ['Con tanto visitante, mi casa puede dar algo más.', 'Una casa rural: ganaré un dinero con los forasteros.', 'Si vienen turistas, que duerman en mi casa.'],
+  quejarse_turistas: ['Con tanto turista no hay quien descanse.', 'Los alquileres suben y los de aquí nos quedamos fuera.', 'Turistas sí, pero con respeto a los vecinos.'],
   pedir_aplazamiento: ['Alcalde, deme unos meses: lo pagaré, pero ahora no llego.', 'No es que no quiera pagar, es que no puedo. Necesito tiempo.', 'Con un aplazamiento lo devuelvo poco a poco.'],
 };
 
