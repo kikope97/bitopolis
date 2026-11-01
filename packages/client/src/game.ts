@@ -8,6 +8,12 @@ import {
   type GameState,
   cellsUsed,
   coverageSummary,
+  TRASH,
+  trashActive,
+  trashServed,
+  trashStateOf,
+  truckRouteOf,
+  truckRoutes,
   CRIME,
   jailCapacity,
   canUpgradeBuilding,
@@ -25,6 +31,12 @@ import {
   upgradeReqs,
   type NeedKey,
   stationsFor,
+  CIVIL,
+  FIRE,
+  fireCovered,
+  hasDike,
+  isUnlocked,
+  volunteerPlaces,
   SEASON_TEXT,
   seasonOf,
   WEATHER_TEXT,
@@ -53,14 +65,17 @@ import { openNeighbours, openReport, openTaxes as openTaxesSheet } from './econo
 import { LAYERS, type LayerId, NEED_ICON } from './layers.ts';
 import { openTownHall } from './civic-ui.ts';
 import { openAlbum, snapMoments } from './album-ui.ts';
+import { openAway } from './away-ui.ts';
+import { openRank, rankCard } from './rank-ui.ts';
 import { objectivesNode, openAdvisor, openCitizen, openDiary, openPleno, portraitCanvas, rememberSeen, renderObjectives, resumeSummary, type SocialCtx } from './social-ui.ts';
 import { api, ApiError } from './api.ts';
 import { nextHint } from './hints.ts';
 import { openManagement } from './manage-ui.ts';
+import { errandsSummary, openErrands, openPress } from './town-news-ui.ts';
 import { openWhatsHappening, turnHeadline } from './ai-town-ui.ts';
 import { pocketMark } from './money-ui.ts';
 import { formatDate, money, MONTHS, plural, shortDate, t } from './i18n.ts';
-import { type Camera, type Preview, render, restartAnimations } from './render.ts';
+import { type Camera, type Preview, render, restartAnimations, signSpot } from './render.ts';
 import type { FromWorker, SaveBatch, ToWorker } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
 import { buildingSprite, letterSprite, T } from './sprites.ts';
@@ -383,6 +398,23 @@ export function startGame(opts: GameOptions): void {
       return { x: cam.x, y: cam.y };
     }, () => restartAnimations());
   }
+  /**
+   * 2.1: al subir de rango, «attention» suave: fanfarria, destello en el cartel
+   * de la entrada, baja a x1 sin temblor y un aviso que abre el escudo.
+   */
+  function celebrateRank(text: string) {
+    sfx.fanfare();
+    duck(3);
+    vibrate(150);
+    const at = signSpot(state) ?? hallSpot();
+    if (at) highlight = { x: at.x, y: at.y, since: performance.now() };
+    slowDown();
+    calmPause();
+    toast(`${text}. Toca para ver el escudo.`, { kind: 'good', sticky: true, onClick: () => withBack('Pueblo', openHub, () => openRank(state)) });
+    $('#sr-live').textContent = text;
+    const th = hallSpot();
+    if (th) coins(...screenOf(th.x, th.y), 12);
+  }
   /** Una oferta con plazo baja a x1 (sin temblor) y cuenta como parada (ronda 14). */
   function slowDown() {
     if (speed < 3) return;
@@ -631,6 +663,11 @@ export function startGame(opts: GameOptions): void {
           sticky: true,
           onClick: openAccounts,
         });
+      } else if (e.kind === 'milestone' && e.text.startsWith('¡Bitópolis ya es')) {
+        // 2.1: subida de rango: fanfarria, el cartel destella y un aviso que abre el escudo.
+        celebrateRank(e.text);
+      } else if (e.kind === 'milestone' && e.text.startsWith('El escudo estrena')) {
+        toast(e.text, { kind: 'good', onClick: () => withBack('Pueblo', openHub, () => openRank(state)) });
       } else if (e.kind === 'milestone') {
         toast(e.text, { kind: 'good', sticky: true });
         vibrate(120);
@@ -683,6 +720,23 @@ export function startGame(opts: GameOptions): void {
           if (/Disturbios|llenos/.test(e.text)) attention(refSpot(e.ref) ?? state.buildings.find((b) => b.kind === 'police' && b.built));
         }
         toast(e.text, { kind: bad ? 'warn' : 'good', sticky: /Disturbios|llenos/.test(e.text), onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+      } else if (e.kind === 'fire') {
+        // 2.1: riesgos, incendios, bomberos y urgencias.
+        const go = e.ref !== undefined ? () => focusBuilding(e.ref!) : undefined;
+        if (e.text.startsWith('¡Fuego') || e.text.startsWith('El fuego salta')) {
+          sfx.warn();
+          duck(1.5);
+          calmPause();
+          attention(refSpot(e.ref));
+          toast(e.text, { kind: 'warn', sticky: true, onClick: go });
+        } else if (e.text.startsWith('El fuego deja')) {
+          sfx.warn();
+          toast(e.text, { kind: 'warn', sticky: true, onClick: go });
+        } else if (e.text.startsWith('Riesgo de incendio')) {
+          if (!quiet) toast(e.text, { kind: 'warn', onClick: go });
+        } else if (!quiet || e.text.startsWith('Urgencia')) {
+          toast(e.text, { kind: /no llega/.test(e.text) ? 'warn' : 'good', onClick: go });
+        }
       } else if (e.kind === 'protest') {
         sfx.warn();
         duck(1.5);
@@ -1122,7 +1176,7 @@ export function startGame(opts: GameOptions): void {
       // v1.6: se confirma en la franja de abajo, en rojo (antes, una ventana que tapaba el mapa).
       const b = state.buildings.find((x) => x.x === tile.x && x.y === tile.y);
       const onRiver = terrainAt(state, tile.x, tile.y) === Terrain.River;
-      const what = b ? (b.name ?? BUILD_NAMES[b.kind]) : state.map.tiles[tile.y * state.map.w + tile.x] === Tile.Road ? (onRiver ? 'Puente' : 'Carretera') : null;
+      const what = b ? (b.name ?? BUILD_NAMES[b.kind]) : state.map.tiles[tile.y * state.map.w + tile.x] === Tile.Road ? (onRiver ? 'Puente' : 'Carretera') : hasDike(state, tile.x, tile.y) ? 'Dique' : null;
       if (!what) {
         $('#tool-info').replaceChildren(h('b', {}, 'Derribar'), ': ahí no hay nada que derribar. Toca un edificio o una carretera.');
         return refreshStrip();
@@ -1172,7 +1226,7 @@ export function startGame(opts: GameOptions): void {
       await command(line);
       return;
     }
-    if (touchInput && tool.build) {
+    if (touchInput && (tool.build || tool.id === 'dike')) {
       // Con el dedo solo construye el botón «Construir»: un doble toque no gasta (ronda 10).
       return proposePlace(tile, tile);
     }
@@ -1216,7 +1270,7 @@ export function startGame(opts: GameOptions): void {
     preview = previewFor(a, b);
     const v = validateCommand(state, cmd);
     const hill = tool.build && tool.shape === 'tap' && terrainAt(state, a.x, a.y) === Terrain.Hill;
-    const cost = tool.build && tool.shape === 'tap' ? `${shortCost(tool)}${hill ? ' (colina: materiales +50 %)' : ''}` : lineText(a, b);
+    const cost = tool.id === 'dike' ? shortCost(tool) : tool.build && tool.shape === 'tap' ? `${shortCost(tool)}${hill ? ' (colina: materiales +50 %)' : ''}` : lineText(a, b);
     // Ronda 13: el precio va en su propia línea y siempre se ve (también si no se puede: «no hay dinero»).
     const what = demolishText && v.ok ? demolishText : v.ok ? `${tool.label} aquí` : `${tool.label}: no se puede (${v.error})`;
     // v1.9.1: si con lo que falta por pagar de las obras en marcha la caja quedaría en negativo, se avisa (no se bloquea).
@@ -1360,8 +1414,8 @@ export function startGame(opts: GameOptions): void {
   /* ---------- herramientas (v1.6: cinco pestañas y la bandeja «Construir») ---------- */
   function toolIcon(tl: Tool): HTMLElement {
     const wrap = h('span', { class: 'tool-icon', 'aria-hidden': 'true' });
-    if (tl.build && tl.build !== 'road') {
-      const c = buildingSprite(tl.build, 1);
+    if ((tl.build && tl.build !== 'road') || tl.id === 'dike') {
+      const c = buildingSprite(tl.build ?? tl.id, 1);
       const img = document.createElement('canvas');
       img.width = c.width;
       img.height = c.height;
@@ -1424,6 +1478,8 @@ export function startGame(opts: GameOptions): void {
           // Ronda 12: tocar algo bloqueado no hacía nada; ahora explica qué falta.
           trayMsg.textContent = lockLong(tl, state);
           trayMsg.classList.remove('muted');
+          // Ronda 17: la bandeja puede estar desplazada; el motivo también sale como aviso.
+          toast(lockLong(tl, state), { kind: 'warn' });
           sfx.error();
           vibrate(30);
           return;
@@ -1544,6 +1600,7 @@ export function startGame(opts: GameOptions): void {
     if (plantCapacityOf(b)) gives.push(`da ${b.kind === 'water' ? 'agua' : 'luz'} a ${plantCapacityOf(b)} edificios`);
     if (b.kind === 'police') gives.push(`${cellsOf(b)} calabozos`);
     if (b.kind === 'jail') gives.push(`${jailPlacesOf(b)} plazas`);
+    if (b.kind === 'cleanpoint') gives.push(`su camión recorre ${truckRouteOf(b)} casillas de calle al día`);
     if (gives.length) box.append(h('p', { class: 'muted small' }, `Ahora ${gives.join(', ')}.`));
     if (b.upgradeUntil !== undefined) {
       box.append(h('p', {}, `Mejorando a nivel ${lv + 1}: termina el ${formatDate(tickToDate(b.upgradeUntil))}. Sigue abierto mientras tanto.`));
@@ -1593,10 +1650,17 @@ export function startGame(opts: GameOptions): void {
       const z = state.map.zones[tile.y * state.map.w + tile.x];
       const tt = state.map.tiles[tile.y * state.map.w + tile.x];
       const ter = state.map.terrain?.[tile.y * state.map.w + tile.x] ?? 0;
+      const dike = hasDike(state, tile.x, tile.y);
       const name =
         tt === Tile.Road
           ? ter === Terrain.River ? 'Puente' : 'Carretera'
-          : ter === Terrain.River ? 'Río' : ter === Terrain.Sea ? 'Mar' : tt === Tile.Tree ? 'Árboles' : ter === Terrain.Hill ? 'Colina' : 'Solar';
+          : dike ? 'Dique' : ter === Terrain.River ? 'Río' : ter === Terrain.Sea ? 'Mar' : tt === Tile.Tree ? 'Árboles' : ter === Terrain.Hill ? 'Colina' : 'Solar';
+      if (dike) {
+        sheet(name, h('p', {}, 'Muro de piedra en la orilla: aquí y en las casillas de alrededor no llega la riada.'), h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`)).classList.add('half');
+        openInspect = null;
+        inspectSheet = null;
+        return;
+      }
       const zone = z ? `Zona ${['', 'residencial (R)', 'comercial (C)', 'industrial (I)'][z]}` : 'Sin zona';
       sheet(name, h('p', {}, zone), h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`)).classList.add('half');
       openInspect = null;
@@ -1642,10 +1706,25 @@ export function startGame(opts: GameOptions): void {
         h('label', { class: 'check' }, notify, ' Avísame cuando acabe'),
       );
     } else {
-      // v1.8: destrozado en unos disturbios: no funciona hasta que se repara.
+      // 2.1: ardiendo o en riesgo de incendio.
+      if (b.fire) {
+        const left = Math.max(1, b.fire.until - state.tick);
+        content.push(h('div', { class: 'petition danger-box', 'data-fire': 'ardiendo' }, pixelIcon('fire'), h('p', {}, h('strong', {}, '¡Ardiendo! '), b.fire.covered ? `Los bomberos lo están apagando: unas ${left > 48 ? plural(Math.ceil(left / 24), 'día', 'días') : plural(left, 'hora', 'horas')} más.` : `No hay bomberos que lleguen: arderá unas ${left > 48 ? plural(Math.ceil(left / 24), 'día', 'días') : plural(left, 'hora', 'horas')} y quedará destrozado. Puede saltar a lo de al lado.`)));
+      } else if (b.risk) {
+        const covered = fireCovered(state, b);
+        content.push(h('div', { class: 'petition warn-box', 'data-fire': 'riesgo' }, pixelIcon('fire'), h('p', {}, h('strong', {}, 'En riesgo de incendio '), `(${b.risk.why}). `, covered ? 'Los bomberos llegan a tiempo: si prende, solo será un susto.' : 'No hay bomberos cerca: si prende, quedará destrozado. Un parque de bomberos en 9 casillas lo evita.')));
+      }
+      // v1.8: destrozado en unos disturbios (2.1: o por el fuego): no funciona hasta que se repara.
       if (b.damaged) {
         const dmg = b.damaged;
-        const box = h('div', { class: 'petition danger-box' }, h('p', {}, h('strong', {}, 'Destrozada en unos disturbios. '), 'No vende hasta repararla, pero sigue pagando sueldos e impuestos con sus ahorros: si dos meses seguidos no llega a las nóminas, cierra.'));
+        const fire = dmg.cause === 'fuego';
+        const home = b.kind === 'house' || b.kind === 'res';
+        const why = fire
+          ? home
+            ? 'Quien vivía aquí está sin casa hasta que se repare (lo nota en su felicidad) y no entra nadie nuevo.'
+            : 'No funciona ni contrata hasta repararlo. Nunca se pierde: se arregla pagando la obra.'
+          : 'No vende hasta repararla, pero sigue pagando sueldos e impuestos con sus ahorros: si dos meses seguidos no llega a las nóminas, cierra.';
+        const box = h('div', { class: 'petition danger-box' }, h('p', {}, h('strong', {}, fire ? 'Destrozado por el fuego. ' : 'Destrozada en unos disturbios. '), why));
         if (dmg.repairUntil >= 0) box.append(h('p', { class: 'muted small' }, `En reparación: reabre el ${formatDate(tickToDate(dmg.repairUntil))}.`));
         else {
           const fix = h('button', { class: 'btn primary wide' }, `Reparar · ${money(dmg.cost)}`);
@@ -1663,6 +1742,9 @@ export function startGame(opts: GameOptions): void {
           pills.push(h('span', { class: `pill ${b.hasPower ? 'good' : 'bad'}` }, b.hasPower ? 'Luz ✓' : `SIN LUZ${b.darkDays ? ` (${plural(b.darkDays, 'día', 'días')})` : ''}`));
         }
         if (b.kind === 'shop' || b.kind === 'factory') pills.push(h('span', { class: 'pill' }, money(unitValue(state, b))));
+        // 2.1: basura sin recoger.
+        const dirty = trashStateOf(b);
+        if (dirty !== 'limpio') pills.push(h('span', { class: 'pill bad' }, dirty === 'ratas' ? `RATAS · ${bagsText(b)}` : `Basura: ${bagsText(b)}`));
         // v1.9: las cuentas de la empresa el mes pasado (salud de las empresas).
         if ((b.kind === 'shop' || b.kind === 'factory') && b.books) {
           const k = b.books;
@@ -1678,6 +1760,27 @@ export function startGame(opts: GameOptions): void {
         if (used >= cellsOf(b)) content.push(h('p', { class: 'pol-tag' }, jailCapacity(state) ? 'Llenos: esperan sitio en la cárcel.' : 'Llenos: hace falta una cárcel para poder detener a más.'));
       }
       if (b.kind === 'jail') content.push(h('p', {}, `Presos: ${state.justice?.jail.length ?? 0} de ${jailCapacity(state)} plazas.`));
+      // 2.1: bomberos y protección civil.
+      if (b.kind === 'firestation') {
+        const lv = b.level ?? 1;
+        const em = state.emergencies;
+        content.push(h('p', {}, `Llega a ${radiusOf(b)} casillas: ahí, un incendio se apaga en ${FIRE.coveredHours[0]}–${FIRE.coveredHours[1]} horas y sin daños. ${lv >= FIRE.hillLevel ? 'Con cisterna: también en las colinas.' : 'En las colinas no llega hasta el nivel 2 (cisterna).'}${lv >= FIRE.floodLevel ? ' Ayuda en las riadas: reparaciones a la mitad en su radio.' : ''}`));
+        if (em) content.push(h('p', { class: 'muted small' }, `Incendios en el pueblo: ${em.fires} · apagados a tiempo: ${em.putOut}`));
+      }
+      if (b.kind === 'civilprotection') {
+        const vols = state.citizens.filter((c) => c.volunteer);
+        content.push(h('p', {}, `En ${radiusOf(b)} casillas, las riadas un ${Math.round(CIVIL.floodCut * 100)} % menos y el quitanieves a mitad de precio. Con la caseta puedes levantar diques en la orilla (${money(CIVIL.dikeCost)} cada uno).`));
+        content.push(h('p', { class: 'muted small' }, `Voluntarios: ${vols.length}${vols.length ? ` (${vols.slice(0, 4).map((c) => c.name.split(' ')[0]).join(', ')}${vols.length > 4 ? '…' : ''})` : ''} · plazas libres: ${Math.max(0, volunteerPlaces(state))} · riadas evitadas: ${state.emergencies?.floodsAvoided ?? 0}`));
+      }
+      // 2.1: punto limpio: por dónde pasa su camión y qué hace en cada nivel.
+      if (b.kind === 'cleanpoint' && b.built) {
+        const route = truckRoutes(state).find((r) => r.id === b.id)?.roads.length ?? 0;
+        const served = [...trashServed(state).values()].filter((p) => p.id === b.id).length;
+        content.push(h('p', {}, `El camión recorre ${route} de ${truckRouteOf(b)} casillas de calle al día y recoge la basura de ${plural(served, 'edificio', 'edificios')}. Con nieve llega a la mitad.`));
+        content.push(h('p', { class: 'muted small' }, 'Solo pagan la tasa de basuras los vecinos por cuya calle pasa el camión. Mira la capa «Limpieza».'));
+        if (levelOf(b) >= 2) content.push(h('p', {}, `Reciclaje: la tasa de basuras es un ${Math.round(TRASH.recyclingDiscount * 100)} % más barata para los suyos, y los ecologistas lo agradecen.`));
+        if (levelOf(b) >= 3) content.push(h('p', {}, `Compostaje: vende el abono fuera (${money(TRASH.compostPerResident)} por vecino atendido al mes).`));
+      }
       // v1.8 (petición del creador): los servicios suben de nivel.
       if (UPGRADABLE.includes(b.kind)) content.push(levelBox(b));
       const res = occupants(state, b);
@@ -1743,9 +1846,28 @@ export function startGame(opts: GameOptions): void {
       row('police', 'Seguridad', crime < 20 ? true : crime < 40 ? 'warn' : false, `${crime < 20 ? 'Tranquilo' : crime < 40 ? 'Algo de delincuencia' : 'Inseguro'}${police ? ' · comisaría cerca' : pop >= 20 ? ' · sin comisaría cerca' : ''}`),
       ...(pop >= 25 ? [svc('colegio', 'school', 'Colegio'), svc('salud', 'health', 'Salud')] : []),
       ...(pop >= 10 ? [svc('ocio', 'leaf', 'Parque o plaza')] : []),
+      // 2.1: bomberos (en cuanto se pueden construir).
+      ...(isUnlocked(state, 'firestation') || state.buildings.some((s) => s.kind === 'firestation') ? [svc('bomberos', 'fire', 'Bomberos')] : []),
+      ...(trashActive(state) || state.buildings.some((s) => s.kind === 'cleanpoint') ? [trashRow(b, row)] : []),
       row('bar', 'Tienda', state.buildings.some((s) => s.kind === 'shop' && s.built && !s.damaged && Math.abs(s.x - b.x) + Math.abs(s.y - b.y) <= 6), state.buildings.some((s) => s.kind === 'shop' && s.built && !s.damaged && Math.abs(s.x - b.x) + Math.abs(s.y - b.y) <= 6) ? 'Cerca' : 'Lejos'),
     ];
     return h('div', {}, h('dl', { class: 'svc-table', 'aria-label': 'Servicios de la vivienda' }, ...rows), h('p', { class: 'muted small' }, `Valor: ${money(unitValue(state, b))} por vivienda`));
+  }
+
+  /** 2.1: bolsas de basura que tiene un edificio (cada 10 unidades, una bolsa). */
+  function bagsText(b: Building): string {
+    const n = Math.max(1, Math.round((b.trash ?? 0) / 10));
+    return plural(n, 'bolsa', 'bolsas');
+  }
+
+  /** 2.1: fila «Basura» de la tabla de servicios. */
+  function trashRow(b: Building, row: (icon: string, label: string, ok: boolean | 'warn', text: string) => HTMLElement): HTMLElement {
+    const st = trashStateOf(b);
+    const by = trashServed(state).get(b.id);
+    if (st === 'ratas') return row('rat', 'Basura', false, `Ratas: ${bagsText(b)} sin recoger`);
+    if (st === 'bolsas') return row('trash', 'Basura', 'warn', `${bagsText(b)} en la calle${by ? '' : ' · no pasa el camión'}`);
+    if (by) return row('trash', 'Basura', true, `Pasa el camión${levelOf(by) >= 2 ? ' · reciclaje' : ''}`);
+    return row('trash', 'Basura', 'warn', 'No pasa el camión: no se le cobra la tasa');
   }
 
   /** Vecinos de un edificio: una fila por persona con retrato y lo esencial (v1.6). */
@@ -1793,6 +1915,12 @@ export function startGame(opts: GameOptions): void {
     openSettings(state.aiMode && state.ai ? { share: state.ai.share, locked: aiShareLocked, set: (share) => command({ type: 'SetAiShare', share }) } : undefined);
   const openHappening = () => openWhatsHappening(social, (id) => withBack('Qué está pasando', openHappening, () => openCitizen(social, id)));
   const openAccounts = () => openReport(state);
+  const openErrandsSheet = () => openErrands(social, (id) => withBack('Encargos del pueblo', openErrandsSheet, () => openCitizen(social, id)));
+  const openPressSheet = () =>
+    openPress(social, (ref) => {
+      if (state.buildings.some((b) => b.id === ref)) focusBuilding(ref);
+      else if (state.citizens.some((c) => c.id === ref)) withBack('El Eco de Bitópolis', openPressSheet, () => openCitizen(social, ref));
+    });
 
   /**
    * v1.6: el panel «Pueblo» sustituye al menú plano. Cada sección resume cómo va
@@ -1826,6 +1954,8 @@ export function startGame(opts: GameOptions): void {
     if (assocs.length) townSum.push(protest ? 'manifestación convocada' : plural(assocs.length, 'asociación vecinal', 'asociaciones vecinales'));
     sheet(
       'Pueblo',
+      // 2.1: el rango y el escudo del pueblo, arriba del todo.
+      rankCard(state, go(() => openRank(state))),
       card(
         'coin',
         'Dinero',
@@ -1853,6 +1983,14 @@ export function startGame(opts: GameOptions): void {
         item('Felicidad', go(openHappiness)),
         item('Diario del pueblo', go(() => openDiary(social))),
         item('Álbum del pueblo', go(() => openAlbum(social))),
+      ),
+      // 2.1: encargos del pueblo y El Eco de Bitópolis.
+      card(
+        'inspect',
+        'Encargos y El Eco',
+        [errandsSummary(state)],
+        item('Encargos del pueblo', go(openErrandsSheet), !!state.errands?.list.some((e) => e.status === 'ofrecido')),
+        item('El Eco de Bitópolis', go(openPressSheet), !!state.press?.editions.at(-1) && !state.press.editions.at(-1)!.answered),
       ),
       h('section', { class: 'hub-card' }, h('h3', {}, pixelIcon('smile'), 'Objetivos'), objectivesNode(state)),
       ...(state.aiMode
@@ -1954,7 +2092,7 @@ export function startGame(opts: GameOptions): void {
     legendDay = Math.floor(state.tick / 24);
     // Ronda 13: ordenada por lo que más falta, con «Construir» al lado; plegable para ver el mapa.
     const sum = coverageSummary(state).sort((a, b) => b.falta - a.falta || b.lleno - a.lleno);
-    const TOOL_FOR: Record<string, ToolId> = { agua: 'water', luz: 'power', colegio: 'school', salud: 'clinic', policia: 'police', ocio: 'park' };
+    const TOOL_FOR: Record<string, ToolId> = { agua: 'water', luz: 'power', colegio: 'school', salud: 'clinic', policia: 'police', ocio: 'park', bomberos: 'firestation', basuras: 'cleanpoint' };
     const rows = sum.map((r) => {
       const name = `${NEED_LABEL[r.key][0]!.toUpperCase()}${NEED_LABEL[r.key].slice(1)}`;
       const count = r.falta ? `falta en ${plural(r.falta, 'casa', 'casas')}` : `lleno en ${plural(r.lleno, 'casa', 'casas')}`;
@@ -2203,9 +2341,10 @@ export function startGame(opts: GameOptions): void {
   onState();
   refreshStrip();
   const away = resumeSummary(token, state);
-  if (away && away.length) toast(`Desde tu última visita: ${away.join(' · ')}`, { sticky: true });
   tutorial.start(state);
   tutorial.update(state, tool.id);
+  // 2.1: «Mientras no estabas», una tarjeta que se desliza (no durante el tutorial).
+  if (away && !tutorial.active) openAway(token, state, away, { openCitizen: (id) => openCitizen(social, id), openRank: () => openRank(state) });
   introGeography();
   if (!tutorial.active && resume === 0) toast(`En pausa. Pulsa ▶ (${matchMedia('(orientation: landscape) and (max-height: 500px)').matches ? 'arriba' : 'arriba a la izquierda'}) para que pase el tiempo.`);
   // Sonido: se desbloquea con el primer gesto; el ambiente sigue la hora del juego.

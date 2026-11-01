@@ -1,12 +1,29 @@
+import { emptyErrands } from './errands.ts';
+import { emptyPress } from './press.ts';
 import { emptyPolitics } from './politics-core.ts';
 import { FORMAT_VERSION, type GameState } from './state.ts';
+import { emptyRank } from './rank-core.ts';
 import { levelForPop } from './townhall.ts';
+import { RANKS, TRASH } from './balance.ts';
 
 /**
  * Migraciones encadenadas: MIGRATIONS[n] convierte un estado de formatVersion
  * n a n+1. Cada una debe tener su test en test/migrations.test.ts.
  */
 type Migration = (s: Record<string, any>) => Record<string, any>;
+
+/**
+ * 2.1 (13 → 14), parte de bomberos y protección civil: diques y contadores de
+ * emergencias. Los edificios no cambian (riesgo, fuego y daños son opcionales).
+ * Va en una función propia para combinarla con las otras partes de la 2.1.
+ */
+export function migrate14Fire(s: Record<string, any>): Record<string, any> {
+  return {
+    ...s,
+    dikes: Array.isArray(s.dikes) ? s.dikes : [],
+    emergencies: { fires: 0, putOut: 0, saved: 0, floodsAvoided: 0, ...(s.emergencies ?? {}) },
+  };
+}
 
 export const MIGRATIONS: Record<number, Migration> = {
   // 0 → 1: estados previos al campo `debtMonths`.
@@ -141,7 +158,46 @@ export const MIGRATIONS: Record<number, Migration> = {
       ? { ai: { share: 25, paceDays: 7, turn: null, lastN: 0, next: (s.tick ?? 0) + 7 * 24, mayor: [], quick: null, lastQuick: -1e9, log: [] } }
       : {}),
   }),
+  // 2.1: emergencias, encargos y periódico (cada parte, en su función).
+  13: (s) => ({ ...migrate14Trash(migrate14Rank(migrate14Errands(migrate14Fire(s)))), formatVersion: 14 }),
 };
+
+/** 2.1: encargos del pueblo y El Eco de Bitópolis, vacíos (el primero, en unos días). */
+function migrate14Errands(s: Record<string, any>): Record<string, any> {
+  return { ...s, errands: s.errands ?? emptyErrands(s.tick ?? 0), press: s.press ?? emptyPress() };
+}
+
+/**
+ * 2.1 (rangos del pueblo): un pueblo de antes empieza en el rango que ya le
+ * corresponde, con el escudo de su terreno y sin votación (no hay fanfarria
+ * de algo que ya tenía).
+ */
+export function migrate14Rank(s: Record<string, any>): Record<string, any> {
+  if (s.rank) return s;
+  const pop = s.citizens?.length ?? 0;
+  const hall = s.townhallLevel ?? 1;
+  let level = 0;
+  RANKS.forEach((r, i) => {
+    if (pop >= r.pop && hall >= r.townhall) level = i;
+  });
+  const terrain = s.map?.terrain ?? [];
+  return { ...s, rank: emptyRank(s.seed ?? 0, terrain, level, s.tick ?? 0) };
+}
+
+
+/**
+ * 2.1 (basura y punto limpio): campo de suciedad vacío y 60 días de gracia
+ * para que un pueblo de antes no se ensucie de golpe (la basura empieza a
+ * contar cuando se pueda construir el punto limpio, y nunca antes de la gracia).
+ */
+export function migrate14Trash(s: Record<string, any>): Record<string, any> {
+  const n = (s.map?.w ?? 0) * (s.map?.h ?? 0);
+  return {
+    ...s,
+    trash: s.trash ?? { start: -1, graceUntil: (s.tick ?? 0) + TRASH.graceDays * 24 },
+    fields: s.fields ? { ...s.fields, dirt: s.fields.dirt ?? new Array(n).fill(0) } : s.fields,
+  };
+}
 
 export function migrate(raw: unknown): GameState {
   if (typeof raw !== 'object' || raw === null) throw new Error('estado inválido');

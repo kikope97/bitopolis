@@ -83,9 +83,10 @@ const TURN_TIMEOUT_MS = 30_000;
 const TURN_DEADLINE_MS = 40_000;
 /** Sin este margen, no se hace la segunda pregunta. */
 const TURN_RETRY_MIN_MS = 8_000;
-const TURN_OUT_PER_CITIZEN = 320;
+// Ronda 17: el modelo razona antes de responder y eso cuenta en el tope; con 320 se cortaban lotes enteros.
+const TURN_OUT_PER_CITIZEN = 600;
 /** Tokens de salida del director (sucesos, avisos, foco y crónica). */
-const DIRECTOR_OUT = 900;
+const DIRECTOR_OUT = 1400;
 
 const TIMEOUT_MS = 20_000;
 const MAX_OUT_PER_CITIZEN = 120;
@@ -297,7 +298,7 @@ export class AiService {
       try {
         const provider = this.providerOverride ? this.providerOverride(s) : makeProvider(s.provider, s.key, s.baseUrl);
         const r = await provider.complete(
-          { system: req.system, shared: req.shared, user: req.user, schema: req.schema, model, maxTokens: 300 + ids.length * TURN_OUT_PER_CITIZEN },
+          { system: req.system, shared: req.shared, user: req.user, schema: req.schema, model, maxTokens: 1000 + ids.length * TURN_OUT_PER_CITIZEN },
           AbortSignal.timeout(timeLeft()),
         );
         if (r.truncated) status = 'truncated';
@@ -367,12 +368,13 @@ export class AiService {
         usage.in = r.usage.in;
         usage.cachedIn = r.usage.cachedIn;
         usage.out = r.usage.out;
-        const parsed = parseDirector(r.text, req.ids, `${req.shared}\n${req.user}`);
+        if (r.truncated) status = 'truncated';
+        const parsed = parseDirector(r.text, req.ids, `${req.shared}\n${req.user}`, { news: req.news, errands: req.errands });
         if (parsed) {
           result.director = parsed.director;
           if (parsed.focus) result.focus = parsed.focus;
           if (parsed.chronicle) result.chronicle = parsed.chronicle;
-        } else status = 'invalid';
+        } else if (status === 'ok') status = 'invalid';
       } catch (e) {
         status = (e as Error).name === 'TimeoutError' ? 'timeout' : 'error';
       } finally {

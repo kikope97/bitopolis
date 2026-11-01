@@ -1,5 +1,5 @@
 import type { Command, TaxLevel } from '@bitopolis/shared';
-import { BUILD_NAMES, totalDebt, type Citizen, type GameState, IBI_RATE, MIN_WAGE, type MinWageLevel, PLUSVALIA_RATE, TASA_BASURAS, TASA_TERRAZAS, TAX_SPLIT_POP, unitValue } from '@bitopolis/sim';
+import { BUILD_NAMES, totalDebt, type Citizen, type GameState, IBI_RATE, MIN_WAGE, type MinWageLevel, PLUSVALIA_RATE, TASA_BASURAS, TASA_TERRAZAS, TAX_SPLIT_POP, trashActive, trashFee, trashServed, unitValue } from '@bitopolis/sim';
 import { money, MONTHS } from './i18n.ts';
 import { economyLines } from './money-ui.ts';
 import { h, sheet } from './ui.ts';
@@ -12,10 +12,26 @@ const pct = (n: number) => `${Math.round(n * 1000) / 10} %`.replace('.', ',');
 /** Glosario a un toque: una frase sencilla por tributo (spec §5.4). */
 export const GLOSSARY: Record<string, { name: string; text: string }> = {
   ibi: { name: 'IBI', text: 'Impuesto sobre la vivienda. Sube tu dinero y baja la felicidad de los propietarios (y algo la de los inquilinos, porque sube el alquiler).' },
-  tasas: { name: 'Tasas', text: 'Basuras por hogar y terrazas por comercio. Las pagan todos: sube tu dinero y baja un poco la felicidad de todo el pueblo.' },
+  tasas: { name: 'Tasas', text: 'Basuras por vecino y terrazas por comercio. Sube tu dinero y baja un poco la felicidad de todo el pueblo. Cuando el pueblo crece, la de basuras solo la paga quien tiene recogida (donde pasa el camión del punto limpio).' },
   plusvalia: { name: 'Plusvalía', text: 'Se cobra al vender una vivienda con ganancia. Frena la especulación y molesta a los propietarios.' },
   pie: { name: 'PIE', text: 'Participación en los Ingresos del Estado: el Estado te paga por cada vecino empadronado. Crecer da dinero.' },
 };
+
+/** 2.1: quién paga la tasa de basuras (solo con recogida). */
+function trashNote(state: GameState): HTMLElement | string {
+  if (!trashActive(state)) return '';
+  const served = trashServed(state);
+  const homes = state.citizens.filter((c) => c.homeId !== null);
+  const paying = homes.filter((c) => served.has(c.homeId!)).length;
+  const free = homes.length - paying;
+  return h(
+    'p',
+    { class: 'affects' },
+    free
+      ? `Basuras: la pagan ${paying} vecinos (por su calle pasa el camión). ${free} no la pagan porque no tienen recogida… y lo notan en la puerta de casa.`
+      : `Basuras: la pagan los ${paying} vecinos; el camión pasa por todas las calles.`,
+  );
+}
 
 /** «Las decisiones tienen cara»: a quién afecta un tributo, con nombre. */
 function affected(state: GameState, key: 'ibi' | 'tasas' | 'plusvalia' | 'all'): string {
@@ -36,7 +52,10 @@ function estimate(state: GameState, key: 'ibi' | 'tasas' | 'plusvalia', lv: TaxL
   if (key === 'plusvalia') return 'solo cuando se vende una vivienda con ganancia';
   if (key === 'tasas') {
     const shops = state.buildings.filter((b) => b.kind === 'shop' && b.built).length;
-    return `≈ ${money(state.citizens.length * TASA_BASURAS[lv] + shops * TASA_TERRAZAS[lv])}/mes`;
+    // 2.1: la de basuras, solo quien tiene recogida (con reciclaje, más barata).
+    const served = trashServed(state);
+    const fees = state.citizens.reduce((a, c) => a + (c.homeId === null ? 0 : trashFee(state, TASA_BASURAS[lv], served.get(c.homeId))), 0);
+    return `≈ ${money(fees + shops * TASA_TERRAZAS[lv])}/mes`;
   }
   let total = 0;
   for (const b of state.buildings) {
@@ -131,8 +150,9 @@ export function openTaxes(getState: () => GameState, command: Cmd): void {
     h('p', { class: 'affects' }, affected(state, 'ibi')),
     gloss('ibi'),
     h('h3', {}, 'Tasas'),
-    radio(state.taxes.tasas, 'Tasas', (lv) => `${money(TASA_BASURAS[lv])} por hogar y ${money(TASA_TERRAZAS[lv])} por terraza · ${estimate(state, 'tasas', lv)}`, (lv) => ({ type: 'SetTaxes', tasas: lv })),
+    radio(state.taxes.tasas, 'Tasas', (lv) => `${money(TASA_BASURAS[lv])} por vecino y ${money(TASA_TERRAZAS[lv])} por terraza · ${estimate(state, 'tasas', lv)}`, (lv) => ({ type: 'SetTaxes', tasas: lv })),
     h('p', { class: 'affects' }, affected(state, 'tasas')),
+    trashNote(state),
     gloss('tasas'),
     h('h3', {}, 'Plusvalía'),
     radio(state.taxes.plusvalia, 'Plusvalía', (lv) => `${pct(PLUSVALIA_RATE[lv])} de la ganancia`, (lv) => ({ type: 'SetTaxes', plusvalia: lv })),
@@ -160,6 +180,9 @@ const CONCEPT: Record<string, string> = {
   'venta de viviendas': 'Venta de viviendas',
   multas: 'Multas a los detenidos',
   'reparaciones (disturbios)': 'Reparaciones tras disturbios',
+  'reparaciones (incendio)': 'Reparaciones tras incendios',
+  'reparaciones (inundación)': 'Reparaciones tras riadas',
+  quitanieves: 'Quitanieves',
 };
 
 /** Parte mensual: ingresos y gastos con flechas y «por qué baja tu saldo» con nombres. */

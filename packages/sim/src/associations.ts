@@ -8,7 +8,7 @@ import { directorOwns } from './director-core.ts';
 import { stationsFor, tryArrest, cellsUsed } from './crime.ts';
 import { chance } from './prng.ts';
 import { type Building, type Citizen, type GameState, pushEvent } from './state.ts';
-import { CRIME } from './balance.ts';
+import { CRIME, TRASH } from './balance.ts';
 
 /**
  * v1.7: asociaciones vecinales y protestas. Cuando varios vecinos con nombre
@@ -24,10 +24,12 @@ export const CAUSE_TEXT: Record<Cause, string> = {
   salud: 'centro de salud',
   policia: 'policía',
   ocio: 'parque o plaza',
+  bomberos: 'bomberos',
   ruido: 'menos ruido',
   contaminacion: 'aire limpio',
   inseguridad: 'más seguridad',
   impuestos: 'impuestos más bajos',
+  basuras: 'recogida de basura',
 };
 /** Qué piden (una frase) y cómo se llaman. */
 export const CAUSE_ASK: Record<Cause, string> = {
@@ -37,10 +39,12 @@ export const CAUSE_ASK: Record<Cause, string> = {
   salud: 'un centro de salud cerca',
   policia: 'una comisaría cerca',
   ocio: 'un parque o una plaza cerca',
+  bomberos: 'un parque de bomberos cerca',
   ruido: 'que baje el ruido del barrio',
   contaminacion: 'que se aleje la industria de las casas',
   inseguridad: 'policía en el barrio',
   impuestos: 'que bajen los impuestos',
+  basuras: 'que pase el camión de la basura por sus calles',
 };
 
 export interface Association {
@@ -72,10 +76,12 @@ export const LEMA: Record<Cause, string> = {
   salud: '¡Sanidad en el barrio!',
   policia: '¡Queremos seguridad!',
   ocio: '¡Un parque para los niños!',
+  bomberos: '¡Bomberos para el barrio!',
   ruido: '¡Queremos dormir!',
   contaminacion: '¡Aire limpio ya!',
   inseguridad: '¡Barrio seguro!',
   impuestos: '¡No más impuestos!',
+  basuras: '¡Fuera las ratas!',
 };
 
 /** Centro de las casas de unos vecinos (el barrio de la asociación). */
@@ -95,7 +101,8 @@ export function grievanceOf(state: GameState, c: Citizen, ctx = coverageCtx(stat
   const i = home.y * state.map.w + home.x;
   const scored: [Cause, number][] = [];
   for (const n of missingServices(state, home.x, home.y, ctx)) {
-    if (n.status === 'falta') scored.push([n.key, n.key === 'agua' || n.key === 'luz' ? 12 : 5]);
+    // 2.1: los bomberos se echan de menos, pero menos que lo demás; la basura no se pide por no tener camión, sino cuando se nota en la calle (abajo).
+    if (n.status === 'falta' && n.key !== 'basuras') scored.push([n.key, n.key === 'agua' || n.key === 'luz' ? 12 : n.key === 'bomberos' ? 3 : 5]);
   }
   const pol = state.fields.pollution[i] ?? 0;
   const noise = state.fields.noise[i] ?? 0;
@@ -103,6 +110,8 @@ export function grievanceOf(state: GameState, c: Citizen, ctx = coverageCtx(stat
   if (pol > 30) scored.push(['contaminacion', (pol - 20) / 5]);
   if (noise > 35) scored.push(['ruido', (noise - 25) / 6]);
   if (crime > 30) scored.push(['inseguridad', (crime - 20) / 5]);
+  const dirt = state.fields.dirt?.[i] ?? 0;
+  if (dirt >= TRASH.dirtyField) scored.push(['basuras', 3 + dirt / 10]);
   const lv = felt(state);
   if (lv.ibi === 'high' && lv.tasas === 'high') scored.push(['impuestos', 4 + c.grudge]);
   if (!scored.length) return null;

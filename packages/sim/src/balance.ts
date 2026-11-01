@@ -32,6 +32,11 @@ export const BUILD: Record<BuildKind, BuildSpec> = {
   sports: { materials: 5_500, workers: 5, days: 4, unlockPop: 35 },
   // v1.8: la cárcel (los vecinos no la quieren cerca).
   jail: { materials: 9_000, workers: 6, days: 5, unlockPop: 60 },
+  // 2.1: emergencias.
+  firestation: { materials: 4_500, workers: 4, days: 3, unlockPop: 20 },
+  civilprotection: { materials: 2_500, workers: 3, days: 2, unlockPop: 30 },
+  // 2.1: punto limpio con camión de la basura.
+  cleanpoint: { materials: 2_500, workers: 3, days: 3, unlockPop: 30 }, // ronda 17: con 20 frenaba el crecimiento
 };
 
 /** Obras que crecen solas sobre zonas (las paga un inversor de fuera). */
@@ -63,7 +68,11 @@ export const JOBS: Record<BuildingKind, number> = {
   cemetery: 0,
   library: 2,
   sports: 2,
+  // 2.1: el camión es una contrata (va en el mantenimiento): sin plantilla municipal.
+  cleanpoint: 0,
   jail: 1, // ronda 14: con 4 empleos costaba ~4.100 €/mes sin beneficio medible
+  firestation: 3,
+  civilprotection: 1,
   house: 0,
   res: 0,
   shop: 3,
@@ -88,6 +97,10 @@ export const MAINTENANCE: Record<BuildingKind, number> = {
   library: 300,
   sports: 350,
   jail: 500,
+  firestation: 350,
+  civilprotection: 120,
+  // 2.1: incluye la contrata del camión de la basura.
+  cleanpoint: 200,
   house: 20,
   res: 0,
   shop: 0,
@@ -107,6 +120,9 @@ export const SERVICE: Partial<Record<BuildingKind, { radius: number; happiness: 
   chapel: { radius: 8, happiness: 3 },
   library: { radius: 8, happiness: 3 },
   sports: { radius: 8, happiness: 4 },
+  // 2.1: los bomberos y la protección civil dan tranquilidad (poca) en su radio.
+  firestation: { radius: 9, happiness: 2 },
+  civilprotection: { radius: 10, happiness: 1 },
 };
 
 /** v1.7: efectos propios de los lugares de vida social. */
@@ -204,8 +220,12 @@ export const DEBT_INTEREST_CAP = 0.25;
 export const TAX_SPLIT_POP = 50;
 /** IBI anual sobre el valor del inmueble (escala del juego). */
 export const IBI_RATE = { low: 0.05, medium: 0.07, high: 0.1 } as const;
-/** Tasa de basuras por hogar y mes, y de terrazas por comercio y mes. */
-export const TASA_BASURAS = { low: 10, medium: 15, high: 24 } as const;
+/**
+ * Tasa de basuras por vecino y mes, y de terrazas por comercio y mes.
+ * 2.1: la de basuras solo la paga quien tiene recogida (trash.ts); como ya paga
+ * un servicio de verdad (camión y punto limpio), sube un 20 % (10/15/24 → 12/18/28).
+ */
+export const TASA_BASURAS = { low: 12, medium: 18, high: 28 } as const;
 export const TASA_TERRAZAS = { low: 40, medium: 60, high: 95 } as const;
 /** Plusvalía municipal sobre la ganancia de una compraventa. */
 export const PLUSVALIA_RATE = { low: 0.1, medium: 0.2, high: 0.3 } as const;
@@ -566,4 +586,184 @@ export const DIRECTOR = {
   helpAmount: 120,
   /** Vecinos a los que llega un rumor. */
   rumorReach: 6,
+} as const;
+
+/** 2.1: encargos del pueblo (retos semanales que salen del estado real). */
+export const ERRANDS = {
+  /** Vecinos mínimos para que haya encargos. */
+  minPop: 8,
+  /** A la vez como mucho, cada cuánto se ofrecen y cuándo el primero. */
+  max: 3,
+  offerEveryDays: 7,
+  firstOfferDays: 10,
+  /** Días para responder a uno ofrecido, para cumplirlo y de aplazamiento (una vez). */
+  answerDays: 14,
+  days: 30,
+  postponeDays: 7,
+  /** No se repite el mismo encargo en estos días. */
+  repeatDays: 60,
+  /** Recompensa (€, la paga la Diputación) por tipo. */
+  reward: { servicio: 900, paro: 700, delincuencia: 700, felicidad: 600, deudas: 600 },
+  minJobless: 3,
+  jobsWanted: 2,
+  crimeFrom: 35,
+  crimeTo: 25,
+  happyBelow: 62,
+  happyGain: 5,
+  minDebtors: 4,
+  debtsWanted: 2,
+} as const;
+
+/** 2.1: El Eco de Bitópolis (periódico semanal). */
+export const PRESS = {
+  everyDays: 7,
+  /** Ediciones que se guardan. */
+  keep: 6,
+  /** Vecinos a los que llega la respuesta del alcalde. */
+  reach: 6,
+} as const;
+
+/**
+ * 2.1 (hoja de ruta, petición del creador): incendios y bomberos. Cada día,
+ * cada edificio puede entrar en riesgo (más las fábricas, con calor y con las
+ * estufas del invierno); al día siguiente el riesgo puede acabar en fuego. Con
+ * un parque de bomberos en su radio se apaga en pocas horas; sin él, el
+ * edificio queda destrozado (se repara, nunca se pierde). Ver fire.ts.
+ */
+export const FIRE = {
+  /** Ronda 17: ayudan tras un incendio quienes viven a esta distancia (o tienen relación o medios), como mucho tantos por turno. */
+  helpRadius: 6,
+  maxHelpers: 4,
+  /** Población mínima para que haya incendios. */
+  minPop: 20,
+  /** Probabilidad diaria de que un edificio entre en riesgo. */
+  riskBase: 0.0003,
+  /** Multiplicadores: fábricas, ola de calor y estufas en invierno (viviendas, bar y tiendas). */
+  factory: 4,
+  heat: 2.5,
+  stoves: 2,
+  /** Horas de aviso antes de que el riesgo pueda acabar en fuego (Modo normal) y probabilidad de que prenda. */
+  riskHours: 72, // ronda 17: con 24 (2 s a x10) no daba tiempo a reaccionar
+  ignite: 0.5,
+  /** Con director (Modo IA), días que dura un riesgo esperando a que el director lo elija. */
+  riskDaysAi: 42,
+  /** Horas que arde: con bomberos en su radio, y sin ellos. */
+  coveredHours: [2, 4],
+  uncoveredHours: [8, 14],
+  /** Probabilidad por hora de saltar a cada edificio vecino (también en diagonal). */
+  spreadCovered: 0.003,
+  spreadUncovered: 0.008,
+  /** Como mucho, edificios ardiendo a la vez. */
+  maxBurning: 5,
+  /** Reparación tras el fuego: fracción de los materiales (mínimo) y días de obra. */
+  repair: 0.35,
+  repairMin: 800,
+  repairDays: 3,
+  /** El nivel 2 (cisterna) llega a las colinas; el 3 ayuda en las riadas (reparaciones a la mitad en su radio). */
+  hillLevel: 2,
+  floodLevel: 3,
+  floodRepairCut: 0.5,
+  /** Felicidad: casa destrozada por el fuego; y horas que ahorra cada vecino que ayuda a apagarlo. */
+  burntHomeMood: 10,
+  helpHours: 1,
+  /** Lo que da (como mucho) un vecino a quien se ha quedado sin casa por el fuego. */
+  helpAmount: 100,
+} as const;
+
+/** 2.1: protección civil (caseta de voluntarios) y diques. */
+export const CIVIL = {
+  /** En el radio de una caseta, la probabilidad de riada baja un 60 % y el quitanieves cuesta la mitad. */
+  floodCut: 0.6,
+  snowCut: 0.5,
+  /** Dique en una casilla de la orilla: lo que cuesta y a cuántas casillas protege (también en diagonal). */
+  dikeCost: 900,
+  dikeReach: 1,
+  /** Voluntarios por caseta (parados que se apuntan), felicidad que les da y probabilidad mensual (Modo normal). */
+  volunteersPer: 6,
+  volunteerMood: 3,
+  volunteerChance: 0.25,
+} as const;
+
+/** 2.1: la ambulancia (nivel 2 del centro de salud) llega a las urgencias de los mayores. */
+export const AMBULANCE = {
+  /** Nivel del centro de salud que la tiene y alcance (× su radio). */
+  level: 2,
+  reach: 1.5,
+  /** Probabilidad de llegar a tiempo (con nieve, × snow). */
+  save: 0.6,
+  snow: 0.5,
+  /** Mayores en el menú del director para un susto que acaba bien. */
+  scareAge: 75,
+} as const;
+
+/**
+ * 2.1: rangos del pueblo (de aldea a capital comarcal). Solo título y aspecto
+ * (cartel, escudo, tejados): no desbloquean nada (eso sigue en townhall.ts).
+ * Se sube al tener a la vez los vecinos y el nivel de ayuntamiento; no se baja.
+ */
+export const RANKS = [
+  { id: 'aldea', name: 'Aldea', pop: 0, townhall: 1 },
+  { id: 'lugar', name: 'Lugar', pop: 12, townhall: 2 },
+  { id: 'villa', name: 'Villa', pop: 40, townhall: 2 },
+  { id: 'ciudad', name: 'Ciudad', pop: 100, townhall: 3 },
+  { id: 'capital', name: 'Capital comarcal', pop: 200, townhall: 4 },
+] as const;
+
+export const RANK = {
+  /** Modo IA: días que dura la votación del escudo y el lema (luego deciden las reglas). */
+  voteDays: 10,
+  /** Piezas y lemas que entran en cada votación. */
+  pieceChoices: 3,
+  mottoChoices: 3,
+} as const;
+
+/**
+ * 2.1: basura y punto limpio. Cada edificio con gente acumula basura al día; el
+ * camión del punto limpio recorre cada día unas casillas de carretera (por la
+ * red, desde el punto limpio) y vacía los edificios que dan a ellas. Sin
+ * recogida, la basura se amontona: bolsas, suciedad en la calle y, más arriba,
+ * ratas. La tasa de basuras solo se cobra a quien tiene recogida. Ver trash.ts.
+ */
+export const TRASH = {
+  /** Basura al día por vecino que vive en el edificio y por persona que trabaja en él. */
+  perResident: 2,
+  perWorker: 1,
+  /** De más al día por la actividad (tiendas, bar, mercado y talleres). */
+  activity: { shop: 3, market: 4, bar: 2, factory: 3 } as Partial<Record<BuildingKind, number>>,
+  /** Bolsas en la calle a partir de aquí; ratas, más arriba; tope. */
+  dirtyAt: 40,
+  ratsAt: 120,
+  max: 150,
+  /** Campo de suciedad (0–100): radio alrededor de cada edificio sucio. */
+  dirtRadius: 2,
+  /** Felicidad que resta la suciedad en la calle (campo ≥ dirtyField) y las ratas (campo ≥ ratsField). */
+  dirtyField: 25,
+  ratsField: 70,
+  dirtyMood: 2,
+  ratsMood: 5,
+  /** Delincuencia de más donde la calle está sucia (fracción, a pleno con ratas). */
+  crimeBoost: 0.1,
+  /** Casillas de carretera que recorre el camión al día en el nivel 1 (× capacidad del nivel). */
+  route: 60,
+  /** Con nieve, el camión no llega a las calles nevadas: recorre esta parte. */
+  snowRoute: 0.5,
+  /** Días de aviso desde que se puede construir el punto limpio hasta que la basura empieza a acumularse. */
+  warnDays: 45, // ronda 17: con 20 llegaba justo cuando se ahorra para el ayuntamiento 3
+  /** Partidas de antes (migradas): días de gracia antes de que se ensucien. */
+  graceDays: 60,
+  /** Nivel 2 (reciclaje): tasa más barata y facción ecologista más contenta. */
+  recyclingDiscount: 0.2,
+  recyclingFaction: 6,
+  /** Nivel 3 (compostaje): el abono se vende fuera, por vecino atendido y mes. */
+  compostPerResident: 3,
+  /** «Tirar al monte»: contaminación cerca de casa (puntos y radio). */
+  dumpPollution: 30,
+  dumpRadius: 2,
+  /** Por reglas: un vecino terco con ratas en casa la tira al monte uno de cada tantos días. */
+  dumpTerco: 70,
+  dumpEvery: 7,
+  /** Director: la plaga de ratas se extiende a los edificios cercanos. */
+  plagueRadius: 3,
+  /** Días entre avisos de ratas. */
+  warnEveryDays: 7,
 } as const;

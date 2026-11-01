@@ -1,4 +1,4 @@
-import { TICKS_PER_DAY, TICKS_PER_MONTH, type Command } from '@bitopolis/shared';
+import { Command, TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { describe, expect, it } from 'vitest';
 import {
   applyCommand,
@@ -248,7 +248,8 @@ describe('turnos del pueblo con IA (2.0)', () => {
   }, 120_000);
 
   it('continuidad: cada vecino con IA guarda sus notas (4 como mucho) y su actitud se contagia a los vecinos por reglas', () => {
-    const { state } = runSimulation({ seed: 7, days: 300, profile: 'constructor', aiMode: true, aiShare: 40, onTurn: fuzzTurn(11) });
+    // 2.1: con 11, la actitud media de ese pueblo se redondeaba a 0 y nadie la copiaba (depende del azar del fuzz).
+    const { state } = runSimulation({ seed: 7, days: 300, profile: 'constructor', aiMode: true, aiShare: 40, onTurn: fuzzTurn(12) });
     const ais = state.citizens.filter((c) => c.named && c.notes?.length);
     expect(ais.length).toBeGreaterThan(0);
     expect(ais.every((c) => c.notes!.length <= 4)).toBe(true);
@@ -300,5 +301,19 @@ describe('turnos del pueblo con IA (2.0)', () => {
     expect(applyCommand(state, { type: 'TownTurn', n: t.n, acts: [act] }).ok).toBe(true);
     expect(c.plan).toBeUndefined();
     expect(checkInvariants(state)).toEqual([]);
+  });
+
+  it('ronda 17: un campo largo o raro de la IA nunca tumba el turno (la salida de parseTurn siempre es un comando válido)', () => {
+    const ids = [1, 2];
+    const raw = JSON.stringify({
+      decisiones: [
+        { vecino: 1, accion: 'aceptar_trabajo_en_la_fabrica_grande_del_pueblo:12', gesto: { con: 0, tipo: 'hacer_las_paces_con_todos_ya' }, actitud: 5, gasto: { donde: 'en_el_pueblo', tienda: 0, ocio: true }, plan: { tipo: 'irse_si_no_hay_colegio_pronto_de_verdad', necesidad: 'colegio_y_centro_de_salud', meses: 3 }, pensamiento: 'Bien.', motivo: 'Bien.', recuerdo: '', escudo: { pieza: 'pequeno_pero_valiente', lema: 'otro' } },
+        { vecino: 2, accion: 'seguir', gesto: { con: 0, tipo: 'ninguno' }, actitud: 0, gasto: { donde: 'pueblo', tienda: 0, ocio: false }, plan: { tipo: 'ninguno', necesidad: '', meses: 0 }, pensamiento: '', motivo: '' },
+      ],
+    });
+    const r = parseTurn(raw, ids, 'votacion_escudo "id":"torre"');
+    expect(r.acts).toHaveLength(2);
+    expect(r.acts[0]!.escudo).toBeUndefined();
+    expect(Command.safeParse({ type: 'TownTurn', n: 1, acts: r.acts }).success).toBe(true);
   });
 });

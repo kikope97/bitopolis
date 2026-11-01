@@ -44,6 +44,7 @@ import { charge, totalDebt } from './household.ts';
 import { radiusOf, serviceCapacityOf } from './levels.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance } from './prng.ts';
+import { compostMonth, trashFee, trashServed } from './trash.ts';
 import { addMemory, onBusinessFounded } from './social.ts';
 import {
   type Building,
@@ -375,6 +376,9 @@ export function payDividends(state: GameState, b: Building): void {
 
 /** Vivienda (alquiler, hipoteca, IBI) y tasas de cada hogar. */
 export function monthlyHousing(state: GameState, r: MonthRates): void {
+  // 2.1: la tasa de basuras solo la paga quien tiene recogida (sin nieve: el servicio de siempre).
+  const served = trashServed(state);
+  compostMonth(state, served);
   const byHome = new Map<number, Citizen[]>();
   for (const c of state.citizens) {
     if (c.homeId === null) continue;
@@ -384,6 +388,8 @@ export function monthlyHousing(state: GameState, r: MonthRates): void {
   }
   for (const b of state.buildings) {
     if (!b.built || (b.kind !== 'house' && b.kind !== 'res')) continue;
+    // Ronda 17: una casa quemada no paga alquiler ni tributos hasta que se repare.
+    if (b.damaged?.cause === 'fuego') continue;
     const residents = byHome.get(b.id) ?? [];
     const ibi = Math.round((unitValue(state, b) * r.ibi) / 12);
     let municipal = municipalUnits(b);
@@ -408,7 +414,7 @@ export function monthlyHousing(state: GameState, r: MonthRates): void {
         c.rentArrears = paid < PRIVATE_RENT + ibi ? (c.rentArrears ?? 0) + 1 : 0;
         transfer(state, OUTSIDE, TREASURY, ibi, 'IBI');
       }
-      charge(state, c, TREASURY, r.basuras, 'tasas');
+      charge(state, c, TREASURY, trashFee(state, r.basuras, served.get(b.id)), 'tasas');
     }
     // Viviendas privadas vacías: el dueño de fuera paga su IBI.
     const capacity = HOMES[b.kind] ?? 0;
@@ -445,7 +451,7 @@ export function serviceLoads(state: GameState): Map<number, number> {
   const key = `${state.tick}:${state.citizens.length}:${state.buildings.length}`;
   const hit = loadCache.get(state);
   if (hit && hit.key === key) return hit.loads;
-  const served = state.buildings.filter((b) => b.built && SERVICE_CAPACITY[b.kind]);
+  const served = state.buildings.filter((b) => b.built && !b.damaged && SERVICE_CAPACITY[b.kind]);
   const count = new Map<number, number>(served.map((b) => [b.id, 0]));
   const byId = new Map(state.buildings.map((b) => [b.id, b]));
   for (const c of state.citizens) {

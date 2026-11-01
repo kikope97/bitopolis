@@ -5,7 +5,7 @@ export const TaxLevel = z.enum(['low', 'medium', 'high']);
 export type TaxLevel = z.infer<typeof TaxLevel>;
 
 /** Lo que el alcalde puede construir directamente. */
-export const BuildKind = z.enum(['road', 'water', 'power', 'park', 'school', 'clinic', 'police', 'house', 'plaza', 'market', 'bar', 'chapel', 'cemetery', 'library', 'sports', 'jail']);
+export const BuildKind = z.enum(['road', 'water', 'power', 'park', 'school', 'clinic', 'police', 'house', 'plaza', 'market', 'bar', 'chapel', 'cemetery', 'library', 'sports', 'jail', 'firestation', 'civilprotection', 'cleanpoint']);
 export type BuildKind = z.infer<typeof BuildKind>;
 
 export const ZoneKind = z.enum(['none', 'R', 'C', 'I']);
@@ -31,6 +31,8 @@ export const Command = z.discriminatedUnion('type', [
   z.object({ type: z.literal('ConvenePleno') }),
   z.object({ type: z.literal('MeetAssociation'), associationId: z.number().int() }),
   z.object({ type: z.literal('RepairBuilding'), buildingId: z.number().int() }),
+  /** 2.1: dique en una casilla de la orilla del río (anula la riada ahí). */
+  z.object({ type: z.literal('BuildDike'), x: Coord, y: Coord }),
   z.object({ type: z.literal('UpgradeTownhall') }),
   z.object({ type: z.literal('UpgradeBuilding'), buildingId: z.number().int() }),
   // v1.9: economía de cada vecino.
@@ -76,6 +78,7 @@ export const Command = z.discriminatedUnion('type', [
           pensamiento: z.string().max(300),
           motivo: z.string().max(400),
           recuerdo: z.string().max(300).optional(),
+          escudo: z.object({ pieza: z.string().max(20), lema: z.string().max(40) }).optional(),
         }),
       )
       .max(300),
@@ -86,8 +89,24 @@ export const Command = z.discriminatedUnion('type', [
       .object({
         sucesos: z.array(z.object({ id: z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(40), motivo: z.string().max(400) })).max(6),
         avisos: z.array(z.object({ id: z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(40), motivo: z.string().max(400) })).max(6),
+        /** 2.1: titulares de El Eco y el encargo con historia. */
+        titulares: z.array(z.object({ seccion: z.enum(['sucesos', 'cartas', 'anuncios']), texto: z.string().max(300), sobre: z.number().int().optional(), suceso: z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(40).optional() })).max(3).optional(),
+        encargo: z.object({ id: z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(40), carta: z.string().max(500) }).optional(),
       })
       .optional(),
+  }),
+  /** 2.1: responder a un encargo del pueblo. */
+  z.object({ type: z.literal('AnswerErrand'), errandId: z.number().int(), answer: z.enum(['aceptar', 'mas_tarde', 'rechazar']) }),
+  /** 2.1: contestar en El Eco de Bitópolis (menú cerrado). */
+  z.object({ type: z.literal('AnswerPress'), edition: z.number().int().min(1), answer: z.enum(['agradecer', 'desmentir', 'prometer']) }),
+  /**
+   * 2.1: votos de los vecinos con IA para el escudo y el lema al subir de rango
+   * (menú cerrado de `rankCandidates`; el motor descarta lo que no esté en él y
+   * el resto del pueblo vota por reglas). Solo lo trae la IA del servidor.
+   */
+  z.object({
+    type: z.literal('ChooseCrest'),
+    votes: z.array(z.object({ vecino: z.number().int(), pieza: z.string().regex(/^[a-z_]+$/).max(20), lema: z.string().regex(/^[a-z_]+$/).max(40) })).min(1).max(300),
   }),
   /** 2.0: % de vecinos con IA (solo sube: nadie deja de pensar con IA). */
   z.object({ type: z.literal('SetAiShare'), share: z.number().int().min(0).max(100) }),

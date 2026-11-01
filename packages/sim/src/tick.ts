@@ -1,3 +1,5 @@
+import { errandsDay } from './errands.ts';
+import { pressDay } from './press.ts';
 import { TICKS_PER_DAY, TICKS_PER_MONTH, tickToDate } from '@bitopolis/shared';
 import {
   BUSINESS_SEED_CASH,
@@ -26,6 +28,8 @@ import {
   SOCIAL_PLACES,
   TERRAIN,
   TURN,
+  CIVIL,
+  FIRE,
 } from './balance.ts';
 import { applyCommand, BUILD_NAMES, removeBuilding } from './commands.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
@@ -48,14 +52,17 @@ import {
 } from './economy.ts';
 import { budgetFx, civicDay, festivalMood, onBuildingDone } from './civic.ts';
 import { updateFields } from './fields.ts';
+import { trashDay, trashMood } from './trash.ts';
 import { Terrain } from './terrain.ts';
 import { weatherDay, weatherFx, weatherMood } from './weather.ts';
 import { associationsDay, associationsMonth } from './associations.ts';
 import { albumDay } from './album.ts';
+import { rankDay } from './rank.ts';
 import { crimeDay, jailNear } from './crime.ts';
 import { townLevel, zonesUnlocked } from './townhall.ts';
 import { finishUpgrades, jobsOf, maintenanceOf, plantCapacityOf, radiusOf, serviceHappiness } from './levels.ts';
 import { lifeDay, lifeMonth, lifeYear } from './lifecycle.ts';
+import { burntDown, fireDay, fireTick, volunteersMonth } from './fire.ts';
 import { aiByShare, plansDay, turnsTick } from './turns.ts';
 import { ruleTurn } from './decisions.ts';
 import { basicLiving, drownedInDebt, economyStats, outsideJobsMonth, settleMonth, totalDebt, unansweredDeferrals } from './household.ts';
@@ -87,12 +94,14 @@ export function isBusiness(b: Building): boolean {
 }
 
 export function homeCapacity(b: Building): number {
-  return b.built ? (HOMES[b.kind] ?? 0) : 0;
+  // 2.1: una casa destrozada por el fuego no admite a nadie nuevo hasta repararla.
+  return b.built && !burntDown(b) ? (HOMES[b.kind] ?? 0) : 0;
 }
 
 export function jobCapacity(b: Building): number {
   // Ronda 15: una empresa que pierde dinero recorta plantilla (b.staff) antes de cerrar.
-  return b.built ? Math.min(jobsOf(b), b.staff ?? Infinity) : 0;
+  // 2.1: lo destrozado por el fuego no contrata hasta repararlo.
+  return b.built && !burntDown(b) ? Math.min(jobsOf(b), b.staff ?? Infinity) : 0;
 }
 
 export function occupants(state: GameState, b: Building): Citizen[] {
@@ -228,6 +237,8 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
   const home = c.homeId !== null ? state.buildings.find((b) => b.id === c.homeId) : undefined;
   if (!home) f.push({ label: 'Sin casa', value: -20 });
   else {
+    // 2.1: su casa quedó destrozada por el fuego (hasta que se repare).
+    if (burntDown(home)) f.push({ label: 'El fuego le destrozó la casa', value: -FIRE.burntHomeMood });
     f.push({ label: c.owns ? 'Casa en propiedad' : 'Tiene casa', value: c.owns ? 11 : 8 });
     f.push(home.hasWater ? { label: 'Agua', value: 8 } : { label: 'Sin agua', value: -12 });
     f.push(home.hasPower ? { label: 'Luz', value: 8 } : { label: 'Sin luz', value: -12 });
@@ -237,7 +248,7 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
     const full = new Set<string>();
     for (const b of state.buildings) {
       const s = SERVICE[b.kind];
-      if (!s || !b.built || dist(b, home) > radiusOf(b)) continue;
+      if (!s || !b.built || b.damaged || dist(b, home) > radiusOf(b)) continue;
       // Un servicio saturado rinde en proporción a los vecinos que puede atender.
       const load = serviceSaturation(state, b.kind, b.id);
       if (load < 0.9) full.add(b.kind);
@@ -259,6 +270,9 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
     if (pol > 20) f.push({ label: 'Contaminación', value: -Math.round((pol - 20) / 5) });
     if (noise > 25) f.push({ label: 'Ruido', value: -Math.round((noise - 25) / 6) });
     if (crime > 20) f.push({ label: 'Inseguridad', value: -Math.round((crime - 20) / 5) });
+    // 2.1: basura sin recoger en su calle (bolsas o ratas).
+    const dirty = trashMood(state, home);
+    if (dirty) f.push(dirty);
   }
   if (c.jobId !== null) f.push({ label: 'Trabaja en el pueblo', value: 8 });
   else if (c.unemployedSince !== undefined) f.push({ label: 'En paro', value: -JOBS_OUTSIDE.mood });
@@ -289,12 +303,14 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
   if (fest) f.push(fest);
   if (c.kids?.length) f.push({ label: c.kids.length === 1 ? 'Un hijo en casa' : `${c.kids.length} hijos en casa`, value: 3 });
   // v1.7: la biblioteca, para quien quiere prosperar; sin cementerio, el duelo pesa.
-  if (home && c.desire === 'prosperar' && state.buildings.some((b) => b.kind === 'library' && b.built && dist(b, home) <= radiusOf(b))) {
+  if (home && c.desire === 'prosperar' && state.buildings.some((b) => b.kind === 'library' && b.built && !b.damaged && dist(b, home) <= radiusOf(b))) {
     f.push({ label: 'Biblioteca cerca para formarse', value: SOCIAL_PLACES.libraryProsper });
   }
   if (!state.buildings.some((b) => b.kind === 'cemetery' && b.built) && c.memories.some((m) => m.kind === 'perdio_a' && state.tick - m.tick < 360 * TICKS_PER_DAY)) {
     f.push({ label: 'Sin cementerio donde despedir a los suyos', value: -SOCIAL_PLACES.noCemeteryMood });
   }
+  // 2.1: voluntario de protección civil.
+  if (c.volunteer) f.push({ label: 'Voluntario de protección civil', value: CIVIL.volunteerMood });
   // v1.8: el Palacio Municipal (nivel 5) es motivo de orgullo.
   if (townLevel(state) >= 5) f.push({ label: 'Orgullo de su ayuntamiento', value: 2 });
   // v1.7: el calor sin sombra cerca.
@@ -546,6 +562,8 @@ function endOfDay(state: GameState): void {
       pushEvent(state, 'info', `Reabre ${b.name ?? BUILD_NAMES[b.kind]?.toLowerCase()} tras la reparación`, { ref: b.id });
     }
   }
+  // 2.1: el camión recoge y se amontona lo que no (antes de los campos: la suciedad sale de ahí).
+  trashDay(state);
   updateFields(state);
   assignHomesAndJobs(state);
   // Inercia: la felicidad baja más rápido de lo que sube.
@@ -569,6 +587,8 @@ function endOfDay(state: GameState): void {
   lifeDay(state);
   associationsDay(state);
   crimeDay(state);
+  // 2.1: riesgos e incendios.
+  fireDay(state);
   // 2.0: planes y ultimátums de los vecinos que vencen.
   plansDay(state, (c) => leaveVoluntarily(state, c));
   // v1.9.1: peticiones de aplazamiento sin respuesta.
@@ -577,7 +597,12 @@ function endOfDay(state: GameState): void {
   for (const b of finishUpgrades(state)) {
     pushEvent(state, 'built', `${b.name ?? BUILD_NAMES[b.kind] ?? b.kind} sube a nivel ${b.level}: llega más lejos y atiende a más gente`, { ref: b.id });
   }
+  // 2.1: de aldea a ciudad (antes del álbum: la subida sale en la foto del día).
+  rankDay(state);
   albumDay(state);
+  // 2.1: encargos del pueblo y El Eco de Bitópolis.
+  errandsDay(state);
+  pressDay(state);
   accumulateRates(state);
 }
 
@@ -591,7 +616,7 @@ function businessPayroll(state: GameState, r: ReturnType<typeof monthRates>): vo
   for (const b of state.buildings) {
     if (!isBusiness(b) || !b.built) continue;
     const workers = state.citizens.filter((c) => c.jobId === b.id);
-    if (b.kind === 'factory') {
+    if (b.kind === 'factory' && !b.damaged) {
       // Ronda 15: las fábricas repercuten la mitad de la subida del sueldo en sus precios.
       const rev = workers.length * (FACTORY_REVENUE_PER_WORKER + Math.round(0.5 * (wage - MIN_WAGE.none)));
       transfer(state, OUTSIDE, b.id, rev);
@@ -666,6 +691,8 @@ function endOfMonth(state: GameState): void {
   // El ayuntamiento cuesta más de mantener cuanto más grande (v1.8).
   for (const b of state.buildings) if (b.built) transfer(state, TREASURY, OUTSIDE, Math.round(maintenanceOf(b) * (b.kind === 'townhall' ? townLevel(state) : 1) * budgetFx(state).maintenance), 'mantenimiento');
   lifeMonth(state);
+  // 2.1: voluntarios de protección civil (por reglas).
+  volunteersMonth(state);
   if (state.treasury < 0) {
     const debt = -state.treasury;
     const interest = Math.min(debt, DEBT_INTEREST_STEP) * DEBT_INTEREST + Math.max(0, debt - DEBT_INTEREST_STEP) * DEBT_INTEREST_HIGH;
@@ -710,6 +737,8 @@ export function step(state: GameState): void {
   if (state.pending.length > 0) resolveDuePending(state);
   if (state.tick % TICKS_PER_DAY === 0) endOfDay(state);
   if (state.tick % TICKS_PER_MONTH === 0) endOfMonth(state);
+  // 2.1: el fuego va por horas.
+  fireTick(state);
   // 2.0: turnos del pueblo con IA (abrir, y si vencen sin respuesta, reglas).
   turnsTick(state, ruleTurn);
 }

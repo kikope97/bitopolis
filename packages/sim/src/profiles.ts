@@ -1,9 +1,9 @@
 import type { BuildKind, Command, TaxLevel } from '@bitopolis/shared';
-import { PLANT_CAPACITY } from './balance.ts';
+import { PLANT_CAPACITY, TRASH } from './balance.ts';
 import { canUpgradeTownhall, nextLevel, zonesUnlocked } from './townhall.ts';
 import { buildCost, validateCommand } from './commands.ts';
 import { chance, type RngState, seedRng } from './prng.ts';
-import { buildingAt, type GameState, hasAdjacentRoad, Tile, tileIndex, Zone } from './state.ts';
+import { buildingAt, DIRS, type GameState, hasAdjacentRoad, Tile, tileIndex, Zone } from './state.ts';
 import { freeHomes } from './tick.ts';
 
 /**
@@ -66,6 +66,27 @@ function nextRoad(state: GameState): Command | null {
   return null;
 }
 
+/** Calles conectadas a las que da un edificio. */
+function roadNetworkOf(state: GameState, b: { x: number; y: number }): Set<number> {
+  const { w, tiles } = state.map;
+  const out = new Set<number>();
+  const queue: number[] = [];
+  const push = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= w || y >= state.map.h) return;
+    const i = y * w + x;
+    if (tiles[i] === Tile.Road && !out.has(i)) {
+      out.add(i);
+      queue.push(i);
+    }
+  };
+  for (const [dx, dy] of DIRS) push(b.x + dx, b.y + dy);
+  while (queue.length) {
+    const i = queue.pop()!;
+    for (const [dx, dy] of DIRS) push((i % w) + dx, Math.floor(i / w) + dy);
+  }
+  return out;
+}
+
 function buildingKindOf(state: GameState, id: number): string | undefined {
   return state.buildings.find((b) => b.id === id)?.kind;
 }
@@ -113,7 +134,23 @@ function planner(name: string, o: PlannerOpts): Profile {
       if (built.some((b) => !b.hasPower) && !enough('power') && !state.projects.some((p) => buildingKindOf(state, p.buildingId) === 'power')) {
         if (tryBuild('power')) return out;
       }
-      // v1.8: repara lo que rompieron los disturbios si la caja lo permite.
+      // 2.1: al avisar de la basura, un punto limpio; luego, otro junto a lo que se ensucia (uno por cada 40 vecinos como mucho).
+      const first = (state.trash?.start ?? -1) >= 0 && !has('cleanpoint');
+      const dirty = state.buildings.filter((b) => (b.trash ?? 0) >= TRASH.dirtyAt).sort((a, b) => (b.trash ?? 0) - (a.trash ?? 0) || a.id - b.id)[0];
+      const points = state.buildings.filter((b) => b.kind === 'cleanpoint').length;
+      const cpNear = first ? (dirty ?? state.buildings.filter((b) => b.kind === 'house' || b.kind === 'res').at(-1) ?? state.buildings.find((b) => b.kind === 'townhall')) : dirty && points < 1 + Math.floor(pop / 60) ? dirty : undefined;
+      if (cpNear && !state.projects.some((p) => buildingKindOf(state, p.buildingId) === 'cleanpoint') && state.treasury >= buildCost('cleanpoint') + (first ? 0 : o.reserve / 2)) {
+        // En la misma red de calles que lo sucio (si no, el camión no llegaría).
+        const net = roadNetworkOf(state, cpNear);
+        const onNet = (s: { x: number; y: number }) => DIRS.some(([dx, dy]) => net.has((s.y + dy) * state.map.w + s.x + dx));
+        const near = spots.filter(onNet).sort((a, b) => Math.abs(a.x - cpNear.x) + Math.abs(a.y - cpNear.y) - (Math.abs(b.x - cpNear.x) + Math.abs(b.y - cpNear.y)));
+        const spot = near.find((s) => validateCommand(state, { type: 'Build', kind: 'cleanpoint', x: s.x, y: s.y }).ok);
+        if (spot) {
+          out.push({ type: 'Build', kind: 'cleanpoint', x: spot.x, y: spot.y });
+          return out;
+        }
+      }
+      // v1.8: repara lo que rompieron los disturbios (2.1: o el fuego) si la caja lo permite.
       const broken = state.buildings.find((b) => b.damaged && b.damaged.repairUntil < 0);
       if (broken && state.treasury > broken.damaged!.cost + o.reserve) {
         out.push({ type: 'RepairBuilding', buildingId: broken.id });
@@ -186,7 +223,8 @@ export const PROFILES: Record<string, Profile> = {
     tax: 'medium',
     reserve: 0,
     activity: 1,
-    services: ['park', 'school', 'clinic', 'police'],
+    // 2.1: el constructor también pone bomberos.
+    services: ['park', 'school', 'clinic', 'police', 'firestation'],
     municipalHousing: true,
   }),
 };

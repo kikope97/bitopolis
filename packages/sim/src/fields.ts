@@ -1,6 +1,6 @@
 import type { GameState } from './state.ts';
 import { Tile } from './state.ts';
-import { CRIME, FIELDS, TERRAIN } from './balance.ts';
+import { CRIME, FIELDS, TERRAIN, TRASH } from './balance.ts';
 import { radiusOf } from './levels.ts';
 import { isWater, Terrain } from './terrain.ts';
 
@@ -13,10 +13,12 @@ export interface Fields {
   noise: number[];
   crime: number[];
   land: number[];
+  /** 2.1: suciedad por la basura sin recoger (bolsas y ratas). */
+  dirt: number[];
 }
 
 export function emptyFields(n: number): Fields {
-  return { pollution: new Array(n).fill(0), noise: new Array(n).fill(0), crime: new Array(n).fill(0), land: new Array(n).fill(50) };
+  return { pollution: new Array(n).fill(0), noise: new Array(n).fill(0), crime: new Array(n).fill(0), land: new Array(n).fill(50), dirt: new Array(n).fill(0) };
 }
 
 /** Suma `amount` con caída lineal hasta `radius` (distancia Manhattan). */
@@ -41,6 +43,7 @@ export function updateFields(state: GameState): void {
   const crime = new Float64Array(n);
   const police = new Float64Array(n);
   const good = new Float64Array(n);
+  const dirt = new Float64Array(n);
   const residents = new Map<number, number>();
   // v1.9: la pobreza también cuenta: cada vecino endeudado suma delincuencia en su casa.
   const indebted = new Map<number, number>();
@@ -51,7 +54,8 @@ export function updateFields(state: GameState): void {
   }
 
   for (const b of state.buildings) {
-    if (!b.built) continue;
+    // Ronda 17: lo destrozado (fuego, disturbios) no actúa: ni policía ni fábrica.
+    if (!b.built || b.damaged) continue;
     switch (b.kind) {
       case 'factory':
         stamp(emit, w, h, b.x, b.y, 4, 9);
@@ -94,6 +98,8 @@ export function updateFields(state: GameState): void {
       default:
         break;
     }
+    // 2.1: la basura sin recoger ensucia la calle (bolsas desde dirtyAt; con ratas, a tope).
+    if ((b.trash ?? 0) >= TRASH.dirtyAt) stamp(dirt, w, h, b.x, b.y, TRASH.dirtRadius, (100 * (b.trash ?? 0)) / TRASH.ratsAt);
     const people = residents.get(b.id) ?? 0;
     if (people > 0) stamp(crime, w, h, b.x, b.y, 4, people * 2.2 + (indebted.get(b.id) ?? 0) * CRIME.debtCrime);
   }
@@ -126,15 +132,19 @@ export function updateFields(state: GameState): void {
     }
     if (near) view[i]! += TERRAIN.waterfrontLand;
   }
+  f.dirt ??= new Array(n).fill(0);
   for (let i = 0; i < n; i++) {
     // La contaminación industrial persiste: se disipa muy despacio.
     f.pollution[i] = clamp(f.pollution[i]! * FIELDS.pollutionDecay + emit[i]!);
     f.noise[i] = clamp(noise[i]!);
-    f.crime[i] = clamp(crime[i]! * (1 - Math.min(0.75, police[i]! * 0.9)));
+    f.dirt[i] = clamp(dirt[i]!);
+    // 2.1: con la calle sucia sube la delincuencia (hasta un 10 % con ratas).
+    const filth = 1 + TRASH.crimeBoost * Math.min(1, f.dirt[i]! / TRASH.ratsField);
+    f.crime[i] = clamp(crime[i]! * filth * (1 - Math.min(0.75, police[i]! * 0.9)));
     const x = i % w;
     const y = Math.floor(i / w);
     const centre = Math.max(0, 15 - (Math.abs(x - cx) + Math.abs(y - cy)) * 0.6);
-    f.land[i] = clamp(40 + centre + view[i]! + good[i]! - f.pollution[i]! * 0.6 - f.noise[i]! * 0.25 - f.crime[i]! * 0.4);
+    f.land[i] = clamp(40 + centre + view[i]! + good[i]! - f.pollution[i]! * 0.6 - f.noise[i]! * 0.25 - f.crime[i]! * 0.4 - f.dirt[i]! * 0.15);
   }
 }
 

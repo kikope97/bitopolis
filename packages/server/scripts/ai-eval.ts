@@ -56,7 +56,15 @@ const simulated: LLMProvider = {
       const d = JSON.parse(req.user.slice(req.user.indexOf('\n') + 1)) as { presupuesto_drama: { sucesos_malos_que_caben: number }; menu: { id: string; malo: boolean; avisado: boolean }[] };
       const sucesos = [...d.menu.filter((m) => !m.malo).slice(0, 1), ...d.menu.filter((m) => m.malo && m.avisado).slice(0, d.presupuesto_drama.sucesos_malos_que_caben)];
       const avisos = d.menu.filter((m) => m.malo && !m.avisado).slice(0, 2);
-      const text = JSON.stringify({ sucesos: sucesos.map((m) => ({ id: m.id, motivo: 'Toca.' })), avisos: avisos.map((m) => ({ id: m.id, motivo: 'Se nota.' })), foco: 'La semana', cronica: 'Pasan cosas en el pueblo.' });
+      const e = (d as unknown as { encargos_posibles?: { id: string }[] }).encargos_posibles?.[0];
+      const text = JSON.stringify({
+        sucesos: sucesos.map((m) => ({ id: m.id, motivo: 'Toca.' })),
+        avisos: avisos.map((m) => ({ id: m.id, motivo: 'Se nota.' })),
+        foco: 'La semana',
+        cronica: 'Pasan cosas en el pueblo.',
+        titulares: [{ seccion: 'anuncios', sobre: '', texto: 'El pueblo sigue adelante' }],
+        encargo: e ? { id: e.id, carta: 'Alcalde, hágalo por el pueblo.' } : { id: '', carta: '' },
+      });
       return { text, usage: { in: tokens(req.system + (req.shared ?? '') + req.user), cachedIn: 0, out: tokens(text) } };
     }
     const list = JSON.parse(req.user.slice(req.user.indexOf('\n') + 1)) as {
@@ -143,7 +151,7 @@ for (let seed = 1; seed <= Number(values.seeds); seed++) {
         else totals.retries++;
         try {
           const t0 = performance.now();
-          const r = await llm.complete({ system: req.system, shared: req.shared, user: req.user, schema: req.schema, model, maxTokens: 400 + ids.length * 320 });
+          const r = await llm.complete({ system: req.system, shared: req.shared, user: req.user, schema: req.schema, model, maxTokens: 1000 + ids.length * 600 });
           totals.latencyMs.push(performance.now() - t0);
           if (values.record) recordings.set(ReplayProvider.key({ system: req.system, shared: req.shared, user: req.user }), r);
           totals.tokensIn += r.usage.in || tokens(req.system + req.shared + req.user);
@@ -166,6 +174,11 @@ for (let seed = 1; seed <= Number(values.seeds); seed++) {
           acts.push(...parsed.acts);
           // Como el servidor: a los que se deja, una segunda pregunta.
           if (retry && parsed.missing.length && parsed.missing.length < ids.length) queue.push({ ids: parsed.missing, retry: false });
+          else if (retry && parsed.missing.length === ids.length && ids.length > 1) {
+            // Como el servidor: el lote entero falló (cortado): dos mitades.
+            const half = Math.ceil(ids.length / 2);
+            queue.push({ ids: ids.slice(0, half), retry: false }, { ids: ids.slice(half), retry: false });
+          }
         } catch (e) {
           totals.errors++;
           if (totals.errors <= 3) console.error('error de la IA:', (e as Error).message);
@@ -177,12 +190,12 @@ for (let seed = 1; seed <= Number(values.seeds); seed++) {
         const req = buildDirectorRequest(state, shared);
         dir.calls++;
         try {
-          const r = await llm.complete({ system: req.system, shared: req.shared, user: req.user, schema: req.schema, model: directorModel, maxTokens: 900 });
+          const r = await llm.complete({ system: req.system, shared: req.shared, user: req.user, schema: req.schema, model: directorModel, maxTokens: 1400 });
           if (values.record) recordings.set(ReplayProvider.key({ system: req.system, shared: req.shared, user: req.user }), r);
           dir.tokensIn += r.usage.in || tokens(req.system + req.shared + req.user);
           dir.tokensCached += r.usage.cachedIn;
           dir.tokensOut += r.usage.out || tokens(r.text);
-          director = parseDirector(r.text, req.ids, `${req.shared}\n${req.user}`);
+          director = parseDirector(r.text, req.ids, `${req.shared}\n${req.user}`, { news: req.news, errands: req.errands });
           if (director) {
             dir.valid++;
             for (const x of director.director.sucesos) dir.picked[x.id.split(':')[0]!] = (dir.picked[x.id.split(':')[0]!] ?? 0) + 1;

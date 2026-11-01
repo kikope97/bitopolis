@@ -27,7 +27,7 @@ export function nextHint(state: GameState): Hint {
     return { text: `${unserved.length} edificio(s) sin agua o luz (icono de gota o rayo). Conéctalos con carretera a las plantas, o construye otra si están llenas.` };
   }
   // v1.7: el servicio que falta en más viviendas (la capa «Qué falta» lo enseña casa por casa).
-  const TOOL: Record<string, ToolId> = { colegio: 'school', salud: 'clinic', policia: 'police', ocio: 'park' };
+  const TOOL: Record<string, ToolId> = { colegio: 'school', salud: 'clinic', policia: 'police', ocio: 'park', bomberos: 'firestation', basuras: 'cleanpoint' };
   const gap = coverageSummary(state)
     .filter((r) => TOOL[r.key] && r.falta + r.lleno >= 3)
     .sort((a, b) => b.falta + b.lleno - (a.falta + a.lleno))[0];

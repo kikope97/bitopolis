@@ -1,8 +1,9 @@
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { protestFor, type Association } from './associations.ts';
-import { DEBT, KIDS_MAX, TURN } from './balance.ts';
+import { DEBT, FIRE, KIDS_MAX, TURN } from './balance.ts';
 import { BUILD_NAMES, removeBuilding } from './commands.ts';
 import { homeRobbery } from './crime.ts';
+import { becomeVolunteer, canVolunteer, fireHelpTargets, helpAfterFire, homelessByFire, placeName, shelter } from './fire.ts';
 import { canBuyHome, canFound, shopTypesFor } from './economy.ts';
 import type { Brewing } from './director-core.ts';
 import type { DirectorChoice } from './director.ts';
@@ -11,6 +12,7 @@ import { totalDebt } from './household.ts';
 import { jobsOf } from './levels.ts';
 import { addMemory, goalFor, NEED_TEXT, needOf, needsOf, PROFESSIONS, relation, setRelation } from './social.ts';
 import { transfer } from './money.ts';
+import { canDump, dumpTrash } from './trash.ts';
 import { type Building, type Citizen, DESIRES, FEARS, type GameState, pushEvent, type Trigger } from './state.ts';
 
 /**
@@ -85,6 +87,8 @@ export interface TurnAct {
   motivo: string;
   /** Lo que apunta de esta semana (su memoria escrita). */
   recuerdo?: string;
+  /** 2.1: su voto para el escudo, si hay votación abierta (ids del menú). */
+  escudo?: { pieza: string; lema: string };
 }
 
 export function emptyTownAi(share = TURN.defaultShare): TownAi {
@@ -140,7 +144,7 @@ function vacantJobs(state: GameState, c: Citizen): Building[] {
 function freeHomesFor(state: GameState, c: Citizen): Building[] {
   const use = new Map<number, number>();
   for (const x of state.citizens) if (x.homeId !== null) use.set(x.homeId, (use.get(x.homeId) ?? 0) + 1);
-  const cap = (b: Building) => (b.built ? (b.kind === 'house' ? 3 : b.kind === 'res' ? 4 : 0) : 0);
+  const cap = (b: Building) => (b.built && b.damaged?.cause !== 'fuego' ? (b.kind === 'house' ? 3 : b.kind === 'res' ? 4 : 0) : 0);
   return state.buildings
     .filter((b) => b.id !== c.homeId && cap(b) > (use.get(b.id) ?? 0))
     .sort((a, b) => (state.fields.land[b.y * state.map.w + b.x] ?? 0) - (state.fields.land[a.y * state.map.w + a.x] ?? 0) || a.id - b.id)
@@ -199,6 +203,8 @@ export function turnMenu(state: GameState, c: Citizen): MenuItem[] {
   // Pedir y quejarse.
   for (const n of needsOf(state, c).slice(0, 2)) out.push({ accion: `pedir:${n}`, detalle: `pedir al alcalde ${NEED_TEXT[n]}` });
   out.push({ accion: 'quejarse', detalle: 'quejarse al ayuntamiento' });
+  // 2.1: sin camión y con la basura en la puerta, puede tirarla al monte (contamina y está mal visto).
+  if (canDump(state, c)) out.push({ accion: 'tirar_al_monte', detalle: 'tirar la basura al monte: no pasa el camión por su calle (contamina cerca y los vecinos lo verán mal)' });
   // Deudas.
   if (totalDebt(c) >= DEBT.noticeable) {
     out.push({ accion: 'apretarse', detalle: 'apretarse el cinturón para pagar lo que debe' });
@@ -209,6 +215,21 @@ export function turnMenu(state: GameState, c: Citizen): MenuItem[] {
   if (p && p.homeId === c.homeId && c.homeId !== null && Math.max(c.age, p.age) <= 45 && Math.min(c.age, p.age) >= 20 && (c.kids?.length ?? 0) < KIDS_MAX) {
     out.push({ accion: 'tener_hijo', detalle: `tener un hijo con ${p.name.split(' ')[0]}` });
   }
+  // 2.1: emergencias. Ayudar tras un incendio, acoger a quien se ha quedado sin casa, protección civil.
+  for (const b of fireHelpTargets(state)) {
+    if (b.id === c.homeId) continue;
+    // Ronda 17: ayuda quien tiene relación con los afectados, vive cerca o es sociable y tiene medios.
+    const h = home(state, c);
+    const near = h && Math.abs(h.x - b.x) + Math.abs(h.y - b.y) <= FIRE.helpRadius;
+    const close = state.citizens.some((x) => (x.homeId === b.id || x.jobId === b.id) && c.relations.some((r) => r.id === x.id));
+    if (!near && !close && !(c.traits.social >= 60 && c.money >= 300)) continue;
+    out.push({ accion: `ayudar_incendio:${b.id}`, detalle: b.fire ? `ayudar a apagar el fuego en ${placeName(b)}` : `echar una mano a quien se ha quedado sin casa en ${placeName(b)}` });
+  }
+  if (c.homeId !== null && !homelessByFire(state).includes(c)) {
+    const guests = homelessByFire(state).filter((x) => x !== c && c.relations.some((r) => r.id === x.id && (r.kind === 'amistad' || r.kind === 'pareja')));
+    for (const g of guests.slice(0, 2)) out.push({ accion: `acoger:${g.id}`, detalle: `acoger en su casa a ${g.name.split(' ')[0]}, que se ha quedado sin ella por el fuego` });
+  }
+  if (canVolunteer(state, c)) out.push({ accion: 'hacerse_voluntario', detalle: 'apuntarse como voluntario de protección civil (está en paro)' });
   // Solo si está desesperado: robar en una casa del pueblo.
   if (desperate(c)) out.push({ accion: 'robar', detalle: 'robar en una casa del pueblo (está sin dinero, sin trabajo y endeudado)' });
   out.push({ accion: 'irse', detalle: 'irse del pueblo y vender lo que tenga' });
@@ -306,6 +327,16 @@ export function extraAction(state: GameState, c: Citizen, verb: string, arg: str
       pushEvent(state, 'milestone', `${c.name.split(' ')[0]} y ${p.name.split(' ')[0]} tienen un bebé`, { ref: c.id });
       return 'tiene un bebé';
     }
+    case 'ayudar_incendio': {
+      const b = state.buildings.find((x) => x.id === Number(arg));
+      return b ? helpAfterFire(state, c, b) : 'quiere ayudar, pero ya no hace falta';
+    }
+    case 'acoger':
+      return shelter(state, c, state.citizens.find((x) => x.id === Number(arg)));
+    case 'hacerse_voluntario':
+      return becomeVolunteer(state, c);
+    case 'tirar_al_monte':
+      return canDump(state, c) ? dumpTrash(state, c) : 'al final no tira la basura al monte';
     case 'robar': {
       if (!desperate(c)) return 'se lo piensa mejor y no roba';
       const targets = state.buildings.filter((b) => (b.kind === 'house' || b.kind === 'res') && b.built && b.id !== c.homeId);
@@ -386,6 +417,7 @@ export function applyTownTurn(state: GameState, n: number, acts: TurnAct[], extr
   const t = ai.turn!;
   const lines: TurnLog['lines'] = [];
   const done = new Set<number>();
+  const helps = new Map<string, number>();
   for (const a of acts) {
     const c = state.citizens.find((x) => x.id === a.vecino);
     if (!c || done.has(c.id) || !t.ids.includes(c.id) || !isAiCitizen(state, c)) continue;
@@ -393,7 +425,13 @@ export function applyTownTurn(state: GameState, n: number, acts: TurnAct[], extr
     const parts: string[] = [];
     // Acción principal: solo si está en el menú de ahora.
     const menu = turnMenu(state, c).map((m) => m.accion);
-    const accion = menu.includes(a.accion) ? a.accion : 'seguir';
+    let accion = menu.includes(a.accion) ? a.accion : 'seguir';
+    // Ronda 17: como mucho unas pocas ayudas por incendio y turno.
+    if (accion.startsWith('ayudar_incendio:')) {
+      const n = (helps.get(accion) ?? 0) + 1;
+      helps.set(accion, n);
+      if (n > FIRE.maxHelpers) accion = 'seguir';
+    }
     if (accion !== 'seguir') {
       const trigger: Trigger = accion.startsWith('votar') || accion === 'abstenerse' ? 'elecciones' : accion === 'manifestarse' || accion === 'no_ir' ? 'protesta' : 'opinion';
       parts.push(performActionFromTurn(state, c, trigger, accion, a.motivo));

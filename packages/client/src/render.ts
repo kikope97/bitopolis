@@ -1,4 +1,4 @@
-import { type GameState, isWater, Terrain, Tile, Zone } from '@bitopolis/sim';
+import { ambulanceFor, type GameState, isWater, Terrain, Tile, trashStateOf, truckRoutes, Zone } from '@bitopolis/sim';
 import { happinessMarks, type LayerId, layerCanvas, missingMarks, NEED_ICON } from './layers.ts';
 import { pixelIcon } from './icons.ts';
 
@@ -6,6 +6,7 @@ import { pixelIcon } from './icons.ts';
 const iconCache = new Map<string, HTMLCanvasElement>();
 const icon = (name: string) => iconCache.get(name) ?? iconCache.set(name, pixelIcon(name)).get(name)!;
 import { liveParticles, squash } from './fx.ts';
+import { signSprite } from './crest.ts';
 import { C, PALETTE } from './palette.ts';
 import {
   BH,
@@ -31,11 +32,20 @@ import {
   damagedSprite,
   marcherSprite,
   policeSprite,
+  ratSprite,
+  trashBagsSprite,
+  truckSprite,
   serviceSprite,
   sparkleSprite,
   thiefSprite,
   townhallSprite,
   zoneTile,
+  ambulanceSprite,
+  burntSprite,
+  dikeSprite,
+  fireTruckSprite,
+  flamesSprite,
+  riskSprite,
 } from './sprites.ts';
 
 export interface Camera {
@@ -302,10 +312,40 @@ const roadCache = new Map<string, Pix>();
 
 /** Sprite de un edificio: destrozado, el ayuntamiento según su nivel (v1.8) o el normal. */
 function bSprite(b: GameState['buildings'][number], tod: TimeOfDay, snowing: boolean, state: GameState): HTMLCanvasElement {
-  if (b.damaged) return damagedSprite(b.kind, b.id, tod);
+  // 2.1: lo que destrozó el fuego, quemado (no con pintadas como en los disturbios).
+  if (b.damaged) return b.damaged.cause === 'fuego' ? burntSprite(b.kind, b.id, tod) : damagedSprite(b.kind, b.id, tod);
   if (b.kind === 'townhall') return townhallSprite(state.townhallLevel ?? 1, tod, snowing);
   if (b.level && b.level > 1) return serviceSprite(b.kind, b.id, b.level, tod, snowing);
-  return buildingSprite(b.kind, b.id, tod, snowing);
+  // 2.1: los tejados de las viviendas cambian con el rango del pueblo.
+  return buildingSprite(b.kind, b.id, tod, snowing, state.rank?.level ?? 2);
+}
+
+/**
+ * 2.1: dónde va el cartel del pueblo: junto al final de la calle del
+ * ayuntamiento (la entrada), en la primera casilla libre de hierba o árbol.
+ */
+let signSig = '';
+let signAt: number | null = null;
+export function signSpot(state: GameState, sig = mapSignature(state)): { x: number; y: number } | null {
+  if (sig === signSig) return signAt === null ? null : { x: signAt % state.map.w, y: Math.floor(signAt / state.map.w) };
+  signSig = sig;
+  signAt = null;
+  const { w, h, tiles } = state.map;
+  const hall = state.buildings.find((b) => b.kind === 'townhall');
+  if (!hall) return null;
+  const y = hall.y + 1;
+  if (y >= h) return null;
+  let x = hall.x;
+  while (x > 0 && tiles[y * w + x - 1] === Tile.Road) x--;
+  const used = new Set(state.buildings.map((b) => b.y * w + b.x));
+  const free = (cx: number, cy: number) => cx >= 0 && cy >= 0 && cx < w && cy < h && tiles[cy * w + cx] !== Tile.Road && !used.has(cy * w + cx) && !isWater(state.map.terrain?.[cy * w + cx]) && (state.map.zones[cy * w + cx] ?? 0) === Zone.None;
+  for (const [dx, dy] of [[-1, 1], [-1, 0], [0, 1], [-1, -1], [-2, 1], [-2, 0], [0, 2], [-1, 2]] as const) {
+    if (free(x + dx, y + dy)) {
+      signAt = (y + dy) * w + x + dx;
+      break;
+    }
+  }
+  return signAt === null ? null : { x: signAt % w, y: Math.floor(signAt / w) };
 }
 
 /** Imagen de las herramientas: un sprite reducido a su caja. */
@@ -429,8 +469,11 @@ export function render(
   const y0 = Math.max(0, Math.floor(cam.y / ts) - 1);
   const y1 = Math.min(h - 1, Math.ceil((cam.y + ctx.canvas.height) / ts) + 2);
 
+  const sign = signSpot(state, mapSig);
   const byTile = new Map<number, GameState['buildings'][number]>();
   for (const b of state.buildings) byTile.set(b.y * w + b.x, b);
+  // 2.1: diques en la orilla.
+  const dikes = new Set(state.dikes ?? []);
   const projects = new Map(state.projects.map((p) => [p.buildingId, p]));
   const blink = opts.reducedMotion || Math.floor(opts.time / 600) % 2 === 0;
 
@@ -449,7 +492,15 @@ export function render(
       const py = (y * T - (BH - T)) * z - cam.y;
       const b = byTile.get(y * w + x);
       if (!b && tiles[y * w + x] === Tile.Road && lampAt(state, byTile, x, y)) drawLamp(ctx, px, y * ts - cam.y, z, tod);
+      if (!b && dikes.has(y * w + x)) {
+        ctx.drawImage(dikeSprite(tod), px, y * ts - cam.y, ts, ts);
+        continue;
+      }
       if (!b) {
+        if (sign && sign.x === x && sign.y === y) {
+          ctx.drawImage(signSprite(state, tod), px, py, ts, BH * z);
+          continue;
+        }
         if (tiles[y * w + x] === Tile.Tree) {
           // Viento: la copa se mece con un desfase por árbol.
           const frame = still ? 0 : Math.floor(opts.time / 900 + hash(x, y, 4) * 4) % 2;
@@ -477,6 +528,17 @@ export function render(
         const dh = Math.round(BH * z * sy);
         ctx.drawImage(bSprite(b, tod, snowing, state), px + Math.round((ts - dw) / 2), py + BH * z - dh, dw, dh);
       }
+      // 2.1: llamas (2 fotogramas, sin destellos) y aviso de riesgo encima.
+      if (b.fire) {
+        const frame = still ? 0 : Math.floor(opts.time / 280 + b.id) % 2;
+        // Ronda 17: con el zoom lejano del móvil, llamas más grandes para que el fuego se vea.
+        const big = ts < 26 ? 2 : 1;
+        ctx.drawImage(flamesSprite(frame, tod), px - (ts * (big - 1)) / 2, py - BH * z * (big - 1), ts * big, BH * z * big);
+        for (let k = 0; k < 3; k++) {
+          const life = still ? (k + 0.5) / 3 : ((opts.time / 1800 + k / 3 + hash(b.id, k, 5) * 0.2) % 1);
+          puffs.push({ x: x * T + 14 + Math.round(life * 6 + Math.sin(life * 5 + b.id) * 2), y: y * T - (BH - T) + 4 - Math.round(life * 18), size: Math.min(2, 1 + Math.floor(life * 2)) });
+        }
+      } else if (b.risk) ctx.drawImage(riskSprite(), px + 2 * z, py + 2 * z, 11 * z, 13 * z);
       // Humo de chimeneas (fábricas, central y casas): bocanadas que suben y crecen.
       // En casas solo alguna chimenea y una bocanada: que no parezca contaminación.
       const homeSmoke = b.kind === 'house' && hash(b.id, 9) < 0.2;
@@ -508,6 +570,18 @@ export function render(
           ix -= 12 * z;
         }
         if (!b.hasPower && show(b.darkDays)) ctx.drawImage(iconSprite('noPower'), ix, iy, 11 * z, 13 * z);
+      }
+      // 2.1: basura sin recoger: bolsas al pie del edificio y, con ratas, una que corretea y el icono en el tejado.
+      const dirty = trashStateOf(b);
+      if (dirty !== 'limpio') {
+        const fy = y * ts - cam.y + ts - 9 * z;
+        ctx.drawImage(trashBagsSprite(dirty === 'ratas' ? 3 : 2, tod), px + 19 * z, fy, 12 * z, 8 * z);
+        if (dirty === 'ratas') {
+          const t = still ? 0 : Math.floor(opts.time / 110 + b.id) % 36;
+          const off = t < 18 ? t : 36 - t;
+          ctx.drawImage(ratSprite(t, t < 18 ? 1 : -1, tod), px + (2 + off) * z, fy + 4 * z, 6 * z, 4 * z);
+          if (blink) ctx.drawImage(icon('rat'), px + 2 * z, py + 2 * z, 12 * z, 12 * z);
+        }
       }
     }
   }
@@ -590,7 +664,10 @@ export function render(
 
   drawProtest(ctx, state, cam, opts.time, opts.reducedMotion, tod);
   drawPolice(ctx, state, cam, opts.time, opts.reducedMotion, tod);
+  drawTrucks(ctx, state, cam, opts.time, opts.reducedMotion, tod);
   drawThief(ctx, state, cam, opts.time, opts.reducedMotion, tod);
+  drawFireTrucks(ctx, state, cam, opts.time, opts.reducedMotion, tod);
+  drawAmbulance(ctx, state, cam, opts.time, opts.reducedMotion, tod);
   if (opts.highlight) drawHighlight(ctx, cam, opts.highlight, opts.time, opts.reducedMotion);
   drawWeather(ctx, state, opts.time, opts.reducedMotion);
 
@@ -826,6 +903,51 @@ function drawPolice(ctx: CanvasRenderingContext2D, state: GameState, cam: Camera
 }
 
 /**
+ * 2.1: recorrido del camión de cada punto limpio: un paseo continuo por sus
+ * calles de hoy (ida y vuelta por cada ramal). Se rehace cada día de juego.
+ */
+let truckCache: { key: string; paths: { x: number; y: number }[][] } | null = null;
+export function truckPaths(state: GameState): { x: number; y: number }[][] {
+  const snow = state.weather?.kind === 'nieve';
+  const key = `${Math.floor(state.tick / 24)}:${mapSignature(state)}:${state.buildings.length}:${+snow}`;
+  if (truckCache?.key === key) return truckCache.paths;
+  const { w } = state.map;
+  const paths: { x: number; y: number }[][] = [];
+  for (const r of truckRoutes(state, snow)) {
+    if (r.roads.length < 2) continue;
+    const set = new Set(r.roads);
+    const seen = new Set<number>([r.roads[0]!]);
+    const walk: number[] = [r.roads[0]!];
+    const stack: number[] = [r.roads[0]!];
+    while (stack.length) {
+      const i = stack[stack.length - 1]!;
+      const next = [i + 1, i - 1, i + w, i - w].find((j) => set.has(j) && !seen.has(j) && (j === i + w || j === i - w || Math.floor(j / w) === Math.floor(i / w)));
+      if (next !== undefined) {
+        seen.add(next);
+        stack.push(next);
+        walk.push(next);
+      } else {
+        stack.pop();
+        if (stack.length) walk.push(stack[stack.length - 1]!);
+      }
+    }
+    paths.push(walk.map((i) => ({ x: i % w, y: Math.floor(i / w) })));
+  }
+  truckCache = { key, paths };
+  return paths;
+}
+
+function drawTrucks(ctx: CanvasRenderingContext2D, state: GameState, cam: Camera, time: number, still: boolean, tod: TimeOfDay): void {
+  const z = cam.zoom;
+  truckPaths(state).forEach((path, k) => {
+    const d = still ? 0 : ((time / 1000) * 2.5 + k * 7) % (path.length - 1);
+    const p = along(path, d);
+    const img = truckSprite(Math.floor(time / 250), p.dir, tod);
+    ctx.drawImage(img, (p.fx - 8) * z - cam.x, (p.fy - 10) * z - cam.y, 16 * z, 11 * z);
+  });
+}
+
+/**
  * v1.8: robo sin resolver. Durante unas horas de juego, el ladrón sale
  * corriendo de la tienda con el saco por la calle, alejándose del centro.
  */
@@ -859,6 +981,43 @@ function drawThief(ctx: CanvasRenderingContext2D, state: GameState, cam: Camera,
   const p = along(path, d);
   const img = thiefSprite(Math.floor(time / 90) % 4, p.dir, tod);
   ctx.drawImage(img, (p.fx - 3) * z - cam.x, (p.fy - 11) * z - cam.y, img.width * z, img.height * z);
+}
+
+/**
+ * 2.1: con un incendio que los bomberos pueden apagar, el camión rojo sale del
+ * parque y va por las calles hasta el fuego; allí se queda hasta que se apaga.
+ */
+function drawFireTrucks(ctx: CanvasRenderingContext2D, state: GameState, cam: Camera, time: number, still: boolean, tod: TimeOfDay): void {
+  const z = cam.zoom;
+  for (const b of state.buildings) {
+    if (!b.fire?.covered) continue;
+    const station = state.buildings
+      .filter((s) => s.kind === 'firestation' && s.built)
+      .sort((p, q) => Math.abs(p.x - b.x) + Math.abs(p.y - b.y) - (Math.abs(q.x - b.x) + Math.abs(q.y - b.y)))[0];
+    if (!station) continue;
+    const path = roadPath(state, station, b);
+    if (path.length < 2) continue;
+    const d = still ? path.length - 1 : Math.min(path.length - 1, (sinceSeen(`f${b.id}-${b.fire.since}`, time) / 1000) * 3);
+    const p = along(path, d);
+    const img = fireTruckSprite(still || d >= path.length - 1 ? 0 : Math.floor(time / 120) % 2, p.dir, tod);
+    ctx.drawImage(img, (p.fx - 7) * z - cam.x, (p.fy - 9) * z - cam.y, img.width * z, img.height * z);
+  }
+}
+
+/** 2.1: en una urgencia que se salva, la ambulancia (sin destellos) va del centro de salud a la casa. */
+function drawAmbulance(ctx: CanvasRenderingContext2D, state: GameState, cam: Camera, time: number, still: boolean, tod: TimeOfDay): void {
+  const e = [...state.events].reverse().find((x) => x.kind === 'fire' && (x.text.startsWith('Urgencia') || x.text.includes('la ambulancia llega')));
+  if (!e || state.tick - e.tick > 10 || e.ref === undefined) return;
+  const home = state.buildings.find((b) => b.id === e.ref);
+  const clinic = home ? ambulanceFor(state, home) : undefined;
+  if (!home || !clinic) return;
+  const path = roadPath(state, clinic, home);
+  if (path.length < 2) return;
+  const z = cam.zoom;
+  const d = still ? path.length - 1 : Math.min(path.length - 1, (sinceSeen(`a${e.tick}`, time) / 1000) * 2.5);
+  const p = along(path, d);
+  const img = ambulanceSprite(still || d >= path.length - 1 ? 0 : Math.floor(time / 120) % 2, p.dir, tod);
+  ctx.drawImage(img, (p.fx - 6) * z - cam.x, (p.fy - 9) * z - cam.y, img.width * z, img.height * z);
 }
 
 /** v1.8: destello sobre lo que ha hecho volver a x1 (unos segundos). */

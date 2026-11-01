@@ -6,8 +6,12 @@ import { BUILD_NAMES } from './commands.ts';
 import { freeShopLot } from './economy.ts';
 import { debtBand, pocketOf } from './household.ts';
 import { jobsOf } from './levels.ts';
+import { trashStateOf } from './trash-core.ts';
 import { daysToElection, FACTION_TEXT, factionOf, politicsActive } from './politics.ts';
 import { brewingNow, type DirectorChoice, directorMenu, dramaBudget } from './director.ts';
+import { errandCandidates } from './errands.ts';
+import { weekNews } from './press.ts';
+import { rankCandidates } from './rank.ts';
 import { inventedName, inventedNumber, toneOf } from './prompt.ts';
 import { GOAL_TEXT, HOOK_TEXT, hookFor, memoryText, NEED_TEXT, NEEDS, needsOf } from './social.ts';
 import type { Citizen, GameState } from './state.ts';
@@ -22,7 +26,7 @@ import { GESTURES, gestureCandidates, isAiCitizen, PLANS, planText, SPEND, type 
  * La salida tiene un esquema fijo (sin uniones por vecino); cada parte se valida
  * en el motor con el menú del vecino. Nunca va texto libre del jugador.
  */
-export const TURN_PROMPT_VERSION = 8;
+export const TURN_PROMPT_VERSION = 9;
 
 export const TURN_SYSTEM = `Eres la mente de los vecinos de Bitópolis, un pueblo español pequeño. Cada semana decides, a la vez, qué hace cada vecino de la lista. Ellos viven de verdad: trabajan, compran, se enamoran, se enfadan, ahorran o se arruinan, y reaccionan a lo que hace el alcalde (el jugador).
 
@@ -35,6 +39,7 @@ Para cada vecino del lote devuelve exactamente un objeto con:
 - "plan": un ultimátum o propósito con plazo si de verdad le importa algo ("irse_si_no", "protestar_si_no", "votar_en_contra_si_no", con la "necesidad" de su lista y los "meses", de 1 a 6), o "ninguno". Úsalo con moderación: es una promesa que el pueblo recordará.
 - "pensamiento": una frase en primera persona, en español de España, con su tono y su vida (máx. 140 caracteres).
 - "motivo": por qué hace lo que hace esta semana, en una frase corta en primera persona (máx. 160 caracteres).
+- "escudo": solo si en el pueblo hay "votacion_escudo", su voto: una "pieza" y un "lema" (ids de esa votación), según lo que le importa; si no, "" y "".
 - "recuerdo": lo que apunta de esta semana para acordarse (un hecho, no un sentimiento; máx. 120 caracteres), o "" si no pasó nada. Sus notas anteriores están en "sus_notas".
 
 Reglas:
@@ -46,6 +51,8 @@ Reglas:
 - Mira "oportunidades" del pueblo: quien está en paro, cobra poco o tiene un negocio que pierde dinero debería pensar en aceptar un trabajo, mudarse, despedir o cerrar; quien tiene dinero y ambición alta, en abrir un negocio o contratar.
 - Dinero con cabeza: con deudas, sin trabajo o "no llega", el ocio sobra; con dinero de sobra, puede gastar, invertir o ayudar al negocio del pueblo.
 - "robar" solo existe para quien está desesperado; es una decisión grave y rara.
+- "ayudar_incendio", "acoger" y "hacerse_voluntario" son para quien tiene relación o medios: no todo el pueblo a la vez.
+- "tirar_al_monte" solo aparece si no pasa el camión de la basura y la tiene en la puerta: lo hace quien es terco o está harto; los vecinos lo ven mal. Lo normal es quejarse o pedir "recogida".
 - No menciones a nadie que no esté en los datos, ni cifras inventadas, ni que eres una IA. Sin comillas ni emojis.
 - Responde solo con JSON que cumpla el esquema, con un objeto por cada vecino del lote (no te dejes ninguno). Sé breve en los textos.`;
 
@@ -68,7 +75,7 @@ export function turnShared(state: GameState): string {
     caja_ayuntamiento: band(state.treasury, [0, 5_000, 30_000], ['en deuda', 'justa', 'normal', 'holgada']),
     impuestos: state.taxesSplit ? { ibi: lvl(state.taxes.ibi), tasas: lvl(state.taxes.tasas), plusvalia: lvl(state.taxes.plusvalia) } : lvl(state.taxLevel),
     sueldo_minimo_empresas: `${MIN_WAGE[state.minWage ?? 'none']} € al mes`,
-    servicios: ['water', 'power', 'park', 'school', 'clinic', 'police', 'bar', 'chapel', 'cemetery', 'library', 'sports', 'jail'].filter((k) => kinds.has(k as never)).map((k) => BUILD_NAMES[k]!.toLowerCase()),
+    servicios: ['water', 'power', 'park', 'school', 'clinic', 'police', 'bar', 'chapel', 'cemetery', 'library', 'sports', 'jail', 'cleanpoint'].filter((k) => kinds.has(k as never)).map((k) => BUILD_NAMES[k]!.toLowerCase()),
     economia: last
       ? {
           vecinos_con_deudas: last.debtors ?? 0,
@@ -94,6 +101,8 @@ export function turnShared(state: GameState): string {
     // Solo lo que cuenta (lo que decidió la costumbre, «ahorrar» o «seguir», no dice nada).
     la_semana_pasada: ai.log.at(-1)?.source === 'ia' ? ai.log.at(-1)!.lines.slice(0, 10).map((l) => l.text) : [],
     oportunidades: opportunities(state),
+    // 2.1: el pueblo sube de rango y vota el escudo (menú cerrado).
+    ...(rankCandidates(state) ? { votacion_escudo: { rango: rankCandidates(state)!.rango, piezas: rankCandidates(state)!.piezas, lemas: rankCandidates(state)!.lemas } } : {}),
   };
   return `Así está el pueblo:\n${JSON.stringify(data)}`;
 }
@@ -124,6 +133,14 @@ function askedBefore(state: GameState, c: Citizen) {
   return out.slice(0, 3);
 }
 
+/** 2.1: cómo está la basura en su calle (solo si se nota). */
+function trashBrief(state: GameState, c: Citizen): string | null {
+  const home = state.buildings.find((b) => b.id === c.homeId);
+  if (!home) return null;
+  const st = trashStateOf(home);
+  return st === 'ratas' ? 'ratas en su portal: la basura lleva semanas sin recogerse' : st === 'bolsas' ? 'bolsas de basura amontonadas en su calle' : null;
+}
+
 function citizenBrief(state: GameState, c: Citizen) {
   const job = state.buildings.find((b) => b.id === c.jobId);
   const home = state.buildings.find((b) => b.id === c.homeId);
@@ -148,6 +165,7 @@ function citizenBrief(state: GameState, c: Citizen) {
     trabajo: job ? (job.name ?? BUILD_NAMES[job.kind] ?? job.kind) : c.unemployedSince !== undefined ? 'en paro' : 'fuera del pueblo',
     casa: home ? (c.owns ? 'vivienda en propiedad' : home.kind === 'house' ? 'casa municipal de alquiler' : 'piso de alquiler') : 'sin casa',
     hijos: c.kids?.length ?? 0,
+    ...(trashBrief(state, c) ? { basura: trashBrief(state, c) } : {}),
 
     recuerdos: [...c.memories].sort((a, b) => b.importance - a.importance).slice(0, 3).map((m) => memoryText(state, m)),
     ...(hook ? { gancho: HOOK_TEXT[hook.kind] } : {}),
@@ -200,8 +218,9 @@ export const TURN_SCHEMA = {
           pensamiento: { type: 'string' },
           motivo: { type: 'string' },
           recuerdo: { type: 'string' },
+          escudo: { type: 'object', properties: { pieza: { type: 'string' }, lema: { type: 'string' } }, required: ['pieza', 'lema'], additionalProperties: false },
         },
-        required: ['vecino', 'accion', 'gesto', 'actitud', 'gasto', 'plan', 'pensamiento', 'motivo', 'recuerdo'],
+        required: ['vecino', 'accion', 'gesto', 'actitud', 'gasto', 'plan', 'pensamiento', 'motivo', 'recuerdo', 'escudo'],
         additionalProperties: false,
       },
     },
@@ -247,6 +266,7 @@ const ActSchema = z.object({
   pensamiento: z.string().max(600),
   motivo: z.string().max(600),
   recuerdo: z.string().max(600).optional(),
+  escudo: z.object({ pieza: z.string().max(40), lema: z.string().max(60) }).optional(),
 });
 
 const clean = (s: string, max: number) =>
@@ -288,14 +308,22 @@ export function parseTurn(text: string, ids: number[], sent: string): { acts: Tu
     if (bad(recuerdo)) recuerdo = '';
     acts.push({
       vecino: a.vecino,
-      accion: /^[a-z_]+(:[a-z0-9_]+)?$/.test(accion) ? accion : 'seguir',
-      gesto: { con: a.gesto.con, tipo: a.gesto.tipo },
+      // Ronda 17: cada campo dentro de los límites del comando `TownTurn` (si no, el turno entero se rechazaría).
+      accion: accion.length <= 40 && /^[a-z_]+(:[a-z0-9_]+)?$/.test(accion) ? accion : 'seguir',
+      gesto: { con: a.gesto.con, tipo: a.gesto.tipo.length <= 20 ? a.gesto.tipo : 'ninguno' },
       actitud: Math.max(-2, Math.min(2, Math.round(a.actitud))),
-      gasto: a.gasto,
-      plan: { tipo: a.plan.tipo, necesidad: a.plan.necesidad, meses: Math.max(0, Math.min(12, Math.round(a.plan.meses))) },
+      gasto: { donde: (SPEND as readonly string[]).includes(a.gasto.donde) ? a.gasto.donde : 'pueblo', tienda: a.gasto.tienda, ocio: a.gasto.ocio },
+      plan:
+        a.plan.tipo.length <= 30 && a.plan.necesidad.length <= 20
+          ? { tipo: a.plan.tipo, necesidad: a.plan.necesidad, meses: Math.max(0, Math.min(12, Math.round(a.plan.meses))) }
+          : { tipo: 'ninguno', necesidad: '', meses: 0 },
       pensamiento,
       motivo,
       ...(recuerdo ? { recuerdo } : {}),
+      // El voto del escudo, solo con ids de la votación que se envió.
+      ...(a.escudo && /^[a-z_]{1,20}$/.test(a.escudo.pieza) && /^[a-z_]{1,40}$/.test(a.escudo.lema) && sent.includes(`"id":"${a.escudo.pieza}"`) && sent.includes(`"id":"${a.escudo.lema}"`)
+        ? { escudo: { pieza: a.escudo.pieza, lema: a.escudo.lema } }
+        : {}),
     });
   }
   return { acts, missing: ids.filter((id) => !acts.some((a) => a.vecino === id)) };
@@ -313,6 +341,8 @@ Devuelve:
 - "avisos": sucesos del menú que empiezan a cocerse (0 a 3), para que el alcalde pueda reaccionar a tiempo. Un suceso malo ("malo": true) solo puede pasar si ya estaba avisado ("avisado": true); si no, avísalo primero.
 - "foco": el tema de la semana en una frase corta (máx. 100 caracteres).
 - "cronica": 2 o 3 frases en español de España, como el periódico del pueblo, sobre lo que ha hecho el alcalde, cómo está el pueblo y lo que pasa esta semana (máx. 400 caracteres).
+- "titulares": hasta 3 titulares de El Eco de Bitópolis, uno por sección ("sucesos", "cartas" al director, "anuncios"). Cada titular cuenta solo una de "noticias" o uno de los sucesos que eliges esta semana (su id en "sobre"), con un "texto" de periódico de pueblo (máx. 110 caracteres). No cuentes cómo acaba un suceso: lo decide el juego. Si una sección no tiene noticia, no pongas titular. En "cartas", la voz de un vecino.
+- "encargo": si encaja con la semana, uno de "encargos_posibles" ("id") con la "carta" (máx. 220 caracteres, en primera persona, firmada por quien lo pide) con la que se lo pide al alcalde; si no, id "" y carta "".
 
 Reglas:
 - Sé justo: respeta "presupuesto_drama" (cuántos sucesos malos caben). Un pueblo contento no tiene disturbios; si el alcalde lo hace bien, que pasen también cosas buenas.
@@ -333,8 +363,13 @@ export const DIRECTOR_SCHEMA = {
     },
     foco: { type: 'string' },
     cronica: { type: 'string' },
+    titulares: {
+      type: 'array',
+      items: { type: 'object', properties: { seccion: { type: 'string', enum: ['sucesos', 'cartas', 'anuncios'] }, sobre: { type: 'string' }, texto: { type: 'string' } }, required: ['seccion', 'sobre', 'texto'], additionalProperties: false },
+    },
+    encargo: { type: 'object', properties: { id: { type: 'string' }, carta: { type: 'string' } }, required: ['id', 'carta'], additionalProperties: false },
   },
-  required: ['sucesos', 'avisos', 'foco', 'cronica'],
+  required: ['sucesos', 'avisos', 'foco', 'cronica', 'titulares', 'encargo'],
   additionalProperties: false,
 } as const;
 
@@ -344,6 +379,9 @@ export interface DirectorRequest {
   user: string;
   schema: Record<string, unknown>;
   ids: string[];
+  /** 2.1: noticias de la semana (id «nX» → vecino o edificio) y encargos posibles. */
+  news: { id: string; ref?: number }[];
+  errands: string[];
 }
 
 /** La petición del director: el mismo bloque común del turno y el menú de sucesos. */
@@ -351,21 +389,40 @@ export function buildDirectorRequest(state: GameState, shared = turnShared(state
   const menu = directorMenu(state);
   const brewing = brewingNow(state, menu);
   const budget = dramaBudget(state, menu);
+  const news = weekNews(state);
+  const errands = errandCandidates(state).slice(0, 4);
   const paceTicks = Math.max(1, (state.ai?.paceDays ?? 7) * 24);
   const data = {
     presupuesto_drama: { sucesos_malos_que_caben: budget.bad, por_que: budget.why },
     se_esta_cociendo: brewing.map((b) => ({ id: b.id, texto: b.text, hace_turnos: Math.max(0, Math.round((state.tick - b.since) / paceTicks)) })),
     menu: menu.map((m) => ({ id: m.id, tipo: m.kind, malo: m.bad, avisado: brewing.some((b) => b.id === m.id), texto: m.text, por_que: m.why })),
+    noticias: news.map((n) => ({ id: n.id, seccion: n.section, texto: n.text })),
+    encargos_posibles: errands.map((e) => ({ id: e.key, lo_pide: state.citizens.find((c) => c.id === e.by)?.name ?? 'el pueblo', que: e.text })),
   };
   const user = `Director de la semana (elige entre el menú):\n${JSON.stringify(data)}`;
-  return { system: DIRECTOR_SYSTEM, shared, user, schema: DIRECTOR_SCHEMA as unknown as Record<string, unknown>, ids: menu.map((m) => m.id) };
+  return {
+    system: DIRECTOR_SYSTEM,
+    shared,
+    user,
+    schema: DIRECTOR_SCHEMA as unknown as Record<string, unknown>,
+    ids: menu.map((m) => m.id),
+    news: news.map((n) => ({ id: n.id, ...(n.ref !== undefined ? { ref: n.ref } : {}) })),
+    errands: errands.map((e) => e.key),
+  };
 }
 
 const PickSchema = z.object({ id: z.string().max(60), motivo: z.string().max(600) });
-const DirectorOut = z.object({ sucesos: z.array(PickSchema).max(10), avisos: z.array(PickSchema).max(10), foco: z.string().max(600), cronica: z.string().max(2000) });
+const DirectorOut = z.object({
+  sucesos: z.array(PickSchema).max(10),
+  avisos: z.array(PickSchema).max(10),
+  foco: z.string().max(600),
+  cronica: z.string().max(2000),
+  titulares: z.array(z.object({ seccion: z.string().max(20), sobre: z.string().max(20), texto: z.string().max(600) })).max(6).optional(),
+  encargo: z.object({ id: z.string().max(60), carta: z.string().max(1000) }).optional(),
+});
 
 /** Lee la respuesta del director: solo ids del menú y textos sin nombres inventados. Null si no vale. */
-export function parseDirector(text: string, ids: string[], sent: string): { director: DirectorChoice; focus: string; chronicle: string } | null {
+export function parseDirector(text: string, ids: string[], sent: string, extra: { news?: { id: string; ref?: number }[]; errands?: string[] } = {}): { director: DirectorChoice; focus: string; chronicle: string } | null {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
@@ -378,7 +435,7 @@ export function parseDirector(text: string, ids: string[], sent: string): { dire
     const out: { id: string; motivo: string }[] = [];
     for (const p of list) {
       if (!ids.includes(p.id) || out.some((x) => x.id === p.id) || out.length >= 3) continue;
-      const motivo = clean(p.motivo, 160);
+      const motivo = clean(p.motivo, 100);
       out.push({ id: p.id, motivo: inventedName(motivo, sent) || inventedNumber(motivo, sent) ? '' : motivo });
     }
     return out;
@@ -386,5 +443,24 @@ export function parseDirector(text: string, ids: string[], sent: string): { dire
   const focus = clean(r.data.foco, 120);
   const chronicle = clean(r.data.cronica, 500);
   const bad = (t: string) => !!inventedName(t, sent) || inventedNumber(t, sent);
-  return { director: { sucesos: pick(r.data.sucesos), avisos: pick(r.data.avisos) }, focus: bad(focus) ? '' : focus, chronicle: bad(chronicle) ? '' : chronicle };
+  const picked = pick(r.data.sucesos);
+  // 2.1: titulares (una por sección, texto filtrado) y el encargo con su carta.
+  const titulares: NonNullable<DirectorChoice['titulares']> = [];
+  for (const t of r.data.titulares ?? []) {
+    if (!['sucesos', 'cartas', 'anuncios'].includes(t.seccion) || titulares.some((x) => x.seccion === t.seccion)) continue;
+    const texto = clean(t.texto, 140);
+    if (texto.length < 6 || bad(texto)) continue;
+    // Ronda 17: cada titular cuenta una noticia real o un suceso elegido (si el suceso no pasa, el titular se cae).
+    const news = extra.news?.find((n) => n.id === t.sobre);
+    const suceso = picked.find((x) => x.id === t.sobre);
+    if (!news && !suceso) continue;
+    titulares.push({ seccion: t.seccion as 'sucesos' | 'cartas' | 'anuncios', texto, ...(news?.ref !== undefined ? { sobre: news.ref } : {}), ...(suceso ? { suceso: suceso.id } : {}) });
+  }
+  const carta = clean(r.data.encargo?.carta ?? '', 260);
+  const encargo = r.data.encargo?.id && extra.errands?.includes(r.data.encargo.id) ? { id: r.data.encargo.id, carta: bad(carta) ? '' : carta } : undefined;
+  return {
+    director: { sucesos: picked, avisos: pick(r.data.avisos), ...(titulares.length ? { titulares } : {}), ...(encargo ? { encargo } : {}) },
+    focus: bad(focus) ? '' : focus,
+    chronicle: bad(chronicle) ? '' : chronicle,
+  };
 }

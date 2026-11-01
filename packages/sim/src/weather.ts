@@ -3,8 +3,9 @@ import { BUILD, WEATHER } from './balance.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance, nextInt, type RngState } from './prng.ts';
 import { addMemory } from './social.ts';
-import { type Citizen, type GameState, inBounds, pushEvent, terrainAt, Tile } from './state.ts';
+import { type Citizen, type GameState, inBounds, pushEvent, terrainAt } from './state.ts';
 import { Terrain } from './terrain.ts';
+import { floodChanceAt, floodRepairFactor, snowRoads } from './fire.ts';
 
 /**
  * v1.7: estaciones y tiempo. Cada pocos días cambia el tiempo según la
@@ -79,7 +80,8 @@ export function weatherDay(state: GameState): void {
     if (kind === 'tormenta') flood(state);
   }
   if (state.weather.kind === 'nieve') {
-    const roads = state.map.tiles.filter((t) => t === Tile.Road).length;
+    // 2.1: en el radio de la protección civil, el quitanieves cuesta la mitad.
+    const roads = snowRoads(state);
     const cost = Math.min(state.treasury > 0 ? state.treasury : 0, Math.round(roads * WEATHER.snowPerRoad));
     if (cost > 0) transfer(state, TREASURY, OUTSIDE, cost, 'quitanieves');
   }
@@ -107,16 +109,25 @@ export function riverBuildings(state: GameState): GameState['buildings'] {
 export function flood(state: GameState): void {
   const near = riverBuildings(state).filter((b) => b.built);
   if (!near.length) return;
-  const hit = near.filter(() => chance(state.rng, WEATHER.floodChance));
+  // 2.1: los diques y la protección civil frenan la riada (se tira el mismo dado para todos).
+  const hit: GameState['buildings'] = [];
+  let avoided = 0;
+  for (const b of near) {
+    if (!chance(state.rng, WEATHER.floodChance)) continue;
+    // El dado ya salió: lo que lo evita es la protección (determinista con el mismo dado del motor).
+    if (floodChanceAt(state, b, 1) < 1 && !chance(state.rng, floodChanceAt(state, b, 1))) avoided++;
+    else hit.push(b);
+  }
+  if (avoided && state.emergencies) state.emergencies.floodsAvoided += avoided;
   if (!hit.length) {
-    pushEvent(state, 'info', 'El río crece con la tormenta, pero no se desborda');
+    pushEvent(state, 'info', avoided ? `El río crece con la tormenta: los diques y la protección civil evitan que se aneguen ${avoided === 1 ? 'un edificio' : `${avoided} edificios`}` : 'El río crece con la tormenta, pero no se desborda');
     return;
   }
   let cost = 0;
   const people = new Set<Citizen>();
   for (const b of hit) {
     const spec = BUILD[b.kind as keyof typeof BUILD];
-    cost += Math.round((spec?.materials ?? 2_000) * WEATHER.floodRepair);
+    cost += Math.round((spec?.materials ?? 2_000) * WEATHER.floodRepair * floodRepairFactor(state, b));
     for (const c of state.citizens) if (c.homeId === b.id || c.jobId === b.id) people.add(c);
   }
   transfer(state, TREASURY, OUTSIDE, cost, 'reparaciones (inundación)');

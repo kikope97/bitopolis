@@ -22,8 +22,8 @@ export interface TownhallLevel {
 
 export const TOWNHALL_LEVELS: TownhallLevel[] = [
   { level: 1, pop: 0, cost: 0, name: 'Casa consistorial', unlocks: ['carretera', 'casas', 'agua', 'luz', 'parque'] },
-  { level: 2, pop: 10, cost: 3_000, name: 'Ayuntamiento con reloj', unlocks: ['zonas R, C e I', 'colegio', 'policía', 'bar', 'ermita', 'cementerio', 'plenos'] },
-  { level: 3, pop: 30, cost: 15_000, name: 'Ayuntamiento con balcón', unlocks: ['centro de salud', 'biblioteca', 'polideportivo', 'Plaza Mayor (con su hito)'] },
+  { level: 2, pop: 10, cost: 3_000, name: 'Ayuntamiento con reloj', unlocks: ['zonas R, C e I', 'colegio', 'policía', 'bar', 'ermita', 'cementerio', 'bomberos', 'punto limpio', 'plenos'] },
+  { level: 3, pop: 30, cost: 15_000, name: 'Ayuntamiento con balcón', unlocks: ['centro de salud', 'biblioteca', 'polideportivo', 'protección civil', 'Plaza Mayor (con su hito)'] },
   { level: 4, pop: 60, cost: 35_000, name: 'Casa del Pueblo', unlocks: ['cárcel', 'Mercado (con su hito)'] },
   { level: 5, pop: 120, cost: 70_000, name: 'Palacio Municipal', unlocks: ['más felicidad en todo el pueblo', 'más subvenciones de la Diputación'] },
 ];
@@ -40,12 +40,16 @@ export const BUILD_LEVEL: Record<BuildKind, number> = {
   bar: 2,
   chapel: 2,
   cemetery: 2,
+  cleanpoint: 2,
   clinic: 3,
   library: 3,
   sports: 3,
   plaza: 3,
   jail: 4,
   market: 4,
+  // 2.1: emergencias.
+  firestation: 2,
+  civilprotection: 3,
 };
 
 export const townLevel = (state: GameState): number => state.townhallLevel ?? 1;

@@ -1,12 +1,16 @@
+import { answerErrand, canAnswerErrand } from './errands.ts';
+import { answerPress, canAnswerPress } from './press.ts';
 import { canMeetAssociation, meetAssociation } from './associations.ts';
 import { canUpgradeBuilding, startUpgrade } from './levels.ts';
+import { buildDike, canBuildDike, hasDike } from './fire.ts';
+import { applyCrestVote, validBallot } from './rank.ts';
 import { applyTownTurn, canApplyTurn, mayorText, noteMayor, setAiShare } from './turns.ts';
 import { canMicrocredit, canSettleDebt, grantMicrocredit, settleDebt } from './household.ts';
 import { serviceCounts } from './economy.ts';
 import { BUILD_LEVEL, canUpgradeTownhall, plenoUnlocked, townLevel, upgradeTownhall, zonesUnlocked } from './townhall.ts';
 import { answerGrant, canAnswerGrant, canHoldFestival, canProposeBudget, holdFestival, materialsCost, proposeBudget } from './civic.ts';
 import { Command, TICKS_PER_DAY, tickToDate, type BuildKind, type ZoneKind } from '@bitopolis/shared';
-import { ASSOCIATIONS, BUILD, DEBT_LIMIT, MICROCREDIT, MIN_WAGE, MIN_WAGE_FX, MIN_WAGE_STEP, TERRAIN, WAGE_OUTSIDE, ZONE_COST_PER_TILE } from './balance.ts';
+import { ASSOCIATIONS, BUILD, CIVIL, DEBT_LIMIT, FIRE, MICROCREDIT, MIN_WAGE, MIN_WAGE_FX, MIN_WAGE_STEP, TERRAIN, WAGE_OUTSIDE, ZONE_COST_PER_TILE } from './balance.ts';
 import { isWater, Terrain } from './terrain.ts';
 import { applyDecision, canApplyDecision } from './decisions.ts';
 import { campaign, canCampaign, canMotion, motion } from './politics.ts';
@@ -42,6 +46,9 @@ export const BUILD_NAMES: Record<string, string> = {
   library: 'Biblioteca',
   sports: 'Polideportivo',
   jail: 'Cárcel',
+  firestation: 'Parque de bomberos',
+  civilprotection: 'Protección civil',
+  cleanpoint: 'Punto limpio',
   clinic: 'Centro de salud',
   police: 'Comisaría',
   plaza: 'Plaza Mayor',
@@ -77,7 +84,7 @@ function roadTiles(x: number, y: number, x2: number, y2: number): [number, numbe
 
 function roadNewTiles(state: GameState, x: number, y: number, x2: number, y2: number) {
   return roadTiles(x, y, x2, y2).filter(
-    ([tx, ty]) => state.map.tiles[tileIndex(state, tx, ty)] !== Tile.Road && !buildingAt(state, tx, ty),
+    ([tx, ty]) => state.map.tiles[tileIndex(state, tx, ty)] !== Tile.Road && !buildingAt(state, tx, ty) && !hasDike(state, tx, ty),
   );
 }
 
@@ -102,7 +109,7 @@ export function zoneChanges(state: GameState, cmd: { x: number; y: number; w: nu
     for (let x = cmd.x; x < cmd.x + cmd.w; x++) {
       if (!inBounds(state, x, y)) continue;
       const i = tileIndex(state, x, y);
-      if (state.map.tiles[i] === Tile.Road || buildingAt(state, x, y) || isWater(state.map.terrain?.[i]) || state.map.zones[i] === value) skipped++;
+      if (state.map.tiles[i] === Tile.Road || buildingAt(state, x, y) || isWater(state.map.terrain?.[i]) || hasDike(state, x, y) || state.map.zones[i] === value) skipped++;
       else changed++;
     }
   }
@@ -139,6 +146,7 @@ export function commandOutlay(state: GameState, cmd: Command): number {
   }
   if (cmd.type === 'BuildRoad') return roadCost(state, cmd.x, cmd.y, cmd.x2, cmd.y2);
   if (cmd.type === 'Zone') return cmd.zone === 'none' ? 0 : zoneChanges(state, cmd).changed * ZONE_COST_PER_TILE;
+  if (cmd.type === 'BuildDike') return CIVIL.dikeCost;
   return 0;
 }
 
@@ -157,7 +165,8 @@ export function governmentCommand(state: GameState, cmd: Command): boolean {
 }
 
 /** En la oposición el jugador solo puede hablar con los vecinos (y la IA decidir). */
-const OPPOSITION_ALLOWED = new Set(['TalkTo', 'NotifyProject', 'CitizenAct', 'Campaign', 'Motion']);
+// Ronda 17: el turno del pueblo (IA) y los votos no son órdenes del alcalde: valen también en la oposición.
+const OPPOSITION_ALLOWED = new Set(['TalkTo', 'NotifyProject', 'CitizenAct', 'Campaign', 'Motion', 'TownTurn', 'ChooseCrest']);
 
 export function validateCommand(state: GameState, raw: unknown): CommandResult {
   const parsed = Command.safeParse(raw);
@@ -190,6 +199,7 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       const ter = terrainAt(state, cmd.x, cmd.y);
       if (isWater(ter)) return { ok: false, error: ter === Terrain.Sea ? 'Ahí está el mar' : 'Ahí pasa el río: solo se puede cruzar con un puente (Carretera)' };
       if (t === Tile.Road || buildingAt(state, cmd.x, cmd.y)) return { ok: false, error: 'Ese sitio está ocupado' };
+      if (hasDike(state, cmd.x, cmd.y)) return { ok: false, error: 'Ahí hay un dique' };
       if (!hasAdjacentRoad(state, cmd.x, cmd.y)) return { ok: false, error: 'Necesita una carretera al lado' };
       if (state.treasury < buildCostAt(state, cmd.kind, cmd.x, cmd.y)) return { ok: false, error: 'No hay dinero suficiente' };
       return { ok: true };
@@ -217,7 +227,8 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       const b = buildingAt(state, cmd.x, cmd.y);
       if (b?.kind === 'townhall') return { ok: false, error: 'El ayuntamiento no se derriba' };
       const t = state.map.tiles[tileIndex(state, cmd.x, cmd.y)];
-      if (!b && t !== Tile.Road) return { ok: false, error: 'No hay nada que derribar' };
+      if (b?.fire) return { ok: false, error: 'Está ardiendo: espera a que se apague' };
+      if (!b && t !== Tile.Road && !hasDike(state, cmd.x, cmd.y)) return { ok: false, error: 'No hay nada que derribar' };
       return { ok: true };
     }
     case 'NotifyProject':
@@ -226,6 +237,10 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       return canApplyDecision(state, cmd.citizenId, cmd.action) ? { ok: true } : { ok: false, error: 'Decisión ya no válida' };
     case 'MeetAssociation':
       return canMeetAssociation(state, cmd.associationId);
+    case 'AnswerErrand':
+      return canAnswerErrand(state, cmd.errandId, cmd.answer);
+    case 'AnswerPress':
+      return canAnswerPress(state, cmd.edition, cmd.answer);
     case 'RepairBuilding': {
       const b = buildingById(state, cmd.buildingId);
       if (!b?.damaged) return { ok: false, error: 'Ese edificio no necesita reparación' };
@@ -235,8 +250,13 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
     }
     case 'UpgradeTownhall':
       return canUpgradeTownhall(state);
+    case 'BuildDike':
+      return canBuildDike(state, cmd.x, cmd.y);
     case 'TownTurn':
       return canApplyTurn(state, cmd.n);
+    case 'ChooseCrest':
+      if (!state.rank?.vote) return { ok: false, error: 'No hay votación del escudo abierta' };
+      return cmd.votes.some((b) => validBallot(state, b)) ? { ok: true } : { ok: false, error: 'Ningún voto vale (vecino sin IA o fuera del menú)' };
     case 'SetAiShare':
       if (!state.aiMode || !state.ai) return { ok: false, error: 'Solo en Modo IA' };
       return cmd.share === state.ai.share ? { ok: false, error: 'Ya está en ese %' } : { ok: true };
@@ -312,6 +332,14 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
   switch (cmd.type) {
     case 'TownTurn':
       applyTownTurn(state, cmd.n, cmd.acts, { focus: cmd.focus, chronicle: cmd.chronicle, director: cmd.director });
+      // 2.1: si hay votación del escudo, los vecinos con IA votan en su turno (el resto, por reglas).
+      if (state.rank?.vote && state.ai?.log.at(-1)?.kind === 'semana') {
+        const ballots = cmd.acts.filter((a) => a.escudo?.pieza && a.escudo.lema).map((a) => ({ vecino: a.vecino, pieza: a.escudo!.pieza, lema: a.escudo!.lema }));
+        if (ballots.some((b) => validBallot(state, b))) applyCrestVote(state, ballots);
+      }
+      break;
+    case 'ChooseCrest':
+      applyCrestVote(state, cmd.votes);
       break;
     case 'SetAiShare':
       setAiShare(state, cmd.share);
@@ -384,7 +412,7 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
         for (let x = cmd.x; x < cmd.x + cmd.w; x++) {
           const i = tileIndex(state, x, y);
           if (state.map.tiles[i] === Tile.Road || buildingAt(state, x, y)) continue;
-          if (isWater(state.map.terrain?.[i])) continue;
+          if (isWater(state.map.terrain?.[i]) || hasDike(state, x, y)) continue;
           if (state.map.zones[i] === value) continue;
           state.map.zones[i] = value;
           changed++;
@@ -395,15 +423,26 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
     }
     case 'Demolish': {
       const b = buildingAt(state, cmd.x, cmd.y);
+      const i = tileIndex(state, cmd.x, cmd.y);
       if (b) removeBuilding(state, b.id);
-      else state.map.tiles[tileIndex(state, cmd.x, cmd.y)] = Tile.Grass;
+      else if (state.map.tiles[i] === Tile.Road) state.map.tiles[i] = Tile.Grass;
+      else state.dikes = (state.dikes ?? []).filter((d) => d !== i);
       break;
     }
     case 'MeetAssociation':
       meetAssociation(state, cmd.associationId);
       break;
+    case 'AnswerErrand':
+      answerErrand(state, cmd.errandId, cmd.answer);
+      break;
+    case 'AnswerPress':
+      answerPress(state, cmd.edition, cmd.answer);
+      break;
     case 'UpgradeTownhall':
       upgradeTownhall(state);
+      break;
+    case 'BuildDike':
+      buildDike(state, cmd.x, cmd.y);
       break;
     case 'SetMinimumWage': {
       const before = MIN_WAGE_STEP[state.minWage ?? 'none'];
@@ -439,11 +478,13 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       break;
     }
     case 'RepairBuilding': {
-      // v1.8: el ayuntamiento paga la reparación de lo que rompieron los disturbios.
+      // v1.8: el ayuntamiento paga la reparación de lo que rompieron los disturbios (2.1: o el fuego).
       const b = buildingById(state, cmd.buildingId)!;
-      transfer(state, TREASURY, OUTSIDE, b.damaged!.cost, 'reparaciones (disturbios)');
-      b.damaged!.repairUntil = state.tick + ASSOCIATIONS.repairDays * TICKS_PER_DAY;
-      pushEvent(state, 'info', `Empieza la reparación de ${b.name ?? BUILD_NAMES[b.kind]?.toLowerCase()}: abrirá en ${ASSOCIATIONS.repairDays} días`, { ref: b.id });
+      const fire = b.damaged!.cause === 'fuego';
+      const days = fire ? FIRE.repairDays : ASSOCIATIONS.repairDays;
+      transfer(state, TREASURY, OUTSIDE, b.damaged!.cost, fire ? 'reparaciones (incendio)' : 'reparaciones (disturbios)');
+      b.damaged!.repairUntil = state.tick + days * TICKS_PER_DAY;
+      pushEvent(state, 'info', `Empieza la reparación de ${b.name ?? BUILD_NAMES[b.kind]?.toLowerCase()}: abrirá en ${days} días`, { ref: b.id });
       break;
     }
     case 'NotifyProject': {

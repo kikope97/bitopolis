@@ -3,6 +3,7 @@ import { averageHappiness, freeHomes, happinessFactors, vacancies } from './tick
 import { activeObjectives, lowerFirst, NEED_TEXT, needOf } from './social.ts';
 import { daysToElection, FACTION_TEXT, politicsActive } from './politics.ts';
 import type { GameEvent, GameState } from './state.ts';
+import { type Season, seasonOf } from './weather.ts';
 
 /** Consejero (Modo normal): consejos por reglas con los datos reales. */
 export type AdvisorQuestion = 'como_va' | 'que_cambiarias';
@@ -75,10 +76,49 @@ export interface DiaryEntry {
 
 const DIARY_KINDS = new Set(['arrival', 'departure', 'built', 'business', 'decision', 'milestone', 'bankrupt', 'tax', 'info', 'politics', 'election', 'protest']);
 
+const SEASON_IN: Record<Season, string> = { invierno: 'en invierno', primavera: 'en primavera', verano: 'en verano', otono: 'en otoño' };
+
+/** La noticia de un suceso sin su motivo («Lucía se queda: «…»» → «Lucía se queda»). */
+export function newsOf(text: string): string {
+  const i = text.indexOf(': «');
+  return i > 0 ? text.slice(0, i) : text;
+}
+
+/**
+ * 2.1: la misma noticia de un vecino (o de un edificio) sale como mucho una
+ * vez por estación en el diario: se queda la última y dice cuántas veces pasó.
+ * Devuelve, por suceso que se queda, cuántas veces se repitió; los repetidos
+ * que se quitan no están en el mapa.
+ */
+export function diaryRepeats(events: readonly GameEvent[]): Map<GameEvent, number> {
+  const groups = new Map<string, GameEvent[]>();
+  const keep = new Map<GameEvent, number>();
+  for (const e of events) {
+    if (e.ref === undefined || !['decision', 'info', 'business', 'politics'].includes(e.kind)) {
+      keep.set(e, 1);
+      continue;
+    }
+    const d = tickToDate(e.tick);
+    // El invierno abarca diciembre y el enero siguiente: cuenta con el año de diciembre.
+    const year = d.month === 12 ? d.year + 1 : d.year;
+    const key = `${e.ref}|${newsOf(e.text)}|${year}|${seasonOf(d.month)}`;
+    const list = groups.get(key) ?? [];
+    list.push(e);
+    groups.set(key, list);
+  }
+  for (const list of groups.values()) keep.set(list.at(-1)!, list.length);
+  return keep;
+}
+
 export function diary(state: GameState, maxDays = 12): DiaryEntry[] {
   const byDay = new Map<number, GameEvent[]>();
+  const counts = diaryRepeats(state.events.filter((e) => DIARY_KINDS.has(e.kind)));
+  const lineOf = (e: GameEvent) => {
+    const n = counts.get(e) ?? 1;
+    return n > 1 ? `${newsOf(e.text)} (${n} veces ${SEASON_IN[seasonOf(tickToDate(e.tick).month)]})` : e.text;
+  };
   for (const e of state.events) {
-    if (!DIARY_KINDS.has(e.kind)) continue;
+    if (!DIARY_KINDS.has(e.kind) || !counts.has(e)) continue;
     const d = Math.floor(e.tick / TICKS_PER_DAY);
     const list = byDay.get(d) ?? [];
     list.push(e);
@@ -91,7 +131,7 @@ export function diary(state: GameState, maxDays = 12): DiaryEntry[] {
     // Solo se agrupan los forasteros; bebés e hijos que se independizan, cada uno con su línea.
     const own = (e: { kind: string; text: string }) => e.kind === 'arrival' && /bebé|independiza/.test(e.text);
     const arrivals = evs.filter((e) => e.kind === 'arrival' && !own(e)).length;
-    const lines = evs.filter((e) => e.kind !== 'arrival' || own(e)).map((e) => e.text);
+    const lines = evs.filter((e) => e.kind !== 'arrival' || own(e)).map(lineOf);
     if (arrivals === 1) lines.unshift(evs.find((e) => e.kind === 'arrival' && !own(e))!.text);
     else if (arrivals > 1) lines.unshift(`Llegan ${arrivals} vecinos nuevos al pueblo`);
     return { tick: d * TICKS_PER_DAY, date: `${date.day}/${date.month}, año ${date.year}`, lines };

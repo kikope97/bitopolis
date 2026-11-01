@@ -22,7 +22,7 @@ import {
 } from '../src/index.ts';
 
 function town(): GameState {
-  const { state } = runSimulation({ seed: 3, days: 400, profile: 'constructor' });
+  const { state } = runSimulation({ seed: 1, days: 400, profile: 'constructor' });
   transfer(state, OUTSIDE, TREASURY, 60_000, 'subvencion');
   state.justice = { cells: [], jail: [], hot: [], robberies: 0, arrests: 0, fullWarned: -1 };
   return state;
