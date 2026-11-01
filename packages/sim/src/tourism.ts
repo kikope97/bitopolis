@@ -117,7 +117,7 @@ export function protectArea(state: GameState, heritageId: number): void {
       if (zones[i] === Zone.I && protectedAt(state, x, y) && !state.buildings.some((b) => b.x === x && b.y === y)) zones[i] = Zone.None;
     }
   }
-  pushEvent(state, 'politics', `Entorno protegido alrededor de ${HERITAGE_NAMES[heritageVariant(state, hb.x, hb.y)]}: más visitantes, pero sin industria nueva. A los empresarios no les gusta`, { ref: hb.id });
+  pushEvent(state, 'politics', `Entorno protegido alrededor ${HERITAGE_NAMES[heritageVariant(state, hb.x, hb.y)].replace(/^el /, 'del ')}: más visitantes, pero sin industria nueva. A los empresarios no les gusta`, { ref: hb.id });
 }
 
 /* ---------------- atractivo y visitantes ---------------- */

@@ -1,4 +1,4 @@
-import { ambulanceFor, buildingAt, type GameState, isWater, streetSegment, Terrain, Tile, trashStateOf, truckRoutes, Zone } from '@bitopolis/sim';
+import { ambulanceFor, buildingAt, type GameState, heritageVariant, isWater, streetSegment, Terrain, Tile, trashStateOf, truckRoutes, Zone } from '@bitopolis/sim';
 import { happinessMarks, type LayerId, layerCanvas, missingMarks, NEED_ICON } from './layers.ts';
 import { pixelIcon } from './icons.ts';
 
@@ -46,6 +46,7 @@ import {
   fireTruckSprite,
   flamesSprite,
   farmSprite,
+  heritageSprite,
   riskSprite,
 } from './sprites.ts';
 
@@ -319,6 +320,8 @@ function bSprite(b: GameState['buildings'][number], tod: TimeOfDay, snowing: boo
   if (b.level && b.level > 1) return serviceSprite(b.kind, b.id, b.level, tod, snowing);
   // 2.2: la finca, según su cultivo.
   if (b.kind === 'farm' && b.crop) return farmSprite(b.crop, b.id, tod, snowing);
+  // 2.3: el patrimonio, con la forma que le da el terreno.
+  if (b.kind === 'heritage') return heritageSprite(heritageVariant(state, b.x, b.y), tod, snowing);
   // 2.1: los tejados de las viviendas cambian con el rango del pueblo.
   return buildingSprite(b.kind, b.id, tod, snowing, state.rank?.level ?? 2);
 }

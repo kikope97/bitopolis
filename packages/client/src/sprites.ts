@@ -3058,6 +3058,9 @@ function buildingSpec(kind: string, id: number, rank = VILLA_RANK): [string, () 
       }];
     case 'cleanpoint':
       return ['cleanpoint', () => cleanPoint(18)];
+    // 2.3: el patrimonio (en el mapa, render usa heritageSprite con su forma; aquí, el rollo).
+    case 'heritage':
+      return ['heritage-rollo', rollo];
     case 'factory':
       return [`factory${id % 4}`, () => factory(id % 4)];
     // 2.2: sin saber el cultivo, una finca de cereal (el render usa farmSprite con el suyo).
@@ -3981,5 +3984,158 @@ export function farmSprite(crop: CropKind, id: number, tod: TimeOfDay = 'day', s
   const seed = id % 3;
   const key = `farm-${crop}-${seed}`;
   const make = () => FARM_MAKERS[crop](seed);
+  return snow ? sprite(`snow-${key}`, () => snowify(make()), tod) : sprite(key, make, tod);
+}
+
+/* ===================== 2.3: patrimonio (según el terreno) ===================== */
+
+export type HeritageVariantArt = 'faro' | 'molino' | 'castillo' | 'rollo';
+
+/** Faro junto al mar: torre encalada con franjas rojas sobre las rocas y la linterna arriba. */
+function lighthouse(): Pix {
+  const p = new Pix(T, BH);
+  // Rocas de la base.
+  p.ball(9, 42, 5, MAT.stone, 3);
+  p.ball(22, 43, 4.5, MAT.stone, 5);
+  p.ball(15, 44, 4, MAT.stone, 7);
+  castShadow(p, 12, 12, 8, 30);
+  // Torre que se estrecha hacia arriba.
+  for (let y = 12; y < 41; y++) {
+    const half = 3 + Math.floor((y - 12) / 9);
+    const band = Math.floor((y - 12) / 6) % 2 === 1;
+    const m = band ? MAT.red : MAT.white;
+    for (let x = 16 - half; x < 16 + half; x++) p.set(x, y, x === 16 - half ? m[0] : x >= 16 + half - 1 ? m[2] : m[1]);
+  }
+  // Puerta y ventanucos.
+  p.rect(15, 36, 3, 5, MAT.wood[2]);
+  p.set(16, 36, MAT.wood[1]);
+  p.set(16, 22, MAT.glass[2]);
+  p.set(16, 29, MAT.glass[2]);
+  // Galería, linterna y cúpula.
+  p.hline(11, 11, 10, MAT.metal[2]);
+  p.hline(11, 12, 10, MAT.metal[3]);
+  p.rect(13, 6, 6, 5, nightLights ? C.lamp : MAT.glass[1]);
+  p.vline(13, 6, 5, MAT.metal[2]);
+  p.vline(18, 6, 5, MAT.metal[2]);
+  if (nightLights) {
+    p.hline(3, 8, 9, C.lampWarm);
+    p.hline(20, 8, 10, C.lampWarm);
+  } else p.set(15, 7, 12);
+  p.hline(13, 5, 6, MAT.red[2]);
+  p.hline(14, 4, 4, MAT.red[2]);
+  p.hline(15, 3, 2, MAT.red[3]);
+  p.set(16, 2, MAT.metal[3]);
+  return p;
+}
+
+/** Molino de agua junto al río: casa de piedra con la rueda de paletas al costado. */
+function watermill(): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 4, 24, 18, 20);
+  // Casa de piedra con tejado a un agua.
+  facade(p, 4, 26, 18, 18, MAT.stone, 'stone', 4);
+  for (let x = 3; x < 23; x++) for (let y = 0; y < 6; y++) p.set(x, 20 + y + Math.floor((22 - x) / 6), y === 0 ? MAT.terracotta[0] : (x + y) % 3 === 0 ? MAT.terracotta[2] : MAT.terracotta[1]);
+  p.rect(10, 35, 5, 9, MAT.wood[2]);
+  p.vline(12, 36, 8, MAT.wood[3]);
+  windowAt(p, 6, 31, 3, 3, { frame: MAT.stone[3], lit: nightLights });
+  windowAt(p, 17, 31, 3, 3, { frame: MAT.stone[3], lit: nightLights });
+  // Canal de agua que baja a la rueda.
+  p.rect(22, 27, 9, 2, MAT.wood[1]);
+  p.hline(22, 26, 9, C.waterLight);
+  // Rueda de paletas.
+  p.ellipse(25, 37, 6, 6, MAT.wood[3]);
+  p.ellipse(25, 37, 4.5, 4.5, MAT.wood[1]);
+  p.ellipse(25, 37, 3, 3, MAT.wood[3]);
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2;
+    p.set(Math.round(25 + Math.cos(a) * 5), Math.round(37 + Math.sin(a) * 5), MAT.wood[0]);
+    p.set(Math.round(25 + Math.cos(a) * 2), Math.round(37 + Math.sin(a) * 2), MAT.wood[2]);
+  }
+  p.rect(24, 36, 2, 2, MAT.metal[3]);
+  // Agua al pie de la rueda.
+  p.hline(19, 44, 13, C.water);
+  p.hline(20, 45, 11, C.waterDeep);
+  p.set(22, 43, C.waterLight);
+  p.set(28, 43, C.waterLight);
+  return p;
+}
+
+/** Castillo en la colina: torre del homenaje almenada entre dos torreones, con su bandera. */
+function castle(): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 2, 22, 28, 22);
+  const merlons = (x: number, y: number, w: number) => {
+    for (let i = 0; i < w; i += 2) p.rect(x + i, y - 2, 1, 2, MAT.stone[i === 0 ? 0 : 1]);
+  };
+  // Muralla.
+  facade(p, 2, 30, 28, 14, MAT.stone, 'stone', 9);
+  merlons(2, 30, 28);
+  // Torreones.
+  facade(p, 1, 24, 6, 20, MAT.stone, 'stone', 10);
+  merlons(1, 24, 6);
+  facade(p, 25, 24, 6, 20, MAT.stone, 'stone', 11);
+  merlons(25, 24, 6);
+  // Torre del homenaje.
+  facade(p, 10, 12, 12, 22, MAT.stone, 'stone', 12);
+  merlons(10, 12, 12);
+  p.rect(15, 18, 2, 3, nightLights ? C.lamp : MAT.stone[3]);
+  p.rect(12, 24, 1, 2, MAT.stone[3]);
+  p.rect(19, 24, 1, 2, MAT.stone[3]);
+  p.set(4, 30, MAT.stone[3]);
+  p.set(27, 30, MAT.stone[3]);
+  // Puerta de arco con rastrillo.
+  p.rect(13, 37, 6, 7, MAT.stone[3]);
+  p.hline(14, 36, 4, MAT.stone[3]);
+  for (let x = 14; x < 18; x += 2) p.vline(x, 37, 6, MAT.metal[2]);
+  p.hline(13, 40, 6, MAT.metal[2]);
+  // Bandera.
+  p.vline(16, 2, 9, MAT.metal[3]);
+  p.rect(17, 2, 5, 3, MAT.red[1]);
+  p.hline(17, 3, 5, MAT.yellow[1]);
+  return p;
+}
+
+/** Rollo de justicia con plaza porticada: soportales de piedra al fondo y la columna en el centro. */
+function rollo(): Pix {
+  const p = new Pix(T, BH);
+  // Soportales (pórtico con arcos) al fondo.
+  facade(p, 1, 14, 30, 18, MAT.cream, 'plaster', 6);
+  for (let x = 1; x < 31; x++) p.set(x, 13, MAT.terracotta[2]);
+  p.hline(1, 12, 30, MAT.terracotta[1]);
+  for (let i = 0; i < 4; i++) {
+    windowAt(p, 4 + i * 7, 16, 3, 3, { frame: MAT.cream[3], shutters: MAT.wood, lit: nightLights });
+    const ax = 2 + i * 7;
+    p.rect(ax + 1, 24, 5, 8, MAT.stone[3]);
+    p.hline(ax + 2, 23, 3, MAT.stone[3]);
+    p.vline(ax, 23, 9, MAT.stone[1]);
+  }
+  p.vline(30, 23, 9, MAT.stone[1]);
+  // Suelo empedrado de la plaza.
+  for (let y = 32; y < 47; y++) for (let x = 0; x < 32; x++) p.set(x, y, hash(x, y, 31) > 0.82 ? MAT.stone[2] : (x + y) % 4 === 0 ? MAT.stone[0] : MAT.stone[1]);
+  // Gradas del rollo.
+  p.rect(10, 42, 12, 2, MAT.stone[2]);
+  p.hline(10, 42, 12, MAT.stone[0]);
+  p.rect(12, 40, 8, 2, MAT.stone[2]);
+  p.hline(12, 40, 8, MAT.stone[0]);
+  // Columna, capitel y cruz de remate.
+  p.shadow(17, 41, 4, 1);
+  p.rect(15, 18, 3, 22, MAT.white[1]);
+  p.vline(15, 18, 22, MAT.white[0]);
+  p.vline(17, 18, 22, MAT.white[2]);
+  p.rect(14, 16, 5, 2, MAT.white[2]);
+  p.hline(14, 16, 5, MAT.white[0]);
+  p.vline(16, 11, 5, MAT.metal[3]);
+  p.hline(15, 12, 3, MAT.metal[3]);
+  bush(p, 3, 41, 2, 4, true);
+  bush(p, 28, 41, 2, 5, true);
+  return p;
+}
+
+const HERITAGE_MAKERS: Record<HeritageVariantArt, () => Pix> = { faro: lighthouse, molino: watermill, castillo: castle, rollo };
+
+/** 2.3: sprite del patrimonio según su forma (la decide el terreno, `heritageVariant`). */
+export function heritageSprite(variant: HeritageVariantArt, tod: TimeOfDay = 'day', snow = false): HTMLCanvasElement {
+  const key = `heritage-${variant}`;
+  const make = HERITAGE_MAKERS[variant];
   return snow ? sprite(`snow-${key}`, () => snowify(make()), tod) : sprite(key, make, tod);
 }

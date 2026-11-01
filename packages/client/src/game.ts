@@ -73,6 +73,9 @@ import {
   tenderApplies,
   streetSegment,
   STREETS,
+  HERITAGE_NAMES,
+  heritageVariant,
+  touristified,
 } from '@bitopolis/sim';
 import { contractBox, openTender } from './tender-ui.ts';
 import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
@@ -1908,6 +1911,14 @@ export function startGame(opts: GameOptions): void {
         if (levelOf(b) >= 2) content.push(h('p', {}, `Reciclaje: la tasa de basuras es un ${Math.round(TRASH.recyclingDiscount * 100)} % más barata para los suyos, y los ecologistas lo agradecen.`));
         if (levelOf(b) >= 3) content.push(h('p', {}, `Compostaje: vende el abono fuera (${money(TRASH.compostPerResident)} por vecino atendido al mes).`));
       }
+      // 2.3: el patrimonio (su forma sale del terreno) y la casa rural.
+      if (b.kind === 'heritage') {
+        content.push(h('p', {}, `${HERITAGE_NAMES[heritageVariant(state, b.x, b.y)].replace(/^el /, 'El ')}: atrae visitantes. El mes pasado vinieron ${state.tourism.visitors}.${state.tourism.protectedId === b.id ? ' Su entorno está protegido.' : ''}`));
+        const go = h('button', { class: 'btn wide', id: 'heritage-tourism' }, 'Turismo: tasa y entorno');
+        go.addEventListener('click', () => withBack('Ficha', () => focusBuilding(b.id), () => openTownHall(social, 'tourism')));
+        content.push(go);
+      }
+      if (b.rural && (b.kind === 'house' || b.kind === 'res')) content.push(h('p', { class: 'muted small' }, 'Casa rural: su dueño alquila plazas a los visitantes.'));
       // v1.8 (petición del creador): los servicios suben de nivel.
       if (UPGRADABLE.includes(b.kind)) content.push(levelBox(b));
       const res = occupants(state, b);
@@ -2121,6 +2132,8 @@ export function startGame(opts: GameOptions): void {
         // v1.9.1: el ayuntamiento cuesta de encontrar en el mapa; desde aquí se llega a «Gestión del pueblo».
         item(`Nivel ${townLevel(state)} · ${townLevel(state) >= TOWNHALL_LEVELS.length ? 'Gestión' : 'Ampliar'}`, go(openHall), canUpgradeTownhall(state).ok),
         item('Presupuesto y fiestas', go(() => openTownHall(social)), budgetOpen || offers > 0 || protest),
+        // 2.3: turismo (desde el nivel 3 o en cuanto hay visitantes).
+        ...(townLevel(state) >= 3 || state.tourism.visitors > 0 ? [item(`Turismo · ${plural(state.tourism.visitors, 'visitante', 'visitantes')}`, go(() => openTownHall(social, 'tourism')), touristified(state))] : []),
         item('Pleno municipal', go(() => openPleno(social))),
         item('Política y elecciones', go(() => openPolitics(social))),
         item('Consejero', go(() => openAdvisor(social))),

@@ -29,6 +29,7 @@ export type ToolId =
   | 'civilprotection'
   | 'dike'
   | 'cleanpoint'
+  | 'heritage'
   | 'demolish';
 
 export interface Tool {
@@ -73,6 +74,8 @@ export const TOOLS: Tool[] = [
   { id: 'dike', label: 'Dique', shape: 'tap', key: 'q', help: 'Muro en una casilla junto al río: ahí y alrededor no llega la riada. Hace falta una caseta de protección civil.' },
   // 2.1: recogida de basura.
   { id: 'cleanpoint', label: 'Punto limpio', shape: 'tap', build: 'cleanpoint', key: 'u', help: 'Su camión recoge la basura por las calles de alrededor (60 casillas al día). Solo quien tiene recogida paga la tasa de basuras.' },
+  // 2.3: turismo (uno por partida; su forma sale del terreno).
+  { id: 'heritage', label: 'Patrimonio', shape: 'tap', build: 'heritage', key: 'o', help: 'Monumento que atrae visitantes (uno por pueblo): faro junto al mar, molino junto al río, castillo en la colina o rollo con plaza porticada en el llano. Turismo, en Pueblo › Ayuntamiento.' },
   { id: 'dezone', label: 'Sin zona', shape: 'rect', zone: 'none', key: 'z', help: 'Quita la zona (no derriba lo construido).' },
   { id: 'demolish', label: 'Derribar', shape: 'tap', key: 'x', help: 'Derriba un edificio o una carretera. Pide confirmación.' },
 ];
@@ -99,6 +102,7 @@ export function lockShort(tool: Tool, state: GameState): string | null {
   if ((tool.build === 'plaza' || tool.build === 'market') && !state.unlocked.includes(tool.build)) return `hito de ${unlockPop(tool)}`;
   if (state.citizens.length < unlockPop(tool) && tool.build !== 'plaza' && tool.build !== 'market') return `${unlockPop(tool)} vecinos`;
   if (tool.id === 'dike' && !state.buildings.some((b) => b.kind === 'civilprotection' && b.built)) return 'protección civil';
+  if (tool.build === 'heritage' && state.buildings.some((b) => b.kind === 'heritage')) return 'ya lo tienes';
   return null;
 }
 
@@ -111,6 +115,7 @@ export function lockLong(tool: Tool, state: GameState): string {
   }
   if (tool.build === 'plaza' || tool.build === 'market') return `${tool.label}: es el premio del hito de ${unlockPop(tool)} vecinos (tienes ${state.citizens.length}).`;
   if (tool.id === 'dike' && lockShort(tool, state) === 'protección civil') return 'Dique: primero construye una caseta de protección civil.';
+  if (tool.build === 'heritage' && lockShort(tool, state) === 'ya lo tienes') return 'Patrimonio: solo hay uno por pueblo y ya lo tienes.';
   return `${tool.label}: hacen falta ${unlockPop(tool)} vecinos (tienes ${state.citizens.length}).`;
 }
 
@@ -135,6 +140,7 @@ export const TRAY: { title: string; tools: ToolId[] }[] = [
   { title: 'Servicios', tools: ['park', 'school', 'clinic', 'police', 'cleanpoint', 'jail'] },
   { title: 'Vida social', tools: ['bar', 'chapel', 'cemetery', 'library', 'sports'] },
   { title: 'Emergencias', tools: ['firestation', 'civilprotection', 'dike'] },
+  { title: 'Turismo', tools: ['heritage'] },
   { title: 'Premios de los hitos', tools: ['plaza', 'market'] },
 ];
 
