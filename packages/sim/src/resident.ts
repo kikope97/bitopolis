@@ -22,7 +22,7 @@ function uniqueName(state: GameState): string {
 }
 
 /** Misma regla que `aiByShare` (turns.ts; lo comprueba un test): ¿piensa con IA el vecino `id`? */
-function byShare(state: GameState, id: number): boolean {
+export function byShare(state: GameState, id: number): boolean {
   return hash32(state.seed, id, 77) % 100 < (state.ai?.share ?? 0);
 }
 

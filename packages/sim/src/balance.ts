@@ -1134,7 +1134,8 @@ export const SCENARIOS = {
     ageMin: 60,
     ageMax: 80,
     emptyHouses: 8,
-    demandR: -30,
+    /** Plan: −30; con −30 los empleos de los talleres traían gente igual y la meta caía al 4.º mes. */
+    demandR: -60,
     demandMonths: 12,
     goalPop: 50,
     deadlineMonths: 36,
@@ -1156,8 +1157,8 @@ export const SCENARIOS = {
     citizens: 22,
     treasury: 12_000,
     /** Reparar lo de la riada: parte de los materiales del edificio (mínimo `repairMin`). */
-    repair: 0.6,
-    repairMin: 1_500,
+    repair: 1,
+    repairMin: 4_000,
     village: { house: 2, res: 7, shop: 2, factory: 2, park: 1 },
     money: [400, 2_000],
     age: [20, 72],

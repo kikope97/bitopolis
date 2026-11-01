@@ -1,4 +1,4 @@
-import { type Command, DAYS_PER_YEAR, TICKS_PER_DAY, TICKS_PER_MONTH, type TimedCommand } from '@bitopolis/shared';
+import { type Command, DAYS_PER_YEAR, type ScenarioId, type TerrainShape, TICKS_PER_DAY, TICKS_PER_MONTH, type TimedCommand } from '@bitopolis/shared';
 import { applyCommand } from './commands.ts';
 import { hashState } from './hash.ts';
 import { checkInvariants, moneyDrift } from './invariants.ts';
@@ -18,6 +18,9 @@ export interface RunOptions {
   aiShare?: number;
   /** 2.0: responde a un turno abierto (IA simulada o grabada); null = no responde (deciden las reglas). */
   onTurn?: (state: GameState) => Command | null;
+  /** 2.3: escenario y forma del terreno (por defecto, Libre y aleatorio: lo de siempre). */
+  scenario?: ScenarioId;
+  terrain?: TerrainShape;
 }
 
 export interface SimReport {
@@ -41,6 +44,8 @@ export interface SimReport {
   sales: { year: number; shop: number; factory: number; farm: number; farms: number; income: number; farmShare: number; farmShareIn: number }[];
   /** 2.2: préstamos municipales. */
   loans: LoanMetrics;
+  /** 2.3: escenario (y si se ganó, y en qué mes). */
+  scenario: { id: ScenarioId; terrain: TerrainShape; done: boolean; won: boolean; month: number | null };
 }
 
 export interface LoanMetrics {
@@ -62,7 +67,8 @@ export interface LoanMetrics {
 export function runSimulation(opts: RunOptions): { state: GameState; report: SimReport } {
   const profile = PROFILES[opts.profile];
   if (!profile) throw new Error(`perfil desconocido: ${opts.profile}`);
-  const state = createInitialState({ seed: opts.seed, aiMode: opts.aiMode, aiShare: opts.aiShare });
+  const state = createInitialState({ seed: opts.seed, aiMode: opts.aiMode, aiShare: opts.aiShare, scenario: opts.scenario, terrain: opts.terrain });
+  let scenarioMonth: number | null = null;
   const prng = profileRng(opts.seed);
   const commands: TimedCommand[] = [];
   const invariantErrors: string[] = [];
@@ -124,6 +130,7 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
       const load = loanLoad(state);
       if (Number.isFinite(load)) loans.maxLoadPct = Math.max(loans.maxLoadPct, Math.round(load * 100));
     }
+    if (scenarioMonth === null && state.scenario.won) scenarioMonth = Math.round(state.tick / TICKS_PER_MONTH);
     if (day + 1 === DAYS_PER_YEAR) populationAt1Year = state.citizens.length;
     if (opts.checkEveryDay) {
       for (const e of checkInvariants(state)) invariantErrors.push(`día ${day + 1}: ${e}`);
@@ -161,13 +168,14 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
       monthly: state.stats,
       sales,
       loans,
+      scenario: { id: state.scenario.id, terrain: opts.terrain ?? 'aleatorio', done: state.scenario.done, won: !!state.scenario.won, month: scenarioMonth },
     },
   };
 }
 
 /** Reproduce una partida a partir de semilla + comandos. */
-export function replay(seed: number, commands: readonly TimedCommand[], untilTick: number): GameState {
-  const state = createInitialState({ seed });
+export function replay(seed: number, commands: readonly TimedCommand[], untilTick: number, start: { scenario?: ScenarioId; terrain?: TerrainShape } = {}): GameState {
+  const state = createInitialState({ seed, ...start });
   let i = 0;
   while (state.tick < untilTick) {
     while (i < commands.length && commands[i]!.tick === state.tick) applyCommand(state, commands[i++]!.cmd);
