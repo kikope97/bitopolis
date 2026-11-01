@@ -836,7 +836,9 @@ export function startGame(opts: GameOptions): void {
       } else if (e.kind === 'departure' || e.kind === 'business') {
         // Ronda 15: una apertura es buena noticia; los cierres van además agrupados a fin de mes.
         const opens = e.kind === 'business' && / abre /.test(e.text);
-        if (!quiet) toast(e.text, { kind: opens ? 'good' : 'warn', onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+        // Ronda 21: los que se van a un pueblo vecino llevan a la Comarca (por qué se van), también a x10.
+        const toTown = /se van? a .*: (allí se vive|ha bajado los impuestos)/.test(e.text);
+        if (!quiet || toTown) toast(e.text, { kind: opens ? 'good' : 'warn', onClick: toTown ? () => withBack('Pueblo', openHub, openComarcaSheet) : e.ref ? () => focusBuilding(e.ref!) : undefined });
         if (!opens) calmPause();
       }
     }
@@ -1741,7 +1743,7 @@ export function startGame(opts: GameOptions): void {
   }
   function toolHelp(tl: Tool): string {
     if (tl.id === 'road') return coarse ? 'toca el inicio y luego el final (o arrastra desde el inicio).' : 'arrastra en línea recta. Por debajo van el agua y la luz.';
-    if ((tl.zone && tl.zone !== 'none') || tl.density !== undefined) return coarse ? `${tl.help} Toca una esquina y luego la otra.` : tl.help;
+    if ((tl.zone && tl.zone !== 'none') || tl.density !== undefined) return coarse ? `Toca una esquina y luego la otra. ${tl.help}` : tl.help;
     if (tl.id === 'demolish') return 'toca lo que quieras derribar. Te pedirá confirmación.';
     return tl.help;
   }

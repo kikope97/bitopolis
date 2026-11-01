@@ -148,10 +148,19 @@ function values(state: GameState, layer: LayerId): (number | null)[] {
 
 let cache: { key: string; canvas: HTMLCanvasElement } | null = null;
 
+/** Ronda 21: firma barata de la densidad pedida y de lo crecido (la capa se rehace al marcar). */
+function densitySig(state: GameState): number {
+  let n = 0;
+  const d = state.map.density ?? [];
+  for (let i = 0; i < d.length; i++) if (d[i]) n = (n * 31 + i * 3 + d[i]!) | 0;
+  for (const b of state.buildings) if (b.dense) n = (n * 31 + b.id * 7 + b.dense) | 0;
+  return n;
+}
+
 /** Capa a escala 1 (una trama por casilla); se rehace cada día de juego. */
 export function layerCanvas(state: GameState, layer: LayerId): HTMLCanvasElement | null {
   if (layer === 'none') return null;
-  const key = `${layer}:${Math.floor(state.tick / 24)}:${state.buildings.length}:${layer === 'rural' ? `${state.buildings.filter((b) => b.rural).length}:${state.tourism?.protectedId ?? ''}:` : ''}${prefs().colorblind}`;
+  const key = `${layer}:${Math.floor(state.tick / 24)}:${state.buildings.length}:${layer === 'rural' ? `${state.buildings.filter((b) => b.rural).length}:${state.tourism?.protectedId ?? ''}:` : ''}${layer === 'density' ? `${densitySig(state)}:` : ''}${prefs().colorblind}`;
   if (cache?.key === key) return cache.canvas;
   const def = LAYERS.find((l) => l.id === layer)!;
   const { w, h } = state.map;

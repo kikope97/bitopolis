@@ -57,12 +57,21 @@ function blockBox(state: GameState, b: Building): HTMLElement | null {
   if (!want && !now) return null;
   const land = state.fields.land[b.y * state.map.w + b.x] ?? 0;
   const box = h('section', { class: 'level-box vida-box', 'data-vivienda': 'densidad' });
-  box.append(h('h3', {}, pixelIcon('town'), ` Densidad ${DENSITY_NAME[want]}`), h('p', {}, h('strong', {}, `${homesOf(b)} viviendas`), now ? ` (ha crecido a densidad ${DENSITY_NAME[now]})` : ''));
+  // Ronda 21: lo que tiene, lo que se pidió y, condición a condición, lo que le falta para crecer.
+  box.append(h('h3', {}, pixelIcon('town'), ` Densidad pedida: ${DENSITY_NAME[want]}`), h('p', {}, 'Ahora: ', h('strong', {}, `${homesOf(b)} viviendas`), ` (${DENSITY_NAME[now]})`));
   if (want > now) {
-    const why: string[] = [];
-    if (land <= DENSITY.minLand) why.push(`el suelo vale ${land} y hace falta más de ${DENSITY.minLand}`);
-    if (state.demand.R <= DENSITY.minDemandR) why.push(`la demanda de vivienda es ${state.demand.R} y hace falta más de ${DENSITY.minDemandR}`);
-    box.append(h('p', { class: 'muted small' }, why.length ? `Crecerá a ${DENSITY.homes[now + 1]} viviendas cuando ${why.join(' y ')}.` : `Crecerá a ${DENSITY.homes[now + 1]} viviendas en unos días.`));
+    const okLand = land > DENSITY.minLand;
+    const okDem = state.demand.R > DENSITY.minDemandR;
+    box.append(
+      h('p', { class: 'small' }, `Para crecer a ${DENSITY.homes[now + 1]} viviendas:`),
+      h(
+        'ul',
+        { class: 'reqs' },
+        h('li', { class: okLand ? 'ok' : 'no' }, `${okLand ? '✓' : '✗'} Valor del suelo ${land} (necesita más de ${DENSITY.minLand}; sube con servicios y parques)`),
+        h('li', { class: okDem ? 'ok' : 'no' }, `${okDem ? '✓' : '✗'} Demanda de vivienda ${state.demand.R} (necesita más de ${DENSITY.minDemandR})`),
+      ),
+      okLand && okDem ? h('p', { class: 'muted small' }, 'Crecerá en unos días.') : '',
+    );
   }
   if (now) box.append(h('p', { class: 'muted small' }, `Más vecinos, más ruido: +${DENSITY.noisePerLevel * now} en su calle.`));
   return box;

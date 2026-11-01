@@ -117,8 +117,8 @@ export const TOOLS: Tool[] = [
   { id: 'coop', label: 'Cooperativa', shape: 'tap', build: 'coop', key: '', help: `Una por pueblo. Quien tiene finca puede hacerse socio: vende la cosecha un ${Math.round(COOP.priceFx * 100)} % más cara, paga ${COOP.fee} € al mes y en diciembre se reparte todo. Con la almazara o la bodega (nivel 2), un ${Math.round(COOP.priceFxLevel2 * 100)} %.` },
   { id: 'post', label: 'Correos', shape: 'tap', build: 'post', key: '', help: `Una por pueblo. Las subvenciones de la Diputación dan ${POST.grantDaysWith} días para responder (sin correos, ${POST.grantDaysWithout}) y los que se fueron escriben a su familia y amigos.` },
   // 2.5: se traza como las zonas, solo cambia la zona R.
-  { id: 'densityMid', label: 'Densidad media', shape: 'rect', density: 1, key: '', help: `Marca zona R: sus bloques crecen a ${DENSITY.homes[1]} viviendas si el suelo vale más de ${DENSITY.minLand} y hay demanda (R > ${DENSITY.minDemandR}). Hacen algo más de ruido.` },
-  { id: 'densityHigh', label: 'Densidad alta', shape: 'rect', density: 2, key: '', help: `Marca zona R: sus bloques crecen hasta ${DENSITY.homes[2]} viviendas (con suelo de más de ${DENSITY.minLand} y demanda R > ${DENSITY.minDemandR}). Más gente, más ruido.` },
+  { id: 'densityMid', label: 'Densidad media', shape: 'rect', density: 1, key: '', help: `Los bloques de la zona R crecen a ${DENSITY.homes[1]} viviendas si el suelo vale y hay demanda. Algo más de ruido.` },
+  { id: 'densityHigh', label: 'Densidad alta', shape: 'rect', density: 2, key: '', help: `Los bloques de la zona R crecen hasta ${DENSITY.homes[2]} viviendas si el suelo vale y hay demanda. Más ruido.` },
   { id: 'densityLow', label: 'Densidad baja', shape: 'rect', density: 0, key: '', help: `Vuelve a casas bajas de ${DENSITY.homes[0]} viviendas. Lo que ya ha crecido se queda como está.` },
   { id: 'vpo', label: 'Vivienda protegida', shape: 'tap', build: 'vpo', key: '', help: `${VPO.homes} pisos a ${money(VPO.rent)} al mes. Se sortean cada mes entre quienes los piden y los que menos ganan.` },
   { id: 'dezone', label: 'Sin zona', shape: 'rect', zone: 'none', key: 'z', help: 'Quita la zona (no derriba lo construido).' },
@@ -220,7 +220,7 @@ export const TRAY: { title: string; tools: ToolId[] }[] = [
   { title: 'Emergencias', tools: ['firestation', 'civilprotection', 'dike'] },
   // 2.4 «Vida».
   // 2.5: vivienda (la densidad se traza como las zonas).
-  { title: 'Vivienda', tools: ['vpo', 'densityMid', 'densityHigh', 'densityLow'] },
+  { title: 'Vivienda', tools: ['vpo', 'densityLow', 'densityMid', 'densityHigh'] },
   { title: 'Cuidados', tools: ['nursery', 'residence', 'post'] },
   { title: 'Agua y energía', tools: ['sewage', 'solar', 'wind'] },
   { title: 'Transporte', tools: ['busstation'] },

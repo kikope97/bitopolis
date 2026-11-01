@@ -12,6 +12,10 @@ import {
   relationText,
   SPECIALTY_TEXT,
   strongestPull,
+  isFemaleName,
+  ourAttract,
+  townAttract,
+  COMARCA,
 } from '@bitopolis/sim';
 import { formatDate } from './i18n.ts';
 import { h, sheet, toast } from './ui.ts';
@@ -41,7 +45,10 @@ export function comarcaSummary(state: GameState): string {
   const towns = state.comarca?.towns ?? [];
   if (!towns.length) return 'Los pueblos vecinos aparecen al cerrar el primer mes';
   const n = comarcaPending(state);
-  return n ? `${n === 1 ? 'Una oferta' : `${n} ofertas`} de los pueblos vecinos por responder` : `${towns.length} pueblos vecinos`;
+  const pull = strongestPull(state);
+  const gone = pull ? pullLeavers(state) : 0;
+  const away = gone > 0 ? ` · ${pull!.name} se lleva unos ${gone} vecinos al mes` : '';
+  return (n ? `${n === 1 ? 'Una oferta' : `${n} ofertas`} de los pueblos vecinos por responder` : `${towns.length} pueblos vecinos`) + away;
 }
 
 function townCard(ctx: ComarcaCtx, state: GameState, t: NeighborTown): HTMLElement {
@@ -50,8 +57,8 @@ function townCard(ctx: ComarcaCtx, state: GameState, t: NeighborTown): HTMLEleme
     'section',
     { class: 'hub-card comarca-town', 'data-town': String(t.id) },
     h('h3', {}, t.name),
-    h('p', { class: 'hub-sum' }, `${SIZE(t.pop)} · vive de ${SPECIALTY_TEXT[t.specialty]} · vecinos ${MOOD(t.happiness)}`),
-    h('p', {}, h('strong', {}, t.mayor.name), ` · alcalde ${PERSONALITY_TEXT[t.mayor.personality]}, de los ${FACTION[t.mayor.faction] ?? t.mayor.faction}`),
+    h('p', { class: 'hub-sum' }, `${SIZE(t.pop)} · vive ${SPECIALTY_TEXT[t.specialty].replace(/^el /, 'del ').replace(/^(la|los) /, 'de $1 ')} · vecinos ${MOOD(t.happiness)}`),
+    h('p', {}, h('strong', {}, t.mayor.name), ` · ${isFemaleName(t.mayor.name) ? `alcaldesa ${PERSONALITY_TEXT[t.mayor.personality].replace(/o$/, 'a')}` : `alcalde ${PERSONALITY_TEXT[t.mayor.personality]}`}, de los ${FACTION[t.mayor.faction] ?? t.mayor.faction}`),
     h('p', { class: `comarca-rel rel-${t.relation < 0 ? 'bad' : t.relation > 0 ? 'good' : 'ok'}` }, `Relación: ${rel}${t.downstream ? ' · está río abajo' : ''}`),
   );
   if (t.said) {
@@ -100,7 +107,7 @@ export function openComarca(ctx: ComarcaCtx): void {
     body.push(h('p', { class: 'muted' }, `Feria comarcal de septiembre: ${hostName}.${host === 0 ? ' Los forasteros gastarán en las tiendas del pueblo.' : ''}`));
     const pull = strongestPull(state);
     const n = pullLeavers(state);
-    if (pull && n > 0) body.push(h('p', { class: 'comarca-warn' }, `${pull.name} atrae a los vecinos más que Bitópolis: cada mes se pueden ir unos ${n}. Sube la felicidad o baja los impuestos.`));
+    if (pull && n > 0) body.push(h('p', { class: 'comarca-warn' }, `${pull.name} atrae a los vecinos más que Bitópolis (${Math.round(townAttract(state, pull))} frente a ${Math.round(ourAttract(state))}; se van si la diferencia pasa de ${COMARCA.pullGap}): cada mes se pueden ir unos ${n}. Sube la felicidad o baja los impuestos.`));
     const deals = OFFER_KINDS.filter((k) => activeDeal(state, k));
     if (deals.length) body.push(h('p', { class: 'small' }, `Acuerdos en vigor: ${deals.map((k) => OFFER_TEXT[k]).join(', ')}.`));
     for (const t of towns) body.push(townCard(ctx, state, t));

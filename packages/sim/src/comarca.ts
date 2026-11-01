@@ -64,13 +64,13 @@ export function offerEffect(kind: NeighborOfferKind): string {
   const d = COMARCA.deals;
   switch (kind) {
     case 'luz':
-      return `Os compra la luz que sobre de las placas y molinos: ${d.luz.perBuilding} € al mes por cada edificio que podríais alumbrar de más (${d.months} meses)`;
+      return `Te compra la luz que sobre de las placas y molinos: ${d.luz.perBuilding} € al mes por cada edificio que podrías alumbrar de más (${d.months} meses)`;
     case 'agua':
-      return `Os compra el agua que sobre: ${d.agua.perBuilding} € al mes por cada edificio que podríais abastecer de más (${d.months} meses)`;
+      return `Te compra el agua que sobre: ${d.agua.perBuilding} € al mes por cada edificio que podrías abastecer de más (${d.months} meses)`;
     case 'autobus':
       return `Línea de autobús compartida: ${d.autobus.fee} € al mes y +${d.autobus.happiness} de felicidad para todo el pueblo (${d.months} meses)`;
     case 'cosecha':
-      return `Os compra la cosecha: las fincas cobran un ${Math.round(d.cosecha.bonus * 100)} % más al vender (${d.months} meses)`;
+      return `Te compra la cosecha: las fincas cobran un ${Math.round(d.cosecha.bonus * 100)}\u00a0% más al vender (${d.months} meses)`;
   }
 }
 export const RELATION_TEXT = ['mala', 'tensa', 'normal', 'buena', 'muy buena'] as const;

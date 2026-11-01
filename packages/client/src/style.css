@@ -753,8 +753,8 @@ body.in-game .toast-close { margin: 0; min-width: 44px; min-height: 44px; }
 .hub-card h3 .px-icon { width: 18px; height: 18px; }
 .hub-sum { margin: 0 0 8px; color: var(--muted); font-size: 0.95em; }
 .hub-sum strong { color: var(--text); }
-.hub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.hub-grid .btn { min-height: 48px; padding: 4px 8px; font-size: 0.95rem; line-height: 1.2; }
+.hub-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); gap: 6px; } /* ronda 21: con texto al 200 % no se sale */
+.hub-grid .btn { overflow-wrap: anywhere; min-height: 48px; padding: 4px 8px; font-size: 0.95rem; line-height: 1.2; }
 .hub-grid .btn.attn { border-color: var(--accent); }
 .hub-grid .btn.attn::after { content: '●' / ''; color: var(--accent); margin-left: 2px; }
 .menu-foot { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -1261,6 +1261,6 @@ html[data-text='150'] .vida-seg .seg-btn, html[data-text='200'] .vida-seg .seg-b
 .comarca-rel.rel-bad { color: var(--bad); }
 .comarca-said { margin: 6px 0; padding: 4px 8px; border-left: 3px solid var(--line); font-style: italic; }
 .comarca-offer { margin-top: 8px; padding: 6px 8px; border: 2px solid var(--accent); }
-.comarca-answer { display: flex; gap: 8px; }
+.comarca-answer { display: flex; flex-wrap: wrap; gap: 8px; }
 .comarca-answer .btn { flex: 1 1 0; min-height: 44px; }
 .comarca-warn { color: var(--bad); }
