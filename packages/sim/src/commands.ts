@@ -20,6 +20,10 @@ import { Command, TICKS_PER_DAY, tickToDate, type BuildKind, type ZoneKind } fro
 import { ASSOCIATIONS, BUILD, CIVIL, STREETS, DEBT_LIMIT, FIRE, MICROCREDIT, MIN_WAGE, MIN_WAGE_FX, MIN_WAGE_STEP, TERRAIN, WAGE_OUTSIDE, ZONE_COST_PER_TILE } from './balance.ts';
 import { isWater, Terrain } from './terrain.ts';
 import { applyDecision, canApplyDecision } from './decisions.ts';
+import { canSetCareFee, setCareFee } from './care.ts';
+import { canResolveDilemma, resolveDilemma } from './dilemmas.ts';
+import { approveFestival, canApproveFestival } from './seasons.ts';
+import { canSetBusFare, setBusFare } from './transit.ts';
 import { campaign, canCampaign, canMotion, motion } from './politics.ts';
 import { addMemory, answerPetition, canConvenePleno, closePleno, convenePleno, talkTo } from './social.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
@@ -373,6 +377,15 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       return canProtectArea(state, cmd.heritageId);
     case 'AnswerBigCompany':
       return canAnswerBigCompany(state, cmd.accept, cmd.incentive);
+    // 2.4: vida (cada bloque valida en su archivo).
+    case 'SetBusFare':
+      return canSetBusFare(state, cmd.fare);
+    case 'SetCareFee':
+      return canSetCareFee(state, cmd.service, cmd.level);
+    case 'ResolveDilemma':
+      return canResolveDilemma(state, cmd.id, cmd.option);
+    case 'ApproveFestival':
+      return canApproveFestival(state, cmd.season, cmd.budget);
   }
 }
 
@@ -630,6 +643,18 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       break;
     case 'AnswerBigCompany':
       answerBigCompany(state, cmd.accept, cmd.incentive);
+      break;
+    case 'SetBusFare':
+      setBusFare(state, cmd.fare);
+      break;
+    case 'SetCareFee':
+      setCareFee(state, cmd.service, cmd.level);
+      break;
+    case 'ResolveDilemma':
+      resolveDilemma(state, cmd.id, cmd.option);
+      break;
+    case 'ApproveFestival':
+      approveFestival(state, cmd.season, cmd.budget);
       break;
   }
   if (mayor) noteMayor(state, mayor.text, mayor.big);

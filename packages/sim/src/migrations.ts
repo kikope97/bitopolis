@@ -166,7 +166,38 @@ export const MIGRATIONS: Record<number, Migration> = {
   14: (s) => ({ ...migrate15Loans(migrate15Politics(migrate15Farm(migrate15Tenders(s)))), formatVersion: 15 }),
   // 15 → 16 (2.3, metas grandes): cada parte en su función.
   15: (s) => ({ ...migrate16Medals(migrate16History(migrate16Region(migrate16Scenario(migrate16Tourism(migrate16Landmarks(s)))))), formatVersion: 16 }),
+  // 16 → 17 (2.4, vida): cada parte en su función.
+  16: (s) => ({ ...migrate17Seasons(migrate17Dilemmas(migrate17River(migrate17Transit(migrate17Care(s))))), formatVersion: 17 }),
 };
+
+/** 2.4 (16 → 17), cuidados: cuotas normales (aún no hay guardería ni residencia). */
+export function migrate17Care(s: Record<string, any>): Record<string, any> {
+  return { ...s, care: s.care ?? { nurseryFee: 'normal', residenceFee: 'normal' } };
+}
+
+/** 2.4, autobús: billete normal. */
+export function migrate17Transit(s: Record<string, any>): Record<string, any> {
+  return { ...s, transit: s.transit ?? { fare: 'normal' } };
+}
+
+/** 2.4, el río: limpio al cargar (se ensucia día a día). */
+export function migrate17River(s: Record<string, any>): Record<string, any> {
+  const n = (s.map?.w ?? 0) * (s.map?.h ?? 0);
+  if (!s.fields || Array.isArray(s.fields.river)) return s;
+  return { ...s, fields: { ...s.fields, river: new Array(n).fill(0) } };
+}
+
+/** 2.4, dilemas: ninguno abierto. */
+export function migrate17Dilemmas(s: Record<string, any>): Record<string, any> {
+  return { ...s, dilemmas: Array.isArray(s.dilemmas) ? s.dilemmas : [] };
+}
+
+/** 2.4, fiestas de temporada: ninguna en marcha; las patronales que ya se hicieron cuentan como celebradas. */
+export function migrate17Seasons(s: Record<string, any>): Record<string, any> {
+  if (s.seasons) return s;
+  const year = s.festival?.year ?? 0;
+  return { ...s, seasons: { current: null, held: year > 0 && s.festival?.size !== 'none' ? { patronales: year } : {} } };
+}
 
 /** 2.3 (15 → 16), grandes obras: ninguna en marcha (ningún edificio era 2×2). */
 export function migrate16Landmarks(s: Record<string, any>): Record<string, any> {

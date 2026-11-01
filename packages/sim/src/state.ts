@@ -21,7 +21,7 @@ import type { Tender } from './tenders.ts';
 import type { StreetName } from './streets.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
-export const FORMAT_VERSION = 16;
+export const FORMAT_VERSION = 17;
 
 export const MAP_W = 48;
 export const MAP_H = 48;
@@ -56,6 +56,13 @@ export type BuildingKind =
   | 'civilprotection'
   /** 2.1: punto limpio (recogida de basura). */
   | 'cleanpoint'
+  /** 2.4: cuidados (guardería y residencia), autobús, depuradora y renovables. */
+  | 'nursery'
+  | 'residence'
+  | 'busstation'
+  | 'sewage'
+  | 'solar'
+  | 'wind'
   | 'house'
   /** Crecen solos sobre zonas. */
   | 'res'
@@ -143,6 +150,8 @@ export interface Project {
 }
 
 export interface Citizen {
+  /** 2.4: mayor atendido en la residencia o cuidado en casa por un hijo (care.ts). */
+  care?: 'residencia' | 'casa';
   id: number;
   name: string;
   age: number;
@@ -449,6 +458,14 @@ export interface GameState {
   history: YearStat[];
   records: Records;
   medals: Medal[];
+  /** 2.4: cuotas de la guardería y la residencia (care.ts). */
+  care: CareState;
+  /** 2.4: billete del autobús (transit.ts). */
+  transit: TransitState;
+  /** 2.4: dilemas abiertos y resueltos (dilemmas.ts). */
+  dilemmas: Dilemma[];
+  /** 2.4: fiestas de temporada (seasons.ts); las patronales siguen en `festival`. */
+  seasons: SeasonsState;
   /** 2.3: lo que necesitan recordar los logros entre meses (achievements.ts); se crea al primer cierre de mes. */
   medalTrack?: MedalTrack;
 }
@@ -754,6 +771,10 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiSh
     history: [],
     records: {},
     medals: [],
+    care: { nurseryFee: 'normal', residenceFee: 'normal' },
+    transit: { fare: 'normal' },
+    dilemmas: [],
+    seasons: { current: null, held: {} },
   };
   // Árboles dispersos (se talan gratis al construir encima).
   for (let i = 0; i < tiles.length; i++) {
@@ -891,4 +912,54 @@ export const NO_PROPERTY = { owns: false, boughtPrice: 0, mortgage: 0, mortgageT
 /** Terreno de una casilla (v1.7). */
 export function terrainAt(state: GameState, x: number, y: number): number {
   return state.map.terrain?.[y * state.map.w + x] ?? 0;
+}
+
+/* ---------------- 2.4 «Vida» ---------------- */
+
+export type FeeLevel = 'gratis' | 'reducida' | 'normal';
+export interface CareState {
+  nurseryFee: FeeLevel;
+  residenceFee: FeeLevel;
+}
+
+export type BusFare = 'gratis' | 'normal' | 'caro';
+export interface TransitState {
+  fare: BusFare;
+  /** Usuarios del autobús el mes pasado (para el billete y la ficha). */
+  riders?: number;
+}
+
+export type DilemmaKind = 'ultima_plaza_residencia' | 'familia_con_deudas' | 'fabrica_vierte' | 'preso_arrepentido';
+export interface Dilemma {
+  id: number;
+  kind: DilemmaKind;
+  /** Cuándo se abrió y hasta cuándo se puede decidir (luego, «no decidir»). */
+  tick: number;
+  until: number;
+  /** Vecinos y edificio implicados (datos reales del motor). */
+  citizenIds: number[];
+  buildingId?: number;
+  /** Opciones que ofrece el motor (ids de `DILEMMA`); la IA nunca las escribe. */
+  options: string[];
+  /** La elegida (o 'no_decidir') cuando se cierra. */
+  resolved?: string;
+  /** Presentación del director (IA), validada; sin ella, la del motor. */
+  intro?: string;
+}
+
+export type FestivalSeason = 'romeria' | 'sanjuan' | 'patronales' | 'navidad';
+export type FestivalBudget = 'nada' | 'poco' | 'todo';
+export interface SeasonFestival {
+  season: FestivalSeason;
+  year: number;
+  /** comision: se prepara (un mes antes); aprobada; celebrada; cancelada. */
+  status: 'comision' | 'aprobada' | 'celebrada' | 'cancelada';
+  committee: number[];
+  program: string[];
+  budget: FestivalBudget | null;
+}
+export interface SeasonsState {
+  current: SeasonFestival | null;
+  /** Último año en que se celebró cada fiesta. */
+  held: Partial<Record<FestivalSeason, number>>;
 }

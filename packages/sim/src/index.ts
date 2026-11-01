@@ -51,3 +51,8 @@ export * from './region.ts';
 export * from './scenarios.ts';
 export * from './achievements.ts';
 export * from './view.ts';
+export * from './care.ts';
+export * from './transit.ts';
+export * from './waterworks.ts';
+export * from './dilemmas.ts';
+export * from './seasons.ts';

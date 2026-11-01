@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TICKS_PER_MONTH } from '@bitopolis/shared';
-import { checkInvariants, createInitialState, FORMAT_VERSION, hashState, MIGRATIONS, migrate, migrate14Trash, migrate15Loans, migrate16History, migrate16Landmarks, migrate16Medals, migrate16Region, migrate16Scenario, migrate16Tourism, OUTSIDE, REGION, step, transfer, TREASURY } from '../src/index.ts';
+import { checkInvariants, createInitialState, FORMAT_VERSION, hashState, MIGRATIONS, migrate, migrate14Trash, migrate15Loans, migrate16History, migrate16Landmarks, migrate16Medals, migrate16Region, migrate16Scenario, migrate16Tourism, migrate17Seasons, OUTSIDE, REGION, step, transfer, TREASURY } from '../src/index.ts';
 
 describe('migración 13 → 14 (2.1)', () => {
   it('basura: campo de suciedad vacío y 60 días de gracia (migrate14Trash)', () => {
@@ -38,6 +38,28 @@ describe('migración 14 → 15 (2.2, préstamos)', () => {
     expect(checkInvariants(m)).toEqual([]);
     // Lo que ya tenía no se toca.
     expect(migrate15Loans({ loans: [{ id: 1 }], rating: 'C', loanLedger: { lent: 5 } })).toMatchObject({ loans: [{ id: 1 }], rating: 'C', loanLedger: { lent: 5 } });
+  });
+});
+
+describe('migración 16 → 17 (2.4, vida)', () => {
+  it('añade cuotas, billete, río limpio, dilemas y fiestas de temporada; una nueva y una migrada quedan iguales', () => {
+    const s = createInitialState({ seed: 6 }) as unknown as Record<string, any>;
+    const old: Record<string, any> = structuredClone({ ...s, formatVersion: 16 });
+    for (const k of ['care', 'transit', 'dilemmas', 'seasons']) delete old[k];
+    delete old.fields.river;
+    const m = migrate(old);
+    expect(m.formatVersion).toBe(FORMAT_VERSION);
+    expect(m.care).toEqual({ nurseryFee: 'normal', residenceFee: 'normal' });
+    expect(m.transit).toEqual({ fare: 'normal' });
+    expect(m.dilemmas).toEqual([]);
+    expect(m.fields.river.length).toBe(m.map.w * m.map.h);
+    expect(hashState(m)).toBe(hashState(createInitialState({ seed: 6 })));
+    for (let i = 0; i < 24 * 31; i++) step(m);
+    expect(checkInvariants(m)).toEqual([]);
+  });
+  it('las patronales ya celebradas cuentan como hechas', () => {
+    expect(migrate17Seasons({ festival: { year: 3, size: 'grande' } }).seasons).toEqual({ current: null, held: { patronales: 3 } });
+    expect(migrate17Seasons({ festival: { year: 0, size: 'none' } }).seasons).toEqual({ current: null, held: {} });
   });
 });
 

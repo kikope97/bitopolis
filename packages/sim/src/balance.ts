@@ -39,6 +39,13 @@ export const BUILD: Record<BuildKind, BuildSpec> = {
   cleanpoint: { materials: 2_500, workers: 3, days: 3, unlockPop: 30 }, // ronda 17: con 20 frenaba el crecimiento
   // 2.3: patrimonio (uno por partida, nivel 3; su forma sale del terreno). Atractivo en TOURISM.heritage.
   heritage: { materials: 9_000, workers: 5, days: 5, unlockPop: 40 },
+  // 2.4 (provisional; los afina cada bloque): cuidados, autobús, depuradora y renovables.
+  nursery: { materials: 3_500, workers: 3, days: 3, unlockPop: 30 },
+  residence: { materials: 7_000, workers: 5, days: 4, unlockPop: 45 },
+  busstation: { materials: 6_000, workers: 4, days: 4, unlockPop: 35 },
+  sewage: { materials: 8_000, workers: 4, days: 5, unlockPop: 40 },
+  solar: { materials: 2_500, workers: 2, days: 2, unlockPop: 25 },
+  wind: { materials: 3_500, workers: 3, days: 3, unlockPop: 25 },
 };
 
 /** Obras que crecen solas sobre zonas (las paga un inversor de fuera). */
@@ -89,6 +96,12 @@ export const JOBS: Record<BuildingKind, number> = {
   cathedral: 0,
   heritage: 0,
   bigfactory: 0,
+  nursery: 2,
+  residence: 4,
+  busstation: 2,
+  sewage: 1,
+  solar: 0,
+  wind: 0,
 };
 
 export const HOMES: Partial<Record<BuildingKind, number>> = { house: 3, res: 4 };
@@ -126,6 +139,12 @@ export const MAINTENANCE: Record<BuildingKind, number> = {
   cathedral: 0,
   heritage: 60,
   bigfactory: 0,
+  nursery: 250,
+  residence: 400,
+  busstation: 300,
+  sewage: 350,
+  solar: 40,
+  wind: 80,
 };
 
 /** Radio de cobertura de los servicios (tiles) y su efecto en la felicidad. */
@@ -1231,3 +1250,81 @@ export const ACHIEVEMENTS = {
   /** Encargos cumplidos (los cuenta `errands.medals`, 2.1): bronce, plata y oro. */
   errands: [1, 5, 15],
 } as const;
+
+/* ---------------- 2.4 «Vida» (cada bloque afina sus números) ---------------- */
+
+/** Bloque A: guardería y residencia (care.ts). Cuotas en €/mes por nivel gratis/reducida/normal. */
+export const CARE = {
+  nursery: { places: 20, radius: 8, maxAgeYears: 3, fee: { gratis: 0, reducida: 30, normal: 60 } },
+  residence: { places: 12, fee: { gratis: 0, reducida: 200, normal: 400 } },
+  /** Pareja con plaza de guardería: natalidad ×1,5. Sin plaza, prob. al mes de que deje el trabajo de fuera. */
+  birthWithPlace: 1.5,
+  quitWithoutPlace: 0.15,
+  /** Pensión mínima desde los 67 años (de fuera). */
+  pension: 650,
+  pensionAge: 67,
+  /** Mayores atendidos (≥ 70): no se van, residencia ×0,8 de riesgo de morir, ánimo. */
+  elderAge: 70,
+  residenceDeathFx: 0.8,
+  caredMood: 4,
+  aloneMood: -5,
+  /** «Cuidar en casa»: el hijo pierde parte del sueldo y algo de ánimo; mejora la relación. */
+  homeCare: { wageCut: 0.2, mood: -3, relation: 2, parentAge: 75 },
+};
+
+/** Bloque B: estación de autobuses (transit.ts). */
+export const TRANSIT = {
+  /** El Consorcio paga esta parte del mantenimiento (de fuera). */
+  consortium: 0.5,
+  findChance: 0.45,
+  loseChance: 0.02,
+  mood: 2,
+  demandR: 8,
+  /** € por viaje × días de trabajo al mes, por usuario; caro resta ánimo. */
+  fare: { gratis: 0, normal: 1, caro: 2 },
+  workDays: 20,
+  dearMood: -2,
+  /** Con turismo, visitantes ×1,25; sin él, gasto de forasteros en las tiendas (€/día por cada 10 vecinos). */
+  visitorsFx: 1.25,
+  daytripPer10: 4,
+};
+
+/** Bloque C: el río, la depuradora y las renovables (waterworks.ts). */
+export const WATERWORKS = {
+  /** Lo que echa cada edificio a ≤ `reach` casillas del río (res/shop/factory), y lo que baja por casilla. */
+  reach: 6,
+  dump: { res: 1, shop: 2, factory: 6 } as Record<string, number>,
+  decayPerTile: 0.04,
+  sewage: { buildings: 60, clean: 0.85 },
+  /** Río > dirtyPump: la bomba pierde su +25 %; la orilla, −3. Al salir > fineAt: multa trimestral. */
+  dirtyPump: 40,
+  shoreMood: -3,
+  fineAt: 60,
+  fine: 1_500,
+  solar: { buildings: 15, winter: 0.6, snow: 0.4 },
+  wind: { buildings: 30, storm: 1.2, noise: 30, noiseRadius: 3, complainRadius: 3 },
+};
+
+/** Bloque D: plenos hablados (texto fuera del estado) y sus reacciones. */
+export const PLENO_TALK = {
+  speakers: 4,
+  maxLine: 140,
+  reaction: { aplaude: 2, murmura: -1, abuchea: -2, se_levanta: -2 } as Record<string, number>,
+};
+
+/** Bloque D: dilemas (dilemmas.ts). Uno al mes como mucho, 7 días para decidir. */
+export const DILEMMA = {
+  perMonth: 1,
+  days: 7,
+  noDecideGrudge: 3,
+  expandCost: 3_000,
+};
+
+/** Bloque E: fiestas de temporada (seasons.ts). Mes de cada una (1–12). */
+export const SEASONS = {
+  month: { romeria: 5, sanjuan: 6, patronales: 8, navidad: 12 } as Record<string, number>,
+  committee: 3,
+  collectPerNamed: 10,
+  budgetShare: { nada: 0, poco: 0.5, todo: 1 } as Record<string, number>,
+  nadaGrudge: 1,
+};

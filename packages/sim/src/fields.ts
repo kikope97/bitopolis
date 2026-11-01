@@ -16,10 +16,12 @@ export interface Fields {
   land: number[];
   /** 2.1: suciedad por la basura sin recoger (bolsas y ratas). */
   dirt: number[];
+  /** 2.4: suciedad del río por casilla (0–100; solo en casillas de río, waterworks.ts). */
+  river: number[];
 }
 
 export function emptyFields(n: number): Fields {
-  return { pollution: new Array(n).fill(0), noise: new Array(n).fill(0), crime: new Array(n).fill(0), land: new Array(n).fill(50), dirt: new Array(n).fill(0) };
+  return { pollution: new Array(n).fill(0), noise: new Array(n).fill(0), crime: new Array(n).fill(0), land: new Array(n).fill(50), dirt: new Array(n).fill(0), river: new Array(n).fill(0) };
 }
 
 /** Suma `amount` con caída lineal hasta `radius` (distancia Manhattan). */
