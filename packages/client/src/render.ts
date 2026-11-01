@@ -1,4 +1,4 @@
-import { ambulanceFor, type GameState, isWater, Terrain, Tile, trashStateOf, truckRoutes, Zone } from '@bitopolis/sim';
+import { ambulanceFor, type GameState, isWater, streetSegment, Terrain, Tile, trashStateOf, truckRoutes, Zone } from '@bitopolis/sim';
 import { happinessMarks, type LayerId, layerCanvas, missingMarks, NEED_ICON } from './layers.ts';
 import { pixelIcon } from './icons.ts';
 
@@ -410,7 +410,7 @@ export function render(
   ctx: CanvasRenderingContext2D,
   state: GameState,
   cam: Camera,
-  opts: { preview?: Preview | null; selected?: { x: number; y: number } | null; cursor?: { x: number; y: number } | null; time: number; reducedMotion: boolean; layer?: LayerId; highlight?: { x: number; y: number; since: number } | null },
+  opts: { preview?: Preview | null; selected?: { x: number; y: number } | null; cursor?: { x: number; y: number } | null; time: number; reducedMotion: boolean; layer?: LayerId; highlight?: { x: number; y: number; since: number } | null; labels?: boolean },
 ): void {
   const z = cam.zoom;
   const ts = T * z;
@@ -669,6 +669,8 @@ export function render(
   drawFireTrucks(ctx, state, cam, opts.time, opts.reducedMotion, tod);
   drawAmbulance(ctx, state, cam, opts.time, opts.reducedMotion, tod);
   if (opts.highlight) drawHighlight(ctx, cam, opts.highlight, opts.time, opts.reducedMotion);
+  // 2.2: rótulos de las calles con nombre (solo con el mapa lo bastante cerca para leerlos).
+  if (opts.labels) drawStreetNames(ctx, state, cam, mapSig);
   drawWeather(ctx, state, opts.time, opts.reducedMotion);
 
   const corner = (tx: number, ty: number, color: number, thick: number) => {
@@ -692,6 +694,60 @@ export function render(
   if (opts.selected) corner(opts.selected.x, opts.selected.y, 4, 2);
   // Cursor de teclado: esquinas blancas gruesas (se distingue de la selección por forma y color).
   if (opts.cursor) corner(opts.cursor.x, opts.cursor.y, 12, 3);
+}
+
+/** 2.2: dónde va el rótulo de cada calle con nombre (en medio de su tramo); se recalcula si cambia el mapa. */
+let labelSig = '';
+let labelSpots: { x: number; y: number; text: string; span: number }[] = [];
+function streetLabels(state: GameState, mapSig: string) {
+  const names = state.streetNames ?? [];
+  const sig = `${mapSig}|${names.map((n) => `${n.x},${n.y},${n.name}`).join(';')}`;
+  if (sig === labelSig) return labelSpots;
+  labelSig = sig;
+  labelSpots = names.map((n) => {
+    const seg = streetSegment(state, n.x, n.y);
+    const tiles = seg?.tiles ?? [[n.x, n.y]];
+    const mid = tiles[Math.floor((tiles.length - 1) / 2)]!;
+    return { x: mid[0], y: mid[1], text: n.name, span: seg?.axis === 'h' ? tiles.length : 3 };
+  });
+  return labelSpots;
+}
+
+function drawStreetNames(ctx: CanvasRenderingContext2D, state: GameState, cam: Camera, mapSig: string): void {
+  const spots = streetLabels(state, mapSig);
+  if (!spots.length) return;
+  const z = cam.zoom;
+  const ts = T * z;
+  ctx.save();
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center';
+  for (const s of spots) {
+    const cx = s.x * ts + ts / 2 - cam.x;
+    const cy = s.y * ts + ts * 0.78 - cam.y;
+    if (cx < -ts * 4 || cy < -ts || cx > ctx.canvas.width + ts * 4 || cy > ctx.canvas.height + ts) continue;
+    let fs = Math.max(10, Math.round(8 * z));
+    ctx.font = `${fs}px 'Bitopolis Pixel', ui-monospace, monospace`;
+    const max = Math.max(ts * 1.6, s.span * ts - 4 * z);
+    let w = ctx.measureText(s.text).width;
+    if (w > max) {
+      fs = Math.max(7, Math.floor((fs * max) / w));
+      ctx.font = `${fs}px 'Bitopolis Pixel', ui-monospace, monospace`;
+      w = ctx.measureText(s.text).width;
+    }
+    const pw = Math.ceil(w + 6 * z);
+    const ph = Math.ceil(fs + 4 * z);
+    const x = Math.round(cx - pw / 2);
+    const y = Math.round(cy - ph / 2);
+    // Placa azul con borde claro, como las de las calles.
+    ctx.fillStyle = P(0);
+    ctx.fillRect(x - z, y - z, pw + 2 * z, ph + 2 * z);
+    ctx.fillStyle = P(8);
+    ctx.fillRect(x, y, pw, ph);
+    ctx.fillStyle = P(12);
+    ctx.fillRect(x + z, y + z, pw - 2 * z, Math.max(1, Math.round(z / 2)));
+    ctx.fillText(s.text, cx, y + ph / 2 + z / 2);
+  }
+  ctx.restore();
 }
 
 /**

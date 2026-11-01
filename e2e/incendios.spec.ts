@@ -1,7 +1,7 @@
 import { gzipSync } from 'node:zlib';
 import { expect, type Page, test } from '@playwright/test';
 import { type Building, type GameState, newBuilding, OUTSIDE, runSimulation, Terrain, Tile, transfer, TREASURY, validateCommand } from '../packages/sim/src/index.ts';
-import { pickTool, setSpeed, skipTutorial, state, tile } from './helpers.ts';
+import { chooseOffer, pickTool, setSpeed, skipTutorial, state, tile } from './helpers.ts';
 
 /** 2.1: bomberos e incendios, protección civil y dique. */
 function pack(s: GameState) {
@@ -84,6 +84,7 @@ test('2.1: casa en riesgo y ardiendo en su ficha; el parque de bomberos se const
   await touch(page, spot.x, spot.y);
   const yes = page.locator('#confirm-yes');
   if (await yes.isVisible()) await yes.click();
+  await chooseOffer(page);
   await expect.poll(async () => (await state(page)).buildings.some((b: Building) => b.kind === 'firestation' && b.x === spot.x && b.y === spot.y), { timeout: 10_000 }).toBe(true);
   await shot('4-obra-bomberos');
   expect(errors).toEqual([]);

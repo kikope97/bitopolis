@@ -60,3 +60,9 @@ export async function pickTool(page: Page, id: string) {
   if (await page.locator('#tray').isHidden()) await page.locator('#tab-build').click();
   await page.locator(`#tray [data-tool="${id}"]`).click();
 }
+
+/** 2.2: si sale la hoja de la licitación (obras grandes), elige una oferta (por defecto, la local). */
+export async function chooseOffer(page: Page, offer: 'local' | 'fuera' | 'primo' = 'local') {
+  const card = page.locator(`.tender-card[data-offer="${offer}"]`);
+  if (await card.waitFor({ state: 'visible', timeout: 2000 }).then(() => true, () => false)) await card.click();
+}
