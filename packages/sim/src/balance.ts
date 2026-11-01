@@ -1140,4 +1140,15 @@ export const ACHIEVEMENTS = {
   visitors: 500,
   /** Récord nuevo: como mucho un aviso al mes. */
   recordEveryMonths: 1,
+  /** Récords: no se avisan el primer año (todo es récord) ni si no mejoran al menos esta parte (o 1). */
+  recordAfterMonths: 12,
+  recordMargin: 0.1,
+  /** «Nadie con deudas» solo cuenta desde estos vecinos. */
+  noDebtorsPop: 50,
+  /** Entorno protegido sin turistificar durante estos meses seguidos. */
+  protectedMonths: 12,
+  /** Crisis superada sin cierres: con al menos estas empresas al acabar. */
+  crisisMinBusinesses: 3,
+  /** Encargos cumplidos (los cuenta `errands.medals`, 2.1): bronce, plata y oro. */
+  errands: [1, 5, 15],
 } as const;

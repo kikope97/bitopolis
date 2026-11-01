@@ -122,6 +122,8 @@ export function flood(state: GameState): void {
     else hit.push(b);
   }
   if (avoided && state.emergencies) state.emergencies.floodsAvoided += avoided;
+  // 2.3: una riada más para los logros (achievements.ts).
+  if ((avoided || hit.length) && state.emergencies) state.emergencies.floods = (state.emergencies.floods ?? 0) + 1;
   if (!hit.length) {
     pushEvent(state, 'info', avoided ? `El río crece con la tormenta: los diques y la protección civil evitan que se aneguen ${avoided === 1 ? 'un edificio' : `${avoided} edificios`}` : 'El río crece con la tormenta, pero no se desborda');
     return;
