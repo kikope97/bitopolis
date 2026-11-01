@@ -1,5 +1,5 @@
 import { TICKS_PER_DAY } from '@bitopolis/shared';
-import { BUILD, CRIME, JOBS, MAINTENANCE, PLANT_CAPACITY, SERVICE, SERVICE_CAPACITY, SERVICE_LEVELS as L, TRASH } from './balance.ts';
+import { BUILD, CRIME, JOBS, MAINTENANCE, PLANT_CAPACITY, SERVICE, SERVICE_CAPACITY, SERVICE_LEVELS as L, TRASH, WATERWORKS } from './balance.ts';
 import { truckRoutes } from './trash-core.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import type { Building, BuildingKind, GameState } from './state.ts';
@@ -26,8 +26,11 @@ export function serviceCapacityOf(b: Building): number {
   return Math.round((SERVICE_CAPACITY[b.kind] ?? 0) * mult(b));
 }
 export function plantCapacityOf(b: Building): number {
+  // 2.4: placas y molino dan luz por la red (sin niveles; el tiempo lo aplica updateNetworks).
+  if (b.kind === 'solar' || b.kind === 'wind') return WATERWORKS[b.kind].buildings;
   return b.kind === 'water' || b.kind === 'power' ? Math.round(PLANT_CAPACITY[b.kind] * mult(b)) : 0;
 }
+const POWER_KINDS: readonly string[] = ['power', 'solar', 'wind'];
 export function cellsOf(b: Building): number {
   return Math.round(CRIME.cellsPerStation * mult(b));
 }
@@ -57,10 +60,12 @@ export function usageOf(state: GameState, b: Building, served?: number): { used:
   const dist = (p: { x: number; y: number }) => Math.abs(p.x - b.x) + Math.abs(p.y - b.y);
   if (b.kind === 'water' || b.kind === 'power') {
     // En la red, entre todas las plantas del mismo tipo.
-    const plants = state.buildings.filter((p) => p.kind === b.kind && p.built);
+    // 2.4: la luz, entre la central y las renovables.
+    const same = (k: string) => (b.kind === 'power' ? POWER_KINDS.includes(k) : k === b.kind);
+    const plants = state.buildings.filter((p) => same(p.kind) && p.built);
     const cap = plants.reduce((a, p) => a + plantCapacityOf(p), 0);
     const flag = b.kind === 'water' ? 'hasWater' : 'hasPower';
-    const used = state.buildings.filter((x) => x.built && x.kind !== 'water' && x.kind !== 'power' && x[flag]).length;
+    const used = state.buildings.filter((x) => x.built && x.kind !== 'water' && !POWER_KINDS.includes(x.kind) && x[flag]).length;
     return { used, of: cap };
   }
   if (b.kind === 'jail') {

@@ -1,4 +1,6 @@
 import { loansMonth } from './loans.ts';
+import { attended, careMonth, careMood, childcareMonth, isRetired, pensionsMonth } from './care.ts';
+import { busDemandR, transitMonth, transitMood } from './transit.ts';
 import { fairMonth, isLandmarkKind, landmarkMood, landmarksDay, landmarksMonth, stationCommuterBonus, stationDemandR } from './landmarks.ts';
 import { tourismMonth, tourismMood } from './tourism.ts';
 import { regionFx, regionMonth, regionMood } from './region.ts';
@@ -6,7 +8,9 @@ import { scenarioFx, scenariosMonth } from './scenarios.ts';
 import { newResident } from './resident.ts';
 import { achievementsMonth, historyMonth } from './achievements.ts';
 import { errandsDay } from './errands.ts';
+import { dilemmasDay } from './dilemmas.ts';
 import { pressDay } from './press.ts';
+import { isPowerPlant, isRenewable, pumpDirty, renewableFx, waterworksDay, waterworksMonth, waterworksMood } from './waterworks.ts';
 import { TICKS_PER_DAY, TICKS_PER_MONTH, tickToDate } from '@bitopolis/shared';
 import {
   BUSINESS_SEED_CASH,
@@ -56,6 +60,7 @@ import {
   serviceSaturation,
 } from './economy.ts';
 import { budgetFx, civicDay, festivalMood, onBuildingDone } from './civic.ts';
+import { seasonNoise, seasonsDay } from './seasons.ts';
 import { updateFields } from './fields.ts';
 import { trashDay, trashMood } from './trash.ts';
 import { Terrain } from './terrain.ts';
@@ -175,11 +180,12 @@ export function updateNetworks(state: GameState): { water: Set<number>; power: S
   for (const kind of ['water', 'power'] as const) {
     const flag = kind === 'water' ? 'hasWater' : 'hasPower';
     for (const plant of state.buildings) {
-      if (plant.kind !== kind || !plant.built) continue;
+      // 2.4: placas y molino también dan luz (con su propio tiempo: renewableFx).
+      if (!(plant.kind === kind || (kind === 'power' && isRenewable(plant.kind))) || !plant.built) continue;
       plant[flag] = true;
-      let capacity = Math.round(plantCapacityOf(plant) * (kind === 'water' ? weatherFx(state).water : weatherFx(state).power));
-      // v1.7: una bomba a la orilla del río da agua a más edificios.
-      if (kind === 'water' && riverside(state, plant.x, plant.y)) capacity = Math.round(capacity * TERRAIN.riverPumpBonus);
+      let capacity = Math.round(plantCapacityOf(plant) * (isRenewable(plant.kind) ? renewableFx(state, plant.kind) : kind === 'water' ? weatherFx(state).water : weatherFx(state).power));
+      // v1.7: una bomba a la orilla del río da agua a más edificios (2.4: si el río no baja sucio).
+      if (kind === 'water' && riverside(state, plant.x, plant.y) && !pumpDirty(state, plant.x, plant.y)) capacity = Math.round(capacity * TERRAIN.riverPumpBonus);
       const queue: number[] = [];
       const seen = new Set<number>();
       for (const [dx, dy] of DIRS) {
@@ -230,7 +236,7 @@ export function computeDemand(state: GameState): GameState['demand'] {
   const clamp = (v: number) => Math.round(Math.max(-100, Math.min(100, v)));
   const zones = zonesUnlocked(state);
   // 2.3: la estación da ganas de vivir aquí; «El pueblo que se vacía» resta demanda el primer año (scenarioFx).
-  const R = stationDemandR(state) + 40 + vacancies(state) * 5 - Math.max(0, free - 8) * 1.5 + (happy - 55) + averageTaxMood(state) - (zones ? jobless * 2 : 0) + scenarioFx(state).demandR;
+  const R = stationDemandR(state) + 40 + vacancies(state) * 5 - Math.max(0, free - 8) * 1.5 + (happy - 55) + averageTaxMood(state) - (zones ? jobless * 2 : 0) + scenarioFx(state).demandR + busDemandR(state);
   // v1.9: con sueldo mínimo alto, las empresas suben precios y hay algo menos de demanda comercial.
   const C = !zones ? 0 : (pop / 12 - shops) * 25 - MIN_WAGE_STEP[state.minWage ?? 'none'] * MIN_WAGE_FX.demandC;
   const I = !zones ? 0 : jobless * 6 - factories * 10 + 20 + regionFx(state).demandI;
@@ -283,7 +289,7 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
   }
   if (c.jobId !== null) f.push({ label: 'Trabaja en el pueblo', value: 8 });
   else if (c.unemployedSince !== undefined) f.push({ label: 'En paro', value: -JOBS_OUTSIDE.mood });
-  else f.push({ label: 'Trabaja fuera', value: -4 });
+  else if (!isRetired(c)) f.push({ label: 'Trabaja fuera', value: -4 });
   if (c.mortgage > 0 && c.money < 300) f.push({ label: 'Le cuesta pagar la hipoteca', value: -6 });
   // v1.9 (petición del creador): deber dinero pesa; ir justo, algo.
   const owes = totalDebt(c);
@@ -322,11 +328,19 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
   if (townLevel(state) >= 5) f.push({ label: 'Orgullo de su ayuntamiento', value: 2 });
   // 2.3: grandes obras (estadio, catedral) y la fábrica de la gran empresa.
   f.push(...landmarkMood(state, home), ...regionMood(state, c, home));
+  // 2.4: ruido de la verbena y los fuegos cerca del ayuntamiento.
+  const fiestaNoise = seasonNoise(state, home);
+  if (fiestaNoise) f.push(fiestaNoise);
   // v1.7: el calor sin sombra cerca.
   const heat = weatherMood(state, home);
   if (heat) f.push(heat);
   // 2.3: turistificación (inquilinos) y turistas ruidosos.
   f.push(...tourismMood(state, c, home));
+  // 2.4: la orilla de un río sucio y el ruido de los molinos (jubilados).
+  f.push(...waterworksMood(state, c, home));
+  // 2.4: jubilados, mayores atendidos (o solos), quien cuida en casa y quien va en autobús.
+  f.push(...careMood(state, c));
+  f.push(...transitMood(state, c));
   return f;
 }
 
@@ -373,7 +387,7 @@ function progressProjects(state: GameState): void {
   const commute = COMMUTER_DAILY + stationCommuterBonus(state);
   for (const c of state.citizens) {
     // v1.9: quien está en paro no cobra (cobra la prestación al mes).
-    if (c.jobId === null && c.unemployedSince === undefined && !busy.has(c.id)) transfer(state, OUTSIDE, c.id, commute, 'commuter');
+    if (c.jobId === null && c.unemployedSince === undefined && !busy.has(c.id) && !isRetired(c)) transfer(state, OUTSIDE, c.id, commute, 'commuter');
   }
 }
 
@@ -499,7 +513,8 @@ function departures(state: GameState): void {
     if (state.citizens.length <= 1) break;
     // Los vecinos con nombre deciden irse ellos mismos (detonante «infeliz»).
     if (c.named) continue;
-    const unhappy = c.happiness < 35 && chance(state.rng, 0.04);
+    // 2.4: un mayor atendido (residencia o en casa) no se va por estar triste.
+    const unhappy = c.happiness < 35 && !attended(c) && chance(state.rng, 0.04);
     const broke = c.money === 0 && c.homeId === null && chance(state.rng, 0.1);
     // v1.9: ahogado por las deudas.
     const drowned = !unhappy && !broke && drownedInDebt(state, c) && chance(state.rng, DEBT.leaveChance);
@@ -522,7 +537,7 @@ function endOfDay(state: GameState): void {
   const served = updateNetworks(state);
   // v1.8: días seguidos sin agua o sin luz (el icono sobre la casa sale cuando dura).
   for (const b of state.buildings) {
-    if (!b.built || b.kind === 'water' || b.kind === 'power' || b.kind === 'farm') continue;
+    if (!b.built || b.kind === 'water' || isPowerPlant(b.kind) || b.kind === 'farm') continue;
     b.dryDays = b.hasWater ? 0 : (b.dryDays ?? 0) + 1;
     b.darkDays = b.hasPower ? 0 : (b.darkDays ?? 0) + 1;
   }
@@ -536,6 +551,8 @@ function endOfDay(state: GameState): void {
   // 2.1: el camión recoge y se amontona lo que no (antes de los campos: la suciedad sale de ahí).
   trashDay(state);
   updateFields(state);
+  // 2.4: lo que baja por el río (tras los campos).
+  waterworksDay(state);
   assignHomesAndJobs(state);
   // Inercia: la felicidad baja más rápido de lo que sube.
   for (const c of state.citizens) {
@@ -552,6 +569,8 @@ function endOfDay(state: GameState): void {
   socialDay(state);
   politicsDay(state);
   civicDay(state);
+  // 2.4: fiestas de temporada (comisión, presupuesto y fiesta).
+  seasonsDay(state);
   // 1 de enero: cumpleaños, hijos que se independizan y fallecimientos (v1.5).
   const d = tickToDate(state.tick);
   if (d.month === 1 && d.day === 1 && state.tick > 0) lifeYear(state);
@@ -576,6 +595,8 @@ function endOfDay(state: GameState): void {
   // 2.1: encargos del pueblo y El Eco de Bitópolis.
   errandsDay(state);
   pressDay(state);
+  // 2.4: dilemas (vencen, se cierran o se abren por reglas).
+  dilemmasDay(state);
   accumulateRates(state);
 }
 
@@ -658,10 +679,15 @@ function endOfMonth(state: GameState): void {
   farmMonth(state);
   businessPayroll(state, r);
   outsideJobsMonth(state);
+  // 2.4: pensión mínima de los jubilados y padres que dejan el trabajo sin plaza de guardería.
+  pensionsMonth(state);
+  childcareMonth(state);
   // Las tiendas destrozadas en disturbios no venden hasta que se reparan (v1.8).
   const shops = state.buildings.filter((b) => b.kind === 'shop' && b.built && !b.damaged);
   basicLiving(state, shops);
   monthlyHousing(state, r);
+  // 2.4: residencia y guardería (cuotas con charge: lo impagado queda como deuda).
+  careMonth(state);
   settleMonth(state, shops);
   // 2.3: en septiembre, la feria regional trae compradores de fuera.
   fairMonth(state, shops);
@@ -669,6 +695,10 @@ function endOfMonth(state: GameState): void {
   payBusinesses(state);
   // 2.3: visitantes, casas rurales y tasa turística.
   tourismMonth(state);
+  // 2.4: multa de la Confederación (trimestral) y vertidos por reglas.
+  waterworksMonth(state);
+  // 2.4: billete del autobús, Consorcio y excursionistas.
+  transitMonth(state, shops, state.tourism.visitors);
   // PIE: el Estado paga por vecino empadronado, más si el pueblo está contento.
   const pie = Math.round(PIE_PER_CITIZEN * state.citizens.length * Math.max(0.6, Math.min(1.2, averageHappiness(state) / 60)));
   transfer(state, OUTSIDE, TREASURY, pie, 'PIE');

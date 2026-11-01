@@ -23,6 +23,7 @@ import { hash32 } from './hash.ts';
 import { addHook, addMemory } from './social.ts';
 import { buildingAt, type Citizen, type GameState, hasAdjacentRoad, pushEvent, Tile, tileIndex } from './state.ts';
 import { freeHomes } from './tick.ts';
+import { greenFaction, riverDirty } from './waterworks.ts';
 
 /**
  * Elecciones (spec §5.8, v1.0): facciones con exigencias opuestas, intención
@@ -102,6 +103,8 @@ function unmetDemands(state: GameState, f: Faction, members: Citizen[]): string[
     const factories = state.buildings.filter((b) => b.kind === 'factory').length;
     const shops = state.buildings.filter((b) => b.kind === 'shop').length;
     if (factories > shops + 2) out.push('menos industria');
+    // 2.4: el río sucio.
+    if (riverDirty(state)) out.push('un río limpio');
   }
   return out;
 }
@@ -117,7 +120,9 @@ export function updateFactions(state: GameState): void {
       // 2.1: el reciclaje (punto limpio de nivel 2 o más) contenta a los ecologistas.
       (f === 'ecologistas' && state.buildings.some((b) => b.kind === 'cleanpoint' && b.built && levelOf(b) >= 2) ? TRASH.recyclingFaction : 0) +
       // 2.3: el entorno protegido del patrimonio no gusta a los empresarios (sin industria nueva).
-      (f === 'empresarios' && protectedHeritage(state) ? TOURISM.protect.ownerMood : 0);
+      (f === 'empresarios' && protectedHeritage(state) ? TOURISM.protect.ownerMood : 0) +
+      // 2.4: placas, molinos y depuradora contentan a los ecologistas.
+      (f === 'ecologistas' ? greenFaction(state) : 0);
     const satisfaction = Math.max(0, Math.min(100, Math.round(happy * 0.6 + 40 - unmet.length * 14 + bonus)));
     state.politics.factions[f] = { satisfaction, demand: unmet[0] ?? null, demands: unmet.slice(0, 2), unmet, members: members.length };
   }

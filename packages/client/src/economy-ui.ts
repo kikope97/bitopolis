@@ -185,6 +185,7 @@ const CONCEPT: Record<string, string> = {
   'reparaciones (incendio)': 'Reparaciones tras incendios',
   'reparaciones (inundación)': 'Reparaciones tras riadas',
   quitanieves: 'Quitanieves',
+  'multa del río': 'Multa de la Confederación (río sucio)',
 };
 
 /** Parte mensual: ingresos y gastos con flechas y «por qué baja tu saldo» con nombres. */

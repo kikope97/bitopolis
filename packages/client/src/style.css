@@ -286,6 +286,11 @@ progress { width: 100%; height: 16px; accent-color: #38b764; }
 .legend-item.lv1.bad::before { background: radial-gradient(#ffcd75 35%, transparent 36%) 0 0 / 4px 4px; }
 .legend-item.lv2.bad::before { background: repeating-conic-gradient(#ef7d57 0 25%, transparent 0 50%) 0 0 / 4px 4px; }
 .legend-item.lv3.bad::before { background: repeating-linear-gradient(90deg, #5d275d 0 6px, transparent 6px 8px); }
+/* 2.4: capa «Río» (azul limpio → marrón sucio). */
+.legend-item.lv0.river::before { background: radial-gradient(#9fe4ff 30%, transparent 31%) 0 0 / 8px 8px; }
+.legend-item.lv1.river::before { background: radial-gradient(#2a8fd6 35%, transparent 36%) 0 0 / 4px 4px; }
+.legend-item.lv2.river::before { background: repeating-conic-gradient(#c9a46a 0 25%, transparent 0 50%) 0 0 / 4px 4px; }
+.legend-item.lv3.river::before { background: repeating-linear-gradient(90deg, #94714a 0 6px, transparent 6px 8px); }
 .radio-list.compact .btn.choice { min-height: 48px; padding: 6px 12px; }
 .affects { color: var(--accent); margin: 4px 0; }
 .gloss summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--muted); }
@@ -299,7 +304,13 @@ progress { width: 100%; height: 16px; accent-color: #38b764; }
 .answer { min-height: 1.5em; font-style: italic; color: var(--accent); }
 .answer.thinking::after { content: ' …'; }
 .petition { padding: 8px; margin: 8px 0; border: 2px solid var(--line); border-radius: 4px; }
-.petition .row > * { flex: 1; }
+.petition .row { flex-wrap: wrap; }
+.petition .row > * { flex: 1 1 9em; min-width: 0; } /* ronda 20: con texto al 200 % no se sale */
+/* 2.4: fiestas de temporada (chips, comisión con nombres tocables y programa). */
+.season-chips .seg-btn { flex: 1 1 40%; }
+.season-committee { line-height: 44px; }
+.link-btn { display: inline-block; min-height: 44px; padding: 0 2px; background: none; border: 0; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
+.season-program { margin: 4px 0 8px; padding-left: 20px; }
 .quote { font-style: italic; color: var(--accent); }
 .chronicle { line-height: 1.6; }
 .person-click { list-style: none; }
@@ -1209,3 +1220,28 @@ body.placing .tut-arrow { visibility: hidden; }
 .bc-opt { margin: 6px 0; }
 .bc-opt p { margin: 2px 0 0; }
 
+
+/* 2.4: pleno hablado (bocadillos en columna) y dilemas. */
+.pleno-talk { display: flex; flex-direction: column; gap: 10px; margin: 8px 0 12px; }
+.pleno-talk.thinking .pleno-line { opacity: 0.75; }
+.pleno-bubble { position: relative; max-width: 92%; padding: 8px 10px; background: #f4f4f4; color: #1a1c2c; border: 3px solid #1a1c2c; border-radius: 4px; box-shadow: 3px 3px 0 #333c57; }
+.pleno-bubble.en_contra { align-self: flex-end; border-color: #b13e53; }
+.pleno-bubble.matiz { border-color: #3b5dc9; }
+.pleno-bubble-head { margin: 0 0 4px; }
+.pleno-bubble .muted { color: #333c57; } /* ronda 20: contraste sobre el bocadillo claro */
+.pleno-line { margin: 0; line-height: 1.35; }
+.pleno-who { min-height: 44px; padding: 0 4px; font: inherit; font-weight: 700; color: #b13e53; background: none; border: 0; text-decoration: underline; cursor: pointer; }
+.pleno-bubble .pill { color: #1a1c2c; border-color: #1a1c2c; margin-left: 6px; }
+.dilemma-people { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.dilemma-options { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.dilemma-options .btn { width: 100%; min-height: 44px; text-align: left; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.dilemma-options .btn .small { font-weight: 400; }
+/* 2.4: billete y cuotas (3 botones a lo ancho, 44 px) y la luz por estación. */
+.vida-seg { flex-wrap: nowrap; }
+.vida-seg .seg-btn { flex: 1 1 0; min-width: 44px; padding: 6px 4px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.vida-seg .seg-btn small { font-weight: 400; }
+/* Ronda 20: con texto grande, un botón a lo ancho por opción (no se montan). */
+html[data-text='150'] .vida-seg, html[data-text='200'] .vida-seg { flex-direction: column; }
+html[data-text='150'] .vida-seg .seg-btn, html[data-text='200'] .vida-seg .seg-btn { flex-direction: row; justify-content: space-between; min-height: 44px; }
+.vida-seg .seg-btn { min-width: 0; overflow-wrap: anywhere; }
+.vida-seasons li.now { color: var(--accent); }

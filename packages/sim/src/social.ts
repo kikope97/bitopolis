@@ -1,6 +1,6 @@
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { rememberDeparted } from './family.ts';
-import { CAMPAIGN_MONTHS, TRASH } from './balance.ts';
+import { CAMPAIGN_MONTHS, GRUDGE_MAX, PLENO_TALK, TRASH } from './balance.ts';
 import { directorOwns } from './director-core.ts';
 import { BUILD_NAMES } from './commands.ts';
 import { canFound, freeShopLot, saturated, taxLevels } from './economy.ts';
@@ -112,6 +112,16 @@ export const MEMORY_KINDS = [
   // 2.3: grandes obras.
   'dono_obra',
   'obra_voluntario',
+  // 2.4 (bloque D): plenos hablados y dilemas.
+  'pleno_aplaudio',
+  'pleno_protesto',
+  'dilema_a_favor',
+  'dilema_en_contra',
+  // 2.4: cuidados y autobús.
+  'deja_trabajo_crianza',
+  'a_la_residencia',
+  'cuida_padre',
+  'excursion',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -196,6 +206,8 @@ export interface Pleno {
   petitions: Petition[];
   /** 2.2: «Dedicar una calle»: los candidatos del motor y si ya se dedicó en este pleno. */
   street?: { candidates: number[]; done: boolean };
+  /** 2.4: quién habla en el pleno (el texto no entra en el estado: lo pide el cliente). */
+  speakers?: PlenoSpeaker[];
 }
 export interface PromiseRecord {
   id: number;
@@ -384,6 +396,22 @@ export function memoryText(state: GameState, m: Memory): string {
       return 'Donó dinero para una gran obra del pueblo';
     case 'obra_voluntario':
       return 'Echó una mano como voluntario en una gran obra';
+    case 'pleno_aplaudio':
+      return 'Aplaudió en el pleno lo que respondió el alcalde';
+    case 'pleno_protesto':
+      return 'Protestó en el pleno por lo que respondió el alcalde';
+    case 'dilema_a_favor':
+      return 'El alcalde decidió a su favor en un asunto difícil';
+    case 'dilema_en_contra':
+      return 'El alcalde decidió en su contra en un asunto difícil';
+    case 'deja_trabajo_crianza':
+      return 'Dejó su trabajo para cuidar del bebé (no había plaza en la guardería)';
+    case 'a_la_residencia':
+      return m.about.length ? `Llevó a ${who} a la residencia` : 'Entró en la residencia';
+    case 'cuida_padre':
+      return m.about.length ? `Cuida en casa a ${who}` : 'Su familia le cuida en casa';
+    case 'excursion':
+      return 'Fue de excursión en el autobús de los jubilados';
   }
 }
 
@@ -840,7 +868,8 @@ export function convenePleno(state: GameState): void {
   }
   // 2.2: una calle por pleno, entre los candidatos que propone el motor.
   const street = streetCandidates(state).map((c) => c.id);
-  state.pleno = { tick: state.tick, petitions, ...(street.length ? { street: { candidates: street, done: false } } : {}) };
+  const speakers = plenoSpeakers(state, petitions);
+  state.pleno = { tick: state.tick, petitions, ...(street.length ? { street: { candidates: street, done: false } } : {}), ...(speakers.length ? { speakers } : {}) };
   pushEvent(state, 'info', `Pleno municipal: ${petitions.length} peticiones${leader ? ', una de la oposición' : ' de los vecinos'}`);
 }
 
@@ -887,11 +916,14 @@ export function answerPetition(state: GameState, petitionId: number, answer: 'pr
     }
     pushEvent(state, 'info', `El pleno rechaza ${NEED_TEXT[p.need]}`);
   }
+  plenoAnswered(state, p, answer);
   return true;
 }
 
 export function closePleno(state: GameState): void {
   if (!state.pleno) return;
+  // 2.4: quien habló y aún no reaccionó (la IA no llegó a tiempo), reacciona por reglas.
+  settlePlenoReactions(state);
   const answered = state.pleno.petitions.filter((p) => p.answer).length;
   for (const p of state.pleno.petitions) {
     if (p.answer) continue;
@@ -1129,5 +1161,131 @@ export function socialDay(state: GameState): void {
   checkPromises(state);
   checkObjectives(state);
   if (state.tick % TICKS_PER_MONTH === 0) for (const c of state.citizens) if (c.named) c.summary = narrativeSummary(state, c);
+}
+
+/* ---------------- 2.4 (bloque D): plenos hablados ---------------- */
+
+export const PLENO_ROLES = ['pide', 'oposicion', 'a_favor', 'en_contra'] as const;
+export type PlenoRole = (typeof PLENO_ROLES)[number];
+export const PLENO_STANCES = ['a_favor', 'en_contra', 'matiz'] as const;
+export type PlenoStance = (typeof PLENO_STANCES)[number];
+export const PLENO_REACTIONS = ['aplaude', 'murmura', 'abuchea', 'se_levanta'] as const;
+export type PlenoReaction = (typeof PLENO_REACTIONS)[number];
+export const PLENO_REACTION_TEXT: Record<PlenoReaction, string> = { aplaude: 'aplaude', murmura: 'murmura', abuchea: 'abuchea', se_levanta: 'se levanta y se va' };
+
+/** Quien habla en el pleno (datos del motor). El texto de su intervención no entra en el estado. */
+export interface PlenoSpeaker {
+  id: number;
+  role: PlenoRole;
+  postura: PlenoStance;
+  /** La petición de la que habla. */
+  petitionId: number;
+  /** Respuesta del alcalde a esa petición, esperando su reacción (Modo IA: en la reacción rápida). */
+  waiting?: 'promise' | 'reject';
+  reaction?: PlenoReaction;
+}
+
+/**
+ * Hasta `PLENO_TALK.speakers` intervenciones: quien pide, la oposición si
+ * pregunta, un vecino a favor (de los que apoyan) y uno en contra (de los que
+ * no). Determinista: sin dados.
+ */
+export function plenoSpeakers(state: GameState, petitions: Petition[]): PlenoSpeaker[] {
+  const out: PlenoSpeaker[] = [];
+  const main = petitions.find((p) => !p.opposition) ?? petitions[0];
+  if (!main) return out;
+  const named = (id: number) => state.citizens.find((c) => c.id === id && c.named);
+  const add = (id: number, role: PlenoRole, postura: PlenoStance, petitionId: number) => {
+    if (out.length >= PLENO_TALK.speakers || out.some((s) => s.id === id) || !named(id)) return;
+    out.push({ id, role, postura, petitionId });
+  };
+  add(main.citizenId, 'pide', 'a_favor', main.id);
+  const opp = petitions.find((p) => p.opposition);
+  if (opp) add(opp.citizenId, 'oposicion', 'matiz', opp.id);
+  const taken = (c: Citizen) => out.some((s) => s.id === c.id);
+  const fav = main.supporters
+    .map((id) => named(id))
+    .filter((c): c is Citizen => !!c && !taken(c))
+    .sort((a, b) => b.traits.social - a.traits.social || a.id - b.id)[0];
+  if (fav) add(fav.id, 'a_favor', 'a_favor', main.id);
+  const against = state.citizens
+    .filter((c) => c.named && !taken(c) && !main.supporters.includes(c.id) && !wantsNeed(state, c, main.need))
+    .sort((a, b) => b.traits.terco - a.traits.terco || a.id - b.id)[0];
+  if (against) add(against.id, 'en_contra', 'en_contra', main.id);
+  return out;
+}
+
+/** ¿Este vecino reacciona con IA? (como `isAiCitizen` en turns.ts, sin importarlo: evita el ciclo). */
+const thinksWithAi = (state: GameState, c: Citizen) => state.aiMode && c.named && !!state.ai && state.ai.share > 0;
+
+/** Reacción por reglas: según su postura, su terquedad y lo que respondió el alcalde. */
+export function plenoReactionRule(c: Citizen, s: PlenoSpeaker, answer: 'promise' | 'reject'): PlenoReaction {
+  const stubborn = c.traits.terco >= 60;
+  if (s.postura === 'en_contra') return answer === 'promise' ? (stubborn ? 'abuchea' : 'murmura') : 'aplaude';
+  if (s.postura === 'matiz') return answer === 'promise' ? 'murmura' : 'abuchea';
+  return answer === 'promise' ? 'aplaude' : stubborn ? 'se_levanta' : 'abuchea';
+}
+
+/** Efecto determinista de una reacción: ánimo (`PLENO_TALK.reaction`), recuerdo y aviso. */
+export function applyPlenoReaction(state: GameState, c: Citizen, s: PlenoSpeaker, r: PlenoReaction): string {
+  s.reaction = r;
+  delete s.waiting;
+  const delta = PLENO_TALK.reaction[r] ?? 0;
+  c.happiness = Math.max(0, Math.min(100, c.happiness + delta));
+  if (delta < 0) c.grudge = Math.min(GRUDGE_MAX, c.grudge + 1);
+  addMemory(state, c, delta >= 0 ? 'pleno_aplaudio' : 'pleno_protesto', 2, Math.sign(delta));
+  pushEvent(state, 'info', `${c.name.split(' ')[0]} ${PLENO_REACTION_TEXT[r]} en el pleno`, { ref: c.id });
+  return `${PLENO_REACTION_TEXT[r]} en el pleno`;
+}
+
+/**
+ * Al responder una petición: los que hablaron de ella reaccionan. En Modo IA,
+ * los vecinos con IA esperan a la reacción rápida (`reaccion_pleno:<enum>`);
+ * el resto, por reglas, al momento.
+ */
+function plenoAnswered(state: GameState, p: Petition, answer: 'promise' | 'reject'): void {
+  for (const s of state.pleno?.speakers ?? []) {
+    if (s.petitionId !== p.id || s.reaction) continue;
+    const c = state.citizens.find((x) => x.id === s.id);
+    if (!c) continue;
+    if (thinksWithAi(state, c)) s.waiting = answer;
+    else applyPlenoReaction(state, c, s, plenoReactionRule(c, s, answer));
+  }
+}
+
+/** Los que aún esperan reaccionan por reglas (al cerrar el pleno o si la reacción rápida cae en reglas). */
+export function settlePlenoReactions(state: GameState, ids?: number[]): void {
+  for (const s of state.pleno?.speakers ?? []) {
+    if (!s.waiting || s.reaction || (ids && !ids.includes(s.id))) continue;
+    const c = state.citizens.find((x) => x.id === s.id);
+    if (c) applyPlenoReaction(state, c, s, plenoReactionRule(c, s, s.waiting));
+    else delete s.waiting;
+  }
+}
+
+/** ¿Hay alguien con IA esperando a reaccionar a esta petición? (para pedir la reacción rápida). */
+export function plenoAwaits(state: GameState, petitionId: number): boolean {
+  return (state.pleno?.speakers ?? []).some((s) => s.petitionId === petitionId && !s.reaction && state.citizens.some((c) => c.id === s.id && thinksWithAi(state, c)));
+}
+
+/** Vecinos que la reacción rápida tiene que incluir: los que hablaron y esperan. */
+export function plenoQuickIds(state: GameState): number[] {
+  return (state.pleno?.speakers ?? []).filter((s) => s.waiting && !s.reaction).map((s) => s.id);
+}
+
+/** Menú de la reacción rápida para quien habló: las 4 reacciones, con lo que respondió el alcalde. */
+export function plenoReactionMenu(state: GameState, c: Citizen): { accion: string; detalle: string }[] {
+  const s = state.pleno?.speakers?.find((x) => x.id === c.id && x.waiting && !x.reaction);
+  const p = s && state.pleno?.petitions.find((x) => x.id === s.petitionId);
+  if (!s || !p) return [];
+  const what = `${s.waiting === 'promise' ? 'el alcalde promete' : 'el alcalde rechaza'} ${NEED_TEXT[p.need]} (habló ${s.postura === 'a_favor' ? 'a favor' : s.postura === 'en_contra' ? 'en contra' : 'con matices'})`;
+  return PLENO_REACTIONS.map((r) => ({ accion: `reaccion_pleno:${r}`, detalle: `en el pleno ${PLENO_REACTION_TEXT[r]}: ${what}` }));
+}
+
+/** La reacción que eligió la IA (validada: tiene que estar esperando y ser del enum). */
+export function plenoReactFromTurn(state: GameState, c: Citizen, arg: string | undefined): string {
+  const s = state.pleno?.speakers?.find((x) => x.id === c.id && x.waiting && !x.reaction);
+  if (!s || !(PLENO_REACTIONS as readonly string[]).includes(arg ?? '')) return 'se queda callado en el pleno';
+  return applyPlenoReaction(state, c, s, arg as PlenoReaction);
 }
 

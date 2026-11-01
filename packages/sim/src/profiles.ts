@@ -1,5 +1,5 @@
 import type { BuildKind, Command, LandmarkKind, TaxLevel } from '@bitopolis/shared';
-import { JOBS, LANDMARKS, LOANS, MAINTENANCE, PLANT_CAPACITY, PUBLIC_SALARY, REGION, SERVICE, SERVICE_SALARY, TRASH, WAGE_OUTSIDE } from './balance.ts';
+import { CARE, JOBS, LANDMARKS, LOANS, MAINTENANCE, PLANT_CAPACITY, PUBLIC_SALARY, REGION, SERVICE, SERVICE_SALARY, TRANSIT, TRASH, WAGE_OUTSIDE } from './balance.ts';
 import { bigFactorySpot } from './region.ts';
 import { ownIncome, TREASURY } from './money.ts';
 import { jobsOf, maintenanceOf } from './levels.ts';
@@ -13,6 +13,8 @@ import { hash32 } from './hash.ts';
 import { buildingAt, DIRS, footprint, type GameState, hasAdjacentRoad, terrainAt, Tile, tileIndex, Zone } from './state.ts';
 import { freeHomes } from './tick.ts';
 import { farmZoneUnlocked } from './farm.ts';
+import { townShare } from './seasons.ts';
+import { nearestRiverTile, riverCourse, riverExit, riverWorst } from './waterworks.ts';
 
 /**
  * Perfiles de jugador automático para el CLI headless. Cada perfil tiene su
@@ -54,7 +56,17 @@ interface PlannerOpts {
   landmarks?: boolean;
   /** 2.3: deja un polígono de zona I donde quepa la fábrica de la gran empresa (y le dice que sí). */
   bigCompany?: boolean;
+  /**
+   * 2.4: cuidados y autobús. Con el mes en positivo y superávit para pagarlo, la estación de autobuses
+   * (si hay al menos `TRANSIT_RIDERS` vecinos que trabajan fuera), la guardería y la residencia (con
+   * `CARE_ELDERS` mayores de 70); las cuotas, normales.
+   */
+  care?: boolean;
 }
+
+const TRANSIT_RIDERS = 20;
+const CARE_ELDERS = 6;
+const CARE_COUPLES = 3;
 
 /**
  * 2.2: préstamo «con cabeza» para lo que falta: el hueco hasta `cost` (más un
@@ -141,6 +153,9 @@ function roadNetworkOf(state: GameState, b: { x: number; y: number }): Set<numbe
   }
   return out;
 }
+
+/** 2.4: lo que elige un jugador razonable en un dilema (por orden, la primera que pueda). */
+const DILEMMA_PREFERENCE = ['ampliar', 'microcredito', 'mirar_otro_lado', 'que_cumpla', 'plaza_primero', 'perdonar', 'desahuciar', 'multar', 'pedir_indulto'];
 
 /** 2.3: fases que quiere tener en caja para empezar una gran obra. */
 const START_PHASES = 1;
@@ -246,6 +261,17 @@ function industrialBlock(state: GameState, from: { x: number; y: number }[], kee
   return null;
 }
 
+/** 2.4: depuradora cuando el río baja sucio, en el sitio más aguas abajo (trata a todo lo de arriba). */
+function sewagePlan(state: GameState, spots: { x: number; y: number }[], reserve: number): Command | null {
+  if (state.buildings.some((b) => b.kind === 'sewage')) return null;
+  if (riverWorst(state) <= 30 && riverExit(state) <= 20) return null;
+  if (state.treasury < buildCost('sewage') + reserve) return null;
+  const course = riverCourse(state);
+  const down = (s: { x: number; y: number }) => course.section[nearestRiverTile(state, s.x, s.y, undefined, course)] ?? Infinity;
+  const ok = spots.filter((s) => validateCommand(state, { type: 'Build', kind: 'sewage', x: s.x, y: s.y }).ok).sort((a, b) => down(a) - down(b));
+  return ok[0] ? { type: 'Build', kind: 'sewage', x: ok[0].x, y: ok[0].y } : null;
+}
+
 function buildingKindOf(state: GameState, id: number): string | undefined {
   return state.buildings.find((b) => b.id === id)?.kind;
 }
@@ -267,6 +293,11 @@ function planner(name: string, o: PlannerOpts): Profile {
       else if (state.treasury > 20_000 || cur < pref) target = pref;
       if (target !== cur) out.push({ type: 'SetTax', level: order[target]! });
       if (!chance(rng, o.activity)) return out;
+      // 2.4: responde a la comisión de festejos: la mitad si la caja lo permite sin tocar su reserva.
+      const fiesta = state.seasons?.current;
+      if (fiesta?.status === 'comision' && fiesta.asked && state.treasury > townShare(fiesta.season, fiesta.program, 'poco') + o.reserve) {
+        out.push({ type: 'ApproveFestival', season: fiesta.season, budget: 'poco' });
+      }
       // 2.2: el perfil endeudado pide todo lo que le dejen, a 48 meses.
       if (o.borrow === 'maximo') {
         const cap = loanCapacity(state);
@@ -288,6 +319,12 @@ function planner(name: string, o: PlannerOpts): Profile {
       };
       if (!has("water")) { tryBuild("water"); return out; }
       if (!has("power")) { tryBuild("power"); return out; }
+      // 2.4: un jugador decide los dilemas (sin dados: la primera opción válida de su lista).
+      const dilemma = state.dilemmas.find((d) => !d.resolved);
+      if (dilemma) {
+        const pick = DILEMMA_PREFERENCE.map((option): Command => ({ type: 'ResolveDilemma', id: dilemma.id, option })).find((c) => validateCommand(state, c).ok);
+        if (pick) out.push(pick);
+      }
       // Ampliar la red si algún edificio terminado se queda sin agua o luz.
       const built = state.buildings.filter((b) => b.built && b.kind !== 'water' && b.kind !== 'power' && b.kind !== 'farm');
       // No más plantas de las que el pueblo necesita (una nueva mal conectada no arregla nada).
@@ -356,6 +393,12 @@ function planner(name: string, o: PlannerOpts): Profile {
           return out;
         }
       }
+      // 2.4: con el río sucio, una depuradora lo más abajo posible.
+      const sewage = sewagePlan(state, spots, o.reserve);
+      if (sewage) {
+        out.push(sewage);
+        return out;
+      }
       const zonesOn = zonesUnlocked(state);
       // Un jugador razonable mira el parte: no añade servicios (y sus sueldos) con el mes en negativo.
       const last = state.stats.at(-1);
@@ -371,6 +414,24 @@ function planner(name: string, o: PlannerOpts): Profile {
         const before = -((last.breakdown['sueldos'] ?? 0) + (last.breakdown['mantenimiento'] ?? 0));
         const room = ownIncome(last) - last.expenses - Math.max(0, now - before);
         for (const kind of o.services) if (count(kind) < wanted && room >= monthly(kind) && tryBuild(kind)) return out;
+      }
+      // 2.4: estación de autobuses, guardería y residencia.
+      if (o.care && zonesOn && last && last.income >= last.expenses) {
+        const cost = (k: 'busstation' | 'nursery' | 'residence') => (MAINTENANCE[k] + JOBS[k] * PUBLIC_SALARY) * (k === 'busstation' ? 1 - TRANSIT.consortium : 1);
+        const now = state.buildings.reduce((a, b) => a + (b.owner === TREASURY ? maintenanceOf(b) + jobsOf(b) * (b.kind in SERVICE ? SERVICE_SALARY : PUBLIC_SALARY) : 0), 0);
+        const before = -((last.breakdown['sueldos'] ?? 0) + (last.breakdown['mantenimiento'] ?? 0));
+        const room = ownIncome(last) - last.expenses - Math.max(0, now - before);
+        const commuters = state.citizens.filter((c) => c.jobId === null && c.unemployedSince === undefined).length;
+        const elders = state.citizens.filter((c) => c.age >= CARE.elderAge).length;
+        // Parejas en edad de tener hijos que viven juntas (o niños pequeños ya).
+        const couples = state.citizens.filter((c) => c.homeId !== null && c.age >= 20 && c.age <= 45 && c.relations.some((r) => r.kind === 'pareja' && r.id > c.id && state.citizens.find((x) => x.id === r.id)?.homeId === c.homeId)).length;
+        const wants: ['busstation' | 'nursery' | 'residence', boolean][] = [
+          ['busstation', commuters >= TRANSIT_RIDERS],
+          ['nursery', couples >= CARE_COUPLES],
+          ['residence', elders >= CARE_ELDERS],
+        ];
+        // Con holgura: que el superávit pague dos veces lo que cuesta al mes.
+        for (const [kind, ok] of wants) if (ok && !has(kind) && isUnlocked(state, kind) && room >= 3 * cost(kind) && tryBuild(kind)) return out;
       }
       // Vivienda municipal al principio (o siempre, según el perfil).
       if ((!zonesOn || o.municipalHousing) && freeHomes(state) + state.projects.filter((p) => p.payer === 0).length * 3 < 3 && state.demand.R > 0) {
@@ -426,7 +487,7 @@ function planner(name: string, o: PlannerOpts): Profile {
 
 export const PROFILES: Record<string, Profile> = {
   pasivo: { name: 'pasivo', decide: () => [] },
-  casual: planner('casual', { tax: 'medium', reserve: 3_000, activity: 0.3, services: ['park'], municipalHousing: false, tourism: true, landmarks: true, bigCompany: true }),
+  casual: planner('casual', { tax: 'medium', reserve: 3_000, activity: 0.3, services: ['park'], municipalHousing: false, tourism: true, landmarks: true, bigCompany: true, care: true }),
   // 2.2: un jugador casual que además pinta zona agraria (para medir el campo).
   campo: planner('campo', { tax: 'medium', reserve: 3_000, activity: 0.3, services: ['park'], municipalHousing: false, farms: 8 }),
   ahorrador: planner('ahorrador', { tax: 'low', reserve: 4_000, activity: 0.5, services: ['park'], municipalHousing: false }),
@@ -451,6 +512,7 @@ export const PROFILES: Record<string, Profile> = {
     tourism: true,
     landmarks: true,
     bigCompany: true,
+    care: true,
   }),
   // 2.2: como el constructor, pero pidiendo prestado todo lo que le dejen (equilibrio de los préstamos).
   endeudado: planner('endeudado', {

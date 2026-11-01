@@ -152,3 +152,14 @@ pnpm e2e                            # Playwright, viewport móvil y escritorio; 
 - IA: bloque `metas` en `turnShared`; acciones `donar_obra:<id>`, `abrir_casa_rural`, `quejarse_turistas`, `aceptar_trabajo:<fab>`; director `voluntarios_obra`, `polemica_obra`, `reportaje_tv`, `turistas_ruido`, `ere_gran_empresa`, `contrata_vecinos` (la comarca y la empresa van antes que las obras en el menú). `mayorText` cuenta las metas grandes.
 - Textos que entran en el estado: cifras con `fmt()` (loans.ts), nunca `toLocaleString` (cambia el hash entre motores).
 - e2e: `grandes-obras`, `turismo`, `escenarios`, `historia`, `compartir`.
+
+## Vida (2.4) — formato de partida 17, TURN_PROMPT_VERSION 14
+- Edificios nuevos: `nursery`, `residence`, `busstation` (**no** `station`, que es la estación de tren de la 2.3), `sewage`, `solar`, `wind`. Números en `CARE`, `TRANSIT`, `WATERWORKS`, `PLENO_TALK`, `DILEMMA`, `SEASONS` (balance.ts).
+- `sim/src/care.ts`: plazas de guardería (`nurseryUse`, natalidad según la cuota, `childcareMonth`), residencia (`residencePlaces` + `care.extraPlaces`, `careMonth`, cuotas con `charge()`), pensión (`pensionsMonth`, sustituye al sueldo de fuera), «llevar a la residencia o cuidar en casa» (`careMenu`/`careRuleAction`), `SetCareFee`.
+- `sim/src/transit.ts`: una sola estación, `SetBusFare` (el billete mueve `findByFare`), Consorcio, excursionistas, `buscar_trabajo_fuera` (una vez al mes, con `outsideJobsFx`), suceso `excursion`.
+- `sim/src/waterworks.ts`: `riverCourse` (BFS en memoria), `fields.river`, depuradora, multa de la Confederación, renovables con `plantCapacityOf`, molino solo en colina, vertido (`startSpill`, `Building.spill`, `cleanUntil` tras una multa).
+- `sim/src/dilemmas.ts`: cuatro dilemas con opciones del motor (`ResolveDilemma`), uno al mes, 7 días y aviso a 2; con director, `dilema` tiene cupo propio (no gasta drama) y la IA solo lo presenta (`Dilemma.intro`).
+- `sim/src/pleno-prompt.ts` + `POST /api/games/:token/pleno`: el pleno hablado (fuera del estado y del hash; el servidor usa su propio `st.pleno`), plantillas de respaldo, reacciones `reaccion_pleno`.
+- `sim/src/seasons.ts`: fiestas de temporada con comisión (`apuntarse_comision`), programa (`acts[].programa` del `TownTurn`) y `ApproveFestival`; las patronales grandes siguen en `HoldFestival`.
+- IA: bloque `vida` en `turnShared` (en palabras). Cliente: `vida-ui.ts` (fichas), `dilemma-ui.ts`, bocadillos del pleno en `social-ui.ts`, fiestas en `civic-ui.ts`, capa «Río», autobús, molino, luces y hoguera en `render.ts`.
+- e2e: `vida`, `fiestas`, `ia-pleno`, dilema por toque en `tactil`. El LLM falso usa `PW_LLM_PORT` (8099 por defecto).

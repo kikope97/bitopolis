@@ -20,6 +20,11 @@ import { Command, TICKS_PER_DAY, tickToDate, type BuildKind, type ZoneKind } fro
 import { ASSOCIATIONS, BUILD, CIVIL, STREETS, DEBT_LIMIT, FIRE, MICROCREDIT, MIN_WAGE, MIN_WAGE_FX, MIN_WAGE_STEP, TERRAIN, WAGE_OUTSIDE, ZONE_COST_PER_TILE } from './balance.ts';
 import { isWater, Terrain } from './terrain.ts';
 import { applyDecision, canApplyDecision } from './decisions.ts';
+import { canSetCareFee, setCareFee } from './care.ts';
+import { canResolveDilemma, resolveDilemma } from './dilemmas.ts';
+import { approveFestival, canApproveFestival } from './seasons.ts';
+import { canBuildWaterworks } from './waterworks.ts';
+import { canBuildBusStation, canSetBusFare, setBusFare } from './transit.ts';
 import { campaign, canCampaign, canMotion, motion } from './politics.ts';
 import { addMemory, answerPetition, canConvenePleno, closePleno, convenePleno, talkTo } from './social.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
@@ -72,6 +77,13 @@ export const BUILD_NAMES: Record<string, string> = {
   stadium: 'Estadio',
   cathedral: 'Catedral',
   bigfactory: 'Fábrica',
+  // 2.4: cuidados, transporte (bloques A y B), agua y energía (bloque C).
+  nursery: 'Guardería',
+  residence: 'Residencia de mayores',
+  busstation: 'Estación de autobuses',
+  sewage: 'Depuradora',
+  solar: 'Placas solares',
+  wind: 'Molino de viento',
 };
 
 const ZONE_VALUE: Record<ZoneKind, number> = { none: Zone.None, R: Zone.R, C: Zone.C, I: Zone.I, A: Zone.A };
@@ -234,6 +246,14 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
         const h = canBuildHeritage(state);
         if (!h.ok) return h;
       }
+      // 2.4: la depuradora, junto al río; el molino, en la colina.
+      const ww = canBuildWaterworks(state, cmd.kind, cmd.x, cmd.y);
+      if (!ww.ok) return ww;
+      // 2.4: una sola estación de autobuses (llega a todo el pueblo).
+      if (cmd.kind === 'busstation') {
+        const h = canBuildBusStation(state);
+        if (!h.ok) return h;
+      }
       // 2.2: licitación (la local es la de siempre: mismo coste y misma validación).
       if (cmd.offer && cmd.offer !== 'local') {
         const o = canOffer(state, cmd.kind, cmd.x, cmd.y, cmd.offer);
@@ -373,6 +393,15 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       return canProtectArea(state, cmd.heritageId);
     case 'AnswerBigCompany':
       return canAnswerBigCompany(state, cmd.accept, cmd.incentive);
+    // 2.4: vida (cada bloque valida en su archivo).
+    case 'SetBusFare':
+      return canSetBusFare(state, cmd.fare);
+    case 'SetCareFee':
+      return canSetCareFee(state, cmd.service, cmd.level);
+    case 'ResolveDilemma':
+      return canResolveDilemma(state, cmd.id, cmd.option);
+    case 'ApproveFestival':
+      return canApproveFestival(state, cmd.season, cmd.budget);
   }
 }
 
@@ -630,6 +659,18 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       break;
     case 'AnswerBigCompany':
       answerBigCompany(state, cmd.accept, cmd.incentive);
+      break;
+    case 'SetBusFare':
+      setBusFare(state, cmd.fare);
+      break;
+    case 'SetCareFee':
+      setCareFee(state, cmd.service, cmd.level);
+      break;
+    case 'ResolveDilemma':
+      resolveDilemma(state, cmd.id, cmd.option);
+      break;
+    case 'ApproveFestival':
+      approveFestival(state, cmd.season, cmd.budget);
       break;
   }
   if (mayor) noteMayor(state, mayor.text, mayor.big);

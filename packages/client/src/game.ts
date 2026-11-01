@@ -84,10 +84,12 @@ import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
 import { openNeighbours, openReport, openTaxes as openTaxesSheet } from './economy-ui.ts';
 import { heavyLoad, loadPct, openLoans } from './loans-ui.ts';
 import { LAYERS, type LayerId, NEED_ICON } from './layers.ts';
+import { vidaBox } from './vida-ui.ts';
 import { openTownHall } from './civic-ui.ts';
 import { openAlbum, snapMoments } from './album-ui.ts';
 import { openAway } from './away-ui.ts';
 import { openRank, rankCard } from './rank-ui.ts';
+import { dilemmaSpot, openDilemmaSheet, type DilemmaCtx } from './dilemma-ui.ts';
 import { objectivesNode, openAdvisor, openCitizen, openDiary, openPleno, portraitCanvas, rememberSeen, renderObjectives, resumeSummary, type SocialCtx } from './social-ui.ts';
 import { api, ApiError } from './api.ts';
 import { nextHint } from './hints.ts';
@@ -96,7 +98,7 @@ import { errandsSummary, openErrands, openPress } from './town-news-ui.ts';
 import { openWhatsHappening, turnHeadline } from './ai-town-ui.ts';
 import { pocketMark } from './money-ui.ts';
 import { formatDate, money, MONTHS, plural, shortDate, t } from './i18n.ts';
-import { type Camera, type Preview, render, restartAnimations, signSpot } from './render.ts';
+import { busTrips, type Camera, type Preview, render, restartAnimations, signSpot } from './render.ts';
 import type { FromWorker, SaveBatch, ToWorker } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
 import { buildingSprite, landmarkSprite, letterSprite, T, ZONE_COLOR } from './sprites.ts';
@@ -401,9 +403,10 @@ export function startGame(opts: GameOptions): void {
    */
   let highlight: { x: number; y: number; since: number } | null = null;
   let lastAttention = -Infinity;
-  function attention(at: { x: number; y: number } | undefined) {
+  function attention(at: { x: number; y: number } | undefined, force = false) {
     const now = performance.now();
     if (at) highlight = { x: at.x, y: at.y, since: now };
+    if (force && speed >= 3) lastAttention = -Infinity;
     // Ronda 14: si en este mismo lote ya se bajó a x1 (una oferta con plazo), el motivo
     // que llega detrás sí se enseña; si no, como mucho una parada cada 45 s.
     const sameBatch = now - lastAttention < 2_000;
@@ -689,6 +692,16 @@ export function startGame(opts: GameOptions): void {
         sfx.warn();
         calmPause();
         toast(e.text, { kind: 'warn', sticky: true, onClick: () => focusBuilding(e.ref!) });
+      } else if (e.kind === 'warning' && e.text.startsWith('Un asunto difícil')) {
+        // 2.4: un dilema con plazo: destello en el sitio, vuelta a x1 y aviso fijo que abre la hoja.
+        // Ronda 20: el dilema de este aviso (el más reciente sin resolver de ese vecino), y siempre a x1.
+        const d = [...state.dilemmas].reverse().find((x) => !x.resolved && (e.ref === undefined || x.citizenIds[0] === e.ref));
+        sfx.warn();
+        calmPause();
+        attention(d ? dilemmaSpot(state, d.id) : undefined, true);
+        toast(e.text, { kind: 'warn', sticky: true, onClick: d ? () => openDilemmaSheet(dilemmaCtx, d.id) : undefined });
+      } else if (e.kind === 'warning' && e.text.startsWith('No decidiste a tiempo')) {
+        toast(e.text, { kind: 'warn', sticky: true });
       } else if (e.kind === 'bankrupt' || e.kind === 'warning') {
         sfx.warn();
         duck(1.5);
@@ -792,6 +805,10 @@ export function startGame(opts: GameOptions): void {
           attention(a?.x !== undefined && a.y !== undefined ? { x: a.x, y: a.y } : hallSpot());
         }
         toast(e.text, { kind: urgent ? 'warn' : 'info', sticky: urgent || e.text.startsWith('Nace'), onClick: () => openTownHall(social, 'associations') });
+      } else if (e.kind === 'politics' && /comisión de festejos/.test(e.text)) {
+        // 2.4: la comisión de festejos pide presupuesto: aviso fijo que lleva a su sección.
+        slowDown();
+        toast(e.text, { kind: 'info', sticky: true, onClick: () => openTownHall(social, 'seasons') });
       } else if (e.kind === 'politics' && /presupuesto/i.test(e.text)) {
         const decide = e.text.startsWith('Toca presentar');
         if (decide) slowDown();
@@ -1959,6 +1976,9 @@ export function startGame(opts: GameOptions): void {
         content.push(go);
       }
       if (b.rural && (b.kind === 'house' || b.kind === 'res')) content.push(h('p', { class: 'muted small' }, 'Casa rural: su dueño alquila plazas a los visitantes.'));
+      // 2.4 «Vida»: estación (billete), guardería y residencia (cuota), depuradora (el río) y renovables (la luz).
+      const vida = vidaBox(state, b, command, citizenList);
+      if (vida) content.push(vida);
       // v1.8 (petición del creador): los servicios suben de nivel.
       if (UPGRADABLE.includes(b.kind)) content.push(levelBox(b));
       const res = occupants(state, b);
@@ -2106,6 +2126,17 @@ export function startGame(opts: GameOptions): void {
 
   /* ---------- menú, impuestos y cuentas ---------- */
   const social: SocialCtx = { token, state: () => state, command, pickStreet: (id, name) => startDedication(id, name) };
+  // 2.4: el dilema abierto (o el último de ese vecino) para volver desde su ficha.
+  const backToDilemma = (id: number) => {
+    const d = [...state.dilemmas].reverse().find((x) => x.citizenIds.includes(id));
+    if (d) openDilemmaSheet(dilemmaCtx, d.id);
+  };
+  const dilemmaCtx: DilemmaCtx = {
+    state: () => state,
+    command,
+    reveal: (x, y) => revealTile({ x, y }),
+    openCitizen: (id) => withBack('Dilema', () => backToDilemma(id), () => openCitizen(social, id)),
+  };
   const openTaxes = () => openTaxesSheet(() => state, command);
   const openLoansSheet = () => openLoans(() => state, command);
   // 2.0: el % de vecinos con IA se cambia en Ajustes (con key del servidor, lo fija /admin).
@@ -2160,6 +2191,10 @@ export function startGame(opts: GameOptions): void {
     const assocs = state.associations ?? [];
     const protest = assocs.some((a) => a.protestDay >= 0);
     if (assocs.length) townSum.push(protest ? 'manifestación convocada' : plural(assocs.length, 'asociación vecinal', 'asociaciones vecinales'));
+    // 2.4: la comisión de festejos espera presupuesto.
+    const fiesta = state.seasons?.current;
+    const fiestaAsks = !!fiesta && fiesta.status === 'comision' && !!fiesta.asked;
+    if (fiestaAsks) townSum.push('la comisión de festejos pide presupuesto');
     sheet(
       'Pueblo',
       // 2.1: el rango y el escudo del pueblo, arriba del todo.
@@ -2179,9 +2214,10 @@ export function startGame(opts: GameOptions): void {
         [townSum.join(' · ')],
         // v1.9.1: el ayuntamiento cuesta de encontrar en el mapa; desde aquí se llega a «Gestión del pueblo».
         item(`Nivel ${townLevel(state)} · ${townLevel(state) >= TOWNHALL_LEVELS.length ? 'Gestión' : 'Ampliar'}`, go(openHall), canUpgradeTownhall(state).ok),
-        item('Presupuesto y fiestas', go(() => openTownHall(social)), budgetOpen || offers > 0 || protest),
+        item('Presupuesto y fiestas', go(() => openTownHall(social, fiestaAsks ? 'seasons' : undefined)), budgetOpen || offers > 0 || protest || fiestaAsks),
         // 2.3: turismo (desde el nivel 3 o en cuanto hay visitantes).
         ...(townLevel(state) >= 3 || state.tourism.visitors > 0 ? [item(`Turismo · ${plural(state.tourism.visitors, 'visitante', 'visitantes')}`, go(() => openTownHall(social, 'tourism')), touristified(state))] : []),
+        ...(state.dilemmas.some((d) => !d.resolved) ? [item('Un asunto difícil', go(() => openDilemmaSheet(dilemmaCtx, state.dilemmas.find((d) => !d.resolved)!.id)), true)] : []),
         item('Pleno municipal', go(() => openPleno(social))),
         item('Política y elecciones', go(() => openPolitics(social))),
         item('Consejero', go(() => openAdvisor(social))),
@@ -2527,6 +2563,10 @@ export function startGame(opts: GameOptions): void {
     get highlight() {
       return highlight ? { x: highlight.x, y: highlight.y } : null;
     },
+    /** 2.4: viajes del autobús que han empezado en el mapa. */
+    get busTrips() {
+      return busTrips;
+    },
     /** Para las pruebas: centra la cámara en una casilla (no toca el estado). */
     centerOn(tx: number, ty: number) {
       centerOn(tx, ty);
@@ -2544,7 +2584,7 @@ export function startGame(opts: GameOptions): void {
     // La sacudida se aplica a una copia de la cámara: no cambia dónde mira el jugador.
     const [sx, sy] = shakeOffset(time);
     const view = sx || sy ? { ...cam, x: cam.x + sx * dpr(), y: cam.y + sy * dpr() } : cam;
-    render(ctx, state, view, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer, highlight, labels: cam.zoom >= touchZoom() });
+    render(ctx, state, view, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer, highlight, labels: cam.zoom >= touchZoom(), fast: speed >= 10 });
     placeBubbles();
     requestAnimationFrame(frame);
   }

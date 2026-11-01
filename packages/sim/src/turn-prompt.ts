@@ -2,7 +2,8 @@ import { loadBand, loanLoad } from './loans.ts';
 import { TICKS_PER_MONTH, tickToDate } from '@bitopolis/shared';
 import { z } from 'zod';
 import { CAUSE_ASK } from './associations.ts';
-import { MIN_WAGE } from './balance.ts';
+import { DILEMMA, MIN_WAGE } from './balance.ts';
+import { dilemmaBrief } from './dilemmas.ts';
 import { BUILD_NAMES } from './commands.ts';
 import { freeShopLot } from './economy.ts';
 import { debtBand, pocketOf } from './household.ts';
@@ -21,6 +22,10 @@ import { LANDMARK_EFFECT, LANDMARK_NAMES } from './landmarks.ts';
 import { ruralHomes, touristified } from './tourism.ts';
 import { bigFactory, PHASE_NAME } from './region.ts';
 import { scenarioStatus } from './scenarios.ts';
+import { committeeBrief, FESTIVAL_ACTS, SEASON_NAMES } from './seasons.ts';
+import { careBuildings, residenceFree } from './care.ts';
+import { busStation } from './transit.ts';
+import { hasRiver, riverExit } from './waterworks.ts';
 import { newRecordLine } from './achievements.ts';
 import { averageHappiness } from './tick.ts';
 import { GESTURES, gestureCandidates, isAiCitizen, PLANS, planText, SPEND, type TurnAct, turnMenu } from './turns.ts';
@@ -33,13 +38,14 @@ import { GESTURES, gestureCandidates, isAiCitizen, PLANS, planText, SPEND, type 
  * La salida tiene un esquema fijo (sin uniones por vecino); cada parte se valida
  * en el motor con el menú del vecino. Nunca va texto libre del jugador.
  */
-export const TURN_PROMPT_VERSION = 12;
+export const TURN_PROMPT_VERSION = 14;
 
 export const TURN_SYSTEM = `Eres la mente de los vecinos de Bitópolis, un pueblo español pequeño. Cada semana decides, a la vez, qué hace cada vecino de la lista. Ellos viven de verdad: trabajan, compran, se enamoran, se enfadan, ahorran o se arruinan, y reaccionan a lo que hace quien gobierna: el alcalde (el jugador) o, si ganó las elecciones, el rival (mira "politica.gobierna"). El vecino que tenga "es_alcalde" gobierna él: piensa y actúa como alcalde.
 
 Para cada vecino del lote devuelve exactamente un objeto con:
 - "vecino": su id.
 - "accion": UNA de las acciones de su lista "acciones" (copia el texto exacto). Si no quiere hacer nada especial, "seguir". No inventes acciones.
+  Vida (2.4): "llevar_a_residencia"/"cuidar_en_casa" pesan el cariño, la cuota y lo que gana; "buscar_trabajo_fuera" solo si de verdad quiere trabajar fuera; "apuntarse_comision" si le gustan las fiestas. "vida" cuenta cómo están las fiestas, el autobús, las cuotas y el río.
 - "gesto": con quién (id de su lista "con_quien", o 0) y qué ("ninguno", "acercarse", "enfadarse", "hacer_las_paces", "pedir_salir", "romper").
 - "actitud": qué piensa ahora de quien gobierna, de -2 (muy en contra) a 2 (muy a favor). Tiene que salir de lo que vive: impuestos, servicios, su bolsillo, sus planes.
 - "gasto": dónde compra este mes ("pueblo", "fuera" o "ahorrar"), en qué tienda del pueblo si la prefiere (id de la lista de tiendas, o 0) y si se da algún capricho ("ocio"). Comer y lo básico se pagan siempre: tú decides dónde y si hay ocio. Si nadie compra en las tiendas del pueblo, cierran y su gente se queda sin trabajo: compra en el pueblo si le va bien y le compensa.
@@ -48,6 +54,7 @@ Para cada vecino del lote devuelve exactamente un objeto con:
 - "motivo": por qué hace lo que hace esta semana, en una frase corta en primera persona (máx. 160 caracteres).
 - "escudo": solo si en el pueblo hay "votacion_escudo", su voto: una "pieza" y un "lema" (ids de esa votación), según lo que le importa; si no, "" y "".
 - "biografia": solo si el turno es "mensual": su vida en 2 o 3 frases en tercera persona (máx. 280 caracteres), reescribiendo "su_biografia" con lo que ha pasado (sus notas y recuerdos); si no es mensual, "".
+- "programa": solo si en sus datos aparece "comision_fiestas" y encabeza la comisión (o se apunta ahora con "apuntarse_comision" y no hay nadie más), 2 o 3 "id" de "actos_posibles" a su gusto (mira su coste y su efecto); si no, [].
 - "recuerdo": lo que apunta de esta semana para acordarse (un hecho, no un sentimiento; máx. 120 caracteres), o "" si no pasó nada. Sus notas anteriores están en "sus_notas".
 
 Reglas:
@@ -62,6 +69,7 @@ Reglas:
 - "ayudar_incendio", "acoger" y "hacerse_voluntario" son para quien tiene relación o medios: no todo el pueblo a la vez.
 - "tirar_al_monte" solo aparece si no pasa el camión de la basura y la tiene en la puerta: lo hace quien es terco o está harto; los vecinos lo ven mal. Lo normal es quejarse o pedir "recogida".
 - "donar_obra" es para quien cree en la obra y le apoya (el juego pone la cantidad); "abrir_casa_rural", para el propietario con ambición si vienen visitantes; "quejarse_turistas", para quien los sufre. Mira "metas" del pueblo.
+- "reaccion_pleno:…" solo aparece para quien habló en el pleno: elige cómo reacciona a lo que respondió el alcalde según lo que defendía y su carácter. Si en "su_caso" hay un asunto difícil que el alcalde ha decidido, que se note en su actitud, su gesto y su pensamiento.
 - No menciones a nadie que no esté en los datos, ni cifras inventadas, ni que eres una IA. Sin comillas ni emojis.
 - Responde solo con JSON que cumpla el esquema, con un objeto por cada vecino del lote (no te dejes ninguno). Sé breve en los textos.`;
 
@@ -69,6 +77,24 @@ const band = (n: number, cuts: number[], names: string[]) => names[cuts.findInde
 const lvl = (v: string) => ({ low: 'bajo', medium: 'medio', high: 'alto' })[v] ?? v;
 
 /** Cómo está el pueblo (igual para todos los lotes del turno). */
+/** Ronda 20: fiestas, autobús, cuidados y río, en palabras (lo que hay; sin cifras). */
+function vidaBlock(state: GameState): Record<string, string> {
+  const out: Record<string, string> = {};
+  const f = state.seasons?.current;
+  if (f) {
+    const st = f.status === 'comision' ? (f.budget ? 'la comisión prepara la fiesta' : 'la comisión pide presupuesto al ayuntamiento') : f.status === 'aprobada' ? `aprobada (${f.budget === 'todo' ? 'la paga entera el ayuntamiento' : f.budget === 'poco' ? 'el ayuntamiento paga la mitad' : 'sin dinero del ayuntamiento'})` : f.status;
+    out.fiesta = `${SEASON_NAMES[f.season]}: ${st}`;
+  }
+  if (busStation(state)) out.autobus = `hay estación; billete ${state.transit.fare}`;
+  if (careBuildings(state, 'nursery').length) out.guarderia = `cuota ${state.care.nurseryFee}`;
+  if (careBuildings(state, 'residence').length) out.residencia = `cuota ${state.care.residenceFee}; ${residenceFree(state) > 0 ? 'quedan plazas' : 'llena'}`;
+  if (hasRiver(state)) {
+    const r = riverExit(state);
+    out.rio = r < 20 ? 'limpio' : r < 40 ? 'turbio' : 'sucio';
+  }
+  return out;
+}
+
 export function turnShared(state: GameState): string {
   const d = tickToDate(state.tick);
   const kinds = new Set(state.buildings.filter((b) => b.built).map((b) => b.kind));
@@ -86,7 +112,7 @@ export function turnShared(state: GameState): string {
     cuentas: `nota ${state.rating ?? 'B'} (A la mejor, D sin crédito), carga de los préstamos ${loadBand(loanLoad(state))}`,
     impuestos: state.taxesSplit ? { ibi: lvl(state.taxes.ibi), tasas: lvl(state.taxes.tasas), plusvalia: lvl(state.taxes.plusvalia) } : lvl(state.taxLevel),
     sueldo_minimo_empresas: `${MIN_WAGE[state.minWage ?? 'none']} € al mes`,
-    servicios: ['water', 'power', 'park', 'school', 'clinic', 'police', 'bar', 'chapel', 'cemetery', 'library', 'sports', 'jail', 'cleanpoint'].filter((k) => kinds.has(k as never)).map((k) => BUILD_NAMES[k]!.toLowerCase()),
+    servicios: ['water', 'power', 'park', 'school', 'clinic', 'police', 'bar', 'chapel', 'cemetery', 'library', 'sports', 'jail', 'cleanpoint', 'nursery', 'residence', 'busstation', 'sewage', 'solar', 'wind'].filter((k) => kinds.has(k as never)).map((k) => BUILD_NAMES[k]!.toLowerCase()),
     economia: last
       ? {
           vecinos_con_deudas: last.debtors ?? 0,
@@ -116,6 +142,8 @@ export function turnShared(state: GameState): string {
     ...(rankCandidates(state) ? { votacion_escudo: { rango: rankCandidates(state)!.rango, piezas: rankCandidates(state)!.piezas, lemas: rankCandidates(state)!.lemas } } : {}),
     // 2.3: metas grandes (comarca, grandes obras, escenario, turismo, gran empresa y récords).
     metas: bigGoals(state),
+    // Ronda 20: la vida del pueblo (2.4), en bandas y sin cifras; igual en todos los lotes.
+    vida: vidaBlock(state),
   };
   return `Así está el pueblo:\n${JSON.stringify(data)}`;
 }
@@ -216,7 +244,9 @@ function citizenBrief(state: GameState, c: Citizen) {
     ...(c.notes?.length ? { sus_notas: c.notes.map((n) => n.text) } : {}),
     ...(state.ai?.turn?.monthly ? { su_biografia: c.bio?.text ?? narrativeSummary(state, c) } : {}),
     ...(lastLine ? { la_semana_pasada: lastLine.text } : {}),
+    ...(committeeBrief(state, c) ? { comision_fiestas: committeeBrief(state, c) } : {}),
     ...(c.plan ? { su_plan: planText(c.plan) } : {}),
+    ...lifeBrief(state, c),
     actitud_anterior: c.attitude ?? 0,
     necesidades: needsOf(state, c).slice(0, 3),
     acciones: turnMenu(state, c).map((m) => (m.detalle ? `${m.accion} (${m.detalle})` : m.accion)),
@@ -264,8 +294,9 @@ export const TURN_SCHEMA = {
           recuerdo: { type: 'string' },
           escudo: { type: 'object', properties: { pieza: { type: 'string' }, lema: { type: 'string' } }, required: ['pieza', 'lema'], additionalProperties: false },
           biografia: { type: 'string' },
+          programa: { type: 'array', items: { type: 'string', enum: [...FESTIVAL_ACTS] } },
         },
-        required: ['vecino', 'accion', 'gesto', 'actitud', 'gasto', 'plan', 'pensamiento', 'motivo', 'recuerdo', 'escudo', 'biografia'],
+        required: ['vecino', 'accion', 'gesto', 'actitud', 'gasto', 'plan', 'pensamiento', 'motivo', 'recuerdo', 'escudo', 'biografia', 'programa'],
         additionalProperties: false,
       },
     },
@@ -313,6 +344,7 @@ const ActSchema = z.object({
   recuerdo: z.string().max(600).optional(),
   escudo: z.object({ pieza: z.string().max(40), lema: z.string().max(60) }).optional(),
   biografia: z.string().max(1200).optional(),
+  programa: z.array(z.string().max(40)).max(10).optional(),
 });
 
 const clean = (s: string, max: number) =>
@@ -354,6 +386,7 @@ export function parseTurn(text: string, ids: number[], sent: string): { acts: Tu
     if (bad(recuerdo)) recuerdo = '';
     let biografia = clean(a.biografia ?? '', 280);
     if (bad(biografia)) biografia = '';
+    const programa = [...new Set(a.programa ?? [])].filter((x) => (FESTIVAL_ACTS as readonly string[]).includes(x) && sent.includes(`"${x}"`)).slice(0, 3);
     acts.push({
       vecino: a.vecino,
       // Ronda 17: cada campo dentro de los límites del comando `TownTurn` (si no, el turno entero se rechazaría).
@@ -370,6 +403,8 @@ export function parseTurn(text: string, ids: number[], sent: string): { acts: Tu
       motivo,
       ...(recuerdo ? { recuerdo } : {}),
       ...(biografia ? { biografia } : {}),
+      // 2.4: el programa de la comisión, solo con actos que se enviaron (el motor vuelve a validarlo).
+      ...(programa.length ? { programa } : {}),
       // El voto del escudo, solo con ids de la votación que se envió.
       ...(a.escudo && /^[a-z_]{1,20}$/.test(a.escudo.pieza) && /^[a-z_]{1,40}$/.test(a.escudo.lema) && sent.includes(`"id":"${a.escudo.pieza}"`) && sent.includes(`"id":"${a.escudo.lema}"`)
         ? { escudo: { pieza: a.escudo.pieza, lema: a.escudo.lema } }
@@ -394,6 +429,7 @@ Devuelve:
 - "titulares": hasta 3 titulares de El Eco de Bitópolis, uno por sección ("sucesos", "cartas" al director, "anuncios"). Cada titular cuenta solo una de "noticias" o uno de los sucesos que eliges esta semana (su id en "sobre"), con un "texto" de periódico de pueblo (máx. 110 caracteres). No cuentes cómo acaba un suceso: lo decide el juego. Si una sección no tiene noticia, no pongas titular. En "cartas", la voz de un vecino.
 - "pies": solo si hay "fotos": un pie de foto para cada una ("id" y "texto", máx. 110 caracteres, como en un álbum de pueblo, sin inventar nada); si no, lista vacía.
 - "gobierno_rival": solo si hay "gobierno_rival" en los datos (gobierna el partido rival, no el jugador): como su alcalde, elige 0 a 2 "picks" (ids de sus "opciones", coherentes con su estilo y sus promesas) y un "discurso" de una frase (máx. 140 caracteres) en su voz; si no hay, picks vacío y discurso "".
+- "dilema": si en el menú hay alguno de tipo "dilema" y cabe en "presupuesto_drama", puedes plantear uno al alcalde: su "id" y una "presentacion" (máx. 200 caracteres) que cuente el caso con los datos de su "por_que", sin opinar ni proponer soluciones (las opciones las pone el juego). Como mucho uno; si no, id "" y presentacion "".
 - "encargo": si encaja con la semana, uno de "encargos_posibles" ("id") con la "carta" (máx. 220 caracteres, en primera persona, firmada por quien lo pide) con la que se lo pide al alcalde; si no, id "" y carta "".
 
 Reglas:
@@ -425,8 +461,9 @@ export const DIRECTOR_SCHEMA = {
       items: { type: 'object', properties: { id: { type: 'string' }, texto: { type: 'string' } }, required: ['id', 'texto'], additionalProperties: false },
     },
     gobierno_rival: { type: 'object', properties: { picks: { type: 'array', items: { type: 'string' } }, discurso: { type: 'string' } }, required: ['picks', 'discurso'], additionalProperties: false },
+    dilema: { type: 'object', properties: { id: { type: 'string' }, presentacion: { type: 'string' } }, required: ['id', 'presentacion'], additionalProperties: false },
   },
-  required: ['sucesos', 'avisos', 'foco', 'cronica', 'titulares', 'encargo', 'pies', 'gobierno_rival'],
+  required: ['sucesos', 'avisos', 'foco', 'cronica', 'titulares', 'encargo', 'pies', 'gobierno_rival', 'dilema'],
   additionalProperties: false,
 } as const;
 
@@ -493,6 +530,7 @@ const DirectorOut = z.object({
   encargo: z.object({ id: z.string().max(60), carta: z.string().max(1000) }).optional().catch(undefined),
   pies: upTo(z.object({ id: z.string().max(10), texto: z.string().max(600) }).nullable().catch(null), 8).optional().catch(undefined),
   gobierno_rival: z.object({ picks: upTo(z.string().max(60), 6), discurso: z.string().max(600).catch('') }).optional().catch(undefined),
+  dilema: z.object({ id: z.string().max(60), presentacion: z.string().max(1000).catch('') }).optional().catch(undefined),
 });
 
 /** Lee la respuesta del director: solo ids del menú y textos sin nombres inventados. Null si no vale. */
@@ -546,9 +584,28 @@ export function parseDirector(text: string, ids: string[], sent: string, extra: 
   const rivalPicks = (rp?.picks ?? []).filter((x, i, a) => extra.rival?.includes(x) && a.indexOf(x) === i).slice(0, 2);
   const discurso = clean(rp?.discurso ?? '', 140);
   const rival = extra.rival?.length && (rivalPicks.length || discurso) ? { picks: rivalPicks, discurso: bad(discurso) ? '' : discurso } : undefined;
+  const dilema = parseDilemmaPick(r.data.dilema, ids, bad);
   return {
-    director: { sucesos: picked, avisos: pick(r.data.avisos), ...(titulares.length ? { titulares } : {}), ...(encargo ? { encargo } : {}), ...(pies.length ? { pies } : {}), ...(rival ? { rival } : {}) },
+    director: { sucesos: picked, avisos: pick(r.data.avisos), ...(titulares.length ? { titulares } : {}), ...(encargo ? { encargo } : {}), ...(pies.length ? { pies } : {}), ...(rival ? { rival } : {}), ...(dilema ? { dilema } : {}) },
     focus: bad(focus) ? '' : focus,
     chronicle: bad(chronicle) ? '' : chronicle,
   };
+}
+
+/* ---------------- 2.4 (bloque D): pleno y dilemas en el turno ---------------- */
+
+/** Lo que el vecino vive del pleno y de los dilemas (datos del motor). */
+function lifeBrief(state: GameState, c: Citizen): { su_caso?: string } {
+  const d = dilemmaBrief(state, c);
+  return d ? { su_caso: d } : {};
+}
+
+/**
+ * El dilema del director: solo un id «dilema:…» del menú y una presentación
+ * corta sin nombres ni cifras inventadas (si no vale, se abre con el texto del motor).
+ */
+function parseDilemmaPick(p: { id: string; presentacion: string } | undefined, ids: string[], bad: (t: string) => boolean): DirectorChoice['dilema'] | undefined {
+  if (!p?.id || !p.id.startsWith('dilema:') || !ids.includes(p.id)) return undefined;
+  const text = clean(p.presentacion, DILEMMA.introMax);
+  return { id: p.id, presentacion: text.length >= 10 && p.presentacion.trim().length <= DILEMMA.introMax + 20 && !bad(text) ? text : '' };
 }

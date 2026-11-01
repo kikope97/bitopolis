@@ -52,6 +52,13 @@ export const BUILD_LEVEL: Record<BuildKind, number> = {
   civilprotection: 3,
   // 2.3: patrimonio (uno por partida).
   heritage: 3,
+  // 2.4
+  nursery: 3,
+  residence: 3,
+  busstation: 3,
+  sewage: 3,
+  solar: 2,
+  wind: 2,
 };
 
 export const townLevel = (state: GameState): number => state.townhallLevel ?? 1;

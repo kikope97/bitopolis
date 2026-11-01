@@ -5,8 +5,11 @@ import { checkInvariants, moneyDrift } from './invariants.ts';
 import { PROFILES, profileRng } from './profiles.ts';
 import { loanLoad, RATINGS, totalOwed } from './loans.ts';
 import { createInitialState, type GameState, type Rating } from './state.ts';
+import { ownIncome } from './money.ts';
+import { CARE } from './balance.ts';
 import { averageHappiness, step } from './tick.ts';
 import { ruralHomes, ruralShare } from './tourism.ts';
+import { hasRiver, riverExit } from './waterworks.ts';
 
 export interface RunOptions {
   seed: number;
@@ -49,6 +52,27 @@ export interface SimReport {
   scenario: { id: ScenarioId; terrain: TerrainShape; done: boolean; won: boolean; month: number | null };
   /** 2.3: turismo por año: visitantes, lo que dejaron (tasa y casas rurales) y casas rurales (% de las viviendas, máximo del año). */
   tourism: { year: number; visitors: number; tax: number; rural: number; houses: number; ruralPct: number }[];
+  /** 2.4: el río a la salida por año (media y máximo de los cierres de mes), con o sin depuradora, y multas de la Confederación. */
+  river: { hasRiver: boolean; years: { year: number; exitAvg: number; exitMax: number; sewage: number; renewables: number; fines: number }[] };
+  /** 2.4: vida (cuidados y autobús). */
+  life: LifeMetrics;
+}
+
+/** 2.4: nacimientos, mayores que se van (sin contar fallecidos), pensiones, billete e ingresos propios del ayuntamiento. */
+export interface LifeMetrics {
+  births: number;
+  deaths: number;
+  /** Vecinos de 70 años o más que se van del pueblo (sin contar a los que fallecen). */
+  eldersLeft: number;
+  /** Todos los que se van (sin fallecidos). */
+  left: number;
+  /** Pensiones pagadas desde fuera (aprox.: jubilados al cerrar cada mes × pensión). */
+  pensions: number;
+  /** Billete del autobús que cobró el ayuntamiento y lo que entró en la caja (sin préstamos). */
+  busFares: number;
+  ownIncome: number;
+  /** Cuotas de guardería y residencia cobradas. */
+  careFees: number;
 }
 
 export interface LoanMetrics {
@@ -80,10 +104,12 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
   const eventCounts: Record<string, number> = {};
   const sales: SimReport['sales'] = [];
   const tourism: SimReport['tourism'] = [];
+  const river: SimReport['river'] = { hasRiver: hasRiver(state), years: [] };
   let lastIn = state.ledger.externalIn;
   const loans: LoanMetrics = { rating: state.rating, worst: state.rating, months: { A: 0, B: 0, C: 0, D: 0 }, maxLoadPct: 0, requested: 0, requestedAmount: 0, treasury: 0, owed: 0, interest: 0 };
   let statsSeen = 0;
   let treasurySeen = -1;
+  const life: LifeMetrics = { births: 0, deaths: 0, eldersLeft: 0, left: 0, pensions: 0, busFares: 0, ownIncome: 0, careFees: 0 };
 
   for (let day = 0; day < opts.days; day++) {
     for (const cmd of profile.decide(state, prng)) {
@@ -95,6 +121,8 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
         }
       }
     }
+    const before = new Map(state.citizens.map((c) => [c.id, { age: c.age, name: c.name }]));
+    const dayStart = state.tick;
     for (let h = 0; h < TICKS_PER_DAY; h++) {
       step(state);
       // 2.0: el turno se responde en cuanto se abre (como haría la IA a tiempo).
@@ -104,6 +132,20 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
       }
     }
     if (state.bankrupt && bankruptDay === null) bankruptDay = day + 1;
+    // 2.4: vida del día (nacimientos por hogar, despedidas y marchas).
+    const babies = new Set<string>();
+    for (const c of state.citizens) for (const t of c.kids ?? []) if (t > dayStart) babies.add(`${c.homeId}:${t}`);
+    life.births += babies.size;
+    const alive = new Set(state.citizens.map((c) => c.id));
+    for (const [id, c] of before) {
+      if (alive.has(id)) continue;
+      const died = state.events.some((e) => e.tick > dayStart && e.text.startsWith(`Nos ha dejado ${c.name},`));
+      if (died) life.deaths++;
+      else {
+        life.left++;
+        if (c.age >= CARE.elderAge) life.eldersLeft++;
+      }
+    }
     // 2.2: al cerrar cada mes, las ventas del mes de cada tipo de empresa (b.books).
     if (state.tick % TICKS_PER_MONTH === 0) {
       const year = Math.ceil(state.tick / TICKS_PER_MONTH / 12);
@@ -126,6 +168,16 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
       t.rural += state.tourism.lastRural ?? 0;
       t.houses = Math.max(t.houses, ruralHomes(state).length);
       t.ruralPct = Math.max(t.ruralPct, Math.round(ruralShare(state) * 1000) / 10);
+      // 2.4: el río a la salida.
+      let rv = river.years.find((r) => r.year === year);
+      if (!rv) river.years.push((rv = { year, exitAvg: 0, exitMax: 0, sewage: 0, renewables: 0, fines: 0 }));
+      const exit = riverExit(state);
+      const m = ((state.tick / TICKS_PER_MONTH - 1) % 12) + 1;
+      rv.exitAvg = Math.round((rv.exitAvg * (m - 1) + exit) / m);
+      rv.exitMax = Math.max(rv.exitMax, exit);
+      rv.sewage = state.buildings.filter((b) => b.kind === 'sewage' && b.built).length;
+      rv.renewables = state.buildings.filter((b) => (b.kind === 'solar' || b.kind === 'wind') && b.built).length;
+      rv.fines += -(state.stats.at(-1)?.breakdown['multa del río'] ?? 0);
     }
     // 2.2: al cerrar cada mes, la nota y la carga.
     for (const t of state.loanLedger.treasuryTicks) {
@@ -137,6 +189,11 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
     const closed = state.stats.at(-1)?.month ?? 0;
     if (closed !== statsSeen) {
       statsSeen = closed;
+      const m = state.stats.at(-1)!;
+      life.ownIncome += ownIncome(m);
+      life.busFares += m.breakdown['autobús'] ?? 0;
+      life.careFees += (m.breakdown['guardería'] ?? 0) + (m.breakdown['residencia'] ?? 0);
+      life.pensions += state.citizens.filter((c) => c.age >= CARE.pensionAge && c.jobId === null).length * CARE.pension;
       loans.months[state.rating]++;
       if (RATINGS.indexOf(state.rating) > RATINGS.indexOf(loans.worst)) loans.worst = state.rating;
       const load = loanLoad(state);
@@ -182,6 +239,8 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
       loans,
       scenario: { id: state.scenario.id, terrain: opts.terrain ?? 'aleatorio', done: state.scenario.done, won: !!state.scenario.won, month: scenarioMonth },
       tourism,
+      river,
+      life,
     },
   };
 }

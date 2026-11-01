@@ -3061,6 +3061,19 @@ function buildingSpec(kind: string, id: number, rank = VILLA_RANK): [string, () 
     // 2.3: el patrimonio (en el mapa, render usa heritageSprite con su forma; aquí, el rollo).
     case 'heritage':
       return ['heritage-rollo', rollo];
+    // 2.4 «Vida».
+    case 'nursery':
+      return ['nursery', () => nurseryPix(27)];
+    case 'residence':
+      return ['residence', () => residencePix(28)];
+    case 'busstation':
+      return ['busstation', () => busStationPix(29)];
+    case 'sewage':
+      return ['sewage', () => sewagePix(30)];
+    case 'solar':
+      return ['solar', () => solarPix(31)];
+    case 'wind':
+      return ['wind-0', () => windPix(0)];
     case 'factory':
       return [`factory${id % 4}`, () => factory(id % 4)];
     // 2.2: sin saber el cultivo, una finca de cereal (el render usa farmSprite con el suyo).
@@ -3816,7 +3829,7 @@ export function fireTruckPix(frame: number, dir: 1 | -1): Pix {
   }
   return p;
 }
-export const fireTruckSprite = (frame: number, dir: 1 | -1, tod: TimeOfDay = 'day') => sprite(`camion-${frame % 2}-${dir}`, () => fireTruckPix(frame, dir), tod);
+export const fireTruckSprite = (frame: number, dir: 1 | -1, tod: TimeOfDay = 'day') => sprite(`bomberos-${frame % 2}-${dir}`, () => fireTruckPix(frame, dir), tod);
 
 /** Ambulancia por la calle, 13×9 (sin destellos: la luz azul está quieta). */
 export function ambulancePix(frame: number, dir: 1 | -1): Pix {
@@ -4397,3 +4410,268 @@ export function landmarkSprite(kind: string, done: number, phases: number, tod: 
   const key = `lm-${kind}-${done}-${phases}-${horizontal ? 'h' : 'v'}`;
   return snow ? sprite(`snow-${key}`, () => snowify(make()), tod) : sprite(key, make, tod);
 }
+
+/* ======================= 2.4 «Vida»: cuidados, agua, energía y transporte ======================= */
+
+/** Línea de un píxel (Bresenham) con el color dado. */
+function line(p: Pix, x0: number, y0: number, x1: number, y1: number, c: number): void {
+  x0 = Math.round(x0);
+  y0 = Math.round(y0);
+  x1 = Math.round(x1);
+  y1 = Math.round(y1);
+  const dx = Math.abs(x1 - x0);
+  const dy = -Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1;
+  const sy = y0 < y1 ? 1 : -1;
+  let err = dx + dy;
+  for (;;) {
+    p.set(x0, y0, c);
+    if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * err;
+    if (e2 >= dy) {
+      err += dy;
+      x0 += sx;
+    }
+    if (e2 <= dx) {
+      err += dx;
+      y0 += sy;
+    }
+  }
+}
+
+/** Guardería: casita amarilla con tejado rojo, tobogán, arenero y valla de colores. */
+function nurseryPix(seed: number): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 10, 26, 20, 19);
+  facade(p, 10, 28, 20, 16, MAT.yellow, 'plaster', seed);
+  gableRoof(p, 8, 19, 24, 4, 7, RED_TILE);
+  // Rótulo con tres cubos de letras (rojo, azul, verde).
+  p.rect(13, 30, 14, 4, 12);
+  p.rect(14, 31, 3, 2, 2);
+  p.rect(18, 31, 3, 2, 10);
+  p.rect(22, 31, 3, 2, 6);
+  windowAt(p, 13, 36, 3, 3, { frame: 12, flowers: true });
+  windowAt(p, 25, 36, 3, 3, { frame: 12 });
+  doorAt(p, 18, 36, 4, 7, MAT.blue, 12);
+  // Tobogán: escalera, plataforma y la rampa roja.
+  p.vline(2, 31, 13, MAT.metal[2]);
+  p.vline(4, 31, 13, MAT.metal[2]);
+  for (let y = 33; y < 44; y += 2) p.hline(2, y, 3, MAT.metal[1]);
+  p.hline(1, 31, 5, MAT.wood[1]);
+  line(p, 5, 31, 9, 42, MAT.red[1]);
+  line(p, 6, 31, 10, 42, MAT.red[2]);
+  p.hline(9, 43, 2, MAT.red[2]);
+  // Arenero con un cubo.
+  p.rect(1, 44, 8, 3, MAT.wood[2]);
+  p.rect(2, 45, 6, 1, 21);
+  p.set(4, 44, 10);
+  // Valla de colores.
+  for (let x = 11; x < 31; x += 2) p.vline(x, 45, 2, [2, 4, 10, 6][(x >> 1) % 4]!);
+  p.hline(11, 46, 20, MAT.wood[2]);
+  return p;
+}
+
+/** Residencia de mayores: dos plantas, balcón corrido con flores, banco con un abuelo y rampa. */
+function residencePix(seed: number): Pix {
+  const p = new Pix(T, BH);
+  castShadow(p, 2, 16, 28, 30);
+  facade(p, 2, 20, 28, 25, MAT.cream, 'plaster', seed);
+  gableRoof(p, 1, 10, 30, 4, 8, MAT.terracotta);
+  // Planta alta: cuatro ventanas con flores y el balcón corrido.
+  for (const x of [5, 11, 18, 24]) windowAt(p, x, 23, 3, 4, { frame: 12, flowers: true });
+  p.hline(3, 30, 26, MAT.wood[2]);
+  for (let x = 3; x < 29; x += 2) p.set(x, 29, MAT.wood[1]);
+  // Planta baja: ventanas, puerta acristalada y rampa.
+  windowAt(p, 5, 34, 3, 4, { frame: 12 });
+  windowAt(p, 24, 34, 3, 4, { frame: 12 });
+  p.rect(12, 34, 8, 10, MAT.glass[2]);
+  p.rect(12, 34, 8, 4, MAT.glass[1]);
+  p.vline(16, 34, 10, 12);
+  p.frame(11, 33, 10, 12, 12);
+  // Placa verde (centro de mayores).
+  p.rect(14, 31, 4, 2, MAT.moss[1]);
+  p.set(15, 31, 12);
+  line(p, 21, 44, 26, 41, MAT.stone[1]);
+  p.hline(21, 45, 7, MAT.stone[2]);
+  // Banco con un abuelo de pelo gris y su bastón.
+  p.hline(1, 46, 8, MAT.wood[1]);
+  p.set(1, 47, MAT.wood[3]);
+  p.set(8, 47, MAT.wood[3]);
+  person(p, 3, 39, MAT.plum[1], C.hairGray);
+  p.vline(8, 41, 5, MAT.wood[3]);
+  p.set(7, 41, MAT.wood[3]);
+  bush(p, 29, 45, 2.5, seed, true);
+  return p;
+}
+
+/** Autobús interurbano de 16×8: blanco con franja azul, ventanillas y ruedas que giran. */
+export function busPix(frame: number, dir: 1 | -1): Pix {
+  const p = new Pix(16, 8);
+  const fx = (x: number) => (dir === 1 ? x : 15 - x);
+  const set = (x: number, y: number, c: number) => p.set(fx(x), y, c);
+  const rect = (x: number, y: number, w: number, h: number, c: number) => {
+    for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) set(i, j, c);
+  };
+  for (let x = 1; x < 15; x++) set(x, 7, 24); // sombra
+  rect(0, 1, 16, 5, 12);
+  rect(0, 0, 15, 1, 31);
+  // Ventanillas con montantes y el parabrisas delante.
+  rect(1, 2, 12, 2, MAT.glass[1]);
+  for (let x = 4; x < 13; x += 3) rect(x, 2, 1, 2, 12);
+  rect(13, 1, 3, 3, MAT.glass[0]);
+  set(15, 1, MAT.glass[2]);
+  rect(0, 4, 16, 1, MAT.blue[1]);
+  rect(0, 5, 16, 1, 13);
+  set(15, 4, 4); // faro
+  set(0, 4, MAT.red[1]); // piloto
+  for (const x of [2, 11]) {
+    rect(x, 5, 2, 2, 0);
+    set(x + (frame % 2), 6, 55);
+  }
+  return p;
+}
+export const busSprite = (frame: number, dir: 1 | -1, tod: TimeOfDay = 'day') => sprite(`autobus-${frame % 2}-${dir}`, () => busPix(frame, dir), tod);
+
+/** Estación de autobuses: caseta con taquilla, marquesina con andén, señal azul y un autobús parado. */
+function busStationPix(seed: number): Pix {
+  const p = new Pix(T, BH);
+  // Andén de asfalto con las plazas pintadas.
+  p.rect(0, 36, 32, 11, MAT.stone[2]);
+  p.dither(0, 36, 32, 11, MAT.stone[3], seed % 2);
+  p.hline(0, 36, 32, MAT.stone[1]);
+  for (let x = 1; x < 32; x += 4) p.hline(x, 46, 2, 12);
+  // Caseta con taquilla.
+  castShadow(p, 1, 22, 13, 14);
+  facade(p, 1, 23, 13, 13, MAT.white, 'plaster', seed);
+  flatRoof(p, 0, 19, 15, 5, MAT.blue, seed);
+  windowAt(p, 3, 28, 4, 3, { frame: 12 });
+  doorAt(p, 9, 28, 3, 7, MAT.blue, 12);
+  // Rótulo azul.
+  p.rect(3, 24, 9, 2, MAT.blue[1]);
+  p.hline(4, 24, 2, 12);
+  p.hline(7, 25, 4, 12);
+  // Marquesina: dos postes y la cubierta.
+  p.vline(16, 27, 10, MAT.metal[2]);
+  p.vline(30, 27, 10, MAT.metal[2]);
+  p.rect(15, 24, 17, 3, MAT.teal[1]);
+  p.hline(15, 24, 17, MAT.teal[0]);
+  p.hline(15, 26, 17, MAT.teal[3]);
+  p.hline(17, 33, 12, MAT.wood[1]); // banco
+  // Señal de parada en su poste.
+  p.vline(26, 12, 12, MAT.metal[2]);
+  p.ball(26, 11, 2.6, MAT.blue, seed);
+  p.set(26, 11, 12);
+  p.set(25, 10, 12);
+  // Autobús parado en el andén.
+  p.blit(busPix(0, -1), 15, 37);
+  return p;
+}
+
+/** Depuradora: dos balsas redondas (una con el puente que gira), caseta de control y tubería. */
+function sewagePix(seed: number): Pix {
+  const p = new Pix(T, BH);
+  const tank = (cx: number, cy: number, rx: number, ry: number) => {
+    p.ellipse(cx, cy + 1, rx + 1, ry + 1, MAT.stone[3]);
+    p.ellipse(cx, cy, rx + 1, ry + 1, MAT.stone[1]);
+    p.ellipse(cx, cy, rx, ry, C.waterDeep);
+    p.ellipse(cx - 1, cy - 1, rx - 2, ry - 2, 7);
+    p.dither(cx - rx + 2, cy - 1, rx * 2 - 4, 2, 63, seed % 2);
+  };
+  tank(10, 37, 9, 6);
+  tank(23, 25, 7, 5);
+  // Puente giratorio de la balsa grande.
+  p.hline(2, 37, 17, MAT.metal[1]);
+  p.hline(2, 38, 17, MAT.metal[3]);
+  p.rect(9, 35, 3, 3, MAT.metal[0]);
+  // Caseta de control.
+  castShadow(p, 22, 36, 9, 9);
+  facade(p, 22, 37, 9, 9, MAT.white, 'plaster', seed);
+  flatRoof(p, 21, 34, 11, 4, MAT.teal, seed);
+  windowAt(p, 24, 40, 2, 2, { frame: 12 });
+  p.rect(28, 41, 2, 5, MAT.teal[2]);
+  // Tubería de la balsa pequeña a la grande.
+  p.hline(14, 30, 5, MAT.metal[2]);
+  p.vline(14, 30, 3, MAT.metal[2]);
+  p.set(18, 30, MAT.metal[0]);
+  return p;
+}
+
+/** Placas solares: tres filas de paneles azules con su cuadrícula, patas y el inversor. */
+function solarPix(seed: number): Pix {
+  const p = new Pix(T, BH);
+  for (const [i, y] of [[0, 21], [1, 29], [2, 37]] as const) {
+    const x = 2 + (i % 2);
+    p.shadow(x + 1, y + 7, 26, 2);
+    p.rect(x, y, 27, 6, MAT.blue[2]);
+    p.hline(x, y, 27, MAT.glass[0]);
+    p.hline(x, y + 1, 27, MAT.blue[1]);
+    for (let k = x + 4; k < x + 27; k += 5) p.vline(k, y, 6, MAT.blue[3]);
+    p.hline(x, y + 3, 27, MAT.blue[3]);
+    p.hline(x, y + 5, 27, MAT.metal[2]);
+    p.set(x + 1 + Math.floor(hash(seed, i) * 24), y + 2, 12); // reflejo
+    for (const lx of [x + 2, x + 24]) p.vline(lx, y + 6, 2, MAT.metal[3]);
+  }
+  // Inversor con su piloto verde.
+  p.rect(26, 44, 4, 3, MAT.metal[1]);
+  p.set(27, 45, 6);
+  return p;
+}
+
+/**
+ * Molino de viento (aerogenerador) de 32×48: torre blanca que se estrecha,
+ * góndola y tres aspas. `frame` (0–2) gira las aspas 40° cada vez (con tres
+ * aspas, a los 120° se repite).
+ */
+function windPix(frame: number): Pix {
+  const p = new Pix(T, BH);
+  p.ellipse(16, 46, 5, 1.5, MAT.stone[2]);
+  p.shadow(18, 44, 6, 2);
+  for (let y = 13; y < 46; y++) {
+    const w = 2 + Math.floor((y - 13) / 11);
+    const x0 = 16 - Math.floor(w / 2);
+    p.hline(x0, y, w, 12);
+    p.set(x0 + w - 1, y, 13);
+    p.set(x0, y, 31);
+  }
+  p.hline(15, 40, 3, MAT.red[1]); // franja
+  p.rect(15, 42, 2, 3, MAT.metal[2]); // puerta
+  // Góndola.
+  p.rect(15, 10, 7, 3, 12);
+  p.hline(15, 12, 7, 13);
+  p.set(21, 10, 13);
+  // Aspas.
+  const hx = 15;
+  const hy = 11;
+  for (let k = 0; k < 3; k++) {
+    const a = ((frame % 3) * 40 + k * 120 - 90) * (Math.PI / 180);
+    line(p, hx, hy, hx + Math.cos(a) * 11, hy + Math.sin(a) * 11, 31);
+    line(p, hx + Math.cos(a + 1.2), hy + Math.sin(a + 1.2), hx + Math.cos(a) * 6 + Math.cos(a + 1.2), hy + Math.sin(a) * 6 + Math.sin(a + 1.2), 13);
+  }
+  p.ball(hx + 0.5, hy + 0.5, 1.6, MAT.metal, 3);
+  return p;
+}
+
+/** 2.4: el molino con las aspas en la posición `frame` (0–2), con nieve si toca. */
+export function windSprite(frame: number, tod: TimeOfDay = 'day', snow = false): HTMLCanvasElement {
+  const f = ((frame % 3) + 3) % 3;
+  return snow ? sprite(`snow-wind-${f}`, () => snowify(windPix(f)), tod) : sprite(`wind-${f}`, () => windPix(f), tod);
+}
+
+/** Hoguera de San Juan de 16×16: troncos cruzados y llamas (2 fotogramas, sin destellos). */
+export function bonfirePix(frame: number): Pix {
+  const p = new Pix(16, 16);
+  p.ellipse(8, 14, 7, 1.5, 24);
+  line(p, 2, 14, 13, 10, MAT.wood[3]);
+  line(p, 3, 10, 14, 14, MAT.wood[2]);
+  line(p, 2, 13, 13, 9, MAT.wood[1]);
+  const f = frame % 2;
+  p.ellipse(8, 9 - f, 4, 4, MAT.red[1]);
+  p.ellipse(8 - f, 8 - f, 3, 3.5, 3);
+  p.ellipse(8, 8, 1.6, 2.6, 4);
+  p.set(8 - f, 3 + f, 3);
+  p.set(6 + 2 * f, 4, 2);
+  p.set(8, 6, 12);
+  p.set(11 - f, 2, 4);
+  return p;
+}
+export const bonfireSprite = (frame: number, tod: TimeOfDay = 'day') => sprite(`hoguera-${frame % 2}`, () => bonfirePix(frame), tod);

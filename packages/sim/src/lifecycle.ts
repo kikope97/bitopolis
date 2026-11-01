@@ -24,6 +24,8 @@ import { pushEvent } from './state.ts';
 import { freeHomes, newResident } from './tick.ts';
 import { tryAmbulance } from './fire.ts';
 import { tendersForget } from './tenders.ts';
+import { birthFx, nurseryUse, onBirth } from './care.ts';
+import { CARE } from './balance.ts';
 
 /**
  * Ciclo vital (v1.5): cumpleaños, nacimientos, hijos que se independizan,
@@ -138,7 +140,8 @@ export function lifeDay(state: GameState): void {
     // v1.7: con polideportivo cerca de casa, los mayores se cuidan más.
     const home = state.buildings.find((b) => b.id === c.homeId);
     const fit = home && state.buildings.some((b) => countsAsSports(b) && b.built && Math.abs(b.x - home.x) + Math.abs(b.y - home.y) <= 8);
-    const p = Math.min(DEATH_RATE_MAX, (c.age - DEATH_START_AGE + 2) * DEATH_RATE_PER_YEAR_OVER) * (fit ? 1 - SOCIAL_PLACES.sportsHealth : 1);
+    // 2.4: en la residencia, bien atendidos (×0,8).
+    const p = Math.min(DEATH_RATE_MAX, (c.age - DEATH_START_AGE + 2) * DEATH_RATE_PER_YEAR_OVER) * (fit ? 1 - SOCIAL_PLACES.sportsHealth : 1) * (c.care === 'residencia' ? CARE.residenceDeathFx : 1);
     if (chance(state.rng, p)) {
       // 2.1: es una urgencia; con ambulancia que llegue a tiempo, la despedida se pospone (un año).
       if (tryAmbulance(state, c)) return;
@@ -150,6 +153,8 @@ export function lifeDay(state: GameState): void {
 
 /** Cada mes: nacimientos (parejas que viven juntas y, en general, adultos jóvenes). */
 export function lifeMonth(state: GameState): void {
+  // 2.4: con plaza de guardería, más bebés (×1,5); la plaza queda para el bebé.
+  const nm = nurseryUse(state);
   for (const a of state.citizens) {
     if (!a.named) continue;
     for (const r of a.relations) {
@@ -160,8 +165,10 @@ export function lifeMonth(state: GameState): void {
       const kids = a.kids ?? [];
       if (Math.min(a.age, b.age) < 20 || Math.max(a.age, b.age) > 45 || kids.length >= KIDS_MAX) continue;
       if (kids.length && state.tick - kids.at(-1)! < 18 * TICKS_PER_MONTH) continue;
-      if (!chance(state.rng, BIRTH_CHANCE_COUPLE)) continue;
+      const nb = birthFx(state, a, nm);
+      if (!chance(state.rng, BIRTH_CHANCE_COUPLE * nb.fx)) continue;
       a.kids = [...(a.kids ?? []), state.tick];
+      onBirth(state, a, nm, nb.nursery);
       addMemory(state, a, 'nacio_hijo', 5, 5);
       addMemory(state, b, 'nacio_hijo', 5, 5);
       pushEvent(state, 'arrival', `¡Llega un bebé a casa de ${first(a)} y ${first(b)}!`, { ref: a.id });
@@ -170,7 +177,11 @@ export function lifeMonth(state: GameState): void {
   for (const c of state.citizens) {
     if (c.named || c.homeId === null || c.age < 20 || c.age > 42 || (c.kids ?? []).length >= KIDS_MAX) continue;
     if ((c.kids ?? []).length && state.tick - c.kids!.at(-1)! < 18 * TICKS_PER_MONTH) continue;
-    if (chance(state.rng, BIRTH_CHANCE_ADULT)) c.kids = [...(c.kids ?? []), state.tick];
+    const nb = birthFx(state, c, nm);
+    if (chance(state.rng, BIRTH_CHANCE_ADULT * nb.fx)) {
+      c.kids = [...(c.kids ?? []), state.tick];
+      onBirth(state, c, nm, nb.nursery);
+    }
   }
 }
 

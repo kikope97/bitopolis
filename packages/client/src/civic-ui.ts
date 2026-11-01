@@ -1,7 +1,7 @@
 import { tickToDate } from '@bitopolis/shared';
-import { ASSOCIATIONS, attraction, BUDGET_TEXT, BUILD, BUILD_LEVEL, type BudgetPlan, CAUSE_ASK, canHoldFestival, FESTIVAL, type GameState, grantTerms, HERITAGE_NAMES, heritageOf, heritageVariant, kidsCount, ruralHomes, ruralShare, TOURISM, touristified } from '@bitopolis/sim';
+import { ACT_NAMES, ASSOCIATIONS, attraction, canApproveFestival, type FestivalAct, type FestivalBudget, type FestivalSeason, FESTIVAL_SEASONS, programCost, SEASON_NAMES, SEASONS, seasonPossible, townShare, BUDGET_TEXT, BUILD, BUILD_LEVEL, type BudgetPlan, CAUSE_ASK, canHoldFestival, FESTIVAL, type GameState, grantTerms, HERITAGE_NAMES, heritageOf, heritageVariant, kidsCount, ruralHomes, ruralShare, TOURISM, touristified } from '@bitopolis/sim';
 import { formatDate, money } from './i18n.ts';
-import type { SocialCtx } from './social-ui.ts';
+import { openCitizen, type SocialCtx } from './social-ui.ts';
 import { confirmDialog, h, sheet } from './ui.ts';
 
 /**
@@ -11,7 +11,7 @@ import { confirmDialog, h, sheet } from './ui.ts';
 const STATUS: Record<string, string> = { open: 'por aprobar (enero)', approved: 'aprobado', prorrogado: 'prorrogado' };
 const SIZE: Record<string, string> = { none: 'aún no', pequena: 'pequeñas', grande: 'grandes', popular: 'populares (las montaron los vecinos)' };
 
-export function openTownHall(ctx: SocialCtx, focus?: 'budget' | 'festival' | 'grants' | 'associations' | 'tourism'): void {
+export function openTownHall(ctx: SocialCtx, focus?: 'budget' | 'festival' | 'seasons' | 'grants' | 'associations' | 'tourism'): void {
   const s = ctx.state();
   const b = s.budget;
   const d = tickToDate(s.tick);
@@ -120,7 +120,7 @@ export function openTownHall(ctx: SocialCtx, focus?: 'budget' | 'festival' | 'gr
   const kids = kidsCount(s);
   const census = h('p', { class: 'muted small' }, `${s.citizens.length} adultos y ${kids} ${kids === 1 ? 'niño' : 'niños'} (los niños van al colegio y a los 18 se independizan).`);
 
-  const el = sheet('Ayuntamiento', ...budget, ...assoc, ...fest, ...tourismSection(ctx, s, reopen), ...grants, h('h3', {}, 'Censo'), census);
+  const el = sheet('Ayuntamiento', ...budget, ...assoc, ...seasonsSection(ctx, s, () => openTownHall(ctx, 'seasons')), ...fest, ...tourismSection(ctx, s, reopen), ...grants, h('h3', {}, 'Censo'), census);
   // Desde un aviso, directo a su sección (ronda 11: «Aceptar» quedaba fuera de la pantalla).
   if (focus) el.querySelector(`#th-${focus}`)?.scrollIntoView({ block: 'start' });
 }
@@ -184,5 +184,108 @@ function tourismSection(ctx: SocialCtx, s: GameState, reopen: () => void): (Node
   );
   if (touristified(s)) out.push(h('p', { class: 'pol-tag' }, `Más del ${Math.round(TOURISM.touristified.share * 100)} %: los alquileres privados suben un ${Math.round(TOURISM.touristified.rent * 100)} % y los inquilinos están más descontentos (−${Math.abs(TOURISM.touristified.renterMood)} de felicidad). Una tasa más alta trae menos visitantes y frena las casas nuevas.`));
   else out.push(h('p', { class: 'muted small' }, `Las abren propietarios con ganas de negocio cuando hay visitantes de sobra. Por encima del ${Math.round(TOURISM.touristified.share * 100)} % de las viviendas, suben los alquileres. Mira la capa «Casas rurales».`));
+  return out;
+}
+
+/* ---------------- 2.4: fiestas de temporada ---------------- */
+
+/** Fiesta elegida en los chips (si no, la que se prepara o la próxima). */
+let seasonPick: FestivalSeason | null = null;
+/** Solo al refrescar la hoja desde la propia sección se conserva el chip elegido. */
+let keepPick = false;
+
+const BUDGET_LABEL: Record<FestivalBudget, string> = { nada: 'Nada', poco: 'La mitad', todo: 'Todo' };
+const MONTH_NAME = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+const when = (season: FestivalSeason) => `${SEASONS.day[season]} de ${MONTH_NAME[SEASONS.month[season]! - 1]}`;
+
+/** La próxima fiesta por fecha (desde hoy). */
+function nextSeason(s: GameState): FestivalSeason {
+  const d = tickToDate(s.tick);
+  const today = d.month * 100 + d.day;
+  return FESTIVAL_SEASONS.find((x) => SEASONS.month[x]! * 100 + SEASONS.day[x]! >= today) ?? 'romeria';
+}
+
+/**
+ * Romería, San Juan, patronales y Navidad: un chip por fiesta (44 px), la
+ * comisión de festejos (nombres que abren la ficha), el programa con su coste y
+ * los tres botones de presupuesto cuando la comisión lo pide.
+ */
+function seasonsSection(ctx: SocialCtx, s: GameState, reopen: () => void): (Node | string)[] {
+  const cur = s.seasons?.current ?? null;
+  const d = tickToDate(s.tick);
+  const live = cur && (cur.status === 'comision' || cur.status === 'aprobada') ? cur : null;
+  const sel = (keepPick ? seasonPick : null) ?? live?.season ?? nextSeason(s);
+  keepPick = false;
+  const out: (Node | string)[] = [
+    h('h3', { id: 'th-seasons' }, 'Fiestas de temporada'),
+    h('p', { class: 'muted small' }, 'Un mes antes de cada fiesta, tres vecinos forman la comisión de festejos, preparan el programa y te piden presupuesto. Lo que no pongas lo recaudan ellos (10 € por vecino).'),
+  ];
+  const chips = h('div', { class: 'seg season-chips', role: 'radiogroup', 'aria-label': 'Fiestas de temporada' });
+  for (const season of FESTIVAL_SEASONS) {
+    const on = season === sel;
+    const asks = live?.season === season && live.status === 'comision' && !!live.asked;
+    const b = h('button', { class: 'seg-btn', role: 'radio', 'aria-checked': String(on), 'data-season': season }, `${SEASON_NAMES[season]}${asks ? ' •' : ''}`);
+    b.addEventListener('click', () => {
+      seasonPick = season;
+      keepPick = true;
+      reopen();
+    });
+    chips.append(b);
+  }
+  out.push(chips);
+  const f = cur && cur.season === sel && cur.year === d.year ? cur : null;
+  const box: (Node | string)[] = [h('p', {}, h('strong', {}, SEASON_NAMES[sel]), ` · ${when(sel)}`)];
+  if (!f || f.status === 'cancelada') {
+    if (f?.status === 'cancelada' || s.seasons?.held[sel] === d.year) box.push(h('p', { class: 'muted small' }, 'Ya se celebró este año.'));
+    else if (!seasonPossible(s, sel)) box.push(h('p', { class: 'muted small' }, 'Hace falta una ermita: sin ermita no hay romería.'));
+    else box.push(h('p', { class: 'muted small' }, `La comisión se forma un mes antes (el ${SEASONS.day[sel]} de ${MONTH_NAME[SEASONS.month[sel]! - 2] ?? 'noviembre'}).`));
+    if (sel === 'patronales') box.push(h('p', { class: 'muted small' }, 'Las patronales también puedes organizarlas tú en julio o agosto (más abajo).'));
+    out.push(h('div', { class: 'petition', 'data-test': 'season-box' }, ...box));
+    return out;
+  }
+  // Comisión (nombres que abren la ficha).
+  const members = f.committee.map((id) => s.citizens.find((c) => c.id === id)).filter((c) => !!c);
+  if (members.length) {
+    const row = h('p', { class: 'season-committee' }, 'Comisión: ');
+    members.forEach((c, i) => {
+      const a = h('button', { class: 'link-btn', 'data-citizen': String(c.id) }, `${c.name}${i === 0 ? ' (al frente)' : ''}`);
+      a.addEventListener('click', () => openCitizen(ctx, c.id));
+      if (i) row.append(', ');
+      row.append(a);
+    });
+    box.push(row);
+  } else box.push(h('p', { class: 'muted small' }, 'Se está formando la comisión: los vecinos se apuntan estos días.'));
+  // Programa.
+  const acts = (f.status === 'celebrada' ? (f.held ?? []) : f.program) as FestivalAct[];
+  if (acts.length || sel === 'navidad') {
+    const list = h('ul', { class: 'season-program' });
+    if (sel === 'navidad') list.append(h('li', {}, `Luces · ${money(SEASONS.lights.cost)}`));
+    for (const a of acts) list.append(h('li', {}, `${ACT_NAMES[a]} · ${money(SEASONS.acts[a]!.cost)}`));
+    box.push(h('p', {}, f.status === 'celebrada' ? 'Se hizo:' : `Programa${f.programBy === 'ia' ? ' (lo eligió la comisión)' : ''}:`), list);
+  }
+  if (f.status === 'comision' && f.asked) {
+    box.push(h('p', {}, `Piden presupuesto: ${money(programCost(sel, f.program))} en total.`));
+    for (const budget of ['nada', 'poco', 'todo'] as FestivalBudget[]) {
+      const can = canApproveFestival(s, sel, budget);
+      const pay = townShare(sel, f.program, budget);
+      const note = budget === 'nada' ? 'fiesta popular con lo que recauden; la comisión se lo guardará' : budget === 'poco' ? 'la comisión recauda el resto; si no llega, quita actos' : 'el programa entero';
+      const btn = h('button', { class: 'btn choice', 'data-budget': budget, ...(can.ok ? {} : { 'aria-disabled': 'true' }) }, h('strong', {}, `${BUDGET_LABEL[budget]} · ${money(pay)}`), h('span', { class: 'muted small' }, ` ${can.ok ? note : can.error}`));
+      btn.addEventListener('click', async () => {
+        if (!can.ok) return;
+        seasonPick = sel;
+        keepPick = true;
+        if (await ctx.command({ type: 'ApproveFestival', season: sel, budget })) reopen();
+        else keepPick = false;
+      });
+      box.push(btn);
+    }
+    box.push(h('p', { class: 'muted small' }, `Si no contestas antes del ${when(sel)}, la comisión hará lo que pueda con lo que recaude.`));
+  } else if (f.status === 'aprobada') {
+    box.push(h('p', {}, `Presupuesto: ${BUDGET_LABEL[f.budget ?? 'nada'].toLowerCase()} (${money(townShare(sel, f.program, f.budget ?? 'nada'))}). La fiesta es el ${when(sel)}.`));
+  } else if (f.status === 'celebrada') {
+    const paid = f.paid ? ` Pagó el ayuntamiento ${money(f.paid.town)} y la comisión recaudó ${money(f.paid.collected)}.` : '';
+    box.push(h('p', { class: 'small' }, `${f.held?.length ? '' : 'Fiesta popular, sin programa. '}+${f.mood ?? 0} de felicidad${f.until && f.until > s.tick ? ` hasta el ${formatDate(tickToDate(f.until))}` : ''}.${paid}`));
+  } else box.push(h('p', { class: 'muted small' }, 'La comisión está preparando el programa.'));
+  out.push(h('div', { class: 'petition', 'data-test': 'season-box' }, ...box));
   return out;
 }

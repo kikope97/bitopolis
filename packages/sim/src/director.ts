@@ -21,6 +21,7 @@ import { FARM_NAME, farmOutlook, feastCandidates, HARVEST_NAME, hail, hailCandid
 import { offerErrand } from './errands.ts';
 import { publishEdition } from './press.ts';
 import { applyRivalPicks } from './rival-ai.ts';
+import { dilemmaDirectorCandidates, directorDilemma } from './dilemmas.ts';
 import { hash32 } from './hash.ts';
 import { debtBand, totalDebt } from './household.ts';
 import { transfer } from './money.ts';
@@ -36,10 +37,12 @@ import { streetCandidates } from './streets.ts';
 import { applyVolunteers, LANDMARK_NAMES, landmarksInProgress } from './landmarks.ts';
 import { applyTouristNoise, applyTvReport, HERITAGE_NAMES, heritageOf, heritageVariant, ruralHomes, touristNoiseCandidate, tvReportCandidate } from './tourism.ts';
 import { announceEre, bigFactory, ereCandidate, hireBatch, hireCandidates } from './region.ts';
+import { applyExcursion, excursionCandidate } from './transit.ts';
+import { startSpill, waterworksCandidates } from './waterworks.ts';
 
 const plural = (n: number) => (n === 1 ? 'un edificio' : `${n} edificios`);
 
-export const DIRECTOR_KINDS = ['robo_tienda', 'robo_casa', 'asociacion', 'manifestacion', 'pelea', 'reconciliacion', 'gratitud', 'rumor', 'oposicion', 'local', 'encuentro', 'ayuda', 'incendio', 'susto', 'ratas', 'licitacion', 'homenaje', 'cosecha', 'granizo', 'voluntarios_obra', 'polemica_obra', 'reportaje_tv', 'turistas_ruido', 'ere_gran_empresa', 'contrata_vecinos'] as const;
+export const DIRECTOR_KINDS = ['robo_tienda', 'robo_casa', 'asociacion', 'manifestacion', 'pelea', 'reconciliacion', 'gratitud', 'rumor', 'oposicion', 'local', 'encuentro', 'ayuda', 'incendio', 'susto', 'ratas', 'licitacion', 'homenaje', 'cosecha', 'granizo', 'voluntarios_obra', 'polemica_obra', 'reportaje_tv', 'turistas_ruido', 'ere_gran_empresa', 'contrata_vecinos', 'vertido', 'dilema', 'excursion'] as const;
 export type DirectorKind = (typeof DIRECTOR_KINDS)[number];
 
 export interface DirectorCandidate {
@@ -67,6 +70,8 @@ export interface DirectorChoice {
   pies?: { tick: number; kind: string; texto: string }[];
   /** 2.2: el gobierno del rival con IA (ids de `rivalMenu` y su discurso). */
   rival?: { picks: string[]; discurso: string };
+  /** 2.4: el dilema que plantea (id «dilema:…» del menú) y cómo lo presenta (validado; las opciones las pone el motor). */
+  dilema?: { id: string; presentacion: string };
 }
 
 const first = (c: Citizen) => c.name.split(' ')[0]!;
@@ -289,6 +294,13 @@ export function directorMenu(state: GameState): DirectorCandidate[] {
     const [a, b] = founders;
     if (relation(a!, b!.id)?.kind !== 'pareja') out.push({ id: `local:${pairId(a!.id, b!.id)}`, kind: 'local', bad: false, text: `${first(a!)} y ${first(b!)} quieren el mismo local para abrir un negocio`, why: 'solo queda un local libre' });
   }
+  // 2.4 (bloque C): vertidos al río.
+  out.push(...waterworksCandidates(state));
+  // 2.4: dilemas (cupo propio: uno al mes; no hace falta avisarlos).
+  add(dilemmaDirectorCandidates(state).map((c) => ({ ...c, kind: 'dilema' as const, bad: false })));
+  // 2.4: excursión de jubilados en autobús (buena).
+  const trip = excursionCandidate(state);
+  if (trip) out.push({ ...trip, kind: 'excursion', bad: false });
   return out;
 }
 
@@ -412,25 +424,34 @@ export function applyDirector(state: GameState, choice: DirectorChoice): TurnLog
   for (const s of choice.sucesos) {
     const c = menu.find((m) => m.id === s.id);
     if (!c || used.has(c.id) || total <= 0) continue;
-    if (c.bad) {
+    // Ronda 20: un dilema tiene su propio cupo (uno al mes, `canOpenDilemma`): no gasta drama
+    // (si no, un pueblo contento no tenía nunca dilemas con IA) ni hace falta avisarlo.
+    if (c.kind === 'dilema') {
+      // sin cupo de drama
+    } else if (c.bad) {
       // Lo malo, solo si se avisó en un turno anterior y cabe en el presupuesto.
       const warned = brewing.find((b) => b.id === c.id && b.since < opened);
       if (!warned || bad <= 0) continue;
       bad--;
     } else if (good-- <= 0) continue;
-    const line = perform(state, c);
+    const line = c.kind === 'dilema' ? directorDilemma(state, c.id, choice.dilema?.id === c.id ? choice.dilema.presentacion : undefined) : perform(state, c);
     if (!line) continue;
     used.add(c.id);
     total--;
-    if (c.bad) ai.drama.bad++;
+    if (c.kind === 'dilema') {
+      // no cuenta como drama
+    } else if (c.bad) ai.drama.bad++;
     else ai.drama.good++;
     ai.brewing = (ai.brewing ?? []).filter((b) => b.id !== c.id);
     lines.push({ ...line, motivo: clean(s.motivo) });
   }
+  // 2.4: el dilema elegido aparte (con su presentación), si cabe en el cupo de drama.
+  const dl = applyDirectorDilemma(state, choice, menu, used, total);
+  if (dl) lines.push(dl);
   // Avisos nuevos (lo que podría pasar: el jugador aún puede reaccionar).
   for (const a of choice.avisos) {
     const c = menu.find((m) => m.id === a.id);
-    if (!c || used.has(c.id) || (ai.brewing ?? []).some((b) => b.id === c.id) || (ai.brewing ?? []).length >= DIRECTOR.maxBrewing) continue;
+    if (!c || c.kind === 'dilema' || used.has(c.id) || (ai.brewing ?? []).some((b) => b.id === c.id) || (ai.brewing ?? []).length >= DIRECTOR.maxBrewing) continue;
     ai.brewing = [...(ai.brewing ?? []), { id: c.id, text: brewingText(c), since: state.tick, bad: c.bad }];
   }
   // 2.1: El Eco de esta semana (lo escribe el director) y el encargo con su carta.
@@ -479,6 +500,8 @@ function brewingText(c: DirectorCandidate): string {
       return `Hay vecinos hartos del jaleo de los turistas (${c.why})`;
     case 'ere_gran_empresa':
       return `En la fábrica grande se habla de recortes: ${c.why}`;
+    case 'vertido':
+      return `Los pescadores dicen que el agua baja rara junto a ${c.text.replace(' vierte al río sin depurar', '')}: ${c.why}`;
     default:
       return c.text;
   }
@@ -680,6 +703,16 @@ function perform(state: GameState, c: DirectorCandidate): { id: number; text: st
       if (!hireBatch(state, DIRECTOR.hireBatch)) return null;
       return { id: state.citizens.find((x) => x.jobId === Number(arg) && !before.has(x.id))?.id ?? 0, text: c.text };
     }
+    case 'vertido': {
+      const id = Number(arg);
+      if (!startSpill(state, id)) return null;
+      return { id: state.citizens.find((x) => x.jobId === id)?.id ?? 0, text: c.text };
+    }
+    case 'dilema':
+      // Lo abre `directorDilemma` (con la presentación del director).
+      return null;
+    case 'excursion':
+      return applyExcursion(state);
     case 'local': {
       const [a, b] = pair();
       if (!a || !b) return null;
@@ -693,6 +726,21 @@ function perform(state: GameState, c: DirectorCandidate): { id: number; text: st
 /** Para el prompt y para «Se está cociendo»: avisos vigentes. */
 export function brewingNow(state: GameState, menu = directorMenu(state)): Brewing[] {
   return liveBrewing(state, menu);
+}
+
+/**
+ * 2.4: el dilema que el director eligió en `dilema` (si no lo puso ya en
+ * `sucesos`). Gasta un hueco del cupo de drama malo y del total de la semana.
+ */
+function applyDirectorDilemma(state: GameState, choice: DirectorChoice, menu: DirectorCandidate[], used: Set<string>, total: number): TurnLog['lines'][number] | null {
+  const pick = choice.dilema;
+  if (!pick?.id || used.has(pick.id) || total <= 0) return null;
+  const c = menu.find((m) => m.id === pick.id && m.kind === 'dilema');
+  if (!c) return null;
+  const line = directorDilemma(state, c.id, pick.presentacion || undefined);
+  if (!line) return null;
+  used.add(c.id);
+  return line;
 }
 
 setDirectorImpl(applyDirector);

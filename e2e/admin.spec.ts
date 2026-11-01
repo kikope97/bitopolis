@@ -90,7 +90,7 @@ test('admin: primer acceso, ajustes que valen al momento y vista móvil', async 
   // IA del servidor: un endpoint propio (el LLM falso) y probar la conexión.
   const ia = page.getByRole('region', { name: 'IA' });
   await ia.getByText('Avanzado: endpoint propio y precios').click();
-  await ia.getByLabel('Endpoint propio (Ollama, LM Studio…)').fill('http://localhost:8099/v1');
+  await ia.getByLabel('Endpoint propio (Ollama, LM Studio…)').fill(`http://localhost:${process.env.PW_LLM_PORT ?? 8099}/v1`);
   await ia.getByLabel('Vecinos con nombre en Modo normal (1–20)').fill('6');
   await ia.getByLabel('Servidor al mes').fill('5');
   // 2.0: % de vecinos que piensan con IA y modo de los turnos.
@@ -137,7 +137,7 @@ test('admin: primer acceso, ajustes que valen al momento y vista móvil', async 
   await shot('3-ia');
   await page.getByRole('region', { name: 'IA' }).getByText('Avanzado: endpoint propio y precios').click();
   // Si la lista falla (este endpoint no da /models), aviso claro y vuelta al campo de texto.
-  await ia.getByLabel('Endpoint propio (Ollama, LM Studio…)').fill('http://localhost:8099/nada');
+  await ia.getByLabel('Endpoint propio (Ollama, LM Studio…)').fill(`http://localhost:${process.env.PW_LLM_PORT ?? 8099}/nada`);
   await ia.getByLabel('Endpoint propio (Ollama, LM Studio…)').press('Tab');
   await expect(ia.locator('.models-status')).toContainText('No se pudo cargar la lista de modelos');
   await expect(vecinos).toHaveJSProperty('tagName', 'INPUT');

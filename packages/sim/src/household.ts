@@ -2,6 +2,7 @@ import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { stationJobsFx } from './landmarks.ts';
 import { regionFx } from './region.ts';
 import {
+  CARE,
   DEBT,
   GRUDGE_MAX,
   JOBS_OUTSIDE,
@@ -16,6 +17,8 @@ import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance } from './prng.ts';
 import { addMemory } from './social.ts';
 import { type Building, type Citizen, type CitizenDebt, type GameState, pushEvent } from './state.ts';
+import { isRetired, nurseryUse, raisingAtHome } from './care.ts';
+import { transitJobs } from './transit.ts';
 
 /**
  * v1.9 (petición del creador): la economía de cada vecino. Cada uno tiene su
@@ -186,7 +189,8 @@ function spend(state: GameState, c: Citizen, amount: number, shops: Building[]):
 
 /** Gasto básico (comida, ropa, transporte): lo primero que paga cada vecino. */
 export function basicLiving(state: GameState, shops: Building[]): void {
-  for (const c of state.citizens) spend(state, c, LIVING_BASIC, shops);
+  // 2.4: en la residencia la comida va incluida (gastan menos).
+  for (const c of state.citizens) spend(state, c, c.care === 'residencia' ? LIVING_BASIC * CARE.residence.livingShare : LIVING_BASIC, shops);
 }
 
 /** Tras vivienda y tributos: devolver deudas y, si le queda colchón, algo de ocio. */
@@ -239,21 +243,24 @@ export function outsideJobsFx(state: GameState): number {
 
 /** Paro real: quien no trabaja en el pueblo puede perder su trabajo de fuera, o encontrar uno. */
 export function outsideJobsMonth(state: GameState): void {
+  // 2.4: con estación de autobuses se encuentra y se conserva mejor (transit.ts); los jubilados ya no buscan.
+  const odds = transitJobs(state);
+  const nm = nurseryUse(state);
   for (const c of state.citizens) {
-    if (c.jobId !== null) {
+    if (c.jobId !== null || isRetired(c)) {
       delete c.unemployedSince;
       delete c.benefitLeft;
       continue;
     }
     if (c.unemployedSince === undefined) {
-      if (chance(state.rng, JOBS_OUTSIDE.loseChance / outsideJobsFx(state))) {
+      if (chance(state.rng, odds.lose / outsideJobsFx(state))) {
         c.unemployedSince = state.tick;
         c.benefitLeft = JOBS_OUTSIDE.benefitMonths;
         // Ronda 15: que el paro deje rastro (recuerdo y, con nombre, en el diario).
         addMemory(state, c, 'en_paro', 4, -4);
         if (c.named) pushEvent(state, 'info', `${c.name} se queda sin su trabajo de fuera: cobrará el paro ${JOBS_OUTSIDE.benefitMonths} meses`, { ref: c.id });
       }
-    } else if (chance(state.rng, Math.min(0.95, JOBS_OUTSIDE.findChance * outsideJobsFx(state)))) {
+    } else if (!raisingAtHome(state, c, nm) && chance(state.rng, Math.min(0.95, odds.find * outsideJobsFx(state)))) {
       delete c.unemployedSince;
       delete c.benefitLeft;
     } else if ((c.benefitLeft ?? 0) > 0) {

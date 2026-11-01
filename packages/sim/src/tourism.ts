@@ -1,4 +1,5 @@
 import { TICKS_PER_MONTH, tickToDate } from '@bitopolis/shared';
+import { busVisitorsFx } from './transit.ts';
 import type { CommandResult } from './commands.ts';
 import { LANDMARKS, REGION, TOURISM } from './balance.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
@@ -179,7 +180,8 @@ export function expectedVisitors(state: GameState, month = tickToDate(state.tick
     if (l.kind !== 'fair' || l.phases <= 0 || month !== LANDMARKS.effects.fair.month) continue;
     fair = Math.max(fair, 1 + ((LANDMARKS.effects.fair.visitors - 1) * Math.min(l.phase, l.phases)) / l.phases);
   }
-  return Math.round(a.total * TOURISM.perAttract * region * tax * tv * fair);
+  // 2.4: con estación de autobuses, más visitantes.
+  return Math.round(a.total * TOURISM.perAttract * region * tax * tv * fair * busVisitorsFx(state));
 }
 
 /* ---------------- casas rurales ---------------- */

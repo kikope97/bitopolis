@@ -39,6 +39,13 @@ export const BUILD: Record<BuildKind, BuildSpec> = {
   cleanpoint: { materials: 2_500, workers: 3, days: 3, unlockPop: 30 }, // ronda 17: con 20 frenaba el crecimiento
   // 2.3: patrimonio (uno por partida, nivel 3; su forma sale del terreno). Atractivo en TOURISM.heritage.
   heritage: { materials: 9_000, workers: 5, days: 5, unlockPop: 40 },
+  // 2.4 (provisional; los afina cada bloque): cuidados, autobús, depuradora y renovables.
+  nursery: { materials: 3_500, workers: 3, days: 3, unlockPop: 30 },
+  residence: { materials: 7_000, workers: 5, days: 4, unlockPop: 45 },
+  busstation: { materials: 6_000, workers: 4, days: 4, unlockPop: 35 },
+  sewage: { materials: 8_000, workers: 4, days: 5, unlockPop: 40 },
+  solar: { materials: 2_500, workers: 2, days: 2, unlockPop: 25 },
+  wind: { materials: 3_500, workers: 3, days: 3, unlockPop: 25 },
 };
 
 /** Obras que crecen solas sobre zonas (las paga un inversor de fuera). */
@@ -89,6 +96,13 @@ export const JOBS: Record<BuildingKind, number> = {
   cathedral: 0,
   heritage: 0,
   bigfactory: 0,
+  // 2.4 (bloque A/B): con 2/4/2 empleos, un pueblo de 70 vecinos gastaba la mitad de lo que ingresaba en ellos.
+  nursery: 1,
+  residence: 2,
+  busstation: 1,
+  sewage: 1,
+  solar: 0,
+  wind: 0,
 };
 
 export const HOMES: Partial<Record<BuildingKind, number>> = { house: 3, res: 4 };
@@ -126,6 +140,14 @@ export const MAINTENANCE: Record<BuildingKind, number> = {
   cathedral: 0,
   heritage: 60,
   bigfactory: 0,
+  // 2.4: medido con pnpm sim (casual y constructor, 21 semillas, 4 años): con 250/400/300 la caja del casual caía un 25 %.
+  nursery: 100,
+  residence: 250,
+  busstation: 150,
+  sewage: 350,
+  // Ronda 20: unos 8–10 € por edificio con luz (antes salían mucho más baratas que la central).
+  solar: 120,
+  wind: 300,
 };
 
 /** Radio de cobertura de los servicios (tiles) y su efecto en la felicidad. */
@@ -1231,3 +1253,165 @@ export const ACHIEVEMENTS = {
   /** Encargos cumplidos (los cuenta `errands.medals`, 2.1): bronce, plata y oro. */
   errands: [1, 5, 15],
 } as const;
+
+/* ---------------- 2.4 «Vida» (cada bloque afina sus números) ---------------- */
+
+/** Bloque A: guardería y residencia (care.ts). Cuotas en €/mes por nivel gratis/reducida/normal. */
+export const CARE = {
+  nursery: { places: 20, radius: 8, maxAgeYears: 3, fee: { gratis: 0, reducida: 30, normal: 60 } },
+  /**
+   * Los mayores que viven solos y sin hijos en el pueblo entran solos si hay plaza: desde 75 años o, desde
+   * 70, si están tristes (felicidad < unhappyEnter). Con una cuota mayor que la pensión, solo con ahorros
+   * para `savingsMonths` meses. En la residencia, de lo básico solo gastan `livingShare` (la comida va incluida).
+   */
+  residence: { places: 12, fee: { gratis: 0, reducida: 200, normal: 400 }, unhappyEnter: 45, savingsMonths: 12, livingShare: 0.3 },
+  /** Pareja con plaza de guardería: natalidad ×1,5. Sin plaza, prob. al mes de que deje el trabajo de fuera. */
+  /** Ronda 20: con plaza, la natalidad depende de la cuota (gratis anima más a tener hijos). */
+  birthWithPlace: { gratis: 1.7, reducida: 1.5, normal: 1.25 } as Record<string, number>,
+  quitWithoutPlace: 0.15,
+  /** Pensión mínima desde los 67 años (de fuera). */
+  pension: 650,
+  pensionAge: 67,
+  /** Mayores atendidos (≥ 70): no se van, residencia ×0,8 de riesgo de morir, ánimo. */
+  elderAge: 70,
+  residenceDeathFx: 0.8,
+  caredMood: 4,
+  aloneMood: -5,
+  /** «Cuidar en casa»: el hijo pierde parte del sueldo y algo de ánimo; mejora la relación. */
+  homeCare: { wageCut: 0.2, mood: -3, relation: 2, parentAge: 75 },
+};
+
+/** Bloque B: estación de autobuses (transit.ts). */
+export const TRANSIT = {
+  /** El Consorcio paga esta parte del mantenimiento (de fuera). */
+  consortium: 0.5,
+  findChance: 0.45,
+  /** Ronda 20: el billete también cuenta: gratis ayuda a encontrar trabajo fuera, caro lo frena. */
+  findByFare: { gratis: 0.5, normal: 0.45, caro: 0.38 } as Record<string, number>,
+  freeMood: 1,
+  /** Ronda 20: lo que suma buscar trabajo fuera en autobús (además de la tirada del mes). */
+  searchBonus: 0.15,
+  loseChance: 0.02,
+  mood: 2,
+  demandR: 8,
+  /** € por viaje × días de trabajo al mes, por usuario; caro resta ánimo. */
+  fare: { gratis: 0, normal: 1, caro: 2 },
+  workDays: 20,
+  dearMood: -2,
+  /** Con turismo, visitantes ×1,25; sin él, gasto de forasteros en las tiendas (€/día por cada 10 vecinos). */
+  visitorsFx: 1.25,
+  daytripPer10: 4,
+  /** Por reglas, el parado con ambición desde este nivel busca trabajo fuera en autobús. */
+  searchAmbition: 50,
+  /** Excursión de jubilados (director, `excursion`): mínimo y máximo de jubilados, cada cuántos días, ánimo, lo que paga cada uno y, sin director, probabilidad al mes. */
+  excursion: { min: 3, max: 8, everyDays: 90, mood: 3, cost: 15, ruleChance: 0.2 },
+};
+
+/** Bloque C: el río, la depuradora y las renovables (waterworks.ts). */
+export const WATERWORKS = {
+  /** Lo que echa cada edificio a ≤ `reach` casillas del río (res/shop/factory), y lo que baja por casilla. */
+  reach: 6,
+  dump: { res: 1, shop: 2, factory: 6 } as Record<string, number>,
+  decayPerTile: 0.02,
+  sewage: { buildings: 60, clean: 0.85 },
+  /** Río > dirtyPump: la bomba pierde su +25 %; la orilla, −3. Al salir > fineAt: multa trimestral. */
+  dirtyPump: 40,
+  shoreMood: -3,
+  fineAt: 35,
+  fine: 1_500,
+  solar: { buildings: 15, winter: 0.6, snow: 0.4 },
+  wind: { buildings: 30, storm: 1.2, noise: 30, noiseRadius: 3, complainRadius: 3, retireeMood: 3, complainScore: 6 },
+  /** La orilla: casas a ≤ `shoreRadius` casillas del río (ánimo y queja «Salvemos el río»). */
+  shoreRadius: 2,
+  /** Ecologistas: satisfacción por cada renovable (hasta `greenMax`) y por tener depuradora. */
+  greenPerRenewable: 3,
+  greenMax: 9,
+  greenSewage: 4,
+  /** Vertido (director o, sin él, dados al mes): días que dura, cuánto más echa la fábrica y probabilidad por reglas. */
+  spill: { days: 10, mult: 8, ruleChance: 0.06, ecoMemory: -3 },
+};
+
+/** Bloque D: plenos hablados (texto fuera del estado) y sus reacciones. */
+export const PLENO_TALK = {
+  speakers: 4,
+  maxLine: 140,
+  reaction: { aplaude: 2, murmura: -1, abuchea: -2, se_levanta: -2 } as Record<string, number>,
+};
+
+/** Bloque D: dilemas (dilemmas.ts). Uno al mes como mucho, 7 días para decidir. */
+export const DILEMMA = {
+  perMonth: 1,
+  days: 7,
+  noDecideGrudge: 3,
+  expandCost: 3_000,
+  /** Modo normal (o sin director): % diario de que el motor abra uno si hay candidato (sin dados: hash). */
+  ruleChancePct: 15,
+  /** Por reglas, como mucho uno cada tantos meses (con director manda el cupo de drama). */
+  ruleGapMonths: 3,
+  /** Desde cuántos vecinos hay dilemas (con un pueblo recién nacido aún no). */
+  minPop: 40,
+  /** Presentación del director (IA), en caracteres. */
+  introMax: 200,
+  /** La última plaza de la residencia: ánimo de quien entra y de quien se queda fuera (y su rencor). */
+  residence: { chosenMood: 6, leftOutMood: -6, leftOutGrudge: 3, expandPlaces: 3 },
+  /** Familia con deudas: deuda mínima con el ayuntamiento; desahucio, perdón o microcrédito. */
+  family: { minDebt: 200, evictMood: -10, neighborsGrudge: 1, neighborsRadius: 4, forgiveMood: 5, microMood: 3 },
+  /** La fábrica que vierte: contaminación en su casilla y río a menos de `reach`; multa y despidos o mirar a otro lado. */
+  factory: { pollution: 40, reach: 6, fine: 1_200, fired: 2, lookAwayGrudge: 2, lookAwayMood: -2, maxNeighbors: 3 },
+  /** El preso arrepentido: días de condena que le quedan como mínimo; indulto o que cumpla. */
+  prisoner: { minDays: 10, pardonFamilyMood: 6, pardonOrderGrudge: 1, orderTerco: 60, orderMax: 6, serveFamilyMood: -3, prisonerMood: 4 },
+};
+
+/**
+ * Bloque E: fiestas de temporada (seasons.ts). Cada fiesta tiene su mes y su día;
+ * la comisión de festejos se forma el mismo día del mes anterior.
+ */
+export const SEASONS = {
+  month: { romeria: 5, sanjuan: 6, patronales: 8, navidad: 12 } as Record<string, number>,
+  day: { romeria: 15, sanjuan: 23, patronales: 15, navidad: 24 } as Record<string, number>,
+  /** Vecinos en la comisión; días que tienen los vecinos con IA para apuntarse (luego, reglas). */
+  committee: 3,
+  joinDays: 10,
+  /** Mínimo de vecinos para que haya fiesta de temporada. */
+  minPop: 5,
+  /** Lo que pone cada vecino con nombre si la comisión tiene que recaudar (solo quien lo tiene). */
+  collectPerNamed: 40,
+  budgetShare: { nada: 0, poco: 0.5, todo: 1 } as Record<string, number>,
+  nadaGrudge: 1,
+  /** Actos del programa: entre 2 y 3. */
+  programMin: 2,
+  programMax: 3,
+  /**
+   * Cada acto: coste (€), ánimo (felicidad mientras dura el recuerdo), gasto en
+   * cada tienda (€ por cada 10 vecinos) y ruido (felicidad que resta cerca de la plaza).
+   */
+  acts: {
+    verbena: { cost: 500, mood: 2, spend: 6, noise: 3 },
+    procesion: { cost: 150, mood: 2, spend: 2, noise: 0 },
+    concurso_paellas: { cost: 250, mood: 2, spend: 5, noise: 1 },
+    hoguera: { cost: 200, mood: 2, spend: 3, noise: 1 },
+    belen_viviente: { cost: 300, mood: 2, spend: 3, noise: 0 },
+    mercadillo: { cost: 200, mood: 1, spend: 12, noise: 1 },
+    fuegos: { cost: 800, mood: 3, spend: 4, noise: 2 },
+    cabalgata: { cost: 450, mood: 2, spend: 5, noise: 1 },
+  } as Record<string, { cost: number; mood: number; spend: number; noise: number }>,
+  /** Qué actos caben en cada fiesta (el primero de San Juan es siempre la hoguera). */
+  menu: {
+    romeria: ['procesion', 'concurso_paellas', 'verbena', 'mercadillo'],
+    sanjuan: ['hoguera', 'verbena', 'fuegos', 'concurso_paellas'],
+    patronales: ['verbena', 'procesion', 'concurso_paellas', 'fuegos', 'mercadillo', 'cabalgata'],
+    navidad: ['belen_viviente', 'mercadillo', 'cabalgata', 'verbena'],
+  } as Record<string, string[]>,
+  /** Navidad: las luces van siempre (antes que los actos). */
+  lights: { cost: 150, mood: 1 },
+  /** San Juan con río o mar: la hoguera junto al agua alegra más. */
+  waterBonus: 2,
+  /** Probabilidad de que la hoguera deje un riesgo de incendio (con bomberos, la mitad). */
+  bonfireRisk: 0.3,
+  /** Días que dura el recuerdo (ánimo) y el ruido de cada fiesta. */
+  moodDays: { romeria: 7, sanjuan: 7, patronales: 20, navidad: 15 } as Record<string, number>,
+  noiseDays: 3,
+  noiseRadius: 5,
+  /** Fiesta popular reducida (sin dinero para ningún acto). */
+  popularMood: 1,
+};

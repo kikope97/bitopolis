@@ -5,7 +5,7 @@ export const TaxLevel = z.enum(['low', 'medium', 'high']);
 export type TaxLevel = z.infer<typeof TaxLevel>;
 
 /** Lo que el alcalde puede construir directamente. */
-export const BuildKind = z.enum(['road', 'water', 'power', 'park', 'school', 'clinic', 'police', 'house', 'plaza', 'market', 'bar', 'chapel', 'cemetery', 'library', 'sports', 'jail', 'firestation', 'civilprotection', 'cleanpoint', 'heritage']);
+export const BuildKind = z.enum(['road', 'water', 'power', 'park', 'school', 'clinic', 'police', 'house', 'plaza', 'market', 'bar', 'chapel', 'cemetery', 'library', 'sports', 'jail', 'firestation', 'civilprotection', 'cleanpoint', 'heritage', 'nursery', 'residence', 'busstation', 'sewage', 'solar', 'wind']);
 export type BuildKind = z.infer<typeof BuildKind>;
 
 export const ZoneKind = z.enum(['none', 'R', 'C', 'I', 'A']);
@@ -99,6 +99,8 @@ export const Command = z.discriminatedUnion('type', [
           recuerdo: z.string().max(300).optional(),
           escudo: z.object({ pieza: z.string().max(20), lema: z.string().max(40) }).optional(),
           biografia: z.string().max(400).optional(),
+          /** 2.4: el programa de la comisión de festejos (si la encabeza). */
+          programa: z.array(z.string().regex(/^[a-z_]+$/).max(20)).max(3).optional(),
         }),
       )
       .max(300),
@@ -116,6 +118,8 @@ export const Command = z.discriminatedUnion('type', [
         pies: z.array(z.object({ tick: z.number().int(), kind: z.string().max(40), texto: z.string().max(200) })).max(4).optional(),
         /** 2.2: el gobierno del rival con IA (opciones de su menú y su discurso). */
         rival: z.object({ picks: z.array(z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(60)).max(2), discurso: z.string().max(300) }).optional(),
+        /** 2.4: el dilema que plantea y su presentación (las opciones las pone el motor). */
+        dilema: z.object({ id: z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(60), presentacion: z.string().max(400) }).optional(),
       })
       .optional(),
   }),
@@ -144,6 +148,11 @@ export const Command = z.discriminatedUnion('type', [
   z.object({ type: z.literal('ProtectArea'), heritageId: z.number().int().min(1) }),
   /** 2.3: responder a la oferta de la gran empresa. */
   z.object({ type: z.literal('AnswerBigCompany'), accept: z.boolean(), incentive: BigCompanyIncentive }),
+  /** 2.4: billete del autobús, cuotas de guardería/residencia, dilemas y fiestas de temporada. */
+  z.object({ type: z.literal('SetBusFare'), fare: z.enum(['gratis', 'normal', 'caro']) }),
+  z.object({ type: z.literal('SetCareFee'), service: z.enum(['nursery', 'residence']), level: z.enum(['gratis', 'reducida', 'normal']) }),
+  z.object({ type: z.literal('ResolveDilemma'), id: z.number().int().min(1), option: z.string().regex(/^[a-z_]+$/).max(30) }),
+  z.object({ type: z.literal('ApproveFestival'), season: z.enum(['romeria', 'sanjuan', 'patronales', 'navidad']), budget: z.enum(['nada', 'poco', 'todo']) }),
   /** 2.0: % de vecinos con IA (solo sube: nadie deja de pensar con IA). */
   z.object({ type: z.literal('SetAiShare'), share: z.number().int().min(0).max(100) }),
   /** 2.0: días de juego entre turnos de la IA (el cliente los alarga a x3/x10). */

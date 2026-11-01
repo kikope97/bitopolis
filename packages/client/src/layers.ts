@@ -8,7 +8,7 @@ import { T } from './sprites.ts';
  * servicios y contaminación. Cada nivel usa una trama distinta además del
  * color, para que el color nunca sea la única señal.
  */
-export type LayerId = 'none' | 'missing' | 'happiness' | 'pocket' | 'land' | 'services' | 'pollution' | 'clean' | 'rural';
+export type LayerId = 'none' | 'missing' | 'happiness' | 'pocket' | 'land' | 'services' | 'pollution' | 'clean' | 'rural' | 'river';
 
 interface LayerDef {
   id: LayerId;
@@ -23,11 +23,13 @@ const BAD: [number, number, number, number] = [12, 4, 3, 1];
 /** Azul-amarillo (tritanopia): rampa de oscuro a claro sin azul ni amarillo. */
 const GOOD_TRI: [number, number, number, number] = [1, 2, 20, 12];
 const BAD_TRI: [number, number, number, number] = [12, 21, 2, 1];
+/** 2.4: el río, de azul (limpio) a marrón (sucio). */
+const RIVER: [number, number, number, number] = [48, 49, 45, 47];
 
 /** Colores del nivel según el modo de daltonismo (la trama no cambia). */
 function levelColor(colors: [number, number, number, number], lv: number): number {
   if (prefs().colorblind !== 'azul-amarillo') return colors[lv]!;
-  return (colors === BAD ? BAD_TRI : GOOD_TRI)[lv]!;
+  return (colors === BAD || colors === RIVER ? BAD_TRI : GOOD_TRI)[lv]!;
 }
 
 export const LAYERS: LayerDef[] = [
@@ -44,6 +46,8 @@ export const LAYERS: LayerDef[] = [
   { id: 'clean', label: 'Limpieza', colors: GOOD, legend: legend(['Ratas', 'Bolsas en la calle', 'Sin camión', 'Pasa el camión'], 'good') },
   // 2.3: turismo. Casas rurales, el patrimonio con su entorno y quién paga más alquiler por ellas.
   { id: 'rural', label: 'Casas rurales', colors: GOOD, legend: legend(['Alquiler más caro', 'Vivienda', 'Patrimonio y entorno', 'Casa rural'], 'good') },
+  // 2.4: lo que baja por el río (fields.river, waterworks.ts).
+  { id: 'river', label: 'Río', colors: RIVER, legend: legend(['Limpio', 'Algo turbio', 'Sucio', 'Muy sucio'], 'river') },
 ];
 
 function legend(names: string[], kind: string) {
@@ -55,6 +59,8 @@ function values(state: GameState, layer: LayerId): (number | null)[] {
   const n = w * h;
   if (layer === 'land') return state.fields.land;
   if (layer === 'pollution') return state.fields.pollution.map((v) => (v < 3 ? null : v));
+  // 2.4: solo en las casillas de río (0 limpio … 100 muy sucio; la salida, igual).
+  if (layer === 'river') return state.map.terrain.map((t, i) => (t === 1 ? (state.fields.river?.[i] ?? 0) : null));
   if (layer === 'missing') {
     const out: (number | null)[] = new Array(n).fill(null);
     for (const m of missingMarks(state)) {

@@ -1,4 +1,6 @@
+import { gzipSync } from 'node:zlib';
 import { expect, type Page, test } from '@playwright/test';
+import { dilemmaCandidates, openDilemma, OUTSIDE, runSimulation, transfer, TREASURY } from '../packages/sim/src/index.ts';
 import { pickTool, state, tile, setSpeed, skipTutorial } from './helpers.ts';
 
 /**
@@ -182,4 +184,42 @@ test('táctil: se puede alejar como antes; muy alejado, el primer toque acerca y
   const q = await tile(page, th.x + 1, th.y + 2);
   await t.tap(q.x, q.y);
   await expect(page.locator('#confirm-bar')).toBeVisible();
+});
+
+test('táctil: el dilema se abre y se resuelve con el dedo (2.4)', async ({ page, request }, info) => {
+  // Solo con pantalla táctil: en escritorio Chrome no convierte el toque en clic sobre los botones.
+  test.skip(info.project.name !== 'movil');
+  test.setTimeout(120_000);
+  // Pueblo con un preso arrepentido y su familia (como en ia-pleno.spec.ts).
+  const { state: s } = runSimulation({ seed: 1, days: 420, profile: 'constructor' });
+  transfer(s, OUTSIDE, TREASURY, 20_000, 'subvencion');
+  s.townhallLevel = Math.max(2, s.townhallLevel ?? 1);
+  const [p, k] = s.citizens.filter((c) => c.named && c.homeId !== null);
+  k!.homeId = p!.homeId;
+  s.justice!.jail.push({ until: s.tick + 40 * 24, citizenId: p!.id });
+  openDilemma(s, dilemmaCandidates(s).find((c) => c.kind === 'preso_arrepentido')!.key);
+  const data = gzipSync(JSON.stringify({ bitopolis: 1, formatVersion: s.formatVersion, exportedAt: '', mode: 'normal', state: s }));
+  const { token } = await (await request.post('/api/import', { data, headers: { 'content-type': 'application/octet-stream' } })).json();
+  await page.setViewportSize({ width: 360, height: 780 });
+  await page.goto(`/p/${token}`);
+  await page.getByRole('button', { name: 'Continuar' }).click();
+  await skipTutorial(page);
+  await setSpeed(page, 0);
+  const t = await touch(page);
+  const tapOn = async (loc: import('@playwright/test').Locator) => {
+    await loc.scrollIntoViewIfNeeded();
+    const b = (await loc.boundingBox())!;
+    await t.tap(b.x + b.width / 2, b.y + b.height / 2);
+  };
+  await tapOn(page.locator('#menu'));
+  await tapOn(page.getByRole('button', { name: /Un asunto difícil/ }));
+  await expect(page.locator('.sheet h2')).toContainText('preso arrepentido');
+  const opt = page.getByRole('button', { name: /Pedir el indulto/ });
+  const box = (await opt.boundingBox())!;
+  expect(box.height).toBeGreaterThanOrEqual(44);
+  expect(box.width).toBeGreaterThanOrEqual(280);
+  await page.screenshot({ path: `test-results/capturas/${info.project.name}-vida-dilema-tactil-360.png` });
+  await tapOn(opt);
+  await expect(page.locator('.sheet')).toContainText('Decidiste: Pedir el indulto');
+  expect((await state(page)).dilemmas.at(-1).resolved).toBe('pedir_indulto');
 });
