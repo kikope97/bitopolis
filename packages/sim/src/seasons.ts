@@ -230,7 +230,7 @@ function closeCommittee(state: GameState, f: SeasonFestival): void {
   pushEvent(
     state,
     'politics',
-    `La comisión de festejos de ${seasonName(state, f.season)} (${names.join(', ')}) pide presupuesto: ${acts} (${programCost(f.season, f.program)} €). Pueblo › Ayuntamiento`,
+    `La comisión de festejos de ${seasonName(state, f.season)} (${names.join(', ')}) pide presupuesto: ${acts} (${programCost(f.season, f.program)} €)`,
     { ...(leader ? { ref: leader.id } : {}), notify: true },
   );
 }

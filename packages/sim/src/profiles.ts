@@ -13,6 +13,7 @@ import { hash32 } from './hash.ts';
 import { buildingAt, DIRS, footprint, type GameState, hasAdjacentRoad, terrainAt, Tile, tileIndex, Zone } from './state.ts';
 import { freeHomes } from './tick.ts';
 import { farmZoneUnlocked } from './farm.ts';
+import { townShare } from './seasons.ts';
 
 /**
  * Perfiles de jugador automático para el CLI headless. Cada perfil tiene su
@@ -267,6 +268,11 @@ function planner(name: string, o: PlannerOpts): Profile {
       else if (state.treasury > 20_000 || cur < pref) target = pref;
       if (target !== cur) out.push({ type: 'SetTax', level: order[target]! });
       if (!chance(rng, o.activity)) return out;
+      // 2.4: responde a la comisión de festejos: la mitad si la caja lo permite sin tocar su reserva.
+      const fiesta = state.seasons?.current;
+      if (fiesta?.status === 'comision' && fiesta.asked && state.treasury > townShare(fiesta.season, fiesta.program, 'poco') + o.reserve) {
+        out.push({ type: 'ApproveFestival', season: fiesta.season, budget: 'poco' });
+      }
       // 2.2: el perfil endeudado pide todo lo que le dejen, a 48 meses.
       if (o.borrow === 'maximo') {
         const cap = loanCapacity(state);
