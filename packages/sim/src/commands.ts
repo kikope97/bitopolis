@@ -23,8 +23,8 @@ import { applyDecision, canApplyDecision } from './decisions.ts';
 import { canSetCareFee, setCareFee } from './care.ts';
 import { canResolveDilemma, resolveDilemma } from './dilemmas.ts';
 import { approveFestival, canApproveFestival } from './seasons.ts';
-import { canSetBusFare, setBusFare } from './transit.ts';
 import { canBuildWaterworks } from './waterworks.ts';
+import { canBuildBusStation, canSetBusFare, setBusFare } from './transit.ts';
 import { campaign, canCampaign, canMotion, motion } from './politics.ts';
 import { addMemory, answerPetition, canConvenePleno, closePleno, convenePleno, talkTo } from './social.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
@@ -246,6 +246,11 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       // 2.4: la depuradora, junto al río; el molino, en la colina.
       const ww = canBuildWaterworks(state, cmd.kind, cmd.x, cmd.y);
       if (!ww.ok) return ww;
+      // 2.4: una sola estación de autobuses (llega a todo el pueblo).
+      if (cmd.kind === 'busstation') {
+        const h = canBuildBusStation(state);
+        if (!h.ok) return h;
+      }
       // 2.2: licitación (la local es la de siempre: mismo coste y misma validación).
       if (cmd.offer && cmd.offer !== 'local') {
         const o = canOffer(state, cmd.kind, cmd.x, cmd.y, cmd.offer);

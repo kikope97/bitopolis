@@ -37,11 +37,12 @@ import { streetCandidates } from './streets.ts';
 import { applyVolunteers, LANDMARK_NAMES, landmarksInProgress } from './landmarks.ts';
 import { applyTouristNoise, applyTvReport, HERITAGE_NAMES, heritageOf, heritageVariant, ruralHomes, touristNoiseCandidate, tvReportCandidate } from './tourism.ts';
 import { announceEre, bigFactory, ereCandidate, hireBatch, hireCandidates } from './region.ts';
+import { applyExcursion, excursionCandidate } from './transit.ts';
 import { startSpill, waterworksCandidates } from './waterworks.ts';
 
 const plural = (n: number) => (n === 1 ? 'un edificio' : `${n} edificios`);
 
-export const DIRECTOR_KINDS = ['robo_tienda', 'robo_casa', 'asociacion', 'manifestacion', 'pelea', 'reconciliacion', 'gratitud', 'rumor', 'oposicion', 'local', 'encuentro', 'ayuda', 'incendio', 'susto', 'ratas', 'licitacion', 'homenaje', 'cosecha', 'granizo', 'voluntarios_obra', 'polemica_obra', 'reportaje_tv', 'turistas_ruido', 'ere_gran_empresa', 'contrata_vecinos', 'vertido', 'dilema'] as const;
+export const DIRECTOR_KINDS = ['robo_tienda', 'robo_casa', 'asociacion', 'manifestacion', 'pelea', 'reconciliacion', 'gratitud', 'rumor', 'oposicion', 'local', 'encuentro', 'ayuda', 'incendio', 'susto', 'ratas', 'licitacion', 'homenaje', 'cosecha', 'granizo', 'voluntarios_obra', 'polemica_obra', 'reportaje_tv', 'turistas_ruido', 'ere_gran_empresa', 'contrata_vecinos', 'vertido', 'dilema', 'excursion'] as const;
 export type DirectorKind = (typeof DIRECTOR_KINDS)[number];
 
 export interface DirectorCandidate {
@@ -297,6 +298,9 @@ export function directorMenu(state: GameState): DirectorCandidate[] {
   out.push(...waterworksCandidates(state));
   // 2.4: dilemas (gastan cupo de drama; no hace falta avisarlos).
   add(dilemmaDirectorCandidates(state).map((c) => ({ ...c, kind: 'dilema' as const, bad: true })));
+  // 2.4: excursión de jubilados en autobús (buena).
+  const trip = excursionCandidate(state);
+  if (trip) out.push({ ...trip, kind: 'excursion', bad: false });
   return out;
 }
 
@@ -705,6 +709,8 @@ function perform(state: GameState, c: DirectorCandidate): { id: number; text: st
     case 'dilema':
       // Lo abre `directorDilemma` (con la presentación del director).
       return null;
+    case 'excursion':
+      return applyExcursion(state);
     case 'local': {
       const [a, b] = pair();
       if (!a || !b) return null;

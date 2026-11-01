@@ -1,7 +1,7 @@
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { protestFor, type Association } from './associations.ts';
 import { DEBT, FIRE, KIDS_MAX, LISTS, SEASONS, TOURISM, TURN } from './balance.ts';
-import { canPresent, presentCandidacy } from './politics.ts';
+import { canPresent, politicsPrune, presentCandidacy } from './politics.ts';
 import { BUILD_NAMES, removeBuilding } from './commands.ts';
 import { homeRobbery } from './crime.ts';
 import { becomeVolunteer, canVolunteer, fireHelpTargets, helpAfterFire, homelessByFire, placeName, shelter } from './fire.ts';
@@ -20,6 +20,8 @@ import { applyDonation, donorCandidates, LANDMARK_NAMES, landmarksInProgress } f
 import { complainCandidates, complainTourists, openRural, ruralCandidates, ruralDemand } from './tourism.ts';
 import { bigFactory, hireCandidates } from './region.ts';
 import { canJoinCommittee, joinCommittee, proposeProgram, seasonName } from './seasons.ts';
+import { careAction, careMenu } from './care.ts';
+import { searchJobOutside, transitMenu } from './transit.ts';
 import { type Building, buildingAt, type Citizen, DESIRES, FEARS, type GameState, pushEvent, type Trigger } from './state.ts';
 
 /**
@@ -285,6 +287,9 @@ export function turnMenu(state: GameState, c: Citizen): MenuItem[] {
   if (desperate(c)) out.push({ accion: 'robar', detalle: 'robar en una casa del pueblo (está sin dinero, sin trabajo y endeudado)' });
   if (!governs) out.push({ accion: 'irse', detalle: 'irse del pueblo y vender lo que tenga' });
   out.push(...committeeMenu(state, c));
+  // 2.4: cuidados de un padre o una madre mayor (plazas y cuota reales) y trabajo fuera en autobús.
+  out.push(...careMenu(state, c));
+  out.push(...transitMenu(state, c));
   return out;
 }
 
@@ -414,6 +419,11 @@ export function extraAction(state: GameState, c: Citizen, verb: string, arg: str
       return canDump(state, c) ? dumpTrash(state, c) : 'al final no tira la basura al monte';
     case 'apuntarse_comision':
       return joinCommittee(state, c);
+    case 'llevar_a_residencia':
+    case 'cuidar_en_casa':
+      return careAction(state, c, verb, arg);
+    case 'buscar_trabajo_fuera':
+      return searchJobOutside(state, c);
     case 'robar': {
       if (!desperate(c)) return 'se lo piensa mejor y no roba';
       const targets = state.buildings.filter((b) => (b.kind === 'house' || b.kind === 'res') && b.built && b.id !== c.homeId);
@@ -549,6 +559,8 @@ export function applyTownTurn(state: GameState, n: number, acts: TurnAct[], extr
     if (extra?.director) lines.unshift(...applyDirectorImpl(state, extra.director).map((l) => ({ ...l, text: `✦ ${l.text}` })));
   }
   closeTurn(state, 'ia', lines, extra);
+  // Quien encabezaba una candidatura y se ha ido en este turno: la lista se retira ya (no al siguiente tick).
+  politicsPrune(state);
 }
 
 /** El director vive en director.ts (que depende de este módulo): se engancha al cargar. */
@@ -831,6 +843,15 @@ export function mayorText(state: GameState, cmd: { type: string } & Record<strin
       return { text: 'protege el entorno del patrimonio (sin industria nueva)', big: true };
     case 'RequestLoan':
       return { text: 'pide un préstamo al banco', big: false };
+    // 2.4: cuotas de la guardería y la residencia, y el billete del autobús (subirlos es una medida gorda).
+    case 'SetCareFee': {
+      const was = cmd.service === 'nursery' ? state.care.nurseryFee : state.care.residenceFee;
+      const order = ['gratis', 'reducida', 'normal'];
+      const what = cmd.service === 'nursery' ? 'la guardería' : 'la residencia';
+      return { text: cmd.level === 'gratis' ? `hace gratis ${what}` : `pone la cuota ${cmd.level} en ${what}`, big: order.indexOf(String(cmd.level)) > order.indexOf(was) };
+    }
+    case 'SetBusFare':
+      return { text: cmd.fare === 'gratis' ? 'hace gratis el autobús' : `pone el billete del autobús ${cmd.fare}`, big: cmd.fare === 'caro' };
   }
   return null;
 }

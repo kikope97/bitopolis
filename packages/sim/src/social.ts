@@ -117,6 +117,11 @@ export const MEMORY_KINDS = [
   'pleno_protesto',
   'dilema_a_favor',
   'dilema_en_contra',
+  // 2.4: cuidados y autobús.
+  'deja_trabajo_crianza',
+  'a_la_residencia',
+  'cuida_padre',
+  'excursion',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -399,6 +404,14 @@ export function memoryText(state: GameState, m: Memory): string {
       return 'El alcalde decidió a su favor en un asunto difícil';
     case 'dilema_en_contra':
       return 'El alcalde decidió en su contra en un asunto difícil';
+    case 'deja_trabajo_crianza':
+      return 'Dejó su trabajo para cuidar del bebé (no había plaza en la guardería)';
+    case 'a_la_residencia':
+      return m.about.length ? `Llevó a ${who} a la residencia` : 'Entró en la residencia';
+    case 'cuida_padre':
+      return m.about.length ? `Cuida en casa a ${who}` : 'Su familia le cuida en casa';
+    case 'excursion':
+      return 'Fue de excursión en el autobús de los jubilados';
   }
 }
 

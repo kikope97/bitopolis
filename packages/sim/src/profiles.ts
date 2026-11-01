@@ -1,5 +1,5 @@
 import type { BuildKind, Command, LandmarkKind, TaxLevel } from '@bitopolis/shared';
-import { JOBS, LANDMARKS, LOANS, MAINTENANCE, PLANT_CAPACITY, PUBLIC_SALARY, REGION, SERVICE, SERVICE_SALARY, TRASH, WAGE_OUTSIDE } from './balance.ts';
+import { CARE, JOBS, LANDMARKS, LOANS, MAINTENANCE, PLANT_CAPACITY, PUBLIC_SALARY, REGION, SERVICE, SERVICE_SALARY, TRANSIT, TRASH, WAGE_OUTSIDE } from './balance.ts';
 import { bigFactorySpot } from './region.ts';
 import { ownIncome, TREASURY } from './money.ts';
 import { jobsOf, maintenanceOf } from './levels.ts';
@@ -56,7 +56,17 @@ interface PlannerOpts {
   landmarks?: boolean;
   /** 2.3: deja un polígono de zona I donde quepa la fábrica de la gran empresa (y le dice que sí). */
   bigCompany?: boolean;
+  /**
+   * 2.4: cuidados y autobús. Con el mes en positivo y superávit para pagarlo, la estación de autobuses
+   * (si hay al menos `TRANSIT_RIDERS` vecinos que trabajan fuera), la guardería y la residencia (con
+   * `CARE_ELDERS` mayores de 70); las cuotas, normales.
+   */
+  care?: boolean;
 }
+
+const TRANSIT_RIDERS = 20;
+const CARE_ELDERS = 6;
+const CARE_COUPLES = 2;
 
 /**
  * 2.2: préstamo «con cabeza» para lo que falta: el hueco hasta `cost` (más un
@@ -405,6 +415,24 @@ function planner(name: string, o: PlannerOpts): Profile {
         const room = ownIncome(last) - last.expenses - Math.max(0, now - before);
         for (const kind of o.services) if (count(kind) < wanted && room >= monthly(kind) && tryBuild(kind)) return out;
       }
+      // 2.4: estación de autobuses, guardería y residencia.
+      if (o.care && zonesOn && last && last.income >= last.expenses) {
+        const cost = (k: 'busstation' | 'nursery' | 'residence') => (MAINTENANCE[k] + JOBS[k] * PUBLIC_SALARY) * (k === 'busstation' ? 1 - TRANSIT.consortium : 1);
+        const now = state.buildings.reduce((a, b) => a + (b.owner === TREASURY ? maintenanceOf(b) + jobsOf(b) * (b.kind in SERVICE ? SERVICE_SALARY : PUBLIC_SALARY) : 0), 0);
+        const before = -((last.breakdown['sueldos'] ?? 0) + (last.breakdown['mantenimiento'] ?? 0));
+        const room = ownIncome(last) - last.expenses - Math.max(0, now - before);
+        const commuters = state.citizens.filter((c) => c.jobId === null && c.unemployedSince === undefined).length;
+        const elders = state.citizens.filter((c) => c.age >= CARE.elderAge).length;
+        // Parejas en edad de tener hijos que viven juntas (o niños pequeños ya).
+        const couples = state.citizens.filter((c) => c.homeId !== null && c.age >= 20 && c.age <= 45 && c.relations.some((r) => r.kind === 'pareja' && r.id > c.id && state.citizens.find((x) => x.id === r.id)?.homeId === c.homeId)).length;
+        const wants: ['busstation' | 'nursery' | 'residence', boolean][] = [
+          ['busstation', commuters >= TRANSIT_RIDERS],
+          ['nursery', couples >= CARE_COUPLES],
+          ['residence', elders >= CARE_ELDERS],
+        ];
+        // Con holgura: que el superávit pague dos veces lo que cuesta al mes.
+        for (const [kind, ok] of wants) if (ok && !has(kind) && isUnlocked(state, kind) && room >= 2 * cost(kind) && tryBuild(kind)) return out;
+      }
       // Vivienda municipal al principio (o siempre, según el perfil).
       if ((!zonesOn || o.municipalHousing) && freeHomes(state) + state.projects.filter((p) => p.payer === 0).length * 3 < 3 && state.demand.R > 0) {
         if (tryBuild('house')) return out;
@@ -459,7 +487,7 @@ function planner(name: string, o: PlannerOpts): Profile {
 
 export const PROFILES: Record<string, Profile> = {
   pasivo: { name: 'pasivo', decide: () => [] },
-  casual: planner('casual', { tax: 'medium', reserve: 3_000, activity: 0.3, services: ['park'], municipalHousing: false, tourism: true, landmarks: true, bigCompany: true }),
+  casual: planner('casual', { tax: 'medium', reserve: 3_000, activity: 0.3, services: ['park'], municipalHousing: false, tourism: true, landmarks: true, bigCompany: true, care: true }),
   // 2.2: un jugador casual que además pinta zona agraria (para medir el campo).
   campo: planner('campo', { tax: 'medium', reserve: 3_000, activity: 0.3, services: ['park'], municipalHousing: false, farms: 8 }),
   ahorrador: planner('ahorrador', { tax: 'low', reserve: 4_000, activity: 0.5, services: ['park'], municipalHousing: false }),
@@ -484,6 +512,7 @@ export const PROFILES: Record<string, Profile> = {
     tourism: true,
     landmarks: true,
     bigCompany: true,
+    care: true,
   }),
   // 2.2: como el constructor, pero pidiendo prestado todo lo que le dejen (equilibrio de los préstamos).
   endeudado: planner('endeudado', {

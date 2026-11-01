@@ -177,9 +177,11 @@ describe('incendios (2.1)', () => {
         }
       }
       expect(n).toBeTruthy();
+      const t0 = s.tick;
       ignite(s, b);
       runHours(s, FIRE.uncoveredHours[1] + 1);
-      if (s.events.some((e) => e.text.startsWith('El fuego salta'))) spread++;
+      // Solo lo que pasa desde ahora (el pueblo de base puede traer algún salto en su diario).
+      if (s.events.some((e) => e.tick >= t0 && e.text.startsWith('El fuego salta'))) spread++;
       expect(s.buildings.filter((x) => x.fire).length).toBeLessThanOrEqual(FIRE.maxBurning);
     }
     expect(spread).toBeGreaterThan(0);
