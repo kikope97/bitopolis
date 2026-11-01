@@ -5,7 +5,7 @@ export const TaxLevel = z.enum(['low', 'medium', 'high']);
 export type TaxLevel = z.infer<typeof TaxLevel>;
 
 /** Lo que el alcalde puede construir directamente. */
-export const BuildKind = z.enum(['road', 'water', 'power', 'park', 'school', 'clinic', 'police', 'house', 'plaza', 'market', 'bar', 'chapel', 'cemetery', 'library', 'sports', 'jail', 'firestation', 'civilprotection', 'cleanpoint', 'heritage', 'nursery', 'residence', 'busstation', 'sewage', 'solar', 'wind']);
+export const BuildKind = z.enum(['road', 'water', 'power', 'park', 'school', 'clinic', 'police', 'house', 'plaza', 'market', 'bar', 'chapel', 'cemetery', 'library', 'sports', 'jail', 'firestation', 'civilprotection', 'cleanpoint', 'heritage', 'nursery', 'residence', 'busstation', 'sewage', 'solar', 'wind', 'vpo', 'coop', 'post']);
 export type BuildKind = z.infer<typeof BuildKind>;
 
 export const ZoneKind = z.enum(['none', 'R', 'C', 'I', 'A']);
@@ -153,6 +153,9 @@ export const Command = z.discriminatedUnion('type', [
   z.object({ type: z.literal('SetCareFee'), service: z.enum(['nursery', 'residence']), level: z.enum(['gratis', 'reducida', 'normal']) }),
   z.object({ type: z.literal('ResolveDilemma'), id: z.number().int().min(1), option: z.string().regex(/^[a-z_]+$/).max(30) }),
   z.object({ type: z.literal('ApproveFestival'), season: z.enum(['romeria', 'sanjuan', 'patronales', 'navidad']), budget: z.enum(['nada', 'poco', 'todo']) }),
+  /** 2.5: densidad de zona R, y responder a una oferta de un pueblo vecino. */
+  z.object({ type: z.literal('SetZoneDensity'), x: Coord, y: Coord, w: Size, h: Size, level: z.union([z.literal(0), z.literal(1), z.literal(2)]) }),
+  z.object({ type: z.literal('AnswerNeighbor'), id: z.number().int().min(1), accept: z.boolean() }),
   /** 2.0: % de vecinos con IA (solo sube: nadie deja de pensar con IA). */
   z.object({ type: z.literal('SetAiShare'), share: z.number().int().min(0).max(100) }),
   /** 2.0: días de juego entre turnos de la IA (el cliente los alarga a x3/x10). */

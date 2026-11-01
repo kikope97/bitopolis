@@ -21,7 +21,7 @@ import type { Tender } from './tenders.ts';
 import type { StreetName } from './streets.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
-export const FORMAT_VERSION = 17;
+export const FORMAT_VERSION = 18;
 
 export const MAP_W = 48;
 export const MAP_H = 48;
@@ -63,6 +63,10 @@ export type BuildingKind =
   | 'sewage'
   | 'solar'
   | 'wind'
+  /** 2.5: vivienda protegida, cooperativa agraria y oficina de correos. */
+  | 'vpo'
+  | 'coop'
+  | 'post'
   | 'house'
   /** Crecen solos sobre zonas. */
   | 'res'
@@ -358,7 +362,8 @@ export interface GameState {
   /** Horas de juego transcurridas. */
   tick: number;
   /** terrain (v1.7): 0 llano, 1 río, 2 mar, 3 colina (ver terrain.ts). */
-  map: { w: number; h: number; tiles: number[]; zones: number[]; terrain: number[] };
+  /** 2.5: `density` = densidad de cada casilla de zona R (0 baja, 1 media, 2 alta; density.ts). */
+  map: { w: number; h: number; tiles: number[]; zones: number[]; terrain: number[]; density?: number[] };
   /** Caja del ayuntamiento. Negativa = deuda municipal. */
   treasury: number;
   taxLevel: TaxLevel;
@@ -472,6 +477,12 @@ export interface GameState {
   dilemmas: Dilemma[];
   /** 2.4: fiestas de temporada (seasons.ts); las patronales siguen en `festival`. */
   seasons: SeasonsState;
+  /** 2.5: cooperativa agraria (coop.ts). */
+  coop: CoopState;
+  /** 2.5: cartas de los que se fueron (post.ts). */
+  letters: Letter[];
+  /** 2.5: los pueblos vecinos de la comarca (comarca.ts). */
+  comarca: ComarcaState;
   /** 2.3: lo que necesitan recordar los logros entre meses (achievements.ts); se crea al primer cierre de mes. */
   medalTrack?: MedalTrack;
 }
@@ -781,6 +792,9 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiSh
     transit: { fare: 'normal' },
     dilemmas: [],
     seasons: { current: null, held: {} },
+    coop: { members: [], presidentId: null },
+    letters: [],
+    comarca: { towns: [], offers: [], fair: null },
   };
   // Árboles dispersos (se talan gratis al construir encima).
   for (let i = 0; i < tiles.length; i++) {
@@ -989,4 +1003,56 @@ export interface SeasonsState {
   current: SeasonFestival | null;
   /** Último año en que se celebró cada fiesta. */
   held: Partial<Record<FestivalSeason, number>>;
+}
+
+/* ---------------- 2.5 «Comarca» ---------------- */
+
+export interface CoopState {
+  /** Socios (vecinos con finca). */
+  members: number[];
+  presidentId: number | null;
+  /** Lo repartido el último año (para la ficha). */
+  lastShare?: number;
+}
+
+export interface Letter {
+  id: number;
+  /** Quién escribe (ficha de `departed`) y a quién (vecino del pueblo). */
+  from: number;
+  to: number;
+  tick: number;
+  /** Plantilla del motor (el texto con IA queda en la caché del servidor). */
+  template: string;
+  read?: boolean;
+}
+
+export type NeighborSpecialty = 'campo' | 'industria' | 'turismo' | 'servicios';
+export type NeighborPersonality = 'cooperador' | 'competidor' | 'populista' | 'prudente';
+export interface NeighborTown {
+  id: number;
+  name: string;
+  pop: number;
+  happiness: number;
+  treasury: number;
+  specialty: NeighborSpecialty;
+  mayor: { name: string; faction: string; personality: NeighborPersonality };
+  /** −2 (mala) … 2 (muy buena). */
+  relation: number;
+  /** Última declaración (validada o por plantilla). */
+  said?: string;
+}
+export type NeighborOfferKind = 'agua' | 'luz' | 'autobus' | 'cosecha';
+export interface NeighborOffer {
+  id: number;
+  townId: number;
+  kind: NeighborOfferKind;
+  tick: number;
+  until: number;
+  resolved?: 'accepted' | 'rejected' | 'expired';
+}
+export interface ComarcaState {
+  towns: NeighborTown[];
+  offers: NeighborOffer[];
+  /** Feria comarcal de este año (en qué pueblo, 0 = el nuestro). */
+  fair: { year: number; host: number } | null;
 }

@@ -56,4 +56,8 @@ export * from './transit.ts';
 export * from './waterworks.ts';
 export * from './dilemmas.ts';
 export * from './seasons.ts';
+export * from './density.ts';
+export * from './coop.ts';
+export * from './post.ts';
+export * from './comarca.ts';
 export * from './pleno-prompt.ts';

@@ -46,6 +46,10 @@ export const BUILD: Record<BuildKind, BuildSpec> = {
   sewage: { materials: 8_000, workers: 4, days: 5, unlockPop: 40 },
   solar: { materials: 2_500, workers: 2, days: 2, unlockPop: 25 },
   wind: { materials: 3_500, workers: 3, days: 3, unlockPop: 25 },
+  // 2.5 (provisional): vivienda protegida, cooperativa y correos.
+  vpo: { materials: 9_000, workers: 5, days: 5, unlockPop: 60 },
+  coop: { materials: 5_000, workers: 4, days: 4, unlockPop: 40 },
+  post: { materials: 2_000, workers: 2, days: 2, unlockPop: 30 },
 };
 
 /** Obras que crecen solas sobre zonas (las paga un inversor de fuera). */
@@ -103,6 +107,9 @@ export const JOBS: Record<BuildingKind, number> = {
   sewage: 1,
   solar: 0,
   wind: 0,
+  vpo: 0,
+  coop: 2,
+  post: 1,
 };
 
 export const HOMES: Partial<Record<BuildingKind, number>> = { house: 3, res: 4 };
@@ -148,6 +155,9 @@ export const MAINTENANCE: Record<BuildingKind, number> = {
   // Ronda 20: unos 8–10 € por edificio con luz (antes salían mucho más baratas que la central).
   solar: 120,
   wind: 300,
+  vpo: 150,
+  coop: 200,
+  post: 120,
 };
 
 /** Radio de cobertura de los servicios (tiles) y su efecto en la felicidad. */
@@ -1414,4 +1424,32 @@ export const SEASONS = {
   noiseRadius: 5,
   /** Fiesta popular reducida (sin dinero para ningún acto). */
   popularMood: 1,
+};
+
+/* ---------------- 2.5 «Comarca» (cada bloque afina sus números) ---------------- */
+
+/** Bloque F: densidad de las zonas R (viviendas por edificio `res` según el nivel) y VPO. */
+export const DENSITY = {
+  homes: [4, 8, 12],
+  minLand: 60,
+  minDemandR: 40,
+  noisePerLevel: 10,
+};
+export const VPO = { homes: 6, rent: 120 };
+
+/** Bloque G: cooperativa agraria. */
+export const COOP = { priceFx: 0.15, priceFxLevel2: 0.25, fee: 20 };
+
+/** Bloque H: correos y cartas. */
+export const POST = { grantDaysWithout: 20, grantDaysWith: 30, lettersPerMonth: 1, letterMood: 3, returnChance: 0.1, returnHappiness: 60 };
+
+/** Bloques I y J: la comarca (pueblos vecinos), alcaldes y feria comarcal. */
+export const COMARCA = {
+  towns: 3,
+  /** Diferencia de atractivo que hace que se vayan vecinos (2 % al mes). */
+  pullGap: 10,
+  pullShare: 0.02,
+  grantMonths: 6,
+  fairMonth: 9,
+  offerDays: 30,
 };

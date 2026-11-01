@@ -21,6 +21,8 @@ import { ASSOCIATIONS, BUILD, CIVIL, STREETS, DEBT_LIMIT, FIRE, MICROCREDIT, MIN
 import { isWater, Terrain } from './terrain.ts';
 import { applyDecision, canApplyDecision } from './decisions.ts';
 import { canSetCareFee, setCareFee } from './care.ts';
+import { answerNeighbor, canAnswerNeighbor } from './comarca.ts';
+import { canSetZoneDensity, setZoneDensity } from './density.ts';
 import { canResolveDilemma, resolveDilemma } from './dilemmas.ts';
 import { approveFestival, canApproveFestival } from './seasons.ts';
 import { canBuildWaterworks } from './waterworks.ts';
@@ -84,6 +86,9 @@ export const BUILD_NAMES: Record<string, string> = {
   sewage: 'Depuradora',
   solar: 'Placas solares',
   wind: 'Molino de viento',
+  vpo: 'Vivienda protegida',
+  coop: 'Cooperativa agraria',
+  post: 'Correos',
 };
 
 const ZONE_VALUE: Record<ZoneKind, number> = { none: Zone.None, R: Zone.R, C: Zone.C, I: Zone.I, A: Zone.A };
@@ -402,6 +407,11 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       return canResolveDilemma(state, cmd.id, cmd.option);
     case 'ApproveFestival':
       return canApproveFestival(state, cmd.season, cmd.budget);
+    // 2.5: comarca (cada bloque valida en su archivo).
+    case 'SetZoneDensity':
+      return canSetZoneDensity(state, cmd.x, cmd.y, cmd.w, cmd.h, cmd.level);
+    case 'AnswerNeighbor':
+      return canAnswerNeighbor(state, cmd.id, cmd.accept);
   }
 }
 
@@ -671,6 +681,12 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       break;
     case 'ApproveFestival':
       approveFestival(state, cmd.season, cmd.budget);
+      break;
+    case 'SetZoneDensity':
+      setZoneDensity(state, cmd.x, cmd.y, cmd.w, cmd.h, cmd.level);
+      break;
+    case 'AnswerNeighbor':
+      answerNeighbor(state, cmd.id, cmd.accept);
       break;
   }
   if (mayor) noteMayor(state, mayor.text, mayor.big);

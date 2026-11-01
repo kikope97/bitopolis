@@ -168,7 +168,24 @@ export const MIGRATIONS: Record<number, Migration> = {
   15: (s) => ({ ...migrate16Medals(migrate16History(migrate16Region(migrate16Scenario(migrate16Tourism(migrate16Landmarks(s)))))), formatVersion: 16 }),
   // 16 → 17 (2.4, vida): cada parte en su función.
   16: (s) => ({ ...migrate17Seasons(migrate17Dilemmas(migrate17River(migrate17Transit(migrate17Care(s))))), formatVersion: 17 }),
+  // 17 → 18 (2.5, comarca): cada parte en su función.
+  17: (s) => ({ ...migrate18Comarca(migrate18Letters(migrate18Coop(s))), formatVersion: 18 }),
 };
+
+/** 2.5 (17 → 18), cooperativa: sin socios. La densidad (`map.density`) es opcional: baja por defecto. */
+export function migrate18Coop(s: Record<string, any>): Record<string, any> {
+  return { ...s, coop: s.coop ?? { members: [], presidentId: null } };
+}
+
+/** 2.5, correos: ninguna carta todavía. */
+export function migrate18Letters(s: Record<string, any>): Record<string, any> {
+  return { ...s, letters: Array.isArray(s.letters) ? s.letters : [] };
+}
+
+/** 2.5, la comarca: los pueblos vecinos se crean al primer cierre de mes (comarca.ts). */
+export function migrate18Comarca(s: Record<string, any>): Record<string, any> {
+  return { ...s, comarca: s.comarca ?? { towns: [], offers: [], fair: null } };
+}
 
 /** 2.4 (16 → 17), cuidados: cuotas normales (aún no hay guardería ni residencia). */
 export function migrate17Care(s: Record<string, any>): Record<string, any> {
