@@ -165,7 +165,8 @@ describe('candidaturas y recuento (2.2)', () => {
 
   it('por reglas, en un pueblo descontento llegan a presentarse varias listas (nunca más de 3)', () => {
     // Semilla medida: en el perfil agresivo, a los 4 años se presentan dos candidaturas.
-    const { state, report } = runSimulation({ seed: 1, days: 1490, profile: 'agresivo', checkEveryDay: true });
+    // Pruebas 2.5: la 1 ya no llega (los 10 vecinos dan más dinero); se mide de nuevo, la 6.
+    const { state, report } = runSimulation({ seed: 6, days: 1490, profile: 'agresivo', checkEveryDay: true });
     expect(report.invariantErrors).toEqual([]);
     const h = state.politics.history.find((x) => !x.unopposed)!;
     expect(h.lists!.length).toBeGreaterThanOrEqual(2);
