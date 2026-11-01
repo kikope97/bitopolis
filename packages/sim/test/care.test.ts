@@ -218,6 +218,10 @@ describe('residencia, pensión y mayores (2.4)', () => {
     const alone = resident(s, 72, h2.id, 5_000);
     cared.named = false;
     alone.named = false;
+    // Con pareja en el pueblo no entra solo en la residencia: es el que no está atendido.
+    const partner = resident(s, 70, h.id, 5_000);
+    partner.named = false;
+    setRelation(s, alone, partner, 'pareja', 60);
     expect(validActions(s, cared, 'infeliz')).not.toContain('irse');
     expect(validActions(s, alone, 'infeliz')).toContain('irse');
     for (let d = 0; d < 120; d++) {
@@ -225,6 +229,7 @@ describe('residencia, pensión y mayores (2.4)', () => {
       for (let i = 0; i < TICKS_PER_DAY; i++) step(s);
     }
     expect(s.citizens).toContain(cared);
+    expect(alone.care).toBeUndefined();
     expect(s.citizens).not.toContain(alone);
   });
 

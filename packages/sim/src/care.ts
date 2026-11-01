@@ -186,9 +186,15 @@ export function childrenOf(state: GameState, p: Citizen): Citizen[] {
   return state.citizens.filter((c) => c.parents?.includes(p.id));
 }
 
-/** ¿Vive solo? (nadie más en su casa). */
+/**
+ * ¿Vive solo? Sin pareja en el pueblo y sin familia (padres o hijos) en su casa;
+ * los vecinos de otro piso del mismo bloque no cuentan.
+ */
 function livesAlone(state: GameState, p: Citizen): boolean {
-  return p.homeId !== null && !state.citizens.some((x) => x !== p && x.homeId === p.homeId);
+  if (p.homeId === null) return false;
+  const partner = p.relations.find((r) => r.kind === 'pareja');
+  if (partner && state.citizens.some((x) => x.id === partner.id)) return false;
+  return !state.citizens.some((x) => x !== p && x.homeId === p.homeId && (x.parents?.includes(p.id) || p.parents?.includes(x.id)));
 }
 
 /** Quien cuida en casa a este mayor: el hijo que vive con él o, si no, el primero. */
