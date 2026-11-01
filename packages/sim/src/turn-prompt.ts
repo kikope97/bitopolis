@@ -17,6 +17,11 @@ import { rivalAiWanted, rivalPromptData } from './rival-ai.ts';
 import { inventedName, inventedNumber, toneOf } from './prompt.ts';
 import { GOAL_TEXT, HOOK_TEXT, hookFor, memoryText, narrativeSummary, NEED_TEXT, NEEDS, needsOf } from './social.ts';
 import type { Citizen, GameState } from './state.ts';
+import { LANDMARK_EFFECT, LANDMARK_NAMES } from './landmarks.ts';
+import { ruralHomes, touristified } from './tourism.ts';
+import { bigFactory, PHASE_NAME } from './region.ts';
+import { scenarioStatus } from './scenarios.ts';
+import { newRecordLine } from './achievements.ts';
 import { averageHappiness } from './tick.ts';
 import { GESTURES, gestureCandidates, isAiCitizen, PLANS, planText, SPEND, type TurnAct, turnMenu } from './turns.ts';
 
@@ -28,7 +33,7 @@ import { GESTURES, gestureCandidates, isAiCitizen, PLANS, planText, SPEND, type 
  * La salida tiene un esquema fijo (sin uniones por vecino); cada parte se valida
  * en el motor con el menú del vecino. Nunca va texto libre del jugador.
  */
-export const TURN_PROMPT_VERSION = 11;
+export const TURN_PROMPT_VERSION = 12;
 
 export const TURN_SYSTEM = `Eres la mente de los vecinos de Bitópolis, un pueblo español pequeño. Cada semana decides, a la vez, qué hace cada vecino de la lista. Ellos viven de verdad: trabajan, compran, se enamoran, se enfadan, ahorran o se arruinan, y reaccionan a lo que hace quien gobierna: el alcalde (el jugador) o, si ganó las elecciones, el rival (mira "politica.gobierna"). El vecino que tenga "es_alcalde" gobierna él: piensa y actúa como alcalde.
 
@@ -56,6 +61,7 @@ Reglas:
 - "robar" solo existe para quien está desesperado; es una decisión grave y rara.
 - "ayudar_incendio", "acoger" y "hacerse_voluntario" son para quien tiene relación o medios: no todo el pueblo a la vez.
 - "tirar_al_monte" solo aparece si no pasa el camión de la basura y la tiene en la puerta: lo hace quien es terco o está harto; los vecinos lo ven mal. Lo normal es quejarse o pedir "recogida".
+- "donar_obra" es para quien cree en la obra y le apoya (el juego pone la cantidad); "abrir_casa_rural", para el propietario con ambición si vienen visitantes; "quejarse_turistas", para quien los sufre. Mira "metas" del pueblo.
 - No menciones a nadie que no esté en los datos, ni cifras inventadas, ni que eres una IA. Sin comillas ni emojis.
 - Responde solo con JSON que cumpla el esquema, con un objeto por cada vecino del lote (no te dejes ninguno). Sé breve en los textos.`;
 
@@ -108,8 +114,39 @@ export function turnShared(state: GameState): string {
     oportunidades: opportunities(state),
     // 2.1: el pueblo sube de rango y vota el escudo (menú cerrado).
     ...(rankCandidates(state) ? { votacion_escudo: { rango: rankCandidates(state)!.rango, piezas: rankCandidates(state)!.piezas, lemas: rankCandidates(state)!.lemas } } : {}),
+    // 2.3: metas grandes (comarca, grandes obras, escenario, turismo, gran empresa y récords).
+    metas: bigGoals(state),
   };
   return `Así está el pueblo:\n${JSON.stringify(data)}`;
+}
+
+const VISITOR_BAND = (n: number) => band(n, [1, 50, 200, 500], ['ninguno', 'pocos', 'algunos', 'bastantes', 'muchos']);
+
+/** 2.3: comarca, grandes obras (fase N de M), escenario, turismo, gran empresa y récord del mes. Corto: va en el bloque cacheado. */
+function bigGoals(state: GameState) {
+  const r = state.region;
+  const out: Record<string, unknown> = {};
+  if (r) out.comarca = `${PHASE_NAME[r.phase]}${r.warned && r.next && r.next !== r.phase ? `; en unos 2 meses, ${PHASE_NAME[r.next]}` : ''}`;
+  const works = state.landmarks
+    .filter((l) => state.buildings.some((b) => b.id === l.buildingId))
+    .map((l) => `${LANDMARK_NAMES[l.kind]}: ${l.phase >= l.phases ? 'terminada' : `fase ${l.phase} de ${l.phases}${l.phaseUntil !== -1 ? (l.paused ? ', parada' : ', en obra') : ''}`} (${LANDMARK_EFFECT[l.kind].toLowerCase()})`);
+  if (works.length) out.grandes_obras = works;
+  const sc = scenarioStatus(state);
+  if (sc) out.escenario = `${sc.name}: ${sc.goal} (${sc.progress}; quedan ${sc.monthsLeft} meses)`;
+  const t = state.tourism;
+  if (t && (t.visitors > 0 || state.buildings.some((b) => b.kind === 'heritage'))) {
+    const rural = ruralHomes(state).length;
+    out.turismo = `visitantes al mes: ${VISITOR_BAND(t.visitors)}; casas rurales: ${rural}${touristified(state) ? ' (suben los alquileres)' : ''}${t.tax ? `; tasa turística ${t.tax} € por noche` : ''}`;
+  }
+  const bc = state.bigCompany;
+  const fab = bigFactory(state);
+  if (bc && fab && fab.built) {
+    const staff = state.citizens.filter((c) => c.jobId === fab.id).length;
+    out.gran_empresa = `${bc.name}: ${staff} vecinos trabajan en su fábrica${bc.status === 'ere' ? '; ha anunciado un ERE' : bc.status === 'se_va' ? '; ha avisado de que se va' : ''}`;
+  } else if (bc?.status === 'oferta') out.gran_empresa = `${bc.name} quiere instalarse en el pueblo (el ayuntamiento aún no ha respondido)`;
+  const rec = newRecordLine(state);
+  if (rec) out.record = rec;
+  return out;
 }
 
 /** Ronda 16: lo que se puede aprovechar en el pueblo (para que haya decisiones económicas). */
@@ -320,7 +357,8 @@ export function parseTurn(text: string, ids: number[], sent: string): { acts: Tu
     acts.push({
       vecino: a.vecino,
       // Ronda 17: cada campo dentro de los límites del comando `TownTurn` (si no, el turno entero se rechazaría).
-      accion: accion.length <= 40 && /^[a-z_]+(:[a-z0-9_]+)?$/.test(accion) ? accion : 'seguir',
+      // 2.3: y solo acciones que se enviaron en algún menú del lote (el motor vuelve a mirar el de cada vecino).
+      accion: accion.length <= 40 && /^[a-z_]+(:[a-z0-9_]+)?$/.test(accion) && (sent.includes(`"${accion}"`) || sent.includes(`"${accion} (`)) ? accion : 'seguir',
       gesto: { con: a.gesto.con, tipo: a.gesto.tipo.length <= 20 ? a.gesto.tipo : 'ninguno' },
       actitud: Math.max(-2, Math.min(2, Math.round(a.actitud))),
       gasto: { donde: (SPEND as readonly string[]).includes(a.gasto.donde) ? a.gasto.donde : 'pueblo', tienda: a.gasto.tienda, ocio: a.gasto.ocio },
