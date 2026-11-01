@@ -947,6 +947,8 @@ export interface Dilemma {
   resolved?: string;
   /** Presentación del director (IA), validada; sin ella, la del motor. */
   intro?: string;
+  /** Ronda 20: ya se avisó de que quedan 2 días. */
+  reminded?: boolean;
   /** Cuándo se cerró (para la reacción rápida de los afectados). */
   closed?: number;
 }

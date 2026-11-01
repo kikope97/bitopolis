@@ -141,8 +141,8 @@ function opener(c: Citizen): string {
 }
 
 const TEMPLATES: Record<PlenoRole, string[]> = {
-  pide: ['vengo a pedir {need}. Lo necesitamos ya.', 'pido {need}. No es un capricho, es lo que falta.', 'traigo una petición sencilla: {need}.'],
-  oposicion: ['{party} pregunta al alcalde cuándo va a haber {need}.', 'desde {party} queremos saber por qué seguimos sin {need}.'],
+  pide: ['vengo a pedir {need}. Lo necesitamos ya.', 'pido {need}. No es un capricho, es lo que falta.', 'traigo una petición sencilla, {need}.'],
+  oposicion: ['{party} pregunta al alcalde qué pasa con lo de {need}.', 'desde {party} queremos saber por qué seguimos sin {need}.'],
   a_favor: ['apoyo a {asker}: hace falta {need} y lo sabe todo el pueblo.', 'estoy con {asker}. Sin {need} esto no avanza.'],
   en_contra: ['yo no lo veo. Antes de {need} hay otras cosas que arreglar.', 'no estoy de acuerdo con pedir {need} ahora mismo.'],
 };
@@ -159,8 +159,13 @@ export function plenoRuleLine(state: GameState, pleno: PlenoTalkInput, s: Speake
   const list = TEMPLATES[s.role];
   const body = list[hash32(s.id, pleno.tick, 5) % list.length]!.replace('{need}', need).replace('{asker}', asker).replace('{party}', party);
   const open = c ? opener(c) : '';
-  const line = open ? `${open}${body}` : cap(body);
-  return line.length <= PLENO_TALK.maxLine ? line : cap(body).slice(0, PLENO_TALK.maxLine);
+  // Ronda 20: tras un punto, mayúscula; si no cabe, se recorta por la última palabra entera.
+  const line = open ? `${open}${/[.!?] $/.test(open) ? cap(body) : body}` : cap(body);
+  if (line.length <= PLENO_TALK.maxLine) return line;
+  const short = cap(body);
+  if (short.length <= PLENO_TALK.maxLine) return short;
+  const cut = short.slice(0, PLENO_TALK.maxLine - 1);
+  return `${cut.slice(0, Math.max(1, cut.lastIndexOf(' ')))}…`;
 }
 
 /** Todas las intervenciones: las de la IA que valgan y, para el resto, la plantilla. */

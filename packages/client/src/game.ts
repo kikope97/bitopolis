@@ -403,9 +403,10 @@ export function startGame(opts: GameOptions): void {
    */
   let highlight: { x: number; y: number; since: number } | null = null;
   let lastAttention = -Infinity;
-  function attention(at: { x: number; y: number } | undefined) {
+  function attention(at: { x: number; y: number } | undefined, force = false) {
     const now = performance.now();
     if (at) highlight = { x: at.x, y: at.y, since: now };
+    if (force && speed >= 3) lastAttention = -Infinity;
     // Ronda 14: si en este mismo lote ya se bajó a x1 (una oferta con plazo), el motivo
     // que llega detrás sí se enseña; si no, como mucho una parada cada 45 s.
     const sameBatch = now - lastAttention < 2_000;
@@ -693,13 +694,14 @@ export function startGame(opts: GameOptions): void {
         toast(e.text, { kind: 'warn', sticky: true, onClick: () => focusBuilding(e.ref!) });
       } else if (e.kind === 'warning' && e.text.startsWith('Un asunto difícil')) {
         // 2.4: un dilema con plazo: destello en el sitio, vuelta a x1 y aviso fijo que abre la hoja.
-        const d = state.dilemmas.find((x) => !x.resolved);
+        // Ronda 20: el dilema de este aviso (el más reciente sin resolver de ese vecino), y siempre a x1.
+        const d = [...state.dilemmas].reverse().find((x) => !x.resolved && (e.ref === undefined || x.citizenIds[0] === e.ref));
         sfx.warn();
         calmPause();
-        attention(d ? dilemmaSpot(state, d.id) : undefined);
+        attention(d ? dilemmaSpot(state, d.id) : undefined, true);
         toast(e.text, { kind: 'warn', sticky: true, onClick: d ? () => openDilemmaSheet(dilemmaCtx, d.id) : undefined });
       } else if (e.kind === 'warning' && e.text.startsWith('No decidiste a tiempo')) {
-        toast(e.text, { kind: 'warn' });
+        toast(e.text, { kind: 'warn', sticky: true });
       } else if (e.kind === 'bankrupt' || e.kind === 'warning') {
         sfx.warn();
         duck(1.5);

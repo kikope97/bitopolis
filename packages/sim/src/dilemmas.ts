@@ -167,7 +167,7 @@ function prisonerCandidates(state: GameState): DilemmaCandidate[] {
       kind: 'preso_arrepentido',
       citizenIds: [c.id, ...kin.slice(0, 2).map((x) => x.id)],
       options: ['pedir_indulto', 'que_cumpla'],
-      text: `${c.name} está preso y dice estar arrepentido; le quedan ${days} días y su familia pide que salga`,
+      text: `${c.name} cumple condena y pide perdón; le quedan ${days} días y su familia pide que salga`,
     });
   }
   return out;
@@ -231,7 +231,7 @@ export function dilemmaText(state: GameState, d: Dilemma): string {
       return `${f?.name ?? 'La fábrica'} vierte al río. Multarla protege el agua, pero tendría que despedir a ${DILEMMA.factory.fired} trabajadores.`;
     }
     case 'preso_arrepentido':
-      return `${a?.name ?? 'Un vecino'} está preso y dice estar arrepentido. Su familia pide que el alcalde solicite el indulto.`;
+      return `${a?.name ?? 'Un vecino'} cumple condena y pide perdón. Su familia pide que el alcalde solicite el indulto.`;
   }
 }
 
@@ -439,6 +439,11 @@ export function dilemmasDay(state: GameState): void {
       continue;
     }
     if (state.tick >= d.until) expireDilemma(state, d);
+    // Ronda 20: aviso a falta de 2 días (a x10 el plazo pasa volando).
+    else if (!d.reminded && d.until - state.tick <= 2 * TICKS_PER_DAY) {
+      d.reminded = true;
+      pushEvent(state, 'warning', `Un asunto difícil: quedan 2 días para decidir. ${dilemmaText(state, d)}`, { ref: d.citizenIds[0], notify: true });
+    }
   }
   if (directorOwns(state) || !canOpenDilemma(state)) return;
   const last = state.dilemmas.at(-1);

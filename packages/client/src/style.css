@@ -304,7 +304,8 @@ progress { width: 100%; height: 16px; accent-color: #38b764; }
 .answer { min-height: 1.5em; font-style: italic; color: var(--accent); }
 .answer.thinking::after { content: ' …'; }
 .petition { padding: 8px; margin: 8px 0; border: 2px solid var(--line); border-radius: 4px; }
-.petition .row > * { flex: 1; }
+.petition .row { flex-wrap: wrap; }
+.petition .row > * { flex: 1 1 9em; min-width: 0; } /* ronda 20: con texto al 200 % no se sale */
 /* 2.4: fiestas de temporada (chips, comisión con nombres tocables y programa). */
 .season-chips .seg-btn { flex: 1 1 40%; }
 .season-committee { line-height: 44px; }
@@ -1227,6 +1228,7 @@ body.placing .tut-arrow { visibility: hidden; }
 .pleno-bubble.en_contra { align-self: flex-end; border-color: #b13e53; }
 .pleno-bubble.matiz { border-color: #3b5dc9; }
 .pleno-bubble-head { margin: 0 0 4px; }
+.pleno-bubble .muted { color: #333c57; } /* ronda 20: contraste sobre el bocadillo claro */
 .pleno-line { margin: 0; line-height: 1.35; }
 .pleno-who { min-height: 44px; padding: 0 4px; font: inherit; font-weight: 700; color: #b13e53; background: none; border: 0; text-decoration: underline; cursor: pointer; }
 .pleno-bubble .pill { color: #1a1c2c; border-color: #1a1c2c; margin-left: 6px; }
@@ -1238,4 +1240,8 @@ body.placing .tut-arrow { visibility: hidden; }
 .vida-seg { flex-wrap: nowrap; }
 .vida-seg .seg-btn { flex: 1 1 0; min-width: 44px; padding: 6px 4px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .vida-seg .seg-btn small { font-weight: 400; }
+/* Ronda 20: con texto grande, un botón a lo ancho por opción (no se montan). */
+html[data-text='150'] .vida-seg, html[data-text='200'] .vida-seg { flex-direction: column; }
+html[data-text='150'] .vida-seg .seg-btn, html[data-text='200'] .vida-seg .seg-btn { flex-direction: row; justify-content: space-between; min-height: 44px; }
+.vida-seg .seg-btn { min-width: 0; overflow-wrap: anywhere; }
 .vida-seasons li.now { color: var(--accent); }

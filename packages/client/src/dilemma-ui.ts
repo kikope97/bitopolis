@@ -26,6 +26,9 @@ export function dilemmaSpot(state: GameState, id: number): { x: number; y: numbe
   return state.buildings.find((x) => x.id === c?.homeId);
 }
 
+/** Ronda 20: quién es quién en cada dilema (el primero de la lista). */
+const DILEMMA_ROLE: Record<string, string> = { ultima_plaza_residencia: 'pide plaza', familia_con_deudas: 'con deudas', fabrica_vierte: 'trabaja ahí', preso_arrepentido: 'en la cárcel' };
+
 export function openDilemmaSheet(ctx: DilemmaCtx, id: number): void {
   const state = ctx.state();
   const d = state.dilemmas.find((x) => x.id === id);
@@ -35,7 +38,8 @@ export function openDilemmaSheet(ctx: DilemmaCtx, id: number): void {
     const c = state.citizens.find((x) => x.id === cid);
     if (!c) continue;
     const home = state.buildings.find((b) => b.id === c.homeId);
-    const btn = h('button', { class: 'btn small', 'aria-label': `${c.name}: ver dónde vive y su ficha` }, c.name);
+    const role = cid === d.citizenIds[0] || d.kind === 'ultima_plaza_residencia' || d.kind === 'fabrica_vierte' ? DILEMMA_ROLE[d.kind] : 'familia';
+    const btn = h('button', { class: 'btn small', 'aria-label': `${c.name} (${role}): ver dónde vive y su ficha` }, `${c.name} · ${role}`);
     btn.addEventListener('click', () => {
       if (home) ctx.reveal(home.x, home.y);
       ctx.openCitizen(c.id);
@@ -47,7 +51,8 @@ export function openDilemmaSheet(ctx: DilemmaCtx, id: number): void {
     const what = d.resolved === 'no_decidir' ? 'No se decidió a tiempo.' : d.resolved === 'sin_efecto' ? 'Ya no hace falta decidir.' : `Decidiste: ${dilemmaOption(state, d, d.resolved).label}.`;
     body.push(h('p', { class: 'muted' }, what));
   } else {
-    body.push(h('p', { class: 'muted small' }, `Tienes hasta el ${formatDate(tickToDate(d.until))}. Si no decides, los afectados se lo guardarán.`));
+    const left = Math.max(0, Math.ceil((d.until - state.tick) / 24));
+    body.push(h('p', { class: 'muted small' }, `${left === 1 ? 'Queda 1 día' : `Quedan ${left} días`} (hasta el ${formatDate(tickToDate(d.until))}). Si no decides, los afectados se lo guardarán.`));
     const opts = h('div', { class: 'dilemma-options' });
     for (const o of d.options) {
       const t = dilemmaOption(state, d, o);

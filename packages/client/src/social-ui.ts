@@ -285,7 +285,7 @@ function plenoTalk(ctx: SocialCtx): HTMLElement | string {
         return h(
           'div',
           { class: `pleno-bubble ${l.postura}` },
-          h('p', { class: 'pleno-bubble-head' }, who, h('span', { class: 'muted small' }, ` · ${STANCE_TEXT[l.postura] ?? ''}`), sp?.reaction ? h('span', { class: 'pill' }, ` ${PLENO_REACTION_TEXT[sp.reaction]}`) : ''),
+          h('p', { class: 'pleno-bubble-head' }, who, h('span', { class: 'muted small' }, ` · ${l.postura === 'a_favor' ? '✓ ' : l.postura === 'en_contra' ? '✗ ' : '≈ '}${STANCE_TEXT[l.postura] ?? ''}`), sp?.reaction ? h('span', { class: 'pill' }, ` ${PLENO_REACTION_TEXT[sp.reaction]}`) : ''),
           h('p', { class: 'pleno-line' }, `«${l.linea}» `, l.source === 'ia' ? h('span', { class: 'ai-badge' }, 'IA') : ''),
         );
       }),
