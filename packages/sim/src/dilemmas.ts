@@ -175,7 +175,7 @@ function prisonerCandidates(state: GameState): DilemmaCandidate[] {
 
 /** ¿Se puede abrir un dilema ahora? Ninguno abierto, uno al mes como mucho y gobierna el jugador. */
 export function canOpenDilemma(state: GameState): boolean {
-  if (state.politics.mayor !== 'player') return false;
+  if (state.politics.mayor !== 'player' || state.citizens.length < DILEMMA.minPop) return false;
   if (state.dilemmas.some((d) => !d.resolved)) return false;
   const last = state.dilemmas.at(-1);
   return !last || state.tick - last.tick >= TICKS_PER_MONTH / DILEMMA.perMonth;
@@ -186,9 +186,11 @@ export function canOpenDilemma(state: GameState): boolean {
  * y los vecinos tienen que seguir en el pueblo.
  */
 export function dilemmaCandidates(state: GameState): DilemmaCandidate[] {
-  const seen = new Set(state.dilemmas.map((d) => `${d.kind}_${d.citizenIds[0]}`));
+  // El caso se reconoce por su edificio (la fábrica) o por su primer afectado.
+  const caseOf = (x: { kind: string; buildingId?: number; citizenIds: number[] }) => (x.kind === 'fabrica_vierte' ? `${x.kind}_b${x.buildingId}` : `${x.kind}_${x.citizenIds[0]}`);
+  const seen = new Set(state.dilemmas.map(caseOf));
   return [...residenceCandidates(state), ...familyCandidates(state), ...factoryCandidates(state), ...prisonerCandidates(state)].filter(
-    (c) => !seen.has(`${c.kind}_${c.citizenIds[0]}`) && c.citizenIds.length > 0 && c.citizenIds.every((id) => state.citizens.some((x) => x.id === id)),
+    (c) => !seen.has(caseOf(c)) && c.citizenIds.length > 0 && c.citizenIds.every((id) => state.citizens.some((x) => x.id === id)),
   );
 }
 
@@ -200,7 +202,8 @@ export function openDilemma(state: GameState, key: string, intro?: string): Dile
   const c = dilemmaCandidates(state).find((x) => x.key === key);
   if (!c) return null;
   const d: Dilemma = {
-    id: state.nextId++,
+    // Numeración propia (no gasta ids del pueblo: no cambia los de los edificios y vecinos que vengan).
+    id: (state.dilemmas.at(-1)?.id ?? 0) + 1,
     kind: c.kind,
     tick: state.tick,
     until: state.tick + DILEMMA.days * TICKS_PER_DAY,
@@ -430,13 +433,16 @@ export function expireDilemma(state: GameState, d: Dilemma): void {
 export function dilemmasDay(state: GameState): void {
   for (const d of state.dilemmas) {
     if (d.resolved) continue;
-    if (!byId(state, d.citizenIds[0])) {
+    // Si el vecino se fue o el alcalde ya no gobierna, no hay nada que decidir.
+    if (!byId(state, d.citizenIds[0]) || state.politics.mayor !== 'player') {
       close(state, d, 'sin_efecto');
       continue;
     }
     if (state.tick >= d.until) expireDilemma(state, d);
   }
   if (directorOwns(state) || !canOpenDilemma(state)) return;
+  const last = state.dilemmas.at(-1);
+  if (last && state.tick - last.tick < DILEMMA.ruleGapMonths * TICKS_PER_MONTH) return;
   const list = dilemmaCandidates(state);
   if (!list.length || hash32(state.seed, state.tick, 31) % 100 >= DILEMMA.ruleChancePct) return;
   openDilemma(state, list[hash32(state.seed, state.tick, 32) % list.length]!.key);

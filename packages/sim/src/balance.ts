@@ -1320,6 +1320,10 @@ export const DILEMMA = {
   expandCost: 3_000,
   /** Modo normal (o sin director): % diario de que el motor abra uno si hay candidato (sin dados: hash). */
   ruleChancePct: 15,
+  /** Por reglas, como mucho uno cada tantos meses (con director manda el cupo de drama). */
+  ruleGapMonths: 3,
+  /** Desde cuántos vecinos hay dilemas (con un pueblo recién nacido aún no). */
+  minPop: 40,
   /** Presentación del director (IA), en caracteres. */
   introMax: 200,
   /** La última plaza de la residencia: ánimo de quien entra y de quien se queda fuera (y su rencor). */
