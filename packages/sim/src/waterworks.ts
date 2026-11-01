@@ -15,7 +15,7 @@ import { WATERWORKS as W } from './balance.ts';
 import { directorOwns } from './director-core.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { factionOf } from './politics.ts';
-import { chance } from './prng.ts';
+import { hash32 } from './hash.ts';
 import { addMemory } from './social.ts';
 import { type Building, type BuildingKind, type Citizen, type GameState, pushEvent } from './state.ts';
 import { Terrain } from './terrain.ts';
@@ -378,8 +378,9 @@ export function waterworksMonth(state: GameState): void {
     transfer(state, TREASURY, OUTSIDE, W.fine, 'multa del río');
     pushEvent(state, 'warning', `La Confederación Hidrográfica multa al ayuntamiento con ${W.fine} €: el río sale del pueblo muy sucio (${exit}). Una depuradora aguas abajo lo arregla`, { notify: true });
   }
+  // Los dados salen de un hash (semilla, taller y mes): no tocan el PRNG del pueblo.
   if (!directorOwns(state)) {
     const b = spillCandidates(state)[0];
-    if (b && chance(state.rng, W.spill.ruleChance)) startSpill(state, b.id);
+    if (b && (hash32(state.seed, b.id, month) >>> 0) % 1000 < W.spill.ruleChance * 1000) startSpill(state, b.id);
   }
 }
