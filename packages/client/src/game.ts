@@ -70,6 +70,9 @@ import {
   TOWNHALL_LEVELS,
   townLevel,
   zonesUnlocked,
+  zonesWithoutRoad,
+  hasAdjacentRoad,
+  zoneLotWithoutRoad,
   isFemaleName,
   lowerFirst,
   tenderApplies,
@@ -1244,7 +1247,7 @@ export function startGame(opts: GameOptions): void {
       if (touchInput) proposePlace(g.startTile, t1);
       else {
         const cmd = commandFor(tool, g.startTile, t1);
-        if (cmd) void command(cmd);
+        if (cmd) void command(cmd).then((ok) => ok && warnZoneWithoutRoad(cmd));
       }
     }
     // Con un inicio marcado (dos toques) o una obra por confirmar se mantiene la vista previa.
@@ -1321,7 +1324,7 @@ export function startGame(opts: GameOptions): void {
       preview = null;
       document.body.classList.remove('placing');
       selectTool(tool.id);
-      await command(line);
+      if (await command(line)) warnZoneWithoutRoad(line);
       return;
     }
     if (touchInput && (tool.build || tool.id === 'dike' || tool.landmark)) {
@@ -1422,11 +1425,37 @@ export function startGame(opts: GameOptions): void {
       const { changed, skipped } = zoneChanges(state, cmd);
       if (cmd.zone === 'none') return `${plural(changed, 'casilla', 'casillas')}, gratis`;
       const crops = cmd.zone === 'A' ? ` · ${cropsText(cmd)}` : '';
-      return `${plural(changed, 'casilla', 'casillas')}, ${money(changed * ZONE_COST_PER_TILE)}${skipped ? ` (no se cobran ${skipped} ocupadas o ya marcadas; los árboles sí, se talan al construir)` : ''}${crops}`;
+      const lost = noRoadText(cmd);
+      return `${plural(changed, 'casilla', 'casillas')}, ${money(changed * ZONE_COST_PER_TILE)}${skipped ? ` (no se cobran ${skipped} ocupadas o ya marcadas; los árboles sí, se talan al construir)` : ''}${crops}${lost ? ` · ${lost}` : ''}`;
     }
     const n = tilesOf(cmd).filter((t) => state.map.tiles[t.y * state.map.w + t.x] !== Tile.Road && !buildingAt(state, t.x, t.y)).length;
     const bridges = bridgeTiles(a, b);
     return `${plural(n, 'casilla nueva', 'casillas nuevas')}, ${money(lineCost(a, b))}${bridges ? ` (con puente de ${plural(bridges, 'casilla', 'casillas')})` : ''}`;
+  }
+
+  /**
+   * Casillas de una zona que no tocan carretera: el motor nunca construye en
+   * ellas (`zoneLotWithoutRoad`). Antes de marcar se cuenta a mano; después, con el motor.
+   */
+  function noRoadText(cmd: Extract<Command, { type: 'Zone' }>, placed = false): string {
+    if (cmd.zone === 'none') return '';
+    const { w, h: hh } = state.map;
+    const n = tilesOf(cmd).filter((t) => {
+      if (t.x < 0 || t.y < 0 || t.x >= w || t.y >= hh) return false;
+      if (placed) return zoneLotWithoutRoad(state, t.x, t.y);
+      const i = t.y * w + t.x;
+      return state.map.tiles[i] !== Tile.Road && !buildingAt(state, t.x, t.y) && !isWater(state.map.terrain?.[i]) && !hasAdjacentRoad(state, t.x, t.y);
+    }).length;
+    return n ? `⚠ ${plural(n, 'casilla', 'casillas')} sin carretera: ${n === 1 ? 'ahí' : 'aquí'} no se construirá` : '';
+  }
+  /** Tras marcar una zona, si parte no toca carretera, la franja lo dice. */
+  function warnZoneWithoutRoad(cmd: Command | null | undefined) {
+    if (cmd?.type !== 'Zone') return;
+    const lost = noRoadText(cmd, true);
+    if (!lost) return;
+    $('#tool-info').replaceChildren(h('b', {}, tool.label), `: ${lost}. Pon una carretera al lado.`);
+    refreshStrip();
+    $('#sr-live').textContent = lost;
   }
 
   /** 2.2: qué se plantaría en la zona agraria: «Aquí: regadío (río)» (o los cultivos que salgan, del más común). */
@@ -1496,9 +1525,10 @@ export function startGame(opts: GameOptions): void {
     cancelPlace();
     if (!p) return;
     const cmd = commandFor(tool, p.a, p.b);
-    if (cmd) await placeBuild(cmd);
+    const ok = cmd ? await placeBuild(cmd) : false;
     // Tras una carretera o zona, la franja vuelve a la ayuda de la herramienta (no a «toca dónde termina»).
     if (tool.shape !== 'tap') selectTool(tool.id);
+    if (ok) warnZoneWithoutRoad(cmd);
   }
 
   function cancelAnchor() {
@@ -1882,8 +1912,12 @@ export function startGame(opts: GameOptions): void {
         inspectSheet = null;
         return;
       }
-      const zone = z ? `Zona ${['', 'residencial (R)', 'comercial (C)', 'industrial (I)'][z]}` : 'Sin zona';
-      sheet(name, h('p', {}, zone), h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`)).classList.add('half');
+      const zone = z ? `Zona ${['', 'residencial (R)', 'comercial (C)', 'industrial (I)', 'agraria (A)'][z]}` : 'Sin zona';
+      // Un solar de zona que no toca carretera no se construye nunca: se dice.
+      const noRoad = zoneLotWithoutRoad(state, tile.x, tile.y)
+        ? h('p', { class: 'pocket-warn', 'data-test': 'lot-no-road' }, '⚠ Falta carretera: aquí no se construirá nada hasta que pase una carretera al lado.')
+        : '';
+      sheet(name, h('p', {}, zone), noRoad, h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`)).classList.add('half');
       openInspect = null;
       inspectSheet = null;
       return;
@@ -2459,17 +2493,24 @@ export function startGame(opts: GameOptions): void {
   function openDemand() {
     const unlocked = zonesUnlocked(state);
     const { R, C, I } = state.demand;
+    const noRoad = zonesWithoutRoad(state);
     const line = (k: string, name: string, v: number, hint: string) => h('li', {}, h('span', {}, h('strong', {}, `${k} · ${name}`), h('span', { class: 'p-sub' }, hint)), h('span', {}, v > 0 ? `+${v}` : String(v)));
+    /** El texto sale del signo de la demanda (positivo = falta); por encima de 15 se construye. */
+    const hint = (k: 'R' | 'C' | 'I', v: number, falta: string, poco: string, sobra: string) => {
+      const n = noRoad[k];
+      if (v > 15 && n > 0) return `Tienes zona ${k} sin carretera (${n} ${n === 1 ? 'casilla' : 'casillas'}): ponle una carretera al lado o pinta zona ${k} junto a una.`;
+      return v > 15 ? falta : v > 0 ? poco : sobra;
+    };
     sheet(
       'Qué pide el pueblo',
       h('p', {}, `Hoy es ${formatDate(tickToDate(state.tick))}.`),
       unlocked
         ? h(
             'ul',
-            { class: 'accounts' },
-            line('R', 'viviendas', R, R > 20 ? 'Falta sitio para vivir: pinta zona R.' : 'Hay casas de sobra.'),
-            line('C', 'tiendas', C, C > 20 ? 'Quieren comprar cerca: pinta zona C.' : 'Hay tiendas de sobra.'),
-            line('I', 'empleo e industria', I, I > 20 ? 'Hay gente sin trabajo: pinta zona I (lejos de las casas).' : 'Hay empleo de sobra.'),
+            { class: 'accounts demand-list' },
+            line('R', 'viviendas', R, hint('R', R, 'Falta sitio para vivir: pinta zona R.', 'Falta poco sitio para vivir: aún no hace falta más zona R.', 'Hay casas de sobra.')),
+            line('C', 'tiendas', C, hint('C', C, 'Quieren comprar cerca: pinta zona C.', 'Quieren alguna tienda más, pero aún no hace falta más zona C.', 'Hay tiendas de sobra.')),
+            line('I', 'empleo e industria', I, hint('I', I, 'Hay gente sin trabajo: pinta zona I (lejos de las casas).', 'Falta algo de empleo, pero aún no hace falta más zona I.', 'Hay empleo de sobra.')),
           )
         : h('p', {}, `Las zonas R (viviendas), C (tiendas) e I (industria) llegan con el ayuntamiento de nivel 2: pide ${TOWNHALL_LEVELS[1]!.pop} vecinos (ahora hay ${state.citizens.length}) y ${money(TOWNHALL_LEVELS[1]!.cost)}. Toca el ayuntamiento para ampliarlo.`),
       h('p', { class: 'muted small' }, 'Cuanto más alta la barra, más falta hace. Si está en negativo, sobra.'),
