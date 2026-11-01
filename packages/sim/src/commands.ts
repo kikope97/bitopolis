@@ -259,6 +259,10 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
         const h = canBuildBusStation(state);
         if (!h.ok) return h;
       }
+      // 2.5: una cooperativa y una oficina de correos por pueblo.
+      if ((cmd.kind === 'coop' || cmd.kind === 'post') && state.buildings.some((b) => b.kind === cmd.kind)) {
+        return { ok: false, error: cmd.kind === 'coop' ? 'Ya hay una cooperativa en el pueblo' : 'Ya hay una oficina de correos en el pueblo' };
+      }
       // 2.2: licitación (la local es la de siempre: mismo coste y misma validación).
       if (cmd.offer && cmd.offer !== 'local') {
         const o = canOffer(state, cmd.kind, cmd.x, cmd.y, cmd.offer);

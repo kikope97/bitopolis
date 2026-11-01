@@ -23,6 +23,7 @@ import { factionOf, politicsActive } from './politics.ts';
 import { type Faction, FACTIONS } from './politics-core.ts';
 import { pick } from './prng.ts';
 import { addMemory } from './social.ts';
+import { grantOfferDays } from './post.ts';
 import type { Building, BuildingKind, BudgetPlan, GameState, Grant } from './state.ts';
 import { pushEvent, terrainAt } from './state.ts';
 import type { BuildKind } from '@bitopolis/shared';
@@ -167,18 +168,22 @@ function offerGrant(state: GameState): void {
   if (!options.length) return;
   const kind = pick(state.rng, options);
   const share = [0.5, 0.6, 0.7][hash32(state.tick, kind.length) % 3]!;
+  // 2.5: sin oficina de correos, la postal de la Diputación llega tarde y hay menos días para responder.
+  const days = grantOfferDays(state);
   state.grants.push({
     id: state.nextId++,
     kind,
     share,
     offeredTick: state.tick,
-    deadline: state.tick + (GRANT_OFFER_DAYS + GRANT_DEADLINE_DAYS) * TICKS_PER_DAY,
+    deadline: state.tick + (days + GRANT_DEADLINE_DAYS) * TICKS_PER_DAY,
     status: 'offered',
     advance: 0,
     minId: 0,
+    ...(days !== GRANT_OFFER_DAYS ? { offerDays: days } : {}),
   });
-  const until = tickToDate(state.tick + GRANT_OFFER_DAYS * TICKS_PER_DAY);
-  pushEvent(state, 'info', `La Diputación ofrece pagar el ${Math.round(share * 100)} % de ${GRANT_NAME[kind]}. Responde antes del ${until.day}/${until.month} (Pueblo › Ayuntamiento)`);
+  const until = tickToDate(state.tick + days * TICKS_PER_DAY);
+  const late = days < GRANT_OFFER_DAYS ? ' La postal llega tarde: sin oficina de correos hay menos días para responder.' : '';
+  pushEvent(state, 'info', `La Diputación ofrece pagar el ${Math.round(share * 100)} % de ${GRANT_NAME[kind]}. Responde antes del ${until.day}/${until.month} (Pueblo › Ayuntamiento)${late}`);
 }
 
 export const GRANT_NAME: Partial<Record<BuildingKind, string>> = {
@@ -339,7 +344,7 @@ export function civicDay(state: GameState): void {
   }
   // Subvenciones: las ofertas caducan; las aceptadas fuera de plazo se devuelven con recargo.
   for (const g of state.grants) {
-    if (g.status === 'offered' && state.tick - g.offeredTick > GRANT_OFFER_DAYS * TICKS_PER_DAY) g.status = 'declined';
+    if (g.status === 'offered' && state.tick - g.offeredTick > (g.offerDays ?? GRANT_OFFER_DAYS) * TICKS_PER_DAY) g.status = 'declined';
     // 2.3: el FEDER se acaba sin recargo; la cofinanciación de una obra no caduca.
     if (!classic(g)) {
       if (g.status === 'accepted' && state.tick > g.deadline) g.status = 'paid';

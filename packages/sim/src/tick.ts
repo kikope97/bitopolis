@@ -40,6 +40,8 @@ import {
   FIRE,
 } from './balance.ts';
 import { farmMonth, growFarms } from './farm.ts';
+import { coopFees, coopMonth } from './coop.ts';
+import { postMonth } from './post.ts';
 import { applyCommand, BUILD_NAMES, removeBuilding } from './commands.ts';
 import { OUTSIDE, ownIncome, TREASURY, transfer } from './money.ts';
 import { chance, nextInt, pick } from './prng.ts';
@@ -677,6 +679,8 @@ function endOfMonth(state: GameState): void {
   // tributos (lo que no pueda, como deuda), devuelve deudas y, si le sobra, ocio.
   // 2.2: las fincas que cosechan este mes venden (y pagan a los temporeros) antes de las nóminas.
   farmMonth(state);
+  // 2.5: la cooperativa cobra el sobreprecio de las cosechas de sus socios (y reparte en diciembre).
+  coopMonth(state);
   businessPayroll(state, r);
   outsideJobsMonth(state);
   // 2.4: pensión mínima de los jubilados y padres que dejan el trabajo sin plaza de guardería.
@@ -688,6 +692,8 @@ function endOfMonth(state: GameState): void {
   monthlyHousing(state, r);
   // 2.4: residencia y guardería (cuotas con charge: lo impagado queda como deuda).
   careMonth(state);
+  // 2.5: cuota de los socios de la cooperativa (charge: lo impagado queda como deuda).
+  coopFees(state);
   settleMonth(state, shops);
   // 2.3: en septiembre, la feria regional trae compradores de fuera.
   fairMonth(state, shops);
@@ -707,6 +713,9 @@ function endOfMonth(state: GameState): void {
   // 2.3: mantenimiento y cofinanciación de las grandes obras.
   landmarksMonth(state);
   lifeMonth(state);
+  // 2.5: cartas de los que se fueron (con correos); a veces quien escribe vuelve.
+  const back = postMonth(state, freeHomes(state) > 0);
+  if (back?.named) onNamedArrival(state, back);
   // 2.1: voluntarios de protección civil (por reglas).
   volunteersMonth(state);
   monthlyMarket(state);

@@ -566,7 +566,8 @@ export interface Grant {
   /** 2.3: ayuda de emergencia del escenario «Tras la riada» (total en €; la cobra y la reintegra scenarios.ts). */
   emergency?: number;
   /** 2.3: a qué va el FEDER: las fases de la estación (`kind: 'station'`) o las reparaciones. */
-  federFor?: 'station' | 'repair';
+  federFor?: 'station' | 'repair';  /** 2.5: días para responder a la oferta (sin correos, menos; post.ts). Sin definir: `GRANT_OFFER_DAYS`. */
+  offerDays?: number;
 }
 
 /**
@@ -1013,6 +1014,16 @@ export interface CoopState {
   presidentId: number | null;
   /** Lo repartido el último año (para la ficha). */
   lastShare?: number;
+  /** Año del último reparto y lo que tocó a cada socio. */
+  shareYear?: number;
+  perMember?: number;
+  /** Lo que la cooperativa ha ganado este año para el reparto (sobreprecio de las cosechas). */
+  yearBonus?: number;
+  /** Excedente sin vender (euros de producto, no dinero): lo puede comprar la comarca. */
+  stock?: number;
+  /** Cuándo entró cada socio (tick) y meses seguidos sin pagar la cuota. Claves: id del vecino. */
+  joined?: Record<string, number>;
+  arrears?: Record<string, number>;
 }
 
 export interface Letter {

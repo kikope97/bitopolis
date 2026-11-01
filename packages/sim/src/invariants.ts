@@ -1,6 +1,8 @@
 import { HOMES, LISTS } from './balance.ts';
 import { isLandmarkKind } from './landmarks.ts';
 import { farmInvariants } from './farm.ts';
+import { coopInvariants } from './coop.ts';
+import { postInvariants } from './post.ts';
 import { loanInvariants } from './invariants-loans.ts';
 import { totalInternalMoney } from './money.ts';
 import type { GameState } from './state.ts';
@@ -58,6 +60,7 @@ export function checkInvariants(state: GameState): string[] {
   errors.push(...tenderErrors(state), ...streetErrors(state));
   // 2.2: fincas solo en zona agraria y con el cultivo de su terreno.
   errors.push(...farmInvariants(state));
+  errors.push(...coopInvariants(state), ...postInvariants(state));
   // 2.2: préstamos municipales.
   errors.push(...loanInvariants(state));
   errors.push(...listInvariants(state));

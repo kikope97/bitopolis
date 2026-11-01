@@ -1437,11 +1437,58 @@ export const DENSITY = {
 };
 export const VPO = { homes: 6, rent: 120 };
 
-/** Bloque G: cooperativa agraria. */
-export const COOP = { priceFx: 0.15, priceFxLevel2: 0.25, fee: 20 };
+/**
+ * Bloque G: cooperativa agraria (coop.ts). Los socios son vecinos con finca (dueños o
+ * quien la trabaja). La cooperativa vende su cosecha más cara (la diferencia entra en su
+ * caja), cobra una cuota al mes y lo reparte todo a partes iguales al cerrar el año.
+ */
+export const COOP = {
+  /** Sobre el precio de la cosecha de cada socio (nivel 1; nivel 2, almazara o bodega). */
+  priceFx: 0.15,
+  priceFxLevel2: 0.25,
+  /** Cuota mensual de cada socio (con `charge()`: lo impagado queda como deuda). */
+  fee: 20,
+  /** Meses seguidos sin pagar la cuota hasta que la cooperativa le da de baja. */
+  dropAfter: 3,
+  /** Meses como socio antes de poder darse de baja (para que nadie entre y salga cada semana). */
+  minMonths: 3,
+  /** Excedente: esta parte de la cosecha de los socios no la compra el mercado de siempre. */
+  surplusShare: 0.1,
+  /** Lo que no compre la comarca se vende fuera al cerrar el año, a esta parte de su valor. */
+  surplusOutsideFx: 0.5,
+  /** Nivel 2 (almazara o bodega): hacen falta estos socios. */
+  maxLevel: 2,
+  level2Members: 4,
+  /** Reglas (sin IA): se apunta quien es sociable o ahorrador y tiene para unas cuantas cuotas. */
+  joinSocial: 45,
+  joinSaver: 55,
+  joinMoneyFees: 3,
+  /** Reglas: se da de baja el muy terco sin reparto el año pasado, o quien no llega a la cuota. */
+  leaveTerco: 80,
+};
 
-/** Bloque H: correos y cartas. */
-export const POST = { grantDaysWithout: 20, grantDaysWith: 30, lettersPerMonth: 1, letterMood: 3, returnChance: 0.1, returnHappiness: 60 };
+/** Bloque H: correos y cartas (post.ts). */
+export const POST = {
+  /** Días para responder a una subvención de la Diputación sin oficina de correos y con ella. */
+  grantDaysWithout: 20,
+  grantDaysWith: 30,
+  lettersPerMonth: 1,
+  /** Felicidad de quien recibe una carta (y un recuerdo bueno). */
+  letterMood: 3,
+  /** Con el pueblo contento (felicidad media > `returnHappiness`) y casa libre, a veces vuelve quien escribe. */
+  returnChance: 0.1,
+  returnHappiness: 60,
+  /** Ahorros con los que vuelve (de fuera). */
+  returnSavings: 1_500,
+  /** Se escribe a partir de un mes fuera y hasta 6 años después; una carta por persona cada año como mucho. */
+  minDays: 30,
+  maxYears: 6,
+  everyDays: 360,
+  /** Cartas que se guardan (las más viejas se olvidan). */
+  keep: 24,
+  /** Texto de la carta con IA (fuera del estado). */
+  maxText: 400,
+};
 
 /** Bloques I y J: la comarca (pueblos vecinos), alcaldes y feria comarcal. */
 export const COMARCA = {

@@ -122,6 +122,9 @@ export const MEMORY_KINDS = [
   'a_la_residencia',
   'cuida_padre',
   'excursion',
+  // 2.5: correos.
+  'carta',
+  'volvio',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -412,6 +415,10 @@ export function memoryText(state: GameState, m: Memory): string {
       return m.about.length ? `Cuida en casa a ${who}` : 'Su familia le cuida en casa';
     case 'excursion':
       return 'Fue de excursión en el autobús de los jubilados';
+    case 'carta':
+      return `Recibió carta de ${who}`;
+    case 'volvio':
+      return 'Volvió al pueblo';
   }
 }
 
@@ -1023,6 +1030,9 @@ const MEMORY_LINE: Partial<Record<MemoryKind, (who: string) => string>> = {
   le_acogieron: (who) => `No olvidaré que ${who} me abrió su casa tras el fuego.`,
   voluntario: () => 'Desde que soy voluntario de protección civil me siento útil.',
   ambulancia: () => 'Si no llega a ser por la ambulancia, no lo cuento.',
+  // 2.5: correos.
+  carta: (who) => `Me ha escrito ${who}; me ha alegrado el día.`,
+  volvio: () => 'Qué alegría haber vuelto al pueblo.',
 };
 
 /** Frase de un recuerdo; las pérdidas, distintas para la pareja y para una amistad (ronda 11). */
