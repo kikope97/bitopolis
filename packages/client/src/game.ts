@@ -62,6 +62,7 @@ import {
 } from '@bitopolis/sim';
 import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
 import { openNeighbours, openReport, openTaxes as openTaxesSheet } from './economy-ui.ts';
+import { heavyLoad, loadPct, openLoans } from './loans-ui.ts';
 import { LAYERS, type LayerId, NEED_ICON } from './layers.ts';
 import { openTownHall } from './civic-ui.ts';
 import { openAlbum, snapMoments } from './album-ui.ts';
@@ -540,7 +541,10 @@ export function startGame(opts: GameOptions): void {
     moneyTrend.textContent = diff > 0 ? '▲' : diff < 0 ? '▼' : '';
     moneyTrend.className = `trend ${diff > 0 ? 'up' : diff < 0 ? 'down' : ''}`;
     $('#hud-money').classList.toggle('neg', state.treasury < 0);
-    $('#hud-money').setAttribute('aria-label', `Caja del ayuntamiento: ${money(state.treasury)}${diff > 0 ? ', subiendo' : diff < 0 ? ', bajando' : ''}. Ver cuentas`);
+    // 2.2: en ámbar si los préstamos se llevan más del 25 % de lo que entra.
+    const heavy = state.treasury >= 0 && heavyLoad(state);
+    $('#hud-money').classList.toggle('load', heavy);
+    $('#hud-money').setAttribute('aria-label', `Caja del ayuntamiento: ${money(state.treasury)}${diff > 0 ? ', subiendo' : diff < 0 ? ', bajando' : ''}${heavy ? `; los préstamos se llevan el ${loadPct(state)} % de lo que entra` : ''}. Ver cuentas`);
     popText.textContent = String(state.citizens.length);
     $('#hud-pop').setAttribute('aria-label', `Habitantes: ${state.citizens.length}. Ver la lista`);
     const happy = state.citizens.length ? Math.round(state.citizens.reduce((s, c) => s + c.happiness, 0) / state.citizens.length) : 0;
@@ -1908,6 +1912,7 @@ export function startGame(opts: GameOptions): void {
   /* ---------- menú, impuestos y cuentas ---------- */
   const social: SocialCtx = { token, state: () => state, command };
   const openTaxes = () => openTaxesSheet(() => state, command);
+  const openLoansSheet = () => openLoans(() => state, command);
   // 2.0: el % de vecinos con IA se cambia en Ajustes (con key del servidor, lo fija /admin).
   let aiShareLocked = true;
   if (state.aiMode) void api.aiMeta().then((m) => (aiShareLocked = m.serverKey)).catch(() => undefined);
@@ -1962,6 +1967,8 @@ export function startGame(opts: GameOptions): void {
         ['Caja: ', h('strong', {}, money(state.treasury)), net !== null ? ` · último mes: ${net >= 0 ? '+' : ''}${money(net)}` : ''],
         item('Parte mensual', go(openAccounts)),
         item('Impuestos', go(openTaxes)),
+        // 2.2: préstamos municipales (destaca con mucha carga o nota D).
+        item(`Préstamos · nota ${state.rating ?? 'B'}`, go(openLoansSheet), heavyLoad(state) || state.rating === 'D'),
       ),
       card(
         'build',

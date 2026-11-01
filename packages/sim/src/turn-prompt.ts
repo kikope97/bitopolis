@@ -1,3 +1,4 @@
+import { loadBand, loanLoad } from './loans.ts';
 import { tickToDate } from '@bitopolis/shared';
 import { z } from 'zod';
 import { CAUSE_ASK } from './associations.ts';
@@ -73,6 +74,8 @@ export function turnShared(state: GameState): string {
     poblacion: state.citizens.length,
     felicidad_media: Math.round(averageHappiness(state)),
     caja_ayuntamiento: band(state.treasury, [0, 5_000, 30_000], ['en deuda', 'justa', 'normal', 'holgada']),
+    // 2.2: nota de las cuentas y carga de los préstamos, en bandas (sin cifras).
+    cuentas: `nota ${state.rating ?? 'B'} (A la mejor, D sin crédito), carga de los préstamos ${loadBand(loanLoad(state))}`,
     impuestos: state.taxesSplit ? { ibi: lvl(state.taxes.ibi), tasas: lvl(state.taxes.tasas), plusvalia: lvl(state.taxes.plusvalia) } : lvl(state.taxLevel),
     sueldo_minimo_empresas: `${MIN_WAGE[state.minWage ?? 'none']} € al mes`,
     servicios: ['water', 'power', 'park', 'school', 'clinic', 'police', 'bar', 'chapel', 'cemetery', 'library', 'sports', 'jail', 'cleanpoint'].filter((k) => kinds.has(k as never)).map((k) => BUILD_NAMES[k]!.toLowerCase()),
