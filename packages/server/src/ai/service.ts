@@ -507,7 +507,7 @@ export class AiService {
    */
   async text(
     gameId: number,
-    kind: 'consejero' | 'diario' | 'conversacion' | 'pleno',
+    kind: 'consejero' | 'diario' | 'conversacion' | 'pleno' | 'carta',
     req: TextRequest,
     premium: boolean,
     /** 2.4: validación propia (p. ej. el pleno, varias líneas); por defecto `parseText`. */
