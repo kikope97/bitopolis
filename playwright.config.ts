@@ -3,6 +3,8 @@ import { defineConfig, devices } from '@playwright/test';
 // Puerto configurable (varias pruebas a la vez en la misma máquina).
 const PORT = Number(process.env.PW_PORT ?? 8090);
 const ADMIN_PORT = Number(process.env.PW_ADMIN_PORT ?? 8091);
+// 2.4: el LLM falso también (las pruebas que lo usan leen PW_LLM_PORT).
+const LLM_PORT = Number(process.env.PW_LLM_PORT ?? 8099);
 
 export default defineConfig({
   testDir: 'e2e',
@@ -15,7 +17,7 @@ export default defineConfig({
     { name: 'escritorio', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } },
   ],
   webServer: [
-    { command: 'node e2e/fake-llm.mjs', url: 'http://localhost:8099/', reuseExistingServer: !process.env.CI },
+    { command: 'node e2e/fake-llm.mjs', url: `http://localhost:${LLM_PORT}/`, reuseExistingServer: !process.env.CI, env: { FAKE_LLM_PORT: String(LLM_PORT) } },
     {
       // Sin variables de configuración: todo se configura en /admin. Datos nuevos en cada ejecución.
       command: `rm -rf test-results/data && pnpm build && node packages/server/dist/index.js`,
