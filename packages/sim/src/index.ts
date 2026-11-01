@@ -16,6 +16,7 @@ export * from './fields.ts';
 export * from './social.ts';
 export * from './narrative.ts';
 export * from './politics.ts';
+export * from './rival-ai.ts';
 export * from './civic.ts';
 export * from './lifecycle.ts';
 export * from './names.ts';

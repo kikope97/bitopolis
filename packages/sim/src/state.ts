@@ -17,7 +17,7 @@ import type { Justice } from './crime.ts';
 import { emptyRank, type TownRank } from './rank-core.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
-export const FORMAT_VERSION = 14;
+export const FORMAT_VERSION = 15;
 
 export const MAP_W = 48;
 export const MAP_H = 48;

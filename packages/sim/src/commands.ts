@@ -164,6 +164,16 @@ export function governmentCommand(state: GameState, cmd: Command): boolean {
   }
 }
 
+/** 2.2: valida una orden como la validaría el gobierno rival (sin aplicarla). Para `rivalMenu`. */
+export function validateAsGovernment(state: GameState, cmd: unknown): CommandResult {
+  governing = true;
+  try {
+    return validateCommand(state, cmd);
+  } finally {
+    governing = false;
+  }
+}
+
 /** En la oposición el jugador solo puede hablar con los vecinos (y la IA decidir). */
 // Ronda 17: el turno del pueblo (IA) y los votos no son órdenes del alcalde: valen también en la oposición.
 const OPPOSITION_ALLOWED = new Set(['TalkTo', 'NotifyProject', 'CitizenAct', 'Campaign', 'Motion', 'TownTurn', 'ChooseCrest']);

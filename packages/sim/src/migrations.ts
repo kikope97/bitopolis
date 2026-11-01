@@ -1,6 +1,6 @@
 import { emptyErrands } from './errands.ts';
 import { emptyPress } from './press.ts';
-import { emptyPolitics } from './politics-core.ts';
+import { emptyPolitics, FACTION_STYLE, type Faction } from './politics-core.ts';
 import { FORMAT_VERSION, type GameState } from './state.ts';
 import { emptyRank } from './rank-core.ts';
 import { levelForPop } from './townhall.ts';
@@ -160,7 +160,27 @@ export const MIGRATIONS: Record<number, Migration> = {
   }),
   // 2.1: emergencias, encargos y periódico (cada parte, en su función).
   13: (s) => ({ ...migrate14Trash(migrate14Rank(migrate14Errands(migrate14Fire(s)))), formatVersion: 14 }),
+  // 2.2: economía y política (cada parte, en su función).
+  14: (s) => ({ ...migrate15Politics(s), formatVersion: 15 }),
 };
+
+/**
+ * 2.2 (rival y candidaturas): el partido de antes lleva el estilo de su facción
+ * y sus promesas se comprueban como exigencias; las listas empiezan con él
+ * (una copia: nunca la misma referencia).
+ */
+export function migrate15Politics(s: Record<string, any>): Record<string, any> {
+  const pol = s.politics;
+  if (!pol) return s;
+  const fix = (party: Record<string, any>) => ({
+    ...party,
+    style: party.style ?? FACTION_STYLE[party.faction as Faction] ?? 'populista',
+    promises: (party.promises ?? []).map((pr: Record<string, any>) => ({ ...pr, check: pr.check ?? 'exigencia' })),
+  });
+  const party = pol.party ? fix(pol.party) : null;
+  const lists = pol.lists ? pol.lists.map(fix) : party ? [JSON.parse(JSON.stringify(party))] : [];
+  return { ...s, politics: { ...pol, party, lists } };
+}
 
 /** 2.1: encargos del pueblo y El Eco de Bitópolis, vacíos (el primero, en unos días). */
 function migrate14Errands(s: Record<string, any>): Record<string, any> {

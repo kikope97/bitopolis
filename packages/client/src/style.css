@@ -361,6 +361,16 @@ html[data-contrast='alto'] .btn, html[data-contrast='alto'] .seg-btn, html[data-
 .pol-bar.abst .pol-fill { background: repeating-linear-gradient(45deg, #94b0c2 0 3px, #566c86 3px 6px); }
 .btn[aria-disabled='true'] { color: var(--muted); border-style: dashed; box-shadow: none; cursor: not-allowed; }
 body.election-night .bubbles { display: none; }
+/* 2.2: tarjetas de las candidaturas (legibles a 360 px: las promesas bajan de línea). */
+.pol-label { overflow-wrap: anywhere; }
+.rival-card { border: 2px solid var(--line); border-left: 4px solid #b13e53; padding: 6px 10px; margin: 8px 0; background: var(--panel-2); }
+.rival-card.governs { border-left-color: var(--accent); }
+.rival-card h4 { margin: 0 0 4px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; overflow-wrap: anywhere; }
+.rival-card p { margin: 2px 0 6px; }
+.promises { list-style: none; margin: 4px 0 8px; padding: 0; }
+.promises li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 8px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.promise-need { flex: 1 1 10em; min-width: 0; }
+.promises .pill { white-space: nowrap; }
 
 /* Letra pixel (opción estética): 11 filas por em → a 22 px cada píxel mide 2 px exactos. */
 html[data-font='pixel'] body, html[data-font='pixel'] button, html[data-font='pixel'] input, html[data-font='pixel'] select { font-family: 'Bitopolis Pixel', ui-monospace, monospace; -webkit-font-smoothing: none; font-smooth: never; }

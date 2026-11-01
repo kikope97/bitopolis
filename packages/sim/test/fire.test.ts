@@ -33,6 +33,7 @@ import {
   validateCommand,
   volunteersMonth,
   WEATHER,
+  FORMAT_VERSION,
 } from '../src/index.ts';
 
 /** Un pueblo hecho (sin bomberos) con dinero para obras. */
@@ -343,7 +344,7 @@ describe('formato 14 y determinismo (2.1)', () => {
     delete old.dikes;
     delete old.emergencies;
     const m = migrate(old);
-    expect(m.formatVersion).toBe(14);
+    expect(m.formatVersion).toBe(FORMAT_VERSION);
     expect(m.dikes).toEqual([]);
     expect(m.emergencies).toEqual({ fires: 0, putOut: 0, saved: 0, floodsAvoided: 0 });
     expect(typeof MIGRATIONS[13]).toBe('function');

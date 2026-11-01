@@ -68,7 +68,7 @@ import { ruleTurn } from './decisions.ts';
 import { basicLiving, drownedInDebt, economyStats, outsideJobsMonth, settleMonth, totalDebt, unansweredDeferrals } from './household.ts';
 import { FIRST_NAMES, SURNAMES } from './names.ts';
 import { addMemory, goalFor, memoryMood, onCitizenLeaves, PROFESSIONS, relationMood, socialDay } from './social.ts';
-import { politicsDay } from './politics.ts';
+import { politicsDay, politicsPrune } from './politics.ts';
 import {
   type Building,
   type Citizen,
@@ -741,6 +741,8 @@ export function step(state: GameState): void {
   fireTick(state);
   // 2.0: turnos del pueblo con IA (abrir, y si vencen sin respuesta, reglas).
   turnsTick(state, ruleTurn);
+  // 2.2: ninguna candidatura sin su líder (se va, muere o acaba en la cárcel de fuera).
+  politicsPrune(state);
 }
 
 /** Aplica los comandos de este tick y avanza. */
