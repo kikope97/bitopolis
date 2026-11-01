@@ -1,10 +1,12 @@
-import type { BuildKind, Command, TaxLevel } from '@bitopolis/shared';
-import { LOANS, PLANT_CAPACITY, TRASH } from './balance.ts';
+import type { BuildKind, Command, LandmarkKind, TaxLevel } from '@bitopolis/shared';
+import { LANDMARKS, LOANS, PLANT_CAPACITY, TRASH, WAGE_OUTSIDE } from './balance.ts';
+import { LANDMARK_KINDS, landmarkReqs, phaseCost } from './landmarks.ts';
+import { isWater, Terrain } from './terrain.ts';
 import { averageIncome, canRequestLoan, loanCapacity, loanOffer } from './loans.ts';
 import { canUpgradeTownhall, nextLevel, zonesUnlocked } from './townhall.ts';
 import { buildCost, validateCommand } from './commands.ts';
 import { chance, type RngState, seedRng } from './prng.ts';
-import { buildingAt, DIRS, type GameState, hasAdjacentRoad, Tile, tileIndex, Zone } from './state.ts';
+import { buildingAt, DIRS, footprint, type GameState, hasAdjacentRoad, terrainAt, Tile, tileIndex, Zone } from './state.ts';
 import { freeHomes } from './tick.ts';
 import { farmZoneUnlocked } from './farm.ts';
 
@@ -42,6 +44,8 @@ interface PlannerOpts {
    * de agua y luz no llegaba a la zona industrial (semillas 3 y 5: 35 vecinos).
    */
   keepRoads?: boolean;
+  /** 2.3: grandes obras: paga una fase si la caja pasa de la reserva más lo que cuesta (y acepta la cofinanciación). */
+  landmarks?: boolean;
 }
 
 /**
@@ -127,6 +131,86 @@ function roadNetworkOf(state: GameState, b: { x: number; y: number }): Set<numbe
     const i = queue.pop()!;
     for (const [dx, dy] of DIRS) push((i % w) + dx, Math.floor(i / w) + dy);
   }
+  return out;
+}
+
+/**
+ * 2.3: lo que hace un jugador con las grandes obras: acepta la cofinanciación
+ * y el FEDER, dice que sí a la gran empresa (con el IBI bonificado), paga la
+ * fase siguiente si la caja pasa de la reserva más lo que cuesta (con los
+ * sueldos de la obra) y, si no hay ninguna en marcha, empieza la primera que
+ * pueda pagar, cerca del centro.
+ */
+function landmarkPlan(state: GameState, reserve: number, spots: { x: number; y: number }[], keepRoads = false): Command[] {
+  const offer = state.grants.find((g) => g.status === 'offered' && (g.landmark !== undefined || g.feder));
+  if (offer) return [{ type: 'AnswerGrant', grantId: offer.id, accept: true }];
+  if (state.bigCompany?.status === 'oferta') {
+    const yes: Command = { type: 'AnswerBigCompany', accept: true, incentive: 'ibi_bonificado' };
+    return [validateCommand(state, yes).ok ? yes : { type: 'AnswerBigCompany', accept: false, incentive: 'ninguno' }];
+  }
+  const margin = (kind: LandmarkKind) => LANDMARKS.specs[kind].workers * LANDMARKS.specs[kind].days * WAGE_OUTSIDE;
+  for (const lm of state.landmarks) {
+    if (lm.phase >= lm.phases || lm.phaseUntil !== -1) continue;
+    const cmd: Command = { type: 'FundLandmarkPhase', id: lm.id };
+    if (state.treasury > reserve + phaseCost(state, lm) + margin(lm.kind) && validateCommand(state, cmd).ok) return [cmd];
+  }
+  if (state.landmarks.some((l) => l.phase < l.phases)) return [];
+  const planned = keepRoads ? plannedRoadTiles(state) : new Set<number>();
+  for (const kind of LANDMARK_KINDS) {
+    if (state.landmarks.some((l) => l.kind === kind)) continue;
+    // No empieza lo que no puede acabar: hace falta la obra entera (todas las fases y sus sueldos) además de la reserva.
+    if (state.treasury <= reserve + (phaseCost(state, { kind }) + margin(kind)) * LANDMARKS.specs[kind].phases) continue;
+    if (landmarkReqs(state, kind).some((r) => !r.ok)) continue;
+    if (kind === 'bridge' && !riverSpots(state).length) {
+      const road = roadToRiver(state);
+      if (road) return [road];
+      continue;
+    }
+    const size = LANDMARKS.specs[kind].size;
+    const tries: { x: number; y: number }[] =
+      kind === 'bridge' ? riverSpots(state) : spots.flatMap((p) => [p, { x: p.x - 1, y: p.y }, { x: p.x, y: p.y - 1 }, { x: p.x - 1, y: p.y - 1 }]);
+    for (const t of tries) {
+      if (size === 2 && footprint({ ...t, size: 2 }).some(([x, y]) => planned.has(tileIndex(state, x, y)))) continue;
+      const cmd: Command = { type: 'StartLandmark', kind, x: t.x, y: t.y };
+      if (validateCommand(state, cmd).ok) return [cmd];
+    }
+  }
+  return [];
+}
+
+/** Calle recta más corta desde la red hasta la orilla (para poder hacer el puente de piedra). */
+function roadToRiver(state: GameState): Command | null {
+  let best: Command | null = null;
+  let len = Infinity;
+  for (let y = 0; y < state.map.h; y++) {
+    for (let x = 0; x < state.map.w; x++) {
+      if (terrainAt(state, x, y) !== Terrain.River) continue;
+      for (const [dx, dy] of DIRS) {
+        for (let k = 1; k <= 20 && k < len; k++) {
+          const px = x + dx * k;
+          const py = y + dy * k;
+          if (px < 0 || py < 0 || px >= state.map.w || py >= state.map.h) break;
+          if (state.map.tiles[tileIndex(state, px, py)] === Tile.Road) {
+            if (k === 1) return null;
+            const cmd: Command = { type: 'BuildRoad', x: x + dx, y: y + dy, x2: px - dx, y2: py - dy };
+            if (validateCommand(state, cmd).ok) {
+              best = cmd;
+              len = k;
+            }
+            break;
+          }
+          if (buildingAt(state, px, py) || isWater(terrainAt(state, px, py))) break;
+        }
+      }
+    }
+  }
+  return best;
+}
+
+/** Casillas de río junto a una carretera (para el puente de piedra). */
+function riverSpots(state: GameState): { x: number; y: number }[] {
+  const out: { x: number; y: number }[] = [];
+  for (let y = 0; y < state.map.h; y++) for (let x = 0; x < state.map.w; x++) if (terrainAt(state, x, y) === Terrain.River && hasAdjacentRoad(state, x, y)) out.push({ x, y });
   return out;
 }
 
@@ -229,6 +313,14 @@ function planner(name: string, o: PlannerOpts): Profile {
           return out;
         }
       }
+      // 2.3: grandes obras (y la gran empresa, con el IBI bonificado).
+      if (o.landmarks) {
+        const lm = landmarkPlan(state, o.reserve, spots, o.keepRoads);
+        if (lm.length) {
+          out.push(...lm);
+          return out;
+        }
+      }
       const zonesOn = zonesUnlocked(state);
       // Un jugador razonable mira el parte: no añade servicios (y sus sueldos) con el mes en negativo.
       const last = state.stats.at(-1);
@@ -282,7 +374,7 @@ function planner(name: string, o: PlannerOpts): Profile {
 
 export const PROFILES: Record<string, Profile> = {
   pasivo: { name: 'pasivo', decide: () => [] },
-  casual: planner('casual', { tax: 'medium', reserve: 3_000, activity: 0.3, services: ['park'], municipalHousing: false }),
+  casual: planner('casual', { tax: 'medium', reserve: 3_000, activity: 0.3, services: ['park'], municipalHousing: false, landmarks: true }),
   // 2.2: un jugador casual que además pinta zona agraria (para medir el campo).
   campo: planner('campo', { tax: 'medium', reserve: 3_000, activity: 0.3, services: ['park'], municipalHousing: false, farms: 8 }),
   ahorrador: planner('ahorrador', { tax: 'low', reserve: 4_000, activity: 0.5, services: ['park'], municipalHousing: false }),
@@ -304,6 +396,7 @@ export const PROFILES: Record<string, Profile> = {
     municipalHousing: true,
     borrow: 'prudente',
     keepRoads: true,
+    landmarks: true,
   }),
   // 2.2: como el constructor, pero pidiendo prestado todo lo que le dejen (equilibrio de los préstamos).
   endeudado: planner('endeudado', {
