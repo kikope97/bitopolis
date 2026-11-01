@@ -15,6 +15,8 @@ import { donorCandidates, landmarksInProgress } from './landmarks.ts';
 import { complainCandidates, ruralCandidates, ruralDemand } from './tourism.ts';
 import { hireForBigCompany } from './region.ts';
 import { chance } from './prng.ts';
+import { attended, careRuleAction } from './care.ts';
+import { transitRuleAction } from './transit.ts';
 import { LANDMARKS, TOURISM, TURN } from './balance.ts';
 import {
   type Citizen,
@@ -85,7 +87,8 @@ export function validActions(state: GameState, c: Citizen, trigger: Trigger): st
     case 'sin_trabajo':
       return [...vacantJobs(state, c).map((b) => `aceptar_trabajo:${b.id}`), 'seguir_fuera'];
     case 'infeliz':
-      return ['quedarse', 'quejarse', 'irse'];
+      // 2.4: un mayor bien atendido no se va por estar triste.
+      return attended(c) ? ['quedarse', 'quejarse'] : ['quedarse', 'quejarse', 'irse'];
     case 'subida_impuestos':
       return ['quedarse', 'quejarse', 'irse'];
     case 'ahorros':
@@ -197,7 +200,8 @@ export function ruleTurn(state: GameState, ids: number[]): { id: number; text: s
     else if (c.money > 2_500 + c.traits.ahorro * 30) trigger = 'ahorros';
     if (!trigger) {
       // 2.3: por costumbre también, con moderación y dados: donar a la obra, abrir casa rural o quejarse de los turistas.
-      const extra = ruleExtra(state, c);
+      // 2.4: cuidados (residencia o en casa) y buscar trabajo fuera en autobús, por rasgos.
+      const extra = careRuleAction(state, c) ?? transitRuleAction(state, c) ?? ruleExtra(state, c);
       if (extra) {
         const motivo = ruleMotivo(state, c, extra);
         lines.push({ id: c.id, text: `${c.name} ${performAction(state, c, 'opinion', extra, motivo, 'rule')}`, motivo });
@@ -392,6 +396,9 @@ const TEMPLATES: Record<string, string[]> = {
   abrir_casa_rural: ['Con tanto visitante, mi casa puede dar algo más.', 'Una casa rural: ganaré un dinero con los forasteros.', 'Si vienen turistas, que duerman en mi casa.'],
   quejarse_turistas: ['Con tanto turista no hay quien descanse.', 'Los alquileres suben y los de aquí nos quedamos fuera.', 'Turistas sí, pero con respeto a los vecinos.'],
   pedir_aplazamiento: ['Alcalde, deme unos meses: lo pagaré, pero ahora no llego.', 'No es que no quiera pagar, es que no puedo. Necesito tiempo.', 'Con un aplazamiento lo devuelvo poco a poco.'],
+  llevar_a_residencia: ['En la residencia estará mejor atendido que conmigo.', 'Me duele, pero allí lo cuidarán de verdad.', 'Iré a verle cada semana.'],
+  cuidar_en_casa: ['A los míos los cuido yo.', 'Trabajaré menos, pero en casa no le faltará de nada.', 'Me cuidó toda la vida; ahora me toca a mí.'],
+  buscar_trabajo_fuera: ['Con el autobús, buscaré trabajo en la comarca.', 'Si aquí no hay, cogeré el autobús cada mañana.', 'No me quedo de brazos cruzados: a buscar fuera.'],
 };
 
 /** Coletillas según el rasgo dominante: la misma decisión suena distinta en cada vecino. */
