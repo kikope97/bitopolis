@@ -1,5 +1,5 @@
 import type { TurnAct } from '@bitopolis/sim';
-import type { GameState } from '@bitopolis/sim';
+import type { GameState, ViewSnapshot } from '@bitopolis/sim';
 import type { ListedModel } from './model-picker.ts';
 import type { SaveBatch } from './sim.worker.ts';
 
@@ -10,6 +10,9 @@ export interface Summary {
   happiness: number;
   headline: string | null;
 }
+
+/** 2.3: estado del enlace de solo lectura. */
+export type ShareStatus = { active: false } | { active: true; viewToken: string; since: string | null };
 
 export class ApiError extends Error {
   constructor(
@@ -69,6 +72,11 @@ export const api = {
   advisor: (token: string, question: string) => call<{ text: string | null; reason?: string }>('POST', `/api/games/${token}/advisor`, { question }),
   chronicle: (token: string) => call<{ text: string | null; reason?: string }>('POST', `/api/games/${token}/chronicle`),
   regenerate: (token: string, sessionId: string) => call<{ token: string }>('POST', `/api/games/${token}/regenerate`, { sessionId }),
+  /** 2.3: enlace de solo lectura /v/<viewToken> (independiente del de juego). */
+  shareStatus: (token: string) => call<ShareStatus>('GET', `/api/games/${token}/share`),
+  share: (token: string, sessionId: string) => call<ShareStatus>('POST', `/api/games/${token}/share`, { sessionId }),
+  unshare: (token: string, sessionId: string) => call<ShareStatus>('DELETE', `/api/games/${token}/share`, { sessionId }),
+  view: (viewToken: string) => call<{ snapshot: ViewSnapshot; updatedAt: string }>('GET', `/api/view/${viewToken}`),
   async import(file: File): Promise<{ token: string }> {
     const r = await fetch('/api/import', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file });
     const data = await r.json().catch(() => null);
