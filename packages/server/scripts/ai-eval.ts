@@ -197,7 +197,7 @@ for (let seed = 1; seed <= Number(values.seeds); seed++) {
           dir.tokensIn += r.usage.in || tokens(req.system + req.shared + req.user);
           dir.tokensCached += r.usage.cachedIn;
           dir.tokensOut += r.usage.out || tokens(r.text);
-          director = parseDirector(r.text, req.ids, `${req.shared}\n${req.user}`, { news: req.news, errands: req.errands, photos: req.photos });
+          director = parseDirector(r.text, req.ids, `${req.shared}\n${req.user}`, { news: req.news, errands: req.errands, photos: req.photos, rival: req.rival });
           if (director) {
             dir.valid++;
             for (const x of director.director.sucesos) dir.picked[x.id.split(':')[0]!] = (dir.picked[x.id.split(':')[0]!] ?? 0) + 1;

@@ -20,6 +20,7 @@ import { canFound, freeShopLot } from './economy.ts';
 import { FARM_NAME, farmOutlook, feastCandidates, HARVEST_NAME, hail, hailCandidates, harvestFeast } from './farm.ts';
 import { offerErrand } from './errands.ts';
 import { publishEdition } from './press.ts';
+import { applyRivalPicks } from './rival-ai.ts';
 import { hash32 } from './hash.ts';
 import { debtBand, totalDebt } from './household.ts';
 import { transfer } from './money.ts';
@@ -61,6 +62,8 @@ export interface DirectorChoice {
   encargo?: { id: string; carta: string };
   /** 2.2: pies de foto del álbum (momento por tick y tipo). */
   pies?: { tick: number; kind: string; texto: string }[];
+  /** 2.2: el gobierno del rival con IA (ids de `rivalMenu` y su discurso). */
+  rival?: { picks: string[]; discurso: string };
 }
 
 const first = (c: Citizen) => c.name.split(' ')[0]!;
@@ -362,6 +365,7 @@ export function applyDirector(state: GameState, choice: DirectorChoice): TurnLog
   // Ronda 17: el titular de un suceso que al final no pasó no sale.
   const heads = (choice.titulares ?? []).filter((t) => !t.suceso || used.has(t.suceso));
   if (heads.length) publishEdition(state, heads.map((t) => ({ section: t.seccion, text: t.texto, ...(t.sobre !== undefined ? { ref: t.sobre } : {}) })), 'ia');
+  if (choice.rival) applyRivalPicks(state, choice.rival.picks, choice.rival.discurso || undefined);
   for (const p of choice.pies ?? []) {
     const m = (state.album ?? []).find((x) => x.tick === p.tick && x.kind === p.kind && !x.caption);
     if (m) m.caption = p.texto;

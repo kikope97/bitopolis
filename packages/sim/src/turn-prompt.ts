@@ -12,6 +12,7 @@ import { brewingNow, type DirectorChoice, directorMenu, dramaBudget } from './di
 import { errandCandidates } from './errands.ts';
 import { weekNews } from './press.ts';
 import { rankCandidates } from './rank.ts';
+import { rivalAiWanted, rivalPromptData } from './rival-ai.ts';
 import { inventedName, inventedNumber, toneOf } from './prompt.ts';
 import { GOAL_TEXT, HOOK_TEXT, hookFor, memoryText, narrativeSummary, NEED_TEXT, NEEDS, needsOf } from './social.ts';
 import type { Citizen, GameState } from './state.ts';
@@ -26,7 +27,7 @@ import { GESTURES, gestureCandidates, isAiCitizen, PLANS, planText, SPEND, type 
  * La salida tiene un esquema fijo (sin uniones por vecino); cada parte se valida
  * en el motor con el menú del vecino. Nunca va texto libre del jugador.
  */
-export const TURN_PROMPT_VERSION = 10;
+export const TURN_PROMPT_VERSION = 11;
 
 export const TURN_SYSTEM = `Eres la mente de los vecinos de Bitópolis, un pueblo español pequeño. Cada semana decides, a la vez, qué hace cada vecino de la lista. Ellos viven de verdad: trabajan, compran, se enamoran, se enfadan, ahorran o se arruinan, y reaccionan a lo que hace el alcalde (el jugador).
 
@@ -350,6 +351,7 @@ Devuelve:
 - "cronica": 2 o 3 frases en español de España, como el periódico del pueblo, sobre lo que ha hecho el alcalde, cómo está el pueblo y lo que pasa esta semana (máx. 400 caracteres).
 - "titulares": hasta 3 titulares de El Eco de Bitópolis, uno por sección ("sucesos", "cartas" al director, "anuncios"). Cada titular cuenta solo una de "noticias" o uno de los sucesos que eliges esta semana (su id en "sobre"), con un "texto" de periódico de pueblo (máx. 110 caracteres). No cuentes cómo acaba un suceso: lo decide el juego. Si una sección no tiene noticia, no pongas titular. En "cartas", la voz de un vecino.
 - "pies": solo si hay "fotos": un pie de foto para cada una ("id" y "texto", máx. 110 caracteres, como en un álbum de pueblo, sin inventar nada); si no, lista vacía.
+- "gobierno_rival": solo si hay "gobierno_rival" en los datos (gobierna el partido rival, no el jugador): como su alcalde, elige 0 a 2 "picks" (ids de sus "opciones", coherentes con su estilo y sus promesas) y un "discurso" de una frase (máx. 140 caracteres) en su voz; si no hay, picks vacío y discurso "".
 - "encargo": si encaja con la semana, uno de "encargos_posibles" ("id") con la "carta" (máx. 220 caracteres, en primera persona, firmada por quien lo pide) con la que se lo pide al alcalde; si no, id "" y carta "".
 
 Reglas:
@@ -380,8 +382,9 @@ export const DIRECTOR_SCHEMA = {
       type: 'array',
       items: { type: 'object', properties: { id: { type: 'string' }, texto: { type: 'string' } }, required: ['id', 'texto'], additionalProperties: false },
     },
+    gobierno_rival: { type: 'object', properties: { picks: { type: 'array', items: { type: 'string' } }, discurso: { type: 'string' } }, required: ['picks', 'discurso'], additionalProperties: false },
   },
-  required: ['sucesos', 'avisos', 'foco', 'cronica', 'titulares', 'encargo', 'pies'],
+  required: ['sucesos', 'avisos', 'foco', 'cronica', 'titulares', 'encargo', 'pies', 'gobierno_rival'],
   additionalProperties: false,
 } as const;
 
@@ -396,6 +399,8 @@ export interface DirectorRequest {
   errands: string[];
   /** 2.2: fotos del álbum sin pie (id «fX» → momento). */
   photos: { id: string; tick: number; kind: string }[];
+  /** 2.2: opciones de gobierno del rival (si gobierna y le toca este mes). */
+  rival: string[];
 }
 
 /** La petición del director: el mismo bloque común del turno y el menú de sucesos. */
@@ -405,6 +410,8 @@ export function buildDirectorRequest(state: GameState, shared = turnShared(state
   const budget = dramaBudget(state, menu);
   const news = weekNews(state);
   const errands = errandCandidates(state).slice(0, 4);
+  // 2.2: si gobierna el rival y le toca, su menú de gobierno (una vez al mes).
+  const rival = state.ai?.turn?.kind === 'semana' && rivalAiWanted(state) ? rivalPromptData(state) : null;
   // 2.2: en el turno mensual, hasta 4 fotos del último mes sin pie.
   const photos = state.ai?.turn?.monthly ? (state.album ?? []).filter((m) => !m.caption && state.tick - m.tick <= TICKS_PER_MONTH).slice(-4).map((m, i) => ({ id: `f${i + 1}`, tick: m.tick, kind: m.kind, text: m.text })) : [];
   const paceTicks = Math.max(1, (state.ai?.paceDays ?? 7) * 24);
@@ -415,6 +422,7 @@ export function buildDirectorRequest(state: GameState, shared = turnShared(state
     noticias: news.map((n) => ({ id: n.id, seccion: n.section, texto: n.text })),
     encargos_posibles: errands.map((e) => ({ id: e.key, lo_pide: state.citizens.find((c) => c.id === e.by)?.name ?? 'el pueblo', que: e.text })),
     ...(photos.length ? { fotos: photos.map((f) => ({ id: f.id, momento: f.text })) } : {}),
+    ...(rival ? { gobierno_rival: rival } : {}),
   };
   const user = `Director de la semana (elige entre el menú):\n${JSON.stringify(data)}`;
   return {
@@ -426,6 +434,7 @@ export function buildDirectorRequest(state: GameState, shared = turnShared(state
     news: news.map((n) => ({ id: n.id, ...(n.ref !== undefined ? { ref: n.ref } : {}) })),
     errands: errands.map((e) => e.key),
     photos: photos.map((f) => ({ id: f.id, tick: f.tick, kind: f.kind })),
+    rival: rival?.opciones.map((o) => o.id) ?? [],
   };
 }
 
@@ -438,10 +447,11 @@ const DirectorOut = z.object({
   titulares: z.array(z.object({ seccion: z.string().max(20), sobre: z.string().max(20), texto: z.string().max(600) })).max(6).optional(),
   encargo: z.object({ id: z.string().max(60), carta: z.string().max(1000) }).optional(),
   pies: z.array(z.object({ id: z.string().max(10), texto: z.string().max(600) })).max(8).optional(),
+  gobierno_rival: z.object({ picks: z.array(z.string().max(60)).max(6), discurso: z.string().max(600) }).optional(),
 });
 
 /** Lee la respuesta del director: solo ids del menú y textos sin nombres inventados. Null si no vale. */
-export function parseDirector(text: string, ids: string[], sent: string, extra: { news?: { id: string; ref?: number }[]; errands?: string[]; photos?: { id: string; tick: number; kind: string }[] } = {}): { director: DirectorChoice; focus: string; chronicle: string } | null {
+export function parseDirector(text: string, ids: string[], sent: string, extra: { news?: { id: string; ref?: number }[]; errands?: string[]; photos?: { id: string; tick: number; kind: string }[]; rival?: string[] } = {}): { director: DirectorChoice; focus: string; chronicle: string } | null {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
@@ -485,8 +495,13 @@ export function parseDirector(text: string, ids: string[], sent: string, extra: 
     if (!f || texto.length < 4 || bad(texto) || pies.some((x) => x.tick === f.tick && x.kind === f.kind)) continue;
     pies.push({ tick: f.tick, kind: f.kind, texto });
   }
+  // 2.2: el gobierno del rival (solo opciones de su menú; el motor las vuelve a validar).
+  const rp = r.data.gobierno_rival;
+  const rivalPicks = (rp?.picks ?? []).filter((x, i, a) => extra.rival?.includes(x) && a.indexOf(x) === i).slice(0, 2);
+  const discurso = clean(rp?.discurso ?? '', 140);
+  const rival = extra.rival?.length && (rivalPicks.length || discurso) ? { picks: rivalPicks, discurso: bad(discurso) ? '' : discurso } : undefined;
   return {
-    director: { sucesos: picked, avisos: pick(r.data.avisos), ...(titulares.length ? { titulares } : {}), ...(encargo ? { encargo } : {}), ...(pies.length ? { pies } : {}) },
+    director: { sucesos: picked, avisos: pick(r.data.avisos), ...(titulares.length ? { titulares } : {}), ...(encargo ? { encargo } : {}), ...(pies.length ? { pies } : {}), ...(rival ? { rival } : {}) },
     focus: bad(focus) ? '' : focus,
     chronicle: bad(chronicle) ? '' : chronicle,
   };

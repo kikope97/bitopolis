@@ -100,6 +100,8 @@ export const Command = z.discriminatedUnion('type', [
         encargo: z.object({ id: z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(40), carta: z.string().max(500) }).optional(),
         /** 2.2: pies de foto del álbum. */
         pies: z.array(z.object({ tick: z.number().int(), kind: z.string().max(40), texto: z.string().max(200) })).max(4).optional(),
+        /** 2.2: el gobierno del rival con IA (opciones de su menú y su discurso). */
+        rival: z.object({ picks: z.array(z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(60)).max(2), discurso: z.string().max(300) }).optional(),
       })
       .optional(),
   }),
