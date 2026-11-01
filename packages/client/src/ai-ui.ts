@@ -1,7 +1,7 @@
 import { api, type AiMeta, type AiSettings } from './api.ts';
 import { loadModels, modelPicker } from './model-picker.ts';
 
-const KIND_LABEL: Record<string, string> = { decision: 'Decisiones', turno: 'Turnos del pueblo', director: 'Director del pueblo', consejero: 'Consejero', diario: 'Diario', conversacion: 'Conversaciones' };
+const KIND_LABEL: Record<string, string> = { decision: 'Decisiones', turno: 'Turnos del pueblo', director: 'Director del pueblo', consejero: 'Consejero', diario: 'Diario', conversacion: 'Conversaciones', pleno: 'Plenos' };
 import { $, closeSheet, h, sheet, toast } from './ui.ts';
 
 /** Un único formato de euros: «0,42 €» o «menos de 1 céntimo». */

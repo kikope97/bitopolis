@@ -5,11 +5,18 @@ import {
   buildAdvisorRequest,
   buildChronicleRequest,
   buildDecisionRequest,
+  buildPlenoRequest,
   buildTalkRequest,
   createInitialState,
   FORMAT_VERSION,
   type GameState,
   migrate,
+  NEEDS,
+  parsePleno,
+  PLENO_ROLES,
+  PLENO_STANCES,
+  PLENO_TALK,
+  type PlenoTalkInput,
   townFacts,
   validActions,
 } from '@bitopolis/sim';
@@ -322,6 +329,63 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
     // Un texto no válido se recuerda como fallo; si fue por tope o por red, se puede reintentar luego.
     if (r.text || r.reason === 'invalid') chronicles.set(key, r.text ?? '');
     return r;
+  });
+
+  /**
+   * 2.4: el pleno hablado. El cliente manda quién habla y de qué (ids y enums
+   * que calculó el motor); el servidor comprueba los vecinos con su estado,
+   * hace una sola llamada por pleno y guarda el texto en caché. No entra en el
+   * estado ni en el hash. Si falla, el cliente usa las plantillas.
+   */
+  const plenos = new Map<string, string>();
+  const plenoAsking = new Map<string, Promise<{ text: string | null; reason?: string }>>();
+  const lastPleno = new Map<number, number>();
+  const PlenoBody = z.object({
+    tick: z.number().int().min(0),
+    petitions: z
+      .array(z.object({ id: z.number().int(), citizenId: z.number().int(), need: z.enum(NEEDS), yes: z.number().int().min(0).max(100_000), no: z.number().int().min(0).max(100_000), opposition: z.boolean().optional() }))
+      .min(1)
+      .max(4),
+    speakers: z.array(z.object({ id: z.number().int(), role: z.enum(PLENO_ROLES), postura: z.enum(PLENO_STANCES), petitionId: z.number().int() })).min(1).max(PLENO_TALK.speakers),
+  });
+  app.post('/api/games/:token/pleno', async (req, reply) => {
+    const g = await aiGame(req.params);
+    const b = PlenoBody.safeParse(req.body);
+    if (!g || !b.success) return bad(reply, 'petición no válida');
+    const st = g.state;
+    const body = b.data;
+    // El pleno es de ahora (el estado guardado va como mucho un día por detrás) y uno al mes.
+    if (body.tick < st.tick - 72 || body.tick > st.tick + 72 || (st.lastPlenoTick >= 0 && body.tick < st.lastPlenoTick)) return bad(reply, 'ese pleno no es de ahora');
+    const key = `${g.row.id}:${body.tick}`;
+    const cached = plenos.get(key);
+    if (cached !== undefined) return cached ? { lines: JSON.parse(cached) } : { lines: null, reason: 'no disponible en este pleno' };
+    const prev = lastPleno.get(g.row.id);
+    if (prev !== undefined && prev !== body.tick && Math.abs(body.tick - prev) < 24 * 25) return { lines: null, reason: 'solo un pleno al mes' };
+    // Solo vecinos con nombre que existen y peticiones del propio pleno.
+    const speakers = body.speakers.filter((s, i, a) => a.findIndex((x) => x.id === s.id) === i && body.petitions.some((p) => p.id === s.petitionId) && st.citizens.some((c) => c.id === s.id && c.named));
+    if (!speakers.length) return { lines: null, reason: 'nadie habla' };
+    const pleno: PlenoTalkInput = { tick: body.tick, petitions: body.petitions, speakers };
+    lastPleno.set(g.row.id, body.tick);
+    let run = plenoAsking.get(key);
+    if (!run) {
+      const request = buildPlenoRequest(st, pleno);
+      run = ai.text(g.row.id, 'pleno', request, true, (raw) => {
+        const lines = parsePleno(raw, request, pleno);
+        return lines.length ? JSON.stringify(lines.map((l) => ({ id: l.id, linea: l.linea }))) : null;
+      });
+      plenoAsking.set(key, run);
+    }
+    try {
+      const r = await run;
+      // Un texto no válido se recuerda como fallo; si fue por tope o por red, se puede reintentar.
+      if (r.text || r.reason === 'invalid') {
+        plenos.set(key, r.text ?? '');
+        if (plenos.size > 2000) plenos.delete(plenos.keys().next().value!);
+      }
+      return r.text ? { lines: JSON.parse(r.text) } : { lines: null, reason: r.reason };
+    } finally {
+      plenoAsking.delete(key);
+    }
   });
 
   /** «Qué se envía»: un ejemplo real del prompt con el estado de esta partida. */

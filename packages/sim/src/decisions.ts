@@ -5,7 +5,7 @@ import { JOBS, SHOP_NAMES } from './balance.ts';
 import { buyHome, canBuyHome, canFound, foundBusiness, sellOnDeparture, shopTypesFor } from './economy.ts';
 import { OUTSIDE, transfer } from './money.ts';
 import { hash32 } from './hash.ts';
-import { NEED_TEXT as SOCIAL_NEED_TEXT, onCitizenLeaves } from './social.ts';
+import { NEED_TEXT as SOCIAL_NEED_TEXT, onCitizenLeaves, settlePlenoReactions } from './social.ts';
 import { factionOf, voteLean } from './politics.ts';
 import { protestFor } from './associations.ts';
 import { DEBT } from './balance.ts';
@@ -180,6 +180,8 @@ export function ruleTurn(state: GameState, ids: number[]): { id: number; text: s
   const lines: { id: number; text: string; motivo?: string }[] = [];
   const pol = state.politics;
   const voting = pol.party !== null && pol.nextElection - state.tick <= VOTE_WINDOW_DAYS * TICKS_PER_DAY;
+  // 2.4: si la IA no respondió, quien habló en el pleno reacciona por reglas.
+  settlePlenoReactions(state, ids);
   for (const id of ids) {
     const c = state.citizens.find((x) => x.id === id);
     if (!c) continue;

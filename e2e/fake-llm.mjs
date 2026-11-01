@@ -93,6 +93,14 @@ createServer((req, res) => {
       }, delay);
       return;
     }
+    // 2.4: pleno hablado: una línea por vecino que interviene, con su postura.
+    if (Array.isArray(parsed.intervenciones)) {
+      const LINES = { a_favor: 'Lo pido de corazón: el pueblo lo necesita.', en_contra: 'Yo no lo veo claro, hay cosas más urgentes.', matiz: 'Queremos saber cuándo piensa cumplirlo, alcalde.' };
+      const intervenciones = parsed.intervenciones.map((v) => ({ vecino: v.vecino, postura: v.postura, linea: `${LINES[v.postura] ?? LINES.matiz} Palabra de ${v.nombre.split(' ')[0]}.` }));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ intervenciones }) } }], usage: { prompt_tokens: 1500, completion_tokens: 200 } }));
+      return;
+    }
     const isText = !Array.isArray(parsed.vecinos);
     if (isText) {
       const texto = 'Pues aquí andamos, alcalde, con ganas de que el pueblo siga creciendo.';

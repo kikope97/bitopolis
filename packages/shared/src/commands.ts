@@ -118,6 +118,8 @@ export const Command = z.discriminatedUnion('type', [
         pies: z.array(z.object({ tick: z.number().int(), kind: z.string().max(40), texto: z.string().max(200) })).max(4).optional(),
         /** 2.2: el gobierno del rival con IA (opciones de su menú y su discurso). */
         rival: z.object({ picks: z.array(z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(60)).max(2), discurso: z.string().max(300) }).optional(),
+        /** 2.4: el dilema que plantea y su presentación (las opciones las pone el motor). */
+        dilema: z.object({ id: z.string().regex(/^[a-z_]+:[a-z0-9_]+$/).max(60), presentacion: z.string().max(400) }).optional(),
       })
       .optional(),
   }),

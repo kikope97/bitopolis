@@ -505,7 +505,14 @@ export class AiService {
    * Texto con el modelo premium (consejero, diario) o el barato (conversación).
    * Reserva el presupuesto antes de empezar: si no alcanza, no empieza (spec §9.5).
    */
-  async text(gameId: number, kind: 'consejero' | 'diario' | 'conversacion', req: TextRequest, premium: boolean): Promise<{ text: string | null; reason?: string }> {
+  async text(
+    gameId: number,
+    kind: 'consejero' | 'diario' | 'conversacion' | 'pleno',
+    req: TextRequest,
+    premium: boolean,
+    /** 2.4: validación propia (p. ej. el pleno, varias líneas); por defecto `parseText`. */
+    parse: (raw: string) => string | null = (raw) => parseText(raw, req),
+  ): Promise<{ text: string | null; reason?: string }> {
     const s = await this.settings(gameId);
     if (!s.configured) return { text: null, reason: 'IA sin configurar' };
     const model = premium ? s.modelPremium : s.model;
@@ -521,7 +528,7 @@ export class AiService {
       usage.in = r.usage.in;
       usage.cachedIn = r.usage.cachedIn;
       usage.out = r.usage.out;
-      text = parseText(r.text, req);
+      text = parse(r.text);
       if (!text) status = 'invalid';
     } catch (e) {
       status = (e as Error).name === 'TimeoutError' ? 'timeout' : 'error';

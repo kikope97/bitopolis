@@ -947,6 +947,8 @@ export interface Dilemma {
   resolved?: string;
   /** Presentación del director (IA), validada; sin ella, la del motor. */
   intro?: string;
+  /** Cuándo se cerró (para la reacción rápida de los afectados). */
+  closed?: number;
 }
 
 export type FestivalSeason = 'romeria' | 'sanjuan' | 'patronales' | 'navidad';

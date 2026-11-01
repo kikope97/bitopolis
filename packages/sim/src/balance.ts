@@ -1326,6 +1326,22 @@ export const DILEMMA = {
   days: 7,
   noDecideGrudge: 3,
   expandCost: 3_000,
+  /** Modo normal (o sin director): % diario de que el motor abra uno si hay candidato (sin dados: hash). */
+  ruleChancePct: 15,
+  /** Por reglas, como mucho uno cada tantos meses (con director manda el cupo de drama). */
+  ruleGapMonths: 3,
+  /** Desde cuántos vecinos hay dilemas (con un pueblo recién nacido aún no). */
+  minPop: 40,
+  /** Presentación del director (IA), en caracteres. */
+  introMax: 200,
+  /** La última plaza de la residencia: ánimo de quien entra y de quien se queda fuera (y su rencor). */
+  residence: { chosenMood: 6, leftOutMood: -6, leftOutGrudge: 3 },
+  /** Familia con deudas: deuda mínima con el ayuntamiento; desahucio, perdón o microcrédito. */
+  family: { minDebt: 400, evictMood: -10, neighborsGrudge: 1, neighborsRadius: 4, forgiveMood: 5, microMood: 3 },
+  /** La fábrica que vierte: contaminación en su casilla y río a menos de `reach`; multa y despidos o mirar a otro lado. */
+  factory: { pollution: 40, reach: 6, fine: 1_200, fired: 2, lookAwayGrudge: 2, lookAwayMood: -2, maxNeighbors: 3 },
+  /** El preso arrepentido: días de condena que le quedan como mínimo; indulto o que cumpla. */
+  prisoner: { minDays: 10, pardonFamilyMood: 6, pardonOrderGrudge: 1, orderTerco: 60, orderMax: 6, serveFamilyMood: -3, prisonerMood: 4 },
 };
 
 /**

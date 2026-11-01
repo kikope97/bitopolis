@@ -144,6 +144,9 @@ function roadNetworkOf(state: GameState, b: { x: number; y: number }): Set<numbe
   return out;
 }
 
+/** 2.4: lo que elige un jugador razonable en un dilema (por orden, la primera que pueda). */
+const DILEMMA_PREFERENCE = ['ampliar', 'microcredito', 'mirar_otro_lado', 'que_cumpla', 'plaza_primero', 'perdonar', 'desahuciar', 'multar', 'pedir_indulto'];
+
 /** 2.3: fases que quiere tener en caja para empezar una gran obra. */
 const START_PHASES = 1;
 
@@ -306,6 +309,12 @@ function planner(name: string, o: PlannerOpts): Profile {
       };
       if (!has("water")) { tryBuild("water"); return out; }
       if (!has("power")) { tryBuild("power"); return out; }
+      // 2.4: un jugador decide los dilemas (sin dados: la primera opción válida de su lista).
+      const dilemma = state.dilemmas.find((d) => !d.resolved);
+      if (dilemma) {
+        const pick = DILEMMA_PREFERENCE.map((option): Command => ({ type: 'ResolveDilemma', id: dilemma.id, option })).find((c) => validateCommand(state, c).ok);
+        if (pick) out.push(pick);
+      }
       // Ampliar la red si algún edificio terminado se queda sin agua o luz.
       const built = state.buildings.filter((b) => b.built && b.kind !== 'water' && b.kind !== 'power' && b.kind !== 'farm');
       // No más plantas de las que el pueblo necesita (una nueva mal conectada no arregla nada).

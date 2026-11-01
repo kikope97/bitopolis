@@ -56,3 +56,4 @@ export * from './transit.ts';
 export * from './waterworks.ts';
 export * from './dilemmas.ts';
 export * from './seasons.ts';
+export * from './pleno-prompt.ts';
