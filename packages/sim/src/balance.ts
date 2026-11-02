@@ -1586,3 +1586,18 @@ export const COMARCA = {
   /** Declaración de un alcalde, como mucho. */
   maxSaid: 140,
 };
+
+/**
+ * 2.6 «Lo básico»: las reglas con las que crecen las zonas (las usan `growZones`
+ * y `lotStatus`, que explica por qué un solar no crece).
+ */
+export const ZONE_GROWTH = {
+  /** Por debajo o igual de esta demanda no se construye nada en la zona. */
+  minDemand: 15,
+  /** Con tantas casas libres (o más), no se hacen más viviendas. */
+  maxFreeHomes: 6,
+  /** Con vecinos que pueden emprender, los locales se reservan para ellos: la C se salta este tanto por uno de los días. */
+  founderSkip: 0.8,
+  /** Uso de una bomba o central desde el que se avisa (una vez) de que se está llenando. */
+  plantWarnAt: 0.9,
+};
