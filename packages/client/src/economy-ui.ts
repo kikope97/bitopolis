@@ -2,6 +2,7 @@ import type { Command, TaxLevel } from '@bitopolis/shared';
 import { BUILD_NAMES, ownIncome, totalDebt, type Citizen, type GameState, IBI_RATE, MIN_WAGE, type MinWageLevel, PLUSVALIA_RATE, TASA_BASURAS, TASA_TERRAZAS, TAX_SPLIT_POP, trashActive, trashFee, trashServed, unitValue } from '@bitopolis/sim';
 import { money, MONTHS } from './i18n.ts';
 import { economyLines } from './money-ui.ts';
+import { maintenanceSection } from './nucleo-ui.ts';
 import { h, sheet } from './ui.ts';
 
 type Cmd = (c: Command) => Promise<boolean>;
@@ -193,7 +194,7 @@ export function openReport(state: GameState): void {
   const last = state.stats.at(-1);
   const prev = state.stats.at(-2);
   if (!last) {
-    sheet('Parte mensual', h('p', {}, 'Aún no ha terminado ningún mes.'), h('h3', {}, 'Este mes (en curso)'), rows(state.month.breakdown, undefined));
+    sheet('Parte mensual', h('p', {}, 'Aún no ha terminado ningún mes.'), h('h3', {}, 'Este mes (en curso)'), rows(state.month.breakdown, undefined), maintenanceSection(state));
     return;
   }
   const monthName = MONTHS[(last.month - 1 + 12) % 12] ?? '';
@@ -220,6 +221,8 @@ export function openReport(state: GameState): void {
     rows(income, prev?.breakdown),
     h('h3', {}, `Sale: ${money(last.expenses)}`),
     rows(spend, prev?.breakdown),
+    // 2.6: el mantenimiento, por tipo de edificio.
+    maintenanceSection(state),
     // v1.9: los vecinos que no llegan y la salud de las empresas.
     h('h3', {}, 'Vecinos y empresas'),
     h('ul', { class: 'accounts' }, ...economyLines(state).map((l) => h('li', { class: l.bad ? 'neg' : '' }, h('span', {}, l.label), h('span', { class: 'num' }, l.bad ? `⚠ ${l.value}` : l.value)))),

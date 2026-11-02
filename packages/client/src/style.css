@@ -589,6 +589,12 @@ html[data-text='200'] { --ui: 1.3; }
 .strip[data-mode='info'] .tool-info, .strip[data-mode='info'] .confirm-bar,
 .strip[data-mode='tool'] .strip-info, .strip[data-mode='tool'] .confirm-bar,
 .strip[data-mode='confirm'] .strip-info, .strip[data-mode='confirm'] .tool-info { display: none !important; }
+/* 2.6: «Deshacer» tras poner una obra (unos segundos). */
+.strip:not([data-mode='undo']) .undo-bar,
+.strip[data-mode='undo'] .strip-info, .strip[data-mode='undo'] .tool-info, .strip[data-mode='undo'] .confirm-bar { display: none !important; }
+.undo-bar { flex: 1; display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; background: var(--panel); box-shadow: inset 0 3px 0 var(--good); }
+.undo-bar p { margin: 0; flex: 1; min-width: 0; line-height: 1.25; font-size: 0.95em; }
+.undo-bar .btn { min-height: 48px; min-width: 48px; padding: 4px 14px; }
 .strip-info {
   flex: 1;
   min-width: 0;
@@ -721,6 +727,17 @@ html[data-text='200'] .tab .px-icon, html[data-text='200'] .tab .tab-sprite { wi
 .tool-label { font-size: calc(13px * var(--ui)); font-weight: 600; line-height: 1.1; text-align: center; }
 .tool-cost { font-size: calc(12px * var(--ui)); color: var(--muted); line-height: 1.1; }
 .tool.locked .tool-cost { color: var(--accent); }
+/* 2.6: lo que cuesta al mes, bajo el precio. */
+.tool-month { font-size: calc(11px * var(--ui)); color: var(--muted); line-height: 1.1; }
+.tool-month:empty { display: none; }
+.lot-box { margin: 6px 0; padding: 6px 8px; border: 2px solid var(--line); background: var(--bg); }
+.lot-box.no { border-color: #b13e53; }
+.lot-box.ok { border-color: #38b764; }
+.lot-box p { margin: 2px 0; }
+.load-bar { display: block; height: 10px; margin: 4px 0; }
+.load-bar .bar-fill { background: #38b764; }
+.load-bar.over .bar-fill { background: #b13e53; }
+.demand-factors summary { cursor: pointer; min-height: 40px; display: flex; align-items: center; }
 .lock { display: none; }
 
 /* --- avisos: una línea arriba; el resto, en la campana --- */

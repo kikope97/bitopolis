@@ -82,6 +82,11 @@
           <button id="confirm-no" class="btn" aria-label="Cancelar">✕</button>
           <button id="confirm-yes" class="btn primary">Construir</button>
         </div>
+        <!-- 2.6: «Deshacer» unos segundos tras poner una obra (se devuelven los materiales). -->
+        <div id="undo-bar" class="undo-bar" role="status" hidden>
+          <p id="undo-text"></p>
+          <button id="undo-btn" class="btn">Deshacer</button>
+        </div>
       </div>
       <div id="tray" class="tray" role="dialog" aria-label="Construir" hidden></div>
       <!-- v1.6: cinco pestañas grandes; el resto de herramientas, en la bandeja «Construir». -->

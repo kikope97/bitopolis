@@ -2,6 +2,7 @@ import { tickToDate } from '@bitopolis/shared';
 import { ambulanceFor, busStation, buildingAt, type GameState, heritageVariant, isWater, seasonOf, streetSegment, Terrain, Tile, trashStateOf, truckRoutes, Zone } from '@bitopolis/sim';
 import { happinessMarks, type LayerId, layerCanvas, missingMarks, NEED_ICON, ruralMarks } from './layers.ts';
 import { pixelIcon } from './icons.ts';
+import { lotsOf } from './nucleo-ui.ts';
 
 /** Iconos de la capa «Qué falta», creados una vez. */
 const iconCache = new Map<string, HTMLCanvasElement>();
@@ -674,6 +675,22 @@ export function render(
         }
       }
     }
+  }
+
+  // 2.6: sobre los solares vacíos que no crecen por agua o luz, la gota o el rayo tachados.
+  for (const d of lotsOf(state).dry) {
+    if (d.x < x0 || d.x > x1 || d.y < y0 || d.y > y1) continue;
+    const px = d.x * ts - cam.x;
+    const py = d.y * ts - cam.y;
+    const both = d.water && d.power;
+    const iz = both ? z * 0.8 : z;
+    let ix = px + Math.round((ts - (both ? 23 : 11) * iz) / 2);
+    const iy = py + Math.round((ts - 13 * iz) / 2);
+    if (d.water) {
+      ctx.drawImage(iconSprite('noWater'), ix, iy, 11 * iz, 13 * iz);
+      ix += 12 * iz;
+    }
+    if (d.power) ctx.drawImage(iconSprite('noPower'), ix, iy, 11 * iz, 13 * iz);
   }
 
   for (const d of liveParticles(opts.time)) {

@@ -2,6 +2,7 @@ import { tickToDate, type Command } from '@bitopolis/shared';
 import {
   BUILD_NAMES,
   buildingAt,
+  cancelRefund,
   isLandmarkKind,
   LANDMARKS,
   CROP_HINT,
@@ -125,6 +126,7 @@ import { openSettings } from './settings-ui.ts';
 import { shareBlock } from './share-ui.ts';
 import { openElectionNight, openPolitics, renderPollChip } from './politics-ui.ts';
 import { timeOfDay } from './render.ts';
+import { demandExtra, lotBox, monthlyText, networkRoom, networkWarnings, plantLoadBox } from './nucleo-ui.ts';
 
 /** Margen entre toque y arrastre: con el dedo, más (un temblor no es un arrastre). */
 const DRAG_PX = 10;
@@ -614,6 +616,13 @@ export function startGame(opts: GameOptions): void {
   let upgradeWarned = townLevel(state) - 1;
   const albumSeen = { n: state.album?.length ?? 0 };
   function onState() {
+    // 2.6: «Deshacer» solo mientras la obra no haya empezado; avisos de las redes, una vez al día.
+    checkUndo();
+    const netDay = Math.floor(state.tick / 24);
+    if (netDay !== lastNetDay) {
+      lastNetDay = netDay;
+      networkWarnings(state, (text, kind, ref) => toast(text, { kind, onClick: () => focusBuilding(ref.id) }));
+    }
     // v1.7: foto de cada momento nuevo del álbum (en este navegador).
     snapMoments(token, state, albumSeen);
     if (layer === 'missing' && Math.floor(state.tick / 24) !== legendDay) missingLegend();
@@ -779,6 +788,8 @@ export function startGame(opts: GameOptions): void {
       btn.classList.toggle('locked', locked);
       btn.setAttribute('aria-disabled', String(locked));
       btn.querySelector('.tool-cost')!.textContent = locked ? `🔒 ${lockText(tl)}` : trayCost(tl);
+      const month = btn.querySelector<HTMLElement>('.tool-month');
+      if (month) month.textContent = locked ? '' : monthlyText(tl.build, state);
     }
   }
   /** Qué falta para desbloquear una herramienta, en pocas palabras. */
@@ -1413,6 +1424,9 @@ export function startGame(opts: GameOptions): void {
         return refreshStrip();
       }
       const people = b ? occupants(state, b).length + state.citizens.filter((c) => c.jobId === b.id).length : 0;
+      // 2.6: una obra sin empezar se cancela y devuelve los materiales.
+      const refund = b ? cancelRefund(state, b) : 0;
+      if (refund > 0) return proposePlace(tile, tile, `¿Cancelar la obra (${what.toLowerCase()})? Aún no ha empezado: se devuelven ${money(refund)} de materiales.`);
       return proposePlace(tile, tile, `¿Derribar ${what.toLowerCase()}? No se puede deshacer.${people > 0 ? ` Afecta a ${plural(people, 'vecino', 'vecinos')}.` : ''}`);
     }
     // Carretera y zonas: además de arrastrar, se puede tocar el inicio y luego el final.
@@ -1462,7 +1476,7 @@ export function startGame(opts: GameOptions): void {
       return proposePlace(tile, tile);
     }
     const cmd = commandFor(tool, tile, tile);
-    if (cmd) await placeBuild(cmd);
+    if (cmd && (await placeBuild(cmd)) && cmd.type === 'Build') offerUndo(cmd.x, cmd.y);
   }
 
   /**
@@ -1627,7 +1641,9 @@ export function startGame(opts: GameOptions): void {
     preview = previewFor(a, b);
     const v = validateCommand(state, cmd);
     const hill = (tool.build || tool.landmark) && tool.shape === 'tap' && terrainAt(state, a.x, a.y) === Terrain.Hill;
-    const cost = tool.id === 'dike' ? shortCost(tool) : tool.landmark ? `${shortCost(tool)}${hill ? ' (colina: +50 %)' : ''} · ahora solo el solar` : tool.build && tool.shape === 'tap' ? `${shortCost(tool)}${hill ? ' (colina: materiales +50 %)' : ''}` : lineText(a, b);
+    // 2.6: con lo que costará al mes («+1.050 €/mes (mantenimiento y 1 sueldo)»).
+    const month = tool.build && tool.shape === 'tap' ? monthlyText(tool.build, state, true) : '';
+    const cost = tool.id === 'dike' ? shortCost(tool) : tool.landmark ? `${shortCost(tool)}${hill ? ' (colina: +50 %)' : ''} · ahora solo el solar` : tool.build && tool.shape === 'tap' ? `${shortCost(tool)}${hill ? ' (colina: materiales +50 %)' : ''}${month ? ` ${month}` : ''}` : lineText(a, b);
     // Ronda 13: el precio va en su propia línea y siempre se ve (también si no se puede: «no hay dinero»).
     const what = demolishText && v.ok ? demolishText : v.ok ? `${tool.label} aquí` : `${tool.label}: no se puede (${v.error})`;
     // v1.9.1: si con lo que falta por pagar de las obras en marcha la caja quedaría en negativo, se avisa (no se bloquea).
@@ -1659,7 +1675,53 @@ export function startGame(opts: GameOptions): void {
     // Tras una carretera o zona, la franja vuelve a la ayuda de la herramienta (no a «toca dónde termina»).
     if (tool.shape !== 'tap') selectTool(tool.id);
     if (ok) warnZoneWithoutRoad(cmd);
+    if (ok && cmd?.type === 'Build') offerUndo(cmd.x, cmd.y);
   }
+
+  /**
+   * 2.6: «Deshacer» unos segundos tras poner una obra. Manda un `Demolish` que el
+   * motor convierte en cancelación con devolución de los materiales mientras la
+   * obra no haya empezado (`cancelRefund`). Si ya empezó (a x10 un día dura 2 s), se quita.
+   */
+  const UNDO_MS = 5000;
+  let undo: { x: number; y: number; id: number; until: number; timer: number } | null = null;
+  function undoTarget(): Building | null {
+    if (!undo) return null;
+    const b = buildingAt(state, undo.x, undo.y);
+    return b && b.id === undo.id && cancelRefund(state, b) > 0 ? b : null;
+  }
+  function offerUndo(x: number, y: number) {
+    const b = buildingAt(state, x, y);
+    const refund = b ? cancelRefund(state, b) : 0;
+    if (!b || refund <= 0) return;
+    hideUndo();
+    undo = { x, y, id: b.id, until: performance.now() + UNDO_MS, timer: window.setTimeout(hideUndo, UNDO_MS) };
+    $('#undo-text').textContent = `${BUILD_NAMES[b.kind] ?? b.kind}: obra puesta. Si te has equivocado, se devuelven ${money(refund)}.`;
+    $('#undo-bar').hidden = false;
+    refreshStrip();
+  }
+  function hideUndo() {
+    if (undo) window.clearTimeout(undo.timer);
+    undo = null;
+    $('#undo-bar').hidden = true;
+    refreshStrip();
+  }
+  /** Con cada estado nuevo: si la obra ya empezó (o ya no está), fuera «Deshacer». */
+  function checkUndo() {
+    if (undo && !undoTarget()) hideUndo();
+  }
+  $('#undo-btn').onclick = () => {
+    const b = undoTarget();
+    const at = undo;
+    hideUndo();
+    if (!b || !at) {
+      toast('La obra ya ha empezado: para quitarla, usa «Derribar» (ya no se devuelve nada).', { kind: 'warn' });
+      return;
+    }
+    void command({ type: 'Demolish', x: at.x, y: at.y }).then((ok) => {
+      if (ok) $('#sr-live').textContent = 'Obra deshecha: se devuelven los materiales.';
+    });
+  };
 
   function cancelAnchor() {
     anchor = null;
@@ -1849,6 +1911,8 @@ export function startGame(opts: GameOptions): void {
         toolIcon(tl),
         h('span', { class: 'tool-label' }, tl.label),
         h('span', { class: 'tool-cost' }, trayCost(tl)),
+        // 2.6: lo que cuesta al mes, debajo del precio.
+        h('span', { class: 'tool-month' }, monthlyText(tl.build, state)),
       );
       btn.addEventListener('click', () => {
         if (isLocked(tl, state)) {
@@ -1917,7 +1981,7 @@ export function startGame(opts: GameOptions): void {
   /** La franja de abajo: fecha y demanda, la ayuda de la herramienta o la barra de confirmar. */
   function refreshStrip() {
     const strip = $('#strip');
-    strip.dataset.mode = !$('#confirm-bar').hidden ? 'confirm' : $('#tool-info').textContent ? 'tool' : 'info';
+    strip.dataset.mode = !$('#confirm-bar').hidden ? 'confirm' : !$('#undo-bar').hidden ? 'undo' : $('#tool-info').textContent ? 'tool' : 'info';
   }
   function showBar(on: boolean) {
     if (on && $('#confirm-bar').hidden) barShownAt = performance.now();
@@ -1932,6 +1996,8 @@ export function startGame(opts: GameOptions): void {
     if (tl.id === 'road') return coarse ? 'toca el inicio y luego el final (o arrastra desde el inicio).' : 'arrastra en línea recta. Por debajo van el agua y la luz.';
     if ((tl.zone && tl.zone !== 'none') || tl.density !== undefined) return coarse ? `Toca una esquina y luego la otra. ${tl.help}` : tl.help;
     if (tl.id === 'demolish') return 'toca lo que quieras derribar. Te pedirá confirmación.';
+    // 2.6: cuánto margen queda en las redes de agua y luz.
+    if (tl.build === 'water' || tl.build === 'power' || tl.build === 'solar' || tl.build === 'wind') return `${tl.help} ${networkRoom(state, tl.build === 'water' ? 'water' : 'power')}`;
     return tl.help;
   }
 
@@ -1956,7 +2022,9 @@ export function startGame(opts: GameOptions): void {
     else if (tl.id === 'inspect') info.textContent = '';
     else {
       const cost = trayCost(tl) || costText(tl);
-      info.replaceChildren(h('b', {}, tl.label), cost ? ` · ${cost} · ` : ': ', toolHelp(tl));
+      // 2.6: y lo que costará cada mes (mantenimiento y sueldos).
+      const month = monthlyText(tl.build, state, true);
+      info.replaceChildren(h('b', {}, tl.label), cost ? ` · ${cost}${month ? ` ${month}` : ''} · ` : ': ', toolHelp(tl));
     }
     selected = null;
     anchor = null;
@@ -2077,7 +2145,8 @@ export function startGame(opts: GameOptions): void {
       const noRoad = zoneLotWithoutRoad(state, tile.x, tile.y)
         ? h('p', { class: 'pocket-warn', 'data-test': 'lot-no-road' }, '⚠ Falta carretera: aquí no se construirá nada hasta que pase una carretera al lado.')
         : '';
-      sheet(name, h('p', {}, zone), noRoad, h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`)).classList.add('half');
+      // 2.6: y si toca carretera, por qué crece o no (agua, luz, demanda, casas libres).
+      sheet(name, h('p', {}, zone), noRoad || lotBox(state, tile.x, tile.y), h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`)).classList.add('half');
       openInspect = null;
       inspectSheet = null;
       return;
@@ -2231,6 +2300,9 @@ export function startGame(opts: GameOptions): void {
       if (viv) content.push(viv);
       // v1.8 (petición del creador): los servicios suben de nivel.
       if (UPGRADABLE.includes(b.kind)) content.push(levelBox(b));
+      // 2.6: la carga de la bomba o la central (cuántos piden y quién se queda sin).
+      const plant = plantLoadBox(state, b);
+      if (plant) content.push(plant);
       const res = occupants(state, b);
       const workers = state.citizens.filter((c) => c.jobId === b.id);
       if (home && res.length) {
@@ -2614,6 +2686,8 @@ export function startGame(opts: GameOptions): void {
   }
   /** Leyenda de «Qué falta»: cuántas viviendas (y solares R) carecen de cada servicio. */
   let legendDay = -1;
+  /** 2.6: último día en que se miró la carga de las redes. */
+  let lastNetDay = -1;
   let legendFolded = false;
   function missingLegend() {
     legendDay = Math.floor(state.tick / 24);
@@ -2680,6 +2754,8 @@ export function startGame(opts: GameOptions): void {
           )
         : h('p', {}, `Las zonas R (viviendas), C (tiendas) e I (industria) llegan con el ayuntamiento de nivel 2: pide ${TOWNHALL_LEVELS[1]!.pop} vecinos (ahora hay ${state.citizens.length}) y ${money(TOWNHALL_LEVELS[1]!.cost)}. Toca el ayuntamiento para ampliarlo.`),
       h('p', { class: 'muted small' }, 'Cuanto más alta la barra, más falta hace. Si está en negativo, sobra.'),
+      // 2.6: por qué no crecen los solares y de qué sale cada número.
+      ...(unlocked ? (['R', 'C', 'I'] as const).flatMap((z) => demandExtra(state, z)) : demandExtra(state, 'R')),
     ).classList.add('half');
   }
 
