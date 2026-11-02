@@ -109,7 +109,7 @@ export function upgradeReqs(state: GameState, b: Building, served?: number): Upg
   else {
     const need = Math.ceil(u.of * L.usage);
     const what =
-      b.kind === 'water' || b.kind === 'power' ? 'edificios conectados' : b.kind === 'jail' ? 'presos' : b.kind === 'cleanpoint' ? 'casillas de calle que recorre el camión' : 'vecinos atendidos';
+      b.kind === 'water' || b.kind === 'power' ? 'edificios conectados' : b.kind === 'jail' ? 'presos' : b.kind === 'cleanpoint' ? 'casillas de calle que recorre el camión' : b.kind === 'school' ? 'alumnos atendidos (vecinos y sus hijos)' : 'vecinos atendidos';
     reqs.push({ label: `Que se use: ${need} ${what} (hay ${u.used})`, ok: u.used >= need });
   }
   const cost = upgradeCost(b);
