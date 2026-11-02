@@ -34,6 +34,8 @@ describe.each(SEEDS)('cobertura de los servicios, semilla %i', (seed) => {
     const KEY = { school: 'colegio', clinic: 'salud', police: 'policia' } as const;
     let checked = 0;
     for (const kind of ['school', 'clinic', 'police'] as const) {
+      // Lo que aún no se puede construir no sale en «Qué falta» (ctx.active).
+      if (!ctx.active.includes(KEY[kind])) continue;
       const list = s.buildings.filter((b) => b.kind === kind && b.built && !b.damaged);
       const reach = list.map((b) => ({ b, r: serviceReach(s, b, ctx) }));
       const owner = new Map<number, { b: Building; full: boolean }>();
