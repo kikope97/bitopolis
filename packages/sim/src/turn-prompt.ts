@@ -14,6 +14,7 @@ import { daysToElection, FACTION_TEXT, factionOf, politicsActive } from './polit
 import { brewingNow, type DirectorChoice, directorMenu, dramaBudget } from './director.ts';
 import { errandCandidates } from './errands.ts';
 import { weekNews } from './press.ts';
+import { earlyReady, systemOn } from './gates.ts';
 import { rankCandidates } from './rank.ts';
 import { rivalAiWanted, rivalPromptData } from './rival-ai.ts';
 import { inventedName, inventedNumber, toneOf } from './prompt.ts';
@@ -493,7 +494,8 @@ export function buildDirectorRequest(state: GameState, shared = turnShared(state
   const menu = directorMenu(state);
   const brewing = brewingNow(state, menu);
   const budget = dramaBudget(state, menu);
-  const news = weekNews(state);
+  // 2.6: El Eco, no antes de su momento ni en «Pueblo sencillo» (los encargos ya los filtra `errandCandidates`).
+  const news = systemOn(state, 'press') && earlyReady(state, 'press') ? weekNews(state) : [];
   const errands = errandCandidates(state).slice(0, 4);
   // 2.2: si gobierna el rival y le toca, su menú de gobierno (una vez al mes).
   const rival = state.ai?.turn?.kind === 'semana' && rivalAiWanted(state) ? rivalPromptData(state) : null;

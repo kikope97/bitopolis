@@ -66,7 +66,8 @@ describe('encargos del pueblo (2.1)', () => {
 
 describe('El Eco de Bitópolis (2.1)', () => {
   it('sale cada semana con titulares de lo que ha pasado; se contesta una vez', () => {
-    const { state } = runSimulation({ seed: 3, days: 60, profile: 'constructor' });
+    // 2.6: El Eco sale desde los 30 vecinos (o el ayuntamiento 3).
+    const { state } = runSimulation({ seed: 3, days: 150, profile: 'constructor' });
     const p = state.press!;
     expect(p.editions.length).toBeGreaterThan(3);
     const ed = p.editions.at(-1)!;

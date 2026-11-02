@@ -40,25 +40,26 @@ function makeTown() {
     delete b.fire;
     delete b.risk;
   }
-  const spotFor = (kind: 'school' | 'water') => {
+  const spotFor = (kind: 'school' | 'water' | 'residence') => {
     for (let y = 2; y < s.map.h - 2; y++) for (let x = 2; x < s.map.w - 2; x++) if (validateCommand(s, { type: 'Build', kind, x, y }).ok) return { x, y };
     return null;
   };
   return { s, spotFor };
 }
 
-test('2.2: la obra grande se licita: hoja con tres ofertas y se elige la barata de fuera', async ({ page, request }, info) => {
+test('2.2: la obra grande (2.6: desde 6.000 € y el ayuntamiento 3) se licita: hoja con tres ofertas y se elige la barata de fuera', async ({ page, request }, info) => {
   test.setTimeout(120_000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   const shot = (n: string) => page.screenshot({ path: `test-results/capturas/${info.project.name}-licitaciones-${n}.png` });
   if (info.project.name === 'movil') await page.setViewportSize({ width: 360, height: 740 });
   const { s, spotFor } = makeTown();
-  const spot = spotFor('school')!;
+  // 2.6: solo se licitan las obras grandes (materiales desde 6.000 €): la residencia (7.000 €).
+  const spot = spotFor('residence')!;
   expect(spot).toBeTruthy();
   await openTown(page, request, s);
 
-  await pickTool(page, 'school');
+  await pickTool(page, 'residence');
   await touch(page, spot.x, spot.y);
   await confirmIfAsked(page);
   const cards = page.locator('.sheet.half .tender-card');
@@ -103,8 +104,8 @@ test('2.2: el rumor de la obra del primo y «Revisar el contrato»', async ({ pa
   const shop = newBuilding(s, 'shop', shopAt!.x, shopAt!.y, lucia.id);
   shop.built = true;
   shop.name = 'Ferretería de Lucía';
-  const spot = spotFor('water')!;
-  expect(applyCommand(s, { type: 'Build', kind: 'water', ...spot, offer: 'primo' }).ok).toBe(true);
+  const spot = spotFor('residence')!;
+  expect(applyCommand(s, { type: 'Build', kind: 'residence', ...spot, offer: 'primo' }).ok).toBe(true);
   const t = s.tenders!.at(-1)!;
   t.risk = true;
   for (let i = 0; i < TENDER.warnDays * 24; i++) step(s);

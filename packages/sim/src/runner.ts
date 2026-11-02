@@ -26,6 +26,10 @@ export interface RunOptions {
   /** 2.3: escenario y forma del terreno (por defecto, Libre y aleatorio: lo de siempre). */
   scenario?: ScenarioId;
   terrain?: TerrainShape;
+  /** 2.6: «Pueblo sencillo». */
+  simple?: boolean;
+  /** 2.6: se llama al acabar cada día (pruebas que miran el pueblo día a día). */
+  onDay?: (state: GameState, day: number) => void;
 }
 
 export interface SimReport {
@@ -97,7 +101,7 @@ export interface LoanMetrics {
 export function runSimulation(opts: RunOptions): { state: GameState; report: SimReport } {
   const profile = PROFILES[opts.profile];
   if (!profile) throw new Error(`perfil desconocido: ${opts.profile}`);
-  const state = createInitialState({ seed: opts.seed, aiMode: opts.aiMode, aiShare: opts.aiShare, scenario: opts.scenario, terrain: opts.terrain });
+  const state = createInitialState({ seed: opts.seed, aiMode: opts.aiMode, aiShare: opts.aiShare, scenario: opts.scenario, terrain: opts.terrain, simple: opts.simple });
   let scenarioMonth: number | null = null;
   const prng = profileRng(opts.seed);
   const commands: TimedCommand[] = [];
@@ -134,6 +138,7 @@ export function runSimulation(opts: RunOptions): { state: GameState; report: Sim
         if (cmd && applyCommand(state, cmd).ok) commands.push({ tick: state.tick, cmd });
       }
     }
+    opts.onDay?.(state, day);
     if (state.bankrupt && bankruptDay === null) bankruptDay = day + 1;
     // 2.4: vida del día (nacimientos por hogar, despedidas y marchas).
     const babies = new Set<string>();

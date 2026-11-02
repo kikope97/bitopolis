@@ -15,6 +15,9 @@ import type { ScenarioId, TerrainShape } from '@bitopolis/shared';
  */
 let pickedScenario: ScenarioId = 'libre';
 let pickedTerrain: TerrainShape = 'aleatorio';
+/** 2.6: «Pueblo sencillo» (decisión del creador: en Configurar, apagado por defecto). */
+let pickedSimple = false;
+const SIMPLE_HELP = 'Sin encargos, El Eco, pueblos vecinos, licitaciones ni dilemas: solo construir, cuidar a los vecinos y cuadrar las cuentas.';
 const SCENARIOS_SHOWN: ScenarioId[] = ['libre', 'quiebra', 'vaciado', 'riada'];
 const TERRAINS: [TerrainShape, string][] = [
   ['aleatorio', 'Al azar'],
@@ -122,6 +125,9 @@ export async function showStart(token: string): Promise<void> {
   const closed = !info.exists && !meta.newGames;
   // Siempre se puede elegir Modo normal, también con IA del servidor (decisión del creador, spec §10.2).
   let mode: 'normal' | 'ai' = 'normal';
+  // 2.6: se ve en el inicio si se activó «Pueblo sencillo» en Configurar.
+  const simpleNote = h('p', { class: 'notice simple-note', id: 'simple-note' }, 'Pueblo sencillo: ', SIMPLE_HELP);
+  simpleNote.hidden = !pickedSimple;
   const body = $('#start-body');
   body.replaceChildren();
   if (info.exists) {
@@ -129,7 +135,7 @@ export async function showStart(token: string): Promise<void> {
   } else if (closed) {
     body.append(h('p', { class: 'notice closed' }, 'Ahora mismo no se pueden empezar partidas nuevas (lo decide quien gestiona este servidor). Si ya jugabas, abre el enlace que guardaste; si lo perdiste, pídeselo a esa persona.'));
   } else {
-    body.append(modePicker(), scenarioPicker());
+    body.append(modePicker(), scenarioPicker(), simpleNote);
   }
 
   const playBtn = $('#play') as HTMLButtonElement;
@@ -144,7 +150,7 @@ export async function showStart(token: string): Promise<void> {
           await openAiConfig(token, sid, () => void showStart(token));
           return;
         }
-        const start = { ...(pickedScenario !== 'libre' ? { scenario: pickedScenario } : {}), ...(pickedTerrain !== 'aleatorio' ? { terrain: pickedTerrain } : {}) };
+        const start = { ...(pickedScenario !== 'libre' ? { scenario: pickedScenario } : {}), ...(pickedTerrain !== 'aleatorio' ? { terrain: pickedTerrain } : {}), ...(pickedSimple ? { simple: true } : {}) };
         const r = await api.create(token, mode, sid, start);
         startGame({ token, sessionId: sid, state: r.state, onExit: () => location.reload() });
       } else {
@@ -256,6 +262,15 @@ export async function showStart(token: string): Promise<void> {
         }
       };
       items.push(input, label, h('p', { class: 'muted' }, 'Importar crea una partida nueva con otro enlace. Las copias nunca incluyen la API key.'));
+    }
+    // 2.6: «Pueblo sencillo», solo al crear la partida (queda fijo, como el modo).
+    if (!exists && meta.newGames) {
+      const box = h('input', { type: 'checkbox', id: 'simple-town', ...(pickedSimple ? { checked: true } : {}) }) as HTMLInputElement;
+      box.addEventListener('change', () => {
+        pickedSimple = box.checked;
+        simpleNote.hidden = !pickedSimple;
+      });
+      items.push(h('h3', {}, 'Partida nueva'), h('label', { class: 'check' }, box, h('span', {}, 'Pueblo sencillo', h('small', { class: 'help' }, ` ${SIMPLE_HELP} Se elige ahora y queda fijo.`))));
     }
     const gameMode = info.exists ? info.mode : null;
     items.push(h('h3', {}, 'Modo'), h('p', {}, gameMode ? `${gameMode === 'ai' ? t('modeAi') : t('modeNormal')} (fijo en esta partida)` : 'Se elige en la pantalla de inicio.'));

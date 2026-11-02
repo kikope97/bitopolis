@@ -17,6 +17,7 @@ import {
 } from '@bitopolis/sim';
 import { formatDate } from './i18n.ts';
 import { lowMotion } from './prefs.ts';
+import { pollWanted } from './progress.ts';
 import { $, confirmDialog, h, sheet } from './ui.ts';
 import type { SocialCtx } from './social-ui.ts';
 import { openCitizen } from './social-ui.ts';
@@ -51,8 +52,19 @@ function bar(label: string, value: number, cls = ''): HTMLElement {
 export function renderPollChip(state: GameState, onOpen: () => void): void {
   const chip = $('#hud-poll') as HTMLButtonElement;
   const active = politicsActive(state);
-  chip.hidden = !active;
-  if (!active) return;
+  // 2.6: también a un año de las elecciones (aunque aún no haya oposición), con la cuenta atrás.
+  chip.hidden = !pollWanted(state);
+  if (!chip.hidden && !chip.dataset.bound) {
+    chip.dataset.bound = '1';
+    chip.addEventListener('click', onOpen);
+  }
+  if (!active) {
+    if (chip.hidden) return;
+    chip.replaceChildren('🗳 ', h('span', { class: 'poll-word' }, 'Elecciones '), h('span', { class: 'poll-days' }, left(state)));
+    chip.classList.remove('soon', 'neg');
+    chip.setAttribute('aria-label', `Elecciones: ${left(state)}. Aún no se presenta nadie contra ti. Ver política`);
+    return;
+  }
   const p = state.politics;
   const opp = p.mayor !== 'player';
   // Cuenta atrás en los últimos 3 meses (v1.3).
@@ -64,10 +76,6 @@ export function renderPollChip(state: GameState, onOpen: () => void): void {
   chip.classList.toggle('soon', d <= 90);
   chip.classList.toggle('neg', p.approval < 50);
   chip.setAttribute('aria-label', `${opp ? 'Estás en la oposición. ' : ''}Intención de voto: ${p.approval} %. Elecciones: ${left(state)}${d <= 90 ? ` (${d} días)` : ''}. Ver política`);
-  if (!chip.dataset.bound) {
-    chip.dataset.bound = '1';
-    chip.addEventListener('click', onOpen);
-  }
 }
 
 export function openPolitics(ctx: SocialCtx): void {

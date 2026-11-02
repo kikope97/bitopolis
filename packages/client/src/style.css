@@ -1428,3 +1428,10 @@ body.placing .tut-target::after { visibility: hidden; }
 .legend-filter { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; }
 .legend-off { min-width: 44px; min-height: 44px; background: var(--panel); border: 2px solid var(--line); color: var(--text); font: inherit; font-weight: 700; cursor: pointer; }
 .legend.filtered { padding-top: 4px; padding-bottom: 4px; }
+/* 2.6 (lo básico): lo que aparece por primera vez en el panel «Pueblo» y la bandeja lleva «Nuevo». */
+.new-badge { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 8px; background: var(--accent); color: var(--bg); font-size: 0.75em; font-weight: 700; line-height: 1.5; vertical-align: middle; }
+.btn.is-new, .rank-card.is-new { border-color: var(--accent); }
+.tab { position: relative; }
+.tab.has-new::after { content: '' / ''; position: absolute; top: 6px; right: calc(50% - 20px); width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--bg); }
+.tray-cat[hidden] { display: none; }
+.simple-note { margin-top: 12px; padding: 8px 12px; border: 2px dashed var(--accent); border-radius: 4px; }

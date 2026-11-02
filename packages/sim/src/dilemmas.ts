@@ -15,6 +15,7 @@ import { riverNear, startSpill } from './waterworks.ts';
 import { residenceFree } from './care.ts';
 import type { CommandResult } from './commands.ts';
 import { directorOwns } from './director-core.ts';
+import { earlyReady, systemOn } from './gates.ts';
 import { hash32 } from './hash.ts';
 import { canMicrocredit, grantMicrocredit, settleDebt } from './household.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
@@ -204,6 +205,8 @@ function vpoCandidates(state: GameState): DilemmaCandidate[] {
 /** ¿Se puede abrir un dilema ahora? Ninguno abierto, uno al mes como mucho y gobierna el jugador. */
 export function canOpenDilemma(state: GameState): boolean {
   if (state.politics.mayor !== 'player' || state.citizens.length < DILEMMA.minPop) return false;
+  // 2.6: no antes de su momento (también con el director) y nunca en «Pueblo sencillo».
+  if (!earlyReady(state, 'dilemmas') || !systemOn(state, 'dilemmas')) return false;
   if (state.dilemmas.some((d) => !d.resolved)) return false;
   const last = state.dilemmas.at(-1);
   return !last || state.tick - last.tick >= TICKS_PER_MONTH / DILEMMA.perMonth;

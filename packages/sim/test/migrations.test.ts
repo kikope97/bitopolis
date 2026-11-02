@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TICKS_PER_MONTH } from '@bitopolis/shared';
-import { checkInvariants, createInitialState, FORMAT_VERSION, hashState, MIGRATIONS, migrate, migrate14Trash, migrate15Loans, migrate16History, migrate16Landmarks, migrate16Medals, migrate16Region, migrate16Scenario, migrate16Tourism, migrate17Seasons, OUTSIDE, REGION, step, transfer, TREASURY } from '../src/index.ts';
+import { checkInvariants, createInitialState, FORMAT_VERSION, hashState, MIGRATIONS, migrate, migrate14Trash, migrate15Loans, migrate16History, migrate16Landmarks, migrate16Medals, migrate16Region, migrate16Scenario, migrate16Tourism, migrate17Seasons, migrate19Simple, OUTSIDE, REGION, step, transfer, TREASURY } from '../src/index.ts';
 
 describe('migración 13 → 14 (2.1)', () => {
   it('basura: campo de suciedad vacío y 60 días de gracia (migrate14Trash)', () => {
@@ -38,6 +38,23 @@ describe('migración 14 → 15 (2.2, préstamos)', () => {
     expect(checkInvariants(m)).toEqual([]);
     // Lo que ya tenía no se toca.
     expect(migrate15Loans({ loans: [{ id: 1 }], rating: 'C', loanLedger: { lent: 5 } })).toMatchObject({ loans: [{ id: 1 }], rating: 'C', loanLedger: { lent: 5 } });
+  });
+});
+
+describe('migración 18 → 19 (2.6, lo básico)', () => {
+  it('«Pueblo sencillo» apagado; una nueva y una migrada quedan iguales (migrate19Simple)', () => {
+    const s = createInitialState({ seed: 9 }) as unknown as Record<string, any>;
+    const old: Record<string, any> = structuredClone({ ...s, formatVersion: 18 });
+    delete old.simple;
+    const m = migrate(old);
+    expect(m.formatVersion).toBe(FORMAT_VERSION);
+    expect(m.simple).toBe(false);
+    expect(hashState(m)).toBe(hashState(createInitialState({ seed: 9 })));
+    for (let i = 0; i < 24 * 31; i++) step(m);
+    expect(checkInvariants(m)).toEqual([]);
+    // Lo que ya tenía no se toca.
+    expect(migrate19Simple({ simple: true })).toEqual({ simple: true });
+    expect(createInitialState({ seed: 9, simple: true }).simple).toBe(true);
   });
 });
 
