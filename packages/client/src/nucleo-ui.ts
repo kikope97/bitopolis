@@ -74,6 +74,7 @@ export function demandExtra(state: GameState, zone: 'R' | 'C' | 'I'): HTMLElemen
   const f = demandFactors(state)[zone];
   if (f.length) {
     const total = Math.round(f.reduce((a, x) => a + x.value, 0));
+    const clamped = Math.max(-100, Math.min(100, total));
     out.push(
       h(
         'details',
@@ -83,7 +84,9 @@ export function demandExtra(state: GameState, zone: 'R' | 'C' | 'I'): HTMLElemen
           'ul',
           { class: 'accounts' },
           ...f.map((x) => h('li', { class: Math.round(x.value) < 0 ? 'neg' : 'pos' }, h('span', {}, x.label), h('span', { class: 'num' }, signed(Math.round(x.value))))),
-          total !== state.demand[zone] ? h('li', { class: 'muted' }, h('span', {}, 'Tope (de −100 a +100)'), h('span', {}, signed(state.demand[zone]))) : '',
+          clamped !== total ? h('li', { class: 'muted' }, h('span', {}, 'Tope (de −100 a +100)'), h('span', {}, signed(clamped))) : '',
+          // Una obra o un cambio de hoy: el número de la franja se pone al día al cerrar el día.
+          clamped !== state.demand[zone] ? h('li', { class: 'muted' }, h('span', {}, 'Al cerrar el día quedará en'), h('span', {}, signed(clamped))) : '',
         ),
         h('p', { class: 'muted small' }, `Con más de ${ZONE_GROWTH.minDemand} se construye en la zona ${zone}${zone === 'R' ? ` (si quedan menos de ${ZONE_GROWTH.maxFreeHomes} casas libres)` : ''}.`),
       ),
