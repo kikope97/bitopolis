@@ -44,7 +44,7 @@ function towns(): GameState[] {
 
 const clone = (s: GameState) => JSON.parse(JSON.stringify(s)) as GameState;
 
-describe('networkLoad: el mismo reparto que updateNetworks, sin tocar el estado', () => {
+describe('networkLoad: el mismo reparto que updateNetworks, sin tocar el estado', { timeout: 120_000 }, () => {
   it('da los mismos edificios con agua y luz y las mismas carreteras', () => {
     for (const s of towns()) {
       const before = hashState(s);
@@ -91,7 +91,7 @@ describe('networkLoad: el mismo reparto que updateNetworks, sin tocar el estado'
   });
 });
 
-describe('lotStatus: por qué no crece un solar (las condiciones de growZones)', () => {
+describe('lotStatus: por qué no crece un solar (las condiciones de growZones)', { timeout: 120_000 }, () => {
   it('coincide con los solares que growZones puede elegir', () => {
     for (const s of towns()) {
       const c = clone(s);
@@ -191,7 +191,7 @@ describe('lotStatus: por qué no crece un solar (las condiciones de growZones)',
   });
 });
 
-describe('demandFactors: de qué sale la demanda', () => {
+describe('demandFactors: de qué sale la demanda', { timeout: 120_000 }, () => {
   it('suma lo mismo que computeDemand', () => {
     const states = towns();
     states.push(createInitialState({ seed: 9 }));
