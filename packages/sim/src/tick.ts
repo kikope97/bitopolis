@@ -1,4 +1,5 @@
 import { loansMonth } from './loans.ts';
+import { upkeepMonth } from './upkeep.ts';
 import { densityDay, homesOf, vpoMonth, vpoRentMonth } from './density.ts';
 import { attended, careMonth, careMood, childcareMonth, isRetired, pensionsMonth } from './care.ts';
 import { busDemandR, transitMonth, transitMood } from './transit.ts';
@@ -737,6 +738,8 @@ function endOfMonth(state: GameState): void {
   transfer(state, OUTSIDE, TREASURY, pie, 'PIE');
   // El ayuntamiento cuesta más de mantener cuanto más grande (v1.8).
   for (const b of state.buildings) if (b.built) transfer(state, TREASURY, OUTSIDE, Math.round(maintenanceOf(b) * (b.kind === 'townhall' ? townLevel(state) : 1) * budgetFx(state).maintenance), 'mantenimiento');
+  // 2.6: gasto corriente que crece con el pueblo (vecinos, calles, casas municipales).
+  upkeepMonth(state);
   // 2.3: mantenimiento y cofinanciación de las grandes obras.
   landmarksMonth(state);
   lifeMonth(state);

@@ -160,6 +160,28 @@ export const MAINTENANCE: Record<BuildingKind, number> = {
   post: 120,
 };
 
+/**
+ * 2.6 (bloque D, «a media partida el dinero deja de importar»): gasto corriente
+ * que crece con el pueblo (upkeep.ts). Lo cobra el ayuntamiento cada mes, con el
+ * factor de mantenimiento del presupuesto.
+ */
+export const UPKEEP = {
+  /**
+   * Alumbrado, limpieza y oficinas: € por vecino y mes según el nivel del ayuntamiento (índice = nivel).
+   * Casi nada hasta el nivel 3: ahí vive el pueblo casual, que ya va justo (con 20 € quebraban 3 de 8
+   * semillas a 8 años). Pesa en el 4 y el 5, donde los impuestos dejaban atrás al mantenimiento.
+   */
+  perCitizen: [0, 0, 0, 4, 30, 42],
+  /** Conservación de calles: € por casilla de carretera y mes (las primeras, gratis: el pueblo de siempre). */
+  road: 6,
+  freeRoads: 20,
+  /** Comunidad y reparaciones de cada casa municipal de más (las primeras, sin coste). */
+  municipalHouse: 40,
+  freeHouses: 4,
+  /** Entra poco a poco: nada el primer año (meses de partida), entero desde el tercero. */
+  rampMonths: [12, 36],
+} as const;
+
 /** Radio de cobertura de los servicios (tiles) y su efecto en la felicidad. */
 export const SERVICE: Partial<Record<BuildingKind, { radius: number; happiness: number }>> = {
   park: { radius: 5, happiness: 6 },

@@ -63,3 +63,4 @@ export * from './comarca.ts';
 export * from './neighbor-prompt.ts';
 export * from './pleno-prompt.ts';
 export * from './letter-prompt.ts';
+export * from './upkeep.ts';
