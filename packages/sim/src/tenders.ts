@@ -13,6 +13,7 @@ import { TICKS_PER_DAY, type BuildKind } from '@bitopolis/shared';
 import { BUILD, TENDER, WAGE_LOCAL, WAGE_OUTSIDE } from './balance.ts';
 import { materialsCost } from './civic.ts';
 import { directorOwns } from './director-core.ts';
+import { systemOn } from './gates.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { FACTIONS } from './politics-core.ts';
 import { chance } from './prng.ts';
@@ -58,7 +59,7 @@ const first = (c: { name: string }) => c.name.split(' ')[0]!;
 
 /** ¿Esta obra se licita? (materiales desde `TENDER.minCost`, con el presupuesto y la colina). */
 export function tenderApplies(state: GameState, kind: BuildKind, x: number, y: number): boolean {
-  return kind !== 'road' && (state.townhallLevel ?? 1) >= TENDER.fromLevel && materialsCost(state, kind, x, y) >= TENDER.minCost;
+  return kind !== 'road' && systemOn(state, 'tenders') && (state.townhallLevel ?? 1) >= TENDER.fromLevel && materialsCost(state, kind, x, y) >= TENDER.minCost;
 }
 
 /**

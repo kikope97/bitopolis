@@ -913,9 +913,11 @@ export const TRASH = {
  * primo del concejal. `mat` multiplica los materiales y `days` el plazo.
  */
 export const TENDER = {
-  minCost: 2_500,
-  /** Llegan con el ayuntamiento de este nivel (las primeras obras, las del tutorial, van sin licitación). */
-  fromLevel: 2,
+  // 2.6 (lo básico): antes 2.500 € y nivel 2: casi toda obra pasaba por la hoja de tres ofertas.
+  /** Materiales desde los que se licita (la colina y el presupuesto cuentan): solo las obras grandes. */
+  minCost: 6_000,
+  /** Llegan con el ayuntamiento de este nivel (antes, las obras van sin licitación). */
+  fromLevel: 3,
   /** Barata de fuera: su cuadrilla cobra `wage` al día (no los parados del pueblo); con p, sobrecoste al terminar. */
   cheap: { mat: 0.8, days: 1.3, wage: 60, overrun: 0.25, p: 0.4 },
   // Ronda 18: antes (0,15 y 0,25) la de fuera salía siempre a cuenta.
@@ -936,6 +938,23 @@ export const TENDER = {
   offendedGrudge: 4,
   /** Licitaciones guardadas (las 10 últimas; las vivas no se borran). */
   keep: 10,
+} as const;
+
+/**
+ * 2.6 (lo básico, petición del creador): los sucesos que piden respuesta no
+ * llegan con un pueblo recién nacido. Cada uno aparece a partir de `pop`
+ * vecinos o del ayuntamiento de nivel `level` (lo primero que pase), en Modo
+ * normal y con el director (gates.ts). Se suman a los umbrales propios de cada
+ * sistema (los dilemas ya piden `DILEMMA.minPop`; la gran empresa, sus vecinos).
+ */
+export const EARLY = {
+  dilemmas: { pop: 30, level: 3 },
+  letters: { pop: 30, level: 3 },
+  neighborOffers: { pop: 30, level: 3 },
+  bigCompany: { pop: 30, level: 3 },
+  errands: { pop: 30, level: 3 },
+  /** El Eco sale a la vez que llegan los encargos (van juntos en el panel «Pueblo»). */
+  press: { pop: 30, level: 3 },
 } as const;
 
 /** 2.2: calles y plazas con nombre de vecinos (streets.ts). */
