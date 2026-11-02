@@ -13,6 +13,7 @@
 import type { BuildKind } from '@bitopolis/shared';
 import { FOUND_MIN_MONEY, PUBLIC_SALARY, SERVICE, SERVICE_SALARY, TERRAIN, ZONE_GROWTH } from './balance.ts';
 import { budgetFx } from './civic.ts';
+import { networkRoads } from './coverage.ts';
 import { jobsOf, maintenanceOf, plantCapacityOf } from './levels.ts';
 import { type Building, type BuildingKind, DIRS, type GameState, hasAdjacentRoad, inBounds, Tile, tileIndex, Zone } from './state.ts';
 import { freeHomes, isBusiness, lotFree, riverside, zoneGate } from './tick.ts';
@@ -208,6 +209,30 @@ function networkAction(state: GameState, kind: NetKind): string {
   if (!plants.length) return `Construye una ${name} junto a una carretera unida a esta calle.`;
   if (!plants.some((b) => b.built)) return `${the[0]!.toUpperCase()}${the.slice(1)} está en obras: cuando se termine llegará ${kind === 'water' ? 'el agua' : 'la luz'} (si su carretera está unida a esta calle).`;
   return `Esta calle no está unida a la carretera de ${the}: únelas (o construye otra ${name} aquí al lado).`;
+}
+
+/**
+ * Ronda 22: al colocar una obra en (x, y), qué red no llega a su calle
+ * («⚠ Sin agua: esta calle no está unida a la carretera de la bomba…»).
+ * Las plantas no se avisan de su propia red. Vacío si no toca carretera
+ * (eso ya lo dice la validación) o si le llega todo.
+ */
+export function siteNetworkWarn(state: GameState, kind: string, x: number, y: number, roads?: Partial<Record<NetKind, Set<number>>>): string[] {
+  const near: number[] = [];
+  for (const [dx, dy] of DIRS) {
+    const nx = x + dx;
+    const ny = y + dy;
+    if (inBounds(state, nx, ny) && state.map.tiles[tileIndex(state, nx, ny)] === Tile.Road) near.push(tileIndex(state, nx, ny));
+  }
+  if (!near.length) return [];
+  const out: string[] = [];
+  for (const net of ['water', 'power'] as const) {
+    if (net === 'water' ? kind === 'water' : isPowerPlant(kind as BuildingKind) || isRenewable(kind as BuildingKind)) continue;
+    const set = roads?.[net] ?? networkRoads(state, net);
+    if (near.some((i) => set.has(i))) continue;
+    out.push(`⚠ Sin ${net === 'water' ? 'agua' : 'luz'} aquí: ${networkAction(state, net)}`);
+  }
+  return out;
 }
 
 /**

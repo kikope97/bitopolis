@@ -8,7 +8,8 @@ import { $, closeSheet, h, sheet, toast } from './ui.ts';
 export const eur = (n: number) => (n > 0 && n < 0.01 ? 'menos de 1 céntimo' : `${n.toFixed(2).replace('.', ',')} €`);
 
 /** Configuración de la IA: proveedor, modelo, key y topes de gasto (spec §9.5, §11). */
-export async function openAiConfig(token: string, sessionId: string, onSaved: (s: AiSettings) => void): Promise<void> {
+/** `start`: Ronda 22, lo elegido al empezar (escenario, terreno, «Pueblo sencillo»), por si la partida se crea aquí. */
+export async function openAiConfig(token: string, sessionId: string, onSaved: (s: AiSettings) => void, start?: () => Record<string, unknown>): Promise<void> {
   let meta: AiMeta;
   let cur: AiSettings;
   try {
@@ -98,7 +99,7 @@ export async function openAiConfig(token: string, sessionId: string, onSaved: (s
     }
     save.disabled = true;
     try {
-      const body: Record<string, unknown> = { sessionId, accepted: true };
+      const body: Record<string, unknown> = { ...(start?.() ?? {}), sessionId, accepted: true };
       if (!locked.has('model') && model.value()) body.model = model.value();
       if (!locked.has('modelPremium') && premium.value()) body.modelPremium = premium.value();
       if (!locked.has('baseUrl')) body.baseUrl = baseUrl.value.trim();

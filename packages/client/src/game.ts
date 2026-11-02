@@ -1463,6 +1463,7 @@ export function startGame(opts: GameOptions): void {
       const people = b ? occupants(state, b).length + state.citizens.filter((c) => c.jobId === b.id).length : 0;
       // 2.6: una obra sin empezar se cancela y devuelve los materiales.
       const refund = b ? cancelRefund(state, b) : 0;
+      cancelProposal = refund > 0;
       if (refund > 0) return proposePlace(tile, tile, `¿Cancelar la obra (${what.toLowerCase()})? Aún no ha empezado: se devuelven ${money(refund)} de materiales.`);
       return proposePlace(tile, tile, `¿Derribar ${what.toLowerCase()}? No se puede deshacer.${people > 0 ? ` Afecta a ${plural(people, 'vecino', 'vecinos')}.` : ''}`);
     }
@@ -1690,7 +1691,7 @@ export function startGame(opts: GameOptions): void {
     const warn = after < 0 ? h('span', { class: 'cc-warn' }, `⚠ Quedarías en −${money(-after)} con las obras en marcha`) : '';
     // 2.6: lo que gana el pueblo con este servicio aquí («+14 casas con colegio · atenderá a ~38 de 60»).
     const pl = v.ok && !demolishText && tool.build && tool.shape === 'tap' ? placeLines(state, tool.build, a.x, a.y) : null;
-    const reachText = pl ? h('span', { class: 'cc-reach', 'data-test': 'cc-reach' }, h('b', {}, pl.gain), ...pl.warn.map((w) => h('span', { class: 'cc-reach-warn' }, w))) : '';
+    const reachText = pl ? h('span', { class: 'cc-reach', 'data-test': 'cc-reach' }, h('b', { class: pl.none ? 'none' : '' }, pl.gain), ...pl.warn.map((w) => h('span', { class: 'cc-reach-warn' }, w))) : '';
     $('#confirm-text').replaceChildren(h('span', { class: 'cc-what' }, what), demolishText || !cost ? '' : h('span', { class: 'cc-cost' }, v.ok ? cost : `Cuesta ${cost}`), reachText, warn);
     $('#confirm-bar').classList.toggle('warn', after < 0);
     const yes = $('#confirm-yes') as HTMLButtonElement;
@@ -1708,13 +1709,18 @@ export function startGame(opts: GameOptions): void {
 
   /** Tras confirmar, unos instantes sin toques en el mapa: los toques repetidos no proponen otra obra. */
   let quietUntil = 0;
+  /** Ronda 22: la propuesta en curso es cancelar una obra (el motor la rechaza si ya empezó). */
+  let cancelProposal = false;
   async function confirmPlace() {
     const p = pendingPlace;
+    const cancelOnly = cancelProposal;
+    cancelProposal = false;
     quietUntil = performance.now() + 500;
     vibrate(15);
     cancelPlace();
     if (!p) return;
-    const cmd = commandFor(tool, p.a, p.b);
+    const cmd0 = commandFor(tool, p.a, p.b);
+    const cmd = cmd0 && cancelOnly && cmd0.type === 'Demolish' ? { ...cmd0, cancelOnly: true as const } : cmd0;
     const ok = cmd ? await placeBuild(cmd) : false;
     // Tras una carretera o zona, la franja vuelve a la ayuda de la herramienta (no a «toca dónde termina»).
     if (tool.shape !== 'tap') selectTool(tool.id);
@@ -1762,7 +1768,7 @@ export function startGame(opts: GameOptions): void {
       toast('La obra ya ha empezado: para quitarla, usa «Derribar» (ya no se devuelve nada).', { kind: 'warn' });
       return;
     }
-    void command({ type: 'Demolish', x: at.x, y: at.y }).then((ok) => {
+    void command({ type: 'Demolish', x: at.x, y: at.y, cancelOnly: true }).then((ok) => {
       if (ok) $('#sr-live').textContent = 'Obra deshecha: se devuelven los materiales.';
     });
   };
@@ -1776,6 +1782,7 @@ export function startGame(opts: GameOptions): void {
 
   function cancelPlace() {
     pendingPlace = null;
+    cancelProposal = false;
     preview = null;
     showBar(false);
   }
@@ -2086,6 +2093,8 @@ export function startGame(opts: GameOptions): void {
 
   function selectTool(id: ToolId) {
     const tl = TOOLS.find((x) => x.id === id)!;
+    // Ronda 22: con otra herramienta, la franja enseña su ayuda (no el «Deshacer» de la obra anterior).
+    if (undo && id !== tool.id) hideUndo();
     tool = tl;
     const inTray = TRAY.some((c) => c.tools.includes(id));
     for (const b of [tabInspect, tabRoad, tabDemolish]) b.setAttribute('aria-pressed', String(b.dataset.tool === id));
@@ -2242,7 +2251,9 @@ export function startGame(opts: GameOptions): void {
     if (vw < 40 || vh < 40) return;
     const need = Math.max((x1 - x0 + 2) * T / vw, (y1 - y0 + 2) * T / vh);
     // Se aleja lo justo para que quepa (nunca por debajo del mínimo); si ya cabe, no se acerca.
-    const fit = Math.max(minZoom(), Math.min(cam.zoom, Math.floor(1 / need)));
+    // Ronda 22: sin bajar de un zoom en el que se lean los ✓ y ✗ (~14 px CSS por casilla); si no cabe, se centra.
+    const legible = Math.max(minZoom(), Math.ceil((14 * dpr()) / T));
+    const fit = Math.max(legible, Math.min(cam.zoom, Math.floor(1 / need)));
     if (fit < cam.zoom) cam.zoom = fit;
     const ts = tileSize();
     cam.x = Math.round(((x0 + x1 + 1) / 2) * ts - ((left + right) / 2 - r.left) * dpr());
@@ -2252,7 +2263,7 @@ export function startGame(opts: GameOptions): void {
 
   /** 2.6: la zona que toca dibujar: la del servicio que se coloca, la del servicio tocado o la del filtro de «Qué falta». */
   function currentReach(): ReachOverlay | null {
-    const blen = `${state.buildings.length}:${state.tick >> 3}`;
+    const blen = `${state.buildings.length}:${state.tick >> 3}:${state.month.expenses}`;
     let key = '';
     let make: () => ReachOverlay | null = () => null;
     const t = preview?.tiles[0];
@@ -2263,17 +2274,17 @@ export function startGame(opts: GameOptions): void {
         const pl = placeLines(state, kind, t.x, t.y);
         return pl ? previewOverlay(state, pl.info, t.x, t.y) : null;
       };
+    } else if (layer === 'missing' && missingKey) {
+      // Ronda 22: el filtro elegido manda sobre lo último que se tocó.
+      const k = missingKey;
+      key = `f:${k}:${blen}`;
+      make = () => filterOverlay(state, k);
     } else if (selected && tool.id === 'inspect') {
       const b = buildingAt(state, selected.x, selected.y);
       if (b && b.built && !b.damaged && hasReach(b.kind)) {
         key = `s:${b.id}:${b.level ?? 1}:${blen}`;
         make = () => overlayFor(state, serviceReach(state, b));
       }
-    }
-    if (!key && layer === 'missing' && missingKey) {
-      const k = missingKey;
-      key = `f:${k}:${blen}`;
-      make = () => filterOverlay(state, k);
     }
     if (key !== reachMemo.key) reachMemo = { key, overlay: key ? make() : null };
     return reachMemo.overlay;
@@ -2291,7 +2302,7 @@ export function startGame(opts: GameOptions): void {
     info.querySelector('.reach-hint')?.remove();
     if (!key || !kind || !t) return;
     const pl = placeLines(state, kind, t.x, t.y);
-    if (pl) info.append(h('span', { class: 'reach-hint', 'data-test': 'reach-hint' }, h('b', {}, pl.gain), ...pl.warn.map((w) => h('span', { class: 'reach-warn' }, w))));
+    if (pl) info.append(h('span', { class: 'reach-hint', 'data-test': 'reach-hint' }, h('b', { class: pl.none ? 'none' : '' }, pl.gain), ...pl.warn.map((w) => h('span', { class: 'reach-warn' }, w))));
   }
 
   /** Que la casilla quede a la vista, por encima (o al lado) de la hoja abierta (v1.6). */
@@ -2976,7 +2987,11 @@ export function startGame(opts: GameOptions): void {
       const pick = h('button', { class: 'legend-pick', 'aria-pressed': 'false', 'aria-label': `Ver en el mapa dónde falta ${NEED_LABEL[r.key]}`, 'data-need': r.key }, pixelIcon(NEED_ICON[r.key]), h('span', { class: 'legend-text' }, `${nameOf(r.key)}: ${countOf(r)}`));
       pick.addEventListener('click', () => {
         missingKey = r.key;
+        selected = null;
         missingLegend();
+        // Ronda 22: el mapa va a las casas a las que les falta (si no se ven).
+        const lack = filterOverlay(state, r.key).marks.map((m) => m.y * state.map.w + m.x);
+        if (lack.length) revealArea(lack);
         $('#sr-live').textContent = `Qué falta: ${NEED_LABEL[r.key]}. ${countOf(r)}.`;
       });
       return h('span', { class: 'legend-need' }, pick, goBtn(r.key));

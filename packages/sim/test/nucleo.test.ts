@@ -272,6 +272,26 @@ describe('cancelar una obra sin empezar devuelve los materiales', () => {
     expect(checkInvariants(s)).toEqual([]);
   });
 
+  it('se devuelve lo pagado, aunque el precio de hoy haya cambiado (ronda 22)', () => {
+    const { s, x, y } = town();
+    expect(applyCommand(s, { type: 'Build', kind: 'park', x, y }).ok).toBe(true);
+    const paid = s.projects.at(-1)!.paid!;
+    expect(paid).toBe(materialsCost(s, 'park', x, y));
+    s.projects.at(-1)!.paid = paid - 100; // como si se hubiera pagado con otro plan del presupuesto
+    const b = s.buildings.find((q) => q.x === x && q.y === y)!;
+    expect(cancelRefund(s, b)).toBe(paid - 100);
+  });
+
+  it('«cancelOnly» no derriba una obra que ya empezó (ronda 22)', () => {
+    const { s, x, y } = town();
+    expect(applyCommand(s, { type: 'Build', kind: 'park', x, y }).ok).toBe(true);
+    const b = s.buildings.find((q) => q.x === x && q.y === y)!;
+    while (s.projects.find((p) => p.buildingId === b.id)!.workerDaysDone === 0) step(s);
+    const r = applyCommand(s, { type: 'Demolish', x, y, cancelOnly: true });
+    expect(r.ok).toBe(false);
+    expect(s.buildings.some((q) => q.id === b.id)).toBe(true);
+  });
+
   it('lo terminado y lo de otros no se devuelve', () => {
     const { s } = town();
     const done = s.buildings.find((b) => b.built && b.kind in BUILD && b.kind !== 'townhall')!;

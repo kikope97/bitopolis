@@ -5,7 +5,7 @@ import { type AiMeta, api, ApiError, type Summary } from './api.ts';
 import { startGame } from './game.ts';
 import { formatDate, money, plural, t } from './i18n.ts';
 import { sessionId } from './session.ts';
-import { $, confirmDialog, h, sheet, toast } from './ui.ts';
+import { $, closeSheet, confirmDialog, h, sheet, toast } from './ui.ts';
 import { SCENARIO_INFO } from '@bitopolis/sim';
 import type { ScenarioId, TerrainShape } from '@bitopolis/shared';
 
@@ -17,6 +17,8 @@ let pickedScenario: ScenarioId = 'libre';
 let pickedTerrain: TerrainShape = 'aleatorio';
 /** 2.6: «Pueblo sencillo» (decisión del creador: en Configurar, apagado por defecto). */
 let pickedSimple = false;
+/** Lo elegido al empezar, tal cual lo pide `POST /api/games/:token` (y, con key propia, `PUT /ai-config`). */
+const startPicks = () => ({ ...(pickedScenario !== 'libre' ? { scenario: pickedScenario } : {}), ...(pickedTerrain !== 'aleatorio' ? { terrain: pickedTerrain } : {}), ...(pickedSimple ? { simple: true } : {}) });
 const SIMPLE_HELP = 'Sin encargos, El Eco, pueblos vecinos, licitaciones ni dilemas: solo construir, cuidar a los vecinos y cuadrar las cuentas.';
 const SCENARIOS_SHOWN: ScenarioId[] = ['libre', 'quiebra', 'vaciado', 'riada'];
 const TERRAINS: [TerrainShape, string][] = [
@@ -144,14 +146,15 @@ export async function showStart(token: string): Promise<void> {
   playBtn.textContent = info.exists ? t('continue') : t('play');
   playBtn.onclick = async () => {
     playBtn.disabled = true;
+    // Ronda 22: «Configurar» no se queda abierta encima del juego.
+    closeSheet();
     try {
       if (!info.exists) {
         if (mode === 'ai' && !meta.serverKey) {
-          await openAiConfig(token, sid, () => void showStart(token));
+          await openAiConfig(token, sid, () => void showStart(token), startPicks);
           return;
         }
-        const start = { ...(pickedScenario !== 'libre' ? { scenario: pickedScenario } : {}), ...(pickedTerrain !== 'aleatorio' ? { terrain: pickedTerrain } : {}), ...(pickedSimple ? { simple: true } : {}) };
-        const r = await api.create(token, mode, sid, start);
+        const r = await api.create(token, mode, sid, startPicks());
         startGame({ token, sessionId: sid, state: r.state, onExit: () => location.reload() });
       } else {
         await claimAndPlay(false);
@@ -209,7 +212,7 @@ export async function showStart(token: string): Promise<void> {
       b.addEventListener('click', () => {
         mode = m;
         for (const r of radios) r.setAttribute('aria-checked', String(r === b));
-        if (m === 'ai' && !meta.serverKey) void openAiConfig(token, sid, () => void showStart(token));
+        if (m === 'ai' && !meta.serverKey) void openAiConfig(token, sid, () => void showStart(token), startPicks);
       });
       radios.push(b);
       return b;
@@ -276,7 +279,7 @@ export async function showStart(token: string): Promise<void> {
     items.push(h('h3', {}, 'Modo'), h('p', {}, gameMode ? `${gameMode === 'ai' ? t('modeAi') : t('modeNormal')} (fijo en esta partida)` : 'Se elige en la pantalla de inicio.'));
     if (gameMode === 'ai' || (!gameMode && !meta.serverKey && meta.playerKeys && meta.newGames)) {
       const aiBtn = h('button', { class: 'btn wide' }, gameMode === 'ai' ? 'Ajustes de la IA (modelo, key y topes)' : 'Configurar la IA');
-      aiBtn.onclick = () => void openAiConfig(token, sid, () => void showStart(token));
+      aiBtn.onclick = () => void openAiConfig(token, sid, () => void showStart(token), startPicks);
       items.push(aiBtn);
     }
     const settings = h('button', { class: 'btn wide' }, 'Ajustes (sonido y accesibilidad)');

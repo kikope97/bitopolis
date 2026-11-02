@@ -1440,3 +1440,5 @@ body.placing .tut-target::after { visibility: hidden; }
 @media (max-width: 719px) {
   .legend:not(.folded) { max-height: min(50%, calc(100% - 16px - var(--tut-h, 0px))); }
 }
+/* Ronda 22: «+0 casas» no es una buena noticia. */
+.cc-reach b.none, .reach-hint b.none { color: var(--accent) !important; }

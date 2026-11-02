@@ -1,5 +1,6 @@
 import {
   barrioOf,
+  buildingAt,
   CARE,
   type BuildingKind,
   BUILD_NAMES,
@@ -17,6 +18,7 @@ import {
   radiusOf,
   serviceReach,
   serviceSaturation,
+  siteNetworkWarn,
 } from '@bitopolis/sim';
 import { plural } from './i18n.ts';
 
@@ -64,6 +66,12 @@ export function overlayFor(state: GameState, info: CoverageInfo): ReachOverlay {
   // Lo marcado ✓ que en realidad está «falta/lleno» (otro lo atiende y está lleno): queda ✗.
   const bad = new Set(info.lacking.map((s) => `${s.x},${s.y}`));
   for (const m of marks) if (m.t === 'ok' && bad.has(`${m.x},${m.y}`)) m.t = 'no';
+  // Ronda 22: también ✗ en las casas del pueblo a las que les falta este servicio (fuera de su radio).
+  if (info.mode === 'radio' && info.need) {
+    const ctx = coverageCtx(state);
+    const seen = new Set(marks.map((m) => `${m.x},${m.y}`));
+    for (const s of homeSites(state)) if (!seen.has(`${s.x},${s.y}`) && needStatus(state, info.need, s.x, s.y, ctx)) marks.push({ x: s.x, y: s.y, t: 'no' });
+  }
   if (info.mode !== 'radio') {
     for (const id of info.linked) {
       if (homes.has(id)) continue;
@@ -186,21 +194,24 @@ export function reachLine(state: GameState, info: CoverageInfo): { main: string;
 }
 
 /** Las líneas de la barra al colocar: «+14 casas con colegio · atenderá a ~38 de 60», solapes y llenos. */
-export function placeLines(state: GameState, what: string, x: number, y: number): { info: CoverageInfo; gain: string; warn: string[] } | null {
+export function placeLines(state: GameState, what: string, x: number, y: number): { info: CoverageInfo; gain: string; warn: string[]; none: boolean } | null {
   if (what === 'road' || !hasReach(what)) return null;
   const kind = what as BuildingKind;
   const info = coverageOf(state, kind, x, y);
   const label = info.need ? NEED_LABEL[info.need] : kindName(kind);
   const cap = info.capacity;
-  let gain = `+${plural(info.gains.length, 'casa', 'casas')} con ${label}`;
+  // Ronda 22: solo cuentan las viviendas hechas; los solares vacíos van aparte.
+  const homes = info.gains.filter((g) => !!buildingAt(state, g.x, g.y)).length;
+  const lots = info.gains.length - homes;
+  let gain = `+${plural(homes, 'casa', 'casas')} con ${label}${lots ? ` (y ${plural(lots, 'solar', 'solares')})` : ''}`;
   if (info.mode === 'red') gain += ` · dará ${info.kind === 'water' ? 'agua' : 'luz'} a ${cap!.used} de ${cap!.of} edificios`;
   else if (info.mode === 'ruta') gain += ` · recorrerá ${cap!.used} de ${cap!.of} calles`;
   else if (cap && cap.unit !== 'plazas') gain += ` · atenderá a ~${cap.used} de ${cap.of}`;
   else gain += ` · ${plural(info.homesInReach.length, 'vivienda', 'viviendas')} en su radio`;
-  const warn: string[] = [];
+  const warn: string[] = siteNetworkWarn(state, kind, x, y);
   const over = info.overlaps.filter((o) => o.shared > 0 || info.mode !== 'radio').sort((a, b) => b.shared - a.shared)[0];
   if (over && info.mode === 'radio') warn.push(`⚠ Se solapa con ${whereName(state, over)} (${plural(over.shared, 'casa', 'casas')} en común)`);
   for (const o of info.overlaps) if (o.full && o.used !== undefined && o.of !== undefined) warn.push(`${cap0(whereName(state, o))} está lleno (${o.used}/${o.of})`);
-  return { info, gain, warn: warn.slice(0, 2) };
+  return { info, gain, warn: warn.slice(0, 2), none: homes === 0 };
 }
 const cap0 = (s: string) => `${s[0]!.toUpperCase()}${s.slice(1)}`;

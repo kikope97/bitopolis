@@ -147,13 +147,14 @@ export function networkRoom(state: GameState, kind: NetKind): string {
 }
 
 /** Avisos de las redes (una vez por planta): al 90 % y cuando alguien se queda sin servicio. */
+// Ronda 22: la clave lleva la semilla, para que otra partida en la misma pestaña no calle sus avisos.
 const warned = new Map<string, number>();
 export function networkWarnings(state: GameState, say: (text: string, kind: 'warn' | 'info', ref: Building) => void): void {
   const load = loadOf(state);
   for (const [, net] of load.nets) {
     const first = state.buildings.find((b) => b.id === net.plants[0]);
     if (!first || net.capacity <= 0) continue;
-    const key = `${net.kind}:${net.plants.join(',')}`;
+    const key = `${state.seed}:${net.kind}:${net.plants.join(',')}`;
     const w = NET_WORD[net.kind];
     const want = net.served + net.left.length;
     const level = net.left.length ? 2 : want >= ZONE_GROWTH.plantWarnAt * net.capacity ? 1 : 0;

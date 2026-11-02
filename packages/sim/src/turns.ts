@@ -2,7 +2,7 @@ import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { protestFor, type Association } from './associations.ts';
 import { DEBT, FIRE, KIDS_MAX, LISTS, SEASONS, TOURISM, TURN } from './balance.ts';
 import { canPresent, politicsPrune, presentCandidacy } from './politics.ts';
-import { BUILD_NAMES, removeBuilding } from './commands.ts';
+import { BUILD_NAMES, cancelRefund, removeBuilding } from './commands.ts';
 import { homeRobbery } from './crime.ts';
 import { becomeVolunteer, canVolunteer, fireHelpTargets, helpAfterFire, homelessByFire, placeName, shelter } from './fire.ts';
 import { canBuyHome, canFound, shopTypesFor } from './economy.ts';
@@ -792,7 +792,7 @@ export function mayorText(state: GameState, cmd: { type: string } & Record<strin
     case 'Demolish': {
       const b = buildingAt(state, Number(cmd.x), Number(cmd.y));
       // 2.6: deshacer una obra sin empezar no es un derribo (ni una medida gorda).
-      if (b && !b.built) return { text: `cancela la obra de ${(BUILD_NAMES[b.kind] ?? b.kind).toLowerCase()}`, big: false };
+      if (b && cancelRefund(state, b) > 0) return { text: `cancela la obra de ${(BUILD_NAMES[b.kind] ?? b.kind).toLowerCase()}`, big: false };
       return b ? { text: `derriba ${(b.name ?? BUILD_NAMES[b.kind] ?? b.kind).toLowerCase()}`, big: b.kind === 'house' || b.kind === 'res' || b.kind === 'shop' } : null;
     }
     case 'SetTax': {

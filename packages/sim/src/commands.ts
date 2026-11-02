@@ -307,6 +307,8 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       const t = state.map.tiles[tileIndex(state, cmd.x, cmd.y)];
       if (b?.fire) return { ok: false, error: 'Está ardiendo: espera a que se apague' };
       if (!b && t !== Tile.Road && !hasDike(state, cmd.x, cmd.y)) return { ok: false, error: 'No hay nada que derribar' };
+      // Ronda 22: «Cancelar la obra» y «Deshacer» solo valen si aún se devuelve lo pagado.
+      if (cmd.cancelOnly && (!b || cancelRefund(state, b) === 0)) return { ok: false, error: 'La obra ya ha empezado: no se puede cancelar' };
       return { ok: true };
     }
     case 'NotifyProject':
@@ -433,7 +435,8 @@ export function cancelRefund(state: GameState, b: Building): number {
   if (b.built || b.owner !== TREASURY || isLandmarkKind(b.kind) || !(b.kind in BUILD)) return 0;
   const p = state.projects.find((x) => x.buildingId === b.id);
   if (!p || p.payer !== TREASURY || (p.offer ?? 'local') !== 'local' || p.workerDaysDone > 0) return 0;
-  return materialsCost(state, b.kind as BuildKind, b.x, b.y);
+  // Ronda 22: lo que se pagó de verdad (el plan del presupuesto o el tiempo cambian el precio de hoy).
+  return p.paid ?? 0;
 }
 
 /** Quita un edificio cuidando que su dinero y sus vecinos queden en orden. */
@@ -522,6 +525,7 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
         crew: [],
         outsideToday: 0,
         notify: false,
+        ...(offer === 'local' ? { paid: mat } : {}),
       });
       if (offer !== 'local') signTender(state, b, state.projects.at(-1)!, offer, mat);
       pushEvent(state, 'project', `Empieza la obra: ${BUILD_NAMES[cmd.kind]}`, { ref: b.id });

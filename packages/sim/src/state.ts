@@ -157,6 +157,8 @@ export interface Project {
   notify: boolean;
   /** 2.2: oferta de la licitación (sin definir = local, la de siempre). */
   offer?: 'local' | 'fuera' | 'primo';
+  /** Ronda 22: materiales pagados al ponerla (lo que devuelve una cancelación). */
+  paid?: number;
 }
 
 export interface Citizen {

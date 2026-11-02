@@ -198,7 +198,7 @@ export function lockLong(tool: Tool, state: GameState): string {
 /** Coste corto para la barra de confirmación: «hasta 3.500 €». */
 export function shortCost(tool: Tool): string {
   if (tool.landmark) return landmarkCost(tool.landmark);
-  return tool.build && tool.build !== 'road' ? `hasta ${money(buildCost(tool.build))}` : costText(tool);
+  return tool.build && tool.build !== 'road' ? money(buildCost(tool.build)) : costText(tool);
 }
 
 /** Precio en una línea para la bandeja «Construir» (v1.6). */
