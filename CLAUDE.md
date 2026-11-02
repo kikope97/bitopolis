@@ -177,3 +177,15 @@ pnpm e2e                            # Playwright, viewport móvil y escritorio; 
 - Rendimiento: el suelo se repinta por trozos (`groundFor`, tope por fotograma); el estado del worker llega en JSON. `pnpm perf` (`e2e/tirones.spec.ts`).
 - Pantalla: `fitTopbar()` (la barra de arriba pasa a dos filas antes de quitar iconos), leyenda plegada en móvil, marca del tutorial dentro del objetivo (`tut-target`), `--ui` mayor en pantallas grandes. e2e `pantallas` (solo en «escritorio»; `PW_TOWN_CACHE`).
 - Flujos: zonas sin carretera (`zonesWithoutRoad`), «Bajo a x1 por…» con «Volver a xN», bandeja con categorías bloqueadas plegadas (`pickTool` las abre), `plenoPlan` (lo que se anuncia = lo que se pide). e2e `flujo`.
+
+## Lo básico (2.6) — formato de partida 19, TURN_PROMPT_VERSION 16
+- Queja de un jugador (ronda 22): no se veía a quién da servicio cada edificio, el núcleo no se explicaba y había demasiadas mecánicas. Esta versión arregla lo básico antes de añadir nada.
+- `sim/src/reach.ts`: `reaches()`, `servingOf`, `diamondTiles`: **un solo predicado** de «este servicio llega a esta casa» para la felicidad, la carga, «Qué falta» y el dibujo. `service-reach.ts`: `coverageOf(state, kind, x, y)` (vista previa) y `serviceReach(state, b)` (ficha). `coverage.ts`: `needStatus` (falta / lleno), basura por partes de la red.
+- `sim/src/nucleo.ts`: por qué no crece un solar (`lotStatus`, `lotSummary`, `lotsLine`), carga de las redes de agua y luz (`networkLoad`, `netOfBuilding`), coste al mes (`monthlyCostOf`), `siteNetworkWarn` (calle sin agua o luz al colocar). `demandFactors` y `ZONE_GROWTH` en tick.ts/balance.ts.
+- Cancelar una obra sin empezar devuelve lo pagado (`cancelRefund`, `Project.paid`); `Demolish.cancelOnly` falla si ya empezó. El cliente ofrece «Deshacer» 5 s en `#strip` (`data-mode="undo"`).
+- `sim/src/upkeep.ts`: gasto corriente (vecinos según el nivel, carreteras, casas municipales; `UPKEEP`), con rampa desde `upkeepFrom` para las partidas viejas. Frena la caja disparada.
+- `sim/src/gates.ts`: `EARLY`/`earlyReady` (dilemas, cartas, ofertas de los vecinos, gran empresa, encargos y El Eco desde 30 vecinos o el ayuntamiento 3); `systemOn`. «Pueblo sencillo» (`state.simple`, `CreateBody.simple`, también en `PUT /ai-config`, CLI `--simple`): sin encargos, El Eco, comarca, licitaciones ni dilemas. **Decisión del creador**: está en Configurar y viene apagado.
+- Licitaciones solo para obras grandes: `TENDER.minCost` 6000 y `fromLevel` 3.
+- Cliente: `reach-ui.ts` (rombo, ✓/✗, «Ver zona», `revealArea` con zoom legible, filtro de «Qué falta» que manda sobre la selección), `nucleo-ui.ts` (carga de la planta, `data-test="plant-load"`), `progress.ts` (panel «Pueblo» y bandeja progresivos, «Nuevo», «Enseñar todo desde el principio»; `ZONE_HELPERS`).
+- IA: `en_su_casa` en cada vecino, `servicios_llenos` y `gasto_fijo` en `turnShared`.
+- e2e: `cobertura`, `nucleo`, `progresivo`.
