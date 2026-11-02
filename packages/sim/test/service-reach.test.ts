@@ -14,6 +14,7 @@ import {
   stationsFor,
   trashServed,
   truckRoutes,
+  updateNetworks,
 } from '../src/index.ts';
 
 /** 2.6 «Lo básico»: la ficha, «Qué falta», la carga y las comisarías y bomberos dicen lo mismo. */
@@ -69,9 +70,12 @@ describe.each(SEEDS)('cobertura de los servicios, semilla %i', (seed) => {
 
   it('agua y luz: cada edificio con servicio tiene una planta, y la suma es lo que dicen las banderas', () => {
     const s = town(seed);
+    // Las banderas son de la última hora: una obra terminada después aún no las tiene; se ponen al día.
+    updateNetworks(s);
     for (const [kind, flag] of [['water', 'hasWater'], ['power', 'hasPower']] as const) {
       const plants = s.buildings.filter((b) => b.built && (kind === 'water' ? b.kind === 'water' : ['power', 'solar', 'wind'].includes(b.kind)));
-      const linked = plants.flatMap((p) => serviceReach(s, p).linked);
+      // Una planta puede gastar capacidad de otra (si la red le llega antes de encenderse): igual que en updateNetworks.
+      const linked = plants.flatMap((p) => serviceReach(s, p).linked).filter((id) => !plants.some((p) => p.id === id));
       expect(new Set(linked).size).toBe(linked.length);
       const withFlag = s.buildings.filter((b) => b[flag] && !plants.includes(b)).map((b) => b.id);
       expect(new Set(linked)).toEqual(new Set(withFlag));
