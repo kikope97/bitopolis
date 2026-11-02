@@ -170,6 +170,10 @@ const CONCEPT: Record<string, string> = {
   microcréditos: 'Microcréditos concedidos',
   sueldos: 'Sueldos municipales',
   mantenimiento: 'Mantenimiento',
+  // 2.6: gasto corriente que crece con el pueblo (upkeep.ts).
+  'servicios generales': 'Alumbrado, limpieza y oficinas',
+  calles: 'Conservación de calles',
+  'viviendas municipales': 'Comunidad de las casas municipales',
   obras: 'Obras',
   intereses: 'Intereses de la deuda',
   préstamo: 'Préstamos recibidos',
