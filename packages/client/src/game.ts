@@ -1933,7 +1933,7 @@ export function startGame(opts: GameOptions): void {
     for (const cat of TRAY) {
       const fold = tray.querySelector<HTMLDetailsElement>(`details[data-cat="${cat.title}"]`);
       if (!fold) continue;
-      fold.hidden = !reveal.shown(`tray:${cat.title}`) && !reveal.shown(`trayfree:${cat.title}`);
+      fold.hidden = !prefs().fullHub && !reveal.shown(`tray:${cat.title}`) && !reveal.shown(`trayfree:${cat.title}`);
       const tools = cat.tools.map((id) => TOOLS.find((x) => x.id === id)!);
       const free = tools.some((tl) => !isLocked(tl, state));
       const sig = free ? 'free' : 'locked';
@@ -2611,9 +2611,10 @@ export function startGame(opts: GameOptions): void {
   function hubShown(): Record<HubEntry, boolean> {
     refreshReveal();
     const keys = Object.keys(hubWants(state)) as HubEntry[];
-    // En «Pueblo sencillo» no vuelve lo que apaga, aunque se viera antes.
+    // En «Pueblo sencillo» no vuelve lo que apaga, aunque se viera antes. Con «Enseñar todo» (Ajustes), todo lo demás.
     const off: HubEntry[] = state.simple ? ['neighbors', 'errands', 'press'] : [];
-    return Object.fromEntries(keys.map((k) => [k, !off.includes(k) && reveal.shown(`hub:${k}`)])) as Record<HubEntry, boolean>;
+    const all = prefs().fullHub;
+    return Object.fromEntries(keys.map((k) => [k, !off.includes(k) && (all || reveal.shown(`hub:${k}`))])) as Record<HubEntry, boolean>;
   }
   function seenHub(id: HubEntry) {
     reveal.seen(`hub:${id}`);

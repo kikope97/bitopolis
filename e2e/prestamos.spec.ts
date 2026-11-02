@@ -38,6 +38,8 @@ test('2.2: pedir un préstamo (importe, plazo, cuota y TAE), verlo en la lista y
   const shot = (n: string) => page.screenshot({ path: `test-results/capturas/${info.project.name}-prestamos-${n}.png` });
   const { state } = runSimulation({ seed: 42, days: 300, profile: 'casual', checkEveryDay: false });
   expect(loanCapacity(state)).toBeGreaterThan(5_000);
+  // 2.6: con la caja sana, «Préstamos» no sale en el panel hasta hacer falta; con «Enseñar todo» (Ajustes), sí.
+  await page.addInitScript(() => localStorage.setItem('bitopolis.prefs', JSON.stringify({ fullHub: true })));
   await openTown(page, request, state);
 
   await openLoans(page);

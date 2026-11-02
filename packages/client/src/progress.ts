@@ -57,15 +57,16 @@ export function hubWants(state: GameState): Record<HubEntry, boolean> {
   const medal = (state.medals ?? []).length > 0;
   const simple = simpleTown(state);
   const level = townLevel(state);
-  const named = state.citizens.filter((c) => c.named).length;
   const budget = state.budget.status === 'open' || state.grants.length > 0 || state.associations.length > 0 || !!state.seasons?.current || state.tick >= DAYS_PER_YEAR * TICKS_PER_DAY;
   const errands = state.errands;
   return {
     loans: loansWanted(state),
     budget,
-    pleno: (plenoUnlocked(state) && named >= 2) || !!state.pleno || state.lastPlenoTick >= 0,
+    // Con el ayuntamiento 2 se pueden convocar plenos (la hoja explica si aún faltan vecinos con nombre).
+    pleno: plenoUnlocked(state) || !!state.pleno || state.lastPlenoTick >= 0,
     politics: politicsActive(state) || daysToElection(state) <= 12 * DAYS_PER_MONTH,
-    advisor: month,
+    // En Modo IA, desde el principio (el consejero habla con la IA: es la gracia de ese modo).
+    advisor: month || state.aiMode,
     diary: month,
     album: month || medal,
     history: month || medal,

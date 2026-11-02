@@ -616,7 +616,8 @@ export function comarcaMonth(state: GameState, leave: (c: Citizen) => void): voi
   if (!cm || !systemOn(state, 'comarca')) return;
   if (!cm.towns.length) {
     cm.towns = createNeighbors(state);
-    pushEvent(state, 'info', `La comarca: ${cm.towns.map((t) => t.name).join(', ')}. Sus alcaldes también miran lo que haces (Pueblo › Comarca)`);
+    // 2.6: la ficha de los pueblos vecinos sale en el panel con el ayuntamiento 3 (o con su primera oferta).
+    pushEvent(state, 'info', `La comarca: ${cm.towns.map((t) => t.name).join(', ')}. Sus alcaldes también miran lo que haces${(state.townhallLevel ?? 1) >= 3 ? ' (Pueblo › Comarca)' : ''}`);
   }
   ensureFair(state);
   for (const t of cm.towns) simulateTown(state, t);
