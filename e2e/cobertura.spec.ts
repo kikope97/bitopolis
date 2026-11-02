@@ -117,10 +117,10 @@ for (const d of DEVICES) {
         // En táctil, el toque enseña la obra y la barra «Construir / ✕» con lo que gana.
         await page.touchscreen.tap(p.x, p.y);
         await expect(page.locator('#confirm-bar')).toBeVisible();
-        await expect(page.locator('[data-test="cc-reach"]')).toContainText(/\+\d+ casas? con policía · atenderá a ~\d+ de 120/);
+        await expect(page.locator('[data-test="cc-reach"]')).toContainText(/\+\d+ casas? con policía(?: \(y \d+ solar(?:es)?\))? · atenderá a ~\d+ de 120/);
       } else {
         await page.mouse.move(p.x, p.y);
-        await expect(page.locator('[data-test="reach-hint"]')).toContainText(/\+\d+ casas? con policía · atenderá a ~\d+ de 120/);
+        await expect(page.locator('[data-test="reach-hint"]')).toContainText(/\+\d+ casas? con policía(?: \(y \d+ solar(?:es)?\))? · atenderá a ~\d+ de 120/);
       }
       const r = await hook(page);
       expect(r.plus, 'casas que ganan (+)').toBeGreaterThan(0);
