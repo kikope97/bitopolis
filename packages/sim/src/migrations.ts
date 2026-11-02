@@ -170,7 +170,14 @@ export const MIGRATIONS: Record<number, Migration> = {
   16: (s) => ({ ...migrate17Seasons(migrate17Dilemmas(migrate17River(migrate17Transit(migrate17Care(s))))), formatVersion: 17 }),
   // 17 → 18 (2.5, comarca): cada parte en su función.
   17: (s) => ({ ...migrate18Comarca(migrate18Letters(migrate18Coop(s))), formatVersion: 18 }),
+  // 18 → 19 (2.6, lo básico): «Pueblo sencillo» apagado en las partidas que ya existían.
+  18: (s) => ({ ...migrate19Simple(s), formatVersion: 19 }),
 };
+
+/** 2.6 (18 → 19): las partidas de antes no son «Pueblo sencillo» (lo tenían todo). */
+export function migrate19Simple(s: Record<string, any>): Record<string, any> {
+  return { ...s, simple: s.simple === true };
+}
 
 /** 2.5 (17 → 18), cooperativa: sin socios. La densidad (`map.density`) es opcional: baja por defecto. */
 export function migrate18Coop(s: Record<string, any>): Record<string, any> {

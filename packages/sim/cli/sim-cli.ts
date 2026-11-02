@@ -13,6 +13,8 @@ const { values } = parseArgs({
     // 2.3: escenario (libre, quiebra, vaciado, riada) y forma del terreno (aleatorio, rio, costa, colina, llano).
     scenario: { type: 'string', default: 'libre' },
     terrain: { type: 'string', default: 'aleatorio' },
+    // 2.6: «Pueblo sencillo» (sin encargos, El Eco, comarca, licitaciones ni dilemas).
+    simple: { type: 'boolean', default: false },
   },
 });
 
@@ -35,6 +37,7 @@ const { report } = runSimulation({
   checkEveryDay: values.check,
   scenario: scenario.data,
   terrain: terrain.data,
+  simple: values.simple,
 });
 const ms = Math.round(performance.now() - t0);
 const summary = { ...report, commands: report.commands.length, elapsedMs: ms };

@@ -4,6 +4,7 @@ import { MIN_WAGE, REGION } from './balance.ts';
 import { offerFeder } from './civic.ts';
 import type { CommandResult } from './commands.ts';
 import { directorOwns } from './director-core.ts';
+import { earlyReady } from './gates.ts';
 import { hash32 } from './hash.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { factionOf, politicsActive } from './politics.ts';
@@ -142,7 +143,7 @@ export function bigFactorySpot(state: GameState): { x: number; y: number } | nul
 export function bigCompanyReady(state: GameState): boolean {
   const c = REGION.bigCompany;
   // Y que quepa la fábrica: 2×2 de zona I libre junto a una carretera (si no, la oferta llegaría para decir que no).
-  return state.citizens.length >= c.pop && industrialTiles(state) >= c.industrialTiles && state.buildings.some((b) => b.kind === 'power' && b.built && !b.damaged) && bigFactorySpot(state) !== null;
+  return state.citizens.length >= c.pop && earlyReady(state, 'bigCompany') && industrialTiles(state) >= c.industrialTiles && state.buildings.some((b) => b.kind === 'power' && b.built && !b.damaged) && bigFactorySpot(state) !== null;
 }
 
 export function bigFactory(state: GameState): Building | undefined {

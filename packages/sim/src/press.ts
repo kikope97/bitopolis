@@ -7,6 +7,7 @@
 import { TICKS_PER_DAY } from '@bitopolis/shared';
 import { PRESS } from './balance.ts';
 import { answerErrand } from './errands.ts';
+import { earlyReady, systemOn } from './gates.ts';
 import { addMemory } from './social.ts';
 import { type GameEvent, type GameState, pushEvent } from './state.ts';
 
@@ -109,7 +110,7 @@ function ruleHeadlines(state: GameState): Headline[] {
 
 export function publishEdition(state: GameState, headlines: Headline[], source: 'ia' | 'reglas'): Edition | null {
   const p = state.press;
-  if (!p || !headlines.length) return null;
+  if (!p || !headlines.length || !systemOn(state, 'press') || !earlyReady(state, 'press')) return null;
   const ed: Edition = { n: (p.editions.at(-1)?.n ?? 0) + 1, tick: state.tick, source, headlines: headlines.slice(0, 3) };
   p.editions.push(ed);
   if (p.editions.length > PRESS.keep) p.editions.splice(0, p.editions.length - PRESS.keep);
@@ -121,7 +122,7 @@ export function publishEdition(state: GameState, headlines: Headline[], source: 
 /** Cada día: si en una semana no ha salido el periódico (con la IA), sale por plantillas. */
 export function pressDay(state: GameState): void {
   const p = state.press;
-  if (!p || state.citizens.length === 0 || state.tick % TICKS_PER_DAY !== 0) return;
+  if (!p || !systemOn(state, 'press') || !earlyReady(state, 'press') || state.citizens.length === 0 || state.tick % TICKS_PER_DAY !== 0) return;
   if (state.tick - p.last < PRESS.everyDays * TICKS_PER_DAY) return;
   publishEdition(state, ruleHeadlines(state), 'reglas');
 }

@@ -19,6 +19,7 @@ import { TICKS_PER_DAY, TICKS_PER_MONTH, tickToDate } from '@bitopolis/shared';
 import { COMARCA } from './balance.ts';
 import type { CommandResult } from './commands.ts';
 import { harvestMonthOf, isFarm } from './farm.ts';
+import { earlyReady, systemOn } from './gates.ts';
 import { hash32 } from './hash.ts';
 import { plantCapacityOf } from './levels.ts';
 import { fmt } from './loans.ts';
@@ -347,7 +348,8 @@ export function neighborMenu(state: GameState, t: NeighborTown): string[] {
   const offers = state.comarca.offers;
   const openFromTown = offers.some((o) => o.townId === t.id && !o.resolved);
   // Ronda 21: en la oposición no se puede contestar, así que no llegan ofertas.
-  if (!openFromTown && t.relation >= -1 && state.politics.mayor === 'player') {
+  // 2.6: sin ofertas con un pueblo recién nacido (reglas e IA eligen de este menú).
+  if (!openFromTown && t.relation >= -1 && state.politics.mayor === 'player' && earlyReady(state, 'neighborOffers')) {
     for (const k of OFFER_KINDS) {
       if (offers.some((o) => o.kind === k && !o.resolved) || activeDeal(state, k)) continue;
       // Ronda 21: lo que rechazaste (o dejaste caducar) no vuelve del mismo pueblo en unos meses.
@@ -567,7 +569,7 @@ export function answerNeighbor(state: GameState, id: number, accept: boolean): v
 /** Ofertas y acuerdos que vencen; turno de los alcaldes sin respuesta (deciden las reglas). Cada día. */
 export function comarcaDay(state: GameState): void {
   const cm = state.comarca;
-  if (!cm || !cm.towns.length) return;
+  if (!cm || !cm.towns.length || !systemOn(state, 'comarca')) return;
   for (const o of cm.offers) {
     const t = cm.towns.find((x) => x.id === o.townId);
     if (!o.resolved && o.until <= state.tick) {
@@ -610,7 +612,8 @@ export function comarcaHarvest(state: GameState): void {
  */
 export function comarcaMonth(state: GameState, leave: (c: Citizen) => void): void {
   const cm = state.comarca;
-  if (!cm) return;
+  // 2.6: «Pueblo sencillo»: no hay pueblos vecinos (ni competencia, ni ofertas, ni alcaldes).
+  if (!cm || !systemOn(state, 'comarca')) return;
   if (!cm.towns.length) {
     cm.towns = createNeighbors(state);
     pushEvent(state, 'info', `La comarca: ${cm.towns.map((t) => t.name).join(', ')}. Sus alcaldes también miran lo que haces (Pueblo › Comarca)`);
