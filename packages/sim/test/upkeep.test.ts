@@ -47,10 +47,23 @@ describe('gasto corriente (2.6)', () => {
     const s = town(4, 48);
     const before = s.treasury;
     const drift = moneyDrift(s);
+    s.upkeepFrom = 0; // partida de la 2.6: el gasto se cobra desde el principio
     const u = upkeepOf(s);
     upkeepMonth(s);
     expect(s.treasury).toBe(before - u.general - u.roads - u.houses);
     expect(s.month.breakdown['servicios generales']).toBe(-u.general);
     expect(moneyDrift(s)).toBe(drift);
   });
+});
+
+describe('gasto corriente en partidas de antes de la 2.6', () => {
+  it('una partida que ya pasa del mes 36 no lo paga de golpe: la rampa empieza al primer cobro', async () => {
+    const { runSimulation, upkeepOf, upkeepMonth } = await import('../src/index.ts');
+    const { state } = runSimulation({ seed: 3, days: 1200, profile: 'constructor', checkEveryDay: false });
+    delete (state as { upkeepFrom?: number }).upkeepFrom;
+    upkeepMonth(state);
+    const u = upkeepOf(state);
+    expect(u.general + u.roads + u.houses).toBe(0);
+    expect(state.upkeepFrom).toBe(Math.floor(state.tick / TICKS_PER_MONTH));
+  }, 120_000);
 });
