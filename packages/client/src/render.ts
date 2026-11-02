@@ -886,9 +886,11 @@ function drawReachMarks(ctx: CanvasRenderingContext2D, state: GameState, cam: Ca
   const ts = T * z;
   const cssTile = ts / Math.max(1, typeof devicePixelRatio === 'number' ? devicePixelRatio : 1);
   const { w, h } = state.map;
-  const line = Math.max(1, Math.round(z));
-  for (const b of o.borders) {
-    const color = b.ghost ? 13 : 12;
+  // Ronda 22: al menos 2 px CSS y con un contorno oscuro debajo (antes no se veía ni en nieve ni en hierba).
+  const dprNow = Math.max(1, typeof devicePixelRatio === 'number' ? devicePixelRatio : 1);
+  const line = Math.max(Math.round(2 * dprNow), Math.round(z));
+  for (const pass of [0, 1] as const) for (const b of o.borders) {
+    const color = pass === 0 ? 0 : b.ghost ? 13 : 12;
     ctx.fillStyle = P(color);
     const inR = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && Math.abs(x - b.x) + Math.abs(y - b.y) <= b.r;
     for (let y = Math.max(0, b.y - b.r); y <= Math.min(h - 1, b.y + b.r); y++) {
@@ -907,10 +909,12 @@ function drawReachMarks(ctx: CanvasRenderingContext2D, state: GameState, cam: Ca
             else ctx.fillRect(sx, sy + k, sw, Math.min(4 * z, n - k));
           }
         };
-        if (!inR(x, y - 1)) seg(px, py, ts, line);
-        if (!inR(x, y + 1)) seg(px, py + ts - line, ts, line);
-        if (!inR(x - 1, y)) seg(px, py, line, ts);
-        if (!inR(x + 1, y)) seg(px + ts - line, py, line, ts);
+        // El contorno oscuro (pasada 0) es más ancho: queda un filete oscuro por dentro del borde claro.
+        const lw = pass === 0 ? line + Math.round(2 * dprNow) : line;
+        if (!inR(x, y - 1)) seg(px, py, ts, lw);
+        if (!inR(x, y + 1)) seg(px, py + ts - lw, ts, lw);
+        if (!inR(x - 1, y)) seg(px, py, lw, ts);
+        if (!inR(x + 1, y)) seg(px + ts - lw, py, lw, ts);
       }
     }
   }

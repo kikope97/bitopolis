@@ -109,8 +109,12 @@ export function toolInReach(state: GameState, tl: Tool): boolean {
 
 /** Categorías de la bandeja que se enseñan ahora (las que se alcanzan con el siguiente nivel). */
 export function trayCatsWanted(state: GameState): string[] {
-  return TRAY.filter((cat) => cat.tools.some((id) => toolInReach(state, TOOLS.find((x) => x.id === id)!))).map((c) => c.title);
+  const zones = toolInReach(state, TOOLS.find((x) => x.id === 'zoneR')!);
+  return TRAY.filter((cat) => cat.tools.some((id) => (zones || !ZONE_HELPERS.has(id)) && toolInReach(state, TOOLS.find((x) => x.id === id)!))).map((c) => c.title);
 }
+
+/** Ronda 22: herramientas que solo sirven con zonas (sin ellas no abren su categoría). */
+export const ZONE_HELPERS: ReadonlySet<string> = new Set(['dezone', 'densityLow', 'densityMid', 'densityHigh']);
 
 /* ---------------- «Nuevo» (preferencia del navegador) ---------------- */
 

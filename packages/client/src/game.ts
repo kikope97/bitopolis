@@ -117,7 +117,7 @@ import SimWorker from './sim.worker.ts?worker';
 import { buildingSprite, landmarkSprite, letterSprite, resSprite, T, ZONE_COLOR } from './sprites.ts';
 import { bigCompanyContent, landmarkContent, openRegion, regionAttention, regionSummary } from './landmarks-ui.ts';
 import { comarcaPending, comarcaSummary, openComarca } from './comarca-ui.ts';
-import { type HubEntry, hubWants, Reveal, trayCatsWanted } from './progress.ts';
+import { type HubEntry, hubWants, Reveal, trayCatsWanted, ZONE_HELPERS } from './progress.ts';
 import { commandFor, costText, isLocked, lockLong, lockShort, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayCost } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
 import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, h, isSheetOpen, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack } from './ui.ts';
@@ -1413,7 +1413,7 @@ export function startGame(opts: GameOptions): void {
     if (g.mode === 'pan' && touchInput && performance.now() - fling.t < 80) startFling();
     const t1 = tileAt(e.clientX, e.clientY);
     if (g.mode === 'pending' && t1 && performance.now() >= quietUntil) {
-      if (touchInput && tool.id !== 'inspect' && cam.zoom < touchZoom()) {
+      if (touchInput && tool.id !== 'inspect' && cam.zoom < touchZoom() && !pendingPlace) {
         // Muy alejado para acertar con el dedo: este toque acerca ahí; el siguiente ya construye.
         const r = canvas.getBoundingClientRect();
         setZoom(touchZoom(), (e.clientX - r.left) * dpr(), (e.clientY - r.top) * dpr());
@@ -1561,7 +1561,7 @@ export function startGame(opts: GameOptions): void {
     pendingDedication = v.ok ? tile : null;
     preview = seg ? { tiles: seg.tiles.map(([x, y]) => ({ x, y })), ok: v.ok } : { tiles: [tile], ok: false };
     const what = v.ok ? `¿Dedicar ${seg!.axis === 'plaza' ? 'la plaza' : 'esta calle'} a ${dedicating.name}?` : `No se puede (${v.error})`;
-    $('#confirm-text').replaceChildren(h('span', { class: 'cc-what' }, what), v.ok ? h('span', { class: 'cc-cost' }, `Placa: ${money(STREETS.plaque)}`) : '');
+    $('#confirm-text').replaceChildren(what ? h('span', { class: 'cc-what' }, what) : '', v.ok ? h('span', { class: 'cc-cost' }, `Placa: ${money(STREETS.plaque)}`) : '');
     const yes = $('#confirm-yes') as HTMLButtonElement;
     yes.textContent = 'Dedicar aquí';
     yes.className = 'btn primary';
@@ -1679,10 +1679,12 @@ export function startGame(opts: GameOptions): void {
     const v = validateCommand(state, cmd);
     const hill = (tool.build || tool.landmark) && tool.shape === 'tap' && terrainAt(state, a.x, a.y) === Terrain.Hill;
     // 2.6: con lo que costará al mes («+1.050 €/mes (mantenimiento y 1 sueldo)»).
-    const month = tool.build && tool.shape === 'tap' ? monthlyText(tool.build, state, true) : '';
+    const pl0 = v.ok && !demolishText && tool.build && tool.shape === 'tap' && touchInput;
+    // Ronda 22: en la barra, corto («· +2450 €/mes»); el detalle de sueldos está en la bandeja.
+    const month = tool.build && tool.shape === 'tap' ? monthlyText(tool.build, state, true).replace(/\s*\(.*\)$/, '') : '';
     const cost = tool.id === 'dike' ? shortCost(tool) : tool.landmark ? `${shortCost(tool)}${hill ? ' (colina: +50 %)' : ''} · ahora solo el solar` : tool.build && tool.shape === 'tap' ? `${shortCost(tool)}${hill ? ' (colina: materiales +50 %)' : ''}${month ? ` ${month}` : ''}` : lineText(a, b);
     // Ronda 13: el precio va en su propia línea y siempre se ve (también si no se puede: «no hay dinero»).
-    const what = demolishText && v.ok ? demolishText : v.ok ? `${tool.label} aquí` : `${tool.label}: no se puede (${v.error})`;
+    const what = demolishText && v.ok ? demolishText : v.ok ? (pl0 ? '' : `${tool.label} aquí`) : `${tool.label}: no se puede (${v.error})`;
     // v1.9.1: si con lo que falta por pagar de las obras en marcha la caja quedaría en negativo, se avisa (no se bloquea).
     const after = v.ok && !demolishText ? state.treasury - commandOutlay(state, cmd) - pendingWorksCost(state) : 0;
     const warn = after < 0 ? h('span', { class: 'cc-warn' }, `⚠ Quedarías en −${money(-after)} con las obras en marcha`) : '';
@@ -1700,6 +1702,8 @@ export function startGame(opts: GameOptions): void {
     showBar(true);
     $('#confirm-bar').classList.toggle('danger', !!demolishText);
     document.body.classList.add('placing');
+    // Ronda 22: en el móvil la zona del servicio no cabía al acercar; se encuadra entera sobre la barra.
+    if (pl && pl.info.mode === 'radio' && touchInput) revealArea(pl.info.tiles);
   }
 
   /** Tras confirmar, unos instantes sin toques en el mapa: los toques repetidos no proponen otra obra. */
@@ -2021,7 +2025,8 @@ export function startGame(opts: GameOptions): void {
       if (!fold) continue;
       fold.hidden = !prefs().fullHub && !reveal.shown(`tray:${cat.title}`) && !reveal.shown(`trayfree:${cat.title}`);
       const tools = cat.tools.map((id) => TOOLS.find((x) => x.id === id)!);
-      const free = tools.some((tl) => !isLocked(tl, state));
+      const zonesOpen = !isLocked(TOOLS.find((x) => x.id === 'zoneR')!, state);
+      const free = tools.some((tl) => !isLocked(tl, state) && (zonesOpen || !ZONE_HELPERS.has(tl.id)));
       const sig = free ? 'free' : 'locked';
       if (fold.dataset.sig !== sig) {
         fold.dataset.sig = sig;
@@ -2196,10 +2201,11 @@ export function startGame(opts: GameOptions): void {
     return h(
       'section',
       { class: `reach-box${full ? ' full' : ''}`, 'data-test': 'reach-box' },
-      h('p', { class: 'reach-main', 'data-test': 'reach-line' }, line.main),
+      // Ronda 22: en la bomba y la central la cifra principal ya está en su ficha de carga.
+      info.mode === 'red' ? '' : h('p', { class: 'reach-main', 'data-test': 'reach-line' }, line.main),
+      see,
       line.sub ? h('p', { class: 'muted small' }, `${line.sub}.`) : '',
       h('p', { class: 'reach-key small' }, h('span', { class: 'rk ok', 'aria-hidden': 'true' }, '✓'), ' con servicio  ', h('span', { class: 'rk no', 'aria-hidden': 'true' }, '✗'), ' sin él o lleno', info.mode === 'radio' ? '  · borde: su alcance' : '  · calles: su red'),
-      see,
     );
   }
 

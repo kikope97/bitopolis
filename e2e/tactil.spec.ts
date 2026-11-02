@@ -240,7 +240,7 @@ test('táctil: al tocar un colegio con el dedo se ve su zona sobre la hoja y la 
   await page.evaluate(([a, b]) => (window as any).__bitopolis.centerOn(a, b), [school.x, school.y]);
   const p = await tile(page, school.x, school.y);
   await t.tap(p.x, p.y);
-  await expect(page.locator('.sheet [data-test="reach-line"]')).toContainText(/Da servicio a \d+ viviendas?/);
+  await expect(page.locator('.sheet [data-test="reach-line"]')).toContainText(/\d+ viviendas? · \d+ de/);
   const r = await page.evaluate(() => (window as any).__bitopolis.reach);
   expect(r?.borders).toBeGreaterThanOrEqual(1);
   expect(await page.evaluate(([a, b]) => (window as any).__bitopolis.visible(a, b), [school.x, school.y])).toBe(true);

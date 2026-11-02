@@ -90,7 +90,7 @@ for (const d of DEVICES) {
       const { school } = town();
       await touchTile(page, school.x, school.y);
       const line = page.locator('.sheet [data-test="reach-line"]');
-      await expect(line).toContainText(/Da servicio a \d+ viviendas? · atiende a \d+ de un máximo de 60 alumnos/);
+      await expect(line).toContainText(/\d+ viviendas? · \d+ de 60 alumnos/);
       const r = await hook(page);
       expect(r, 'se dibuja la zona').toBeTruthy();
       expect(r.tiles).toBeGreaterThan(100);

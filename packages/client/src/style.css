@@ -696,7 +696,7 @@ html[data-text='200'] .tab .px-icon, html[data-text='200'] .tab .tab-sprite { wi
   box-shadow: 0 -4px 0 #1a1c2c;
 }
 .tray h3 { margin: 6px 0 4px; font-size: calc(13px * var(--ui)); color: var(--accent); font-family: ui-monospace, 'Cascadia Mono', Menlo, monospace; }
-.tray-cat > summary { display: flex; align-items: center; gap: 6px; min-height: 32px; cursor: pointer; list-style: none; }
+.tray-cat > summary { display: flex; align-items: center; gap: 6px; min-height: 44px; cursor: pointer; list-style: none; }
 .tray-cat > summary::-webkit-details-marker { display: none; }
 .tray-cat > summary::before { content: '▸'; color: var(--accent); }
 .tray-cat[open] > summary::before { content: '▾'; }
@@ -959,7 +959,7 @@ html[data-font='pixel'] body .hud-weather { font-size: 0.5rem; }
 .confirm-bar.warn { box-shadow: inset 0 3px 0 #b13e53; }
 .confirm-bar.danger .cc-what { -webkit-line-clamp: 3; }
 /* Ronda 13: leyenda de «Qué falta» con acción y plegable. */
-.legend-head { all: unset; cursor: pointer; display: flex; align-items: center; min-height: 32px; }
+.legend-head { all: unset; cursor: pointer; display: flex; align-items: center; min-height: 44px; }
 .legend-head:focus-visible { outline: 3px solid var(--accent); }
 .legend-need { display: grid; grid-template-columns: 16px 1fr auto; gap: 6px; align-items: center; }
 .legend-go { min-height: 36px; padding: 0 8px; background: var(--panel); border: 2px solid var(--line); color: var(--text); font: inherit; font-size: 0.85em; font-weight: 700; cursor: pointer; }
@@ -1405,7 +1405,7 @@ body.placing .tut-target::after { visibility: hidden; }
 /* 2.6 «Lo básico»: la zona de cada servicio (ficha, colocar y filtro de «Qué falta»). */
 .reach-box { margin: 4px 0 8px; padding: 8px 12px; border: 2px solid #41a6f6; background: var(--bg); }
 .reach-box.full { border-color: #ffcd75; }
-.reach-main { margin: 0 0 4px; font-size: 1.1em; font-weight: 700; line-height: 1.3; }
+.reach-main { margin: 0 0 4px; font-size: 1em; font-weight: 700; line-height: 1.3; }
 .reach-box .muted { margin: 0 0 6px; }
 .reach-key { margin: 0 0 6px; color: var(--muted); white-space: pre-wrap; }
 .rk { display: inline-block; min-width: 1.3em; text-align: center; font-weight: 700; color: #f4f4f4; }
@@ -1435,3 +1435,8 @@ body.placing .tut-target::after { visibility: hidden; }
 .tab.has-new::after { content: '' / ''; position: absolute; top: 6px; right: calc(50% - 20px); width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--bg); }
 .tray-cat[hidden] { display: none; }
 .simple-note { margin-top: 12px; padding: 8px 12px; border: 2px dashed var(--accent); border-radius: 4px; }
+
+/* Ronda 22 (móvil): la leyenda abierta no tapa más de medio mapa en el móvil. */
+@media (max-width: 719px) {
+  .legend:not(.folded) { max-height: min(50%, calc(100% - 16px - var(--tut-h, 0px))); }
+}

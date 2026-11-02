@@ -168,7 +168,7 @@ export function reachLine(state: GameState, info: CoverageInfo): { main: string;
   }
   if (cap && (cap.unit === 'vecinos' || cap.unit === 'alumnos')) {
     const who = cap.unit === 'alumnos' ? 'alumnos' : 'vecinos';
-    const main = `Da servicio a ${homes} · atiende a ${cap.used} de un máximo de ${cap.of} ${who} (${cap.full ? `lleno al ${pct(cap.used, cap.of)} %` : `al ${pct(cap.used, cap.of)} %`})`;
+    const main = `${homes} · ${cap.used} de ${cap.of} ${who} (${cap.full ? 'lleno al ' : ''}${pct(cap.used, cap.of)} %)`;
     if (cap.unit === 'alumnos') subs.push(`en esas viviendas hay ${people}; cada vecino y cada hijo cuentan como alumno`);
     else subs.push(`en esas viviendas viven ${people}`);
     const far = info.homesInReach.length - info.homesServed.length;
