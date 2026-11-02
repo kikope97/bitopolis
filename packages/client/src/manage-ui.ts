@@ -15,6 +15,7 @@ import {
   politicsActive,
   TOWNHALL_LEVELS,
   townLevel,
+  UPKEEP,
 } from '@bitopolis/sim';
 import { money, MONTHS } from './i18n.ts';
 import { economyLines } from './money-ui.ts';
@@ -51,7 +52,16 @@ export function monthlyCostEstimate(s: GameState, extraLevels = 0): number {
   const extra = hall ? maintenanceOf(hall) * extraLevels * fx : 0;
   const last = s.stats.at(-1);
   const base = last ? last.expenses : s.buildings.filter((b) => b.built).reduce((t, b) => t + maintenanceOf(b) * (b.kind === 'townhall' ? townLevel(s) : 1) * fx, 0);
-  return Math.round(base + extra);
+  return Math.round(base + extra + upkeepJump(s, extraLevels));
+}
+
+/** Ronda 22: lo que sube el gasto corriente (€ por vecino, upkeep.ts) al ampliar, ya con la rampa entera. */
+export function upkeepJump(s: GameState, extraLevels: number): number {
+  if (extraLevels <= 0) return 0;
+  const lvl = townLevel(s);
+  const per = UPKEEP.perCitizen;
+  const diff = (per[Math.min(per.length - 1, lvl + extraLevels)] ?? 0) - (per[lvl] ?? 0);
+  return Math.max(0, Math.round(diff * s.citizens.length * budgetFx(s).maintenance));
 }
 
 /**
@@ -94,6 +104,7 @@ export function openManagement(ctx: SocialCtx, links: ManageLinks, fresh?: strin
     up.push(
       h('p', {}, `Siguiente: `, h('strong', {}, next.name), ` (nivel ${next.level}). Pide ${next.pop} vecinos y ${money(next.cost)}.`),
       h('p', { class: 'muted small' }, `Desbloquea: ${next.unlocks.join(', ')}.`),
+      upkeepJump(s, 1) > 0 ? h('p', { class: 'muted small', 'data-test': 'upgrade-upkeep' }, `Con más nivel, el gasto corriente (alumbrado, limpieza, oficinas) sube unos ${money(upkeepJump(s, 1))} al mes.`) : '',
       ok.ok ? h('p', { class: tight ? 'pocket-warn mg-after' : 'muted small mg-after', 'data-test': 'upgrade-after' }, `${tight ? '⚠ ' : ''}Te quedarán ${money(left)}; a fin de mes pagas ≈ ${money(due)}.${tight ? ' Quizá convenga esperar a cobrar.' : ''}`) : '',
       btn,
     );

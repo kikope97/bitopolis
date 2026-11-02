@@ -168,10 +168,10 @@ export const MAINTENANCE: Record<BuildingKind, number> = {
 export const UPKEEP = {
   /**
    * Alumbrado, limpieza y oficinas: € por vecino y mes según el nivel del ayuntamiento (índice = nivel).
-   * Casi nada hasta el nivel 3: ahí vive el pueblo casual, que ya va justo (con 20 € quebraban 3 de 8
-   * semillas a 8 años). Pesa en el 4 y el 5, donde los impuestos dejaban atrás al mantenimiento.
+   * Casi nada hasta el nivel 3. Ronda 22: subida suave (antes 4/30/42): el salto del 3 al 4 era una
+   * trampa (el casual cerraba el año en −37k y el constructor no llegaba nunca al 5).
    */
-  perCitizen: [0, 0, 0, 4, 30, 42],
+  perCitizen: [0, 0, 0, 8, 16, 24],
   /** Conservación de calles: € por casilla de carretera y mes (las primeras, gratis: el pueblo de siempre). */
   road: 6,
   freeRoads: 20,
@@ -372,13 +372,13 @@ export const LOANS = {
 /** Con esta población el impuesto único se separa en IBI, tasas y plusvalía. */
 export const TAX_SPLIT_POP = 50;
 /** IBI anual sobre el valor del inmueble (escala del juego). */
-export const IBI_RATE = { low: 0.05, medium: 0.07, high: 0.1 } as const;
+export const IBI_RATE = { low: 0.05, medium: 0.07, high: 0.085 } as const;
 /**
  * Tasa de basuras por vecino y mes, y de terrazas por comercio y mes.
  * 2.1: la de basuras solo la paga quien tiene recogida (trash.ts); como ya paga
  * un servicio de verdad (camión y punto limpio), sube un 20 % (10/15/24 → 12/18/28).
  */
-export const TASA_BASURAS = { low: 12, medium: 18, high: 28 } as const;
+export const TASA_BASURAS = { low: 12, medium: 18, high: 24 } as const;
 export const TASA_TERRAZAS = { low: 40, medium: 60, high: 95 } as const;
 /** Plusvalía municipal sobre la ganancia de una compraventa. */
 export const PLUSVALIA_RATE = { low: 0.1, medium: 0.2, high: 0.3 } as const;
@@ -1400,7 +1400,7 @@ export const DILEMMA = {
   /** Por reglas, como mucho uno cada tantos meses (con director manda el cupo de drama). */
   ruleGapMonths: 3,
   /** Desde cuántos vecinos hay dilemas (con un pueblo recién nacido aún no). */
-  minPop: 40,
+  minPop: 30,
   /** Presentación del director (IA), en caracteres. */
   introMax: 200,
   /** La última plaza de la residencia: ánimo de quien entra y de quien se queda fuera (y su rencor). */
