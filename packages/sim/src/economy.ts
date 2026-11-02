@@ -44,7 +44,8 @@ import {
 import { hash32 } from './hash.ts';
 import { charge, totalDebt } from './household.ts';
 import { homesOf } from './density.ts';
-import { radiusOf, serviceCapacityOf } from './levels.ts';
+import { serviceCapacityOf } from './levels.ts';
+import { reaches } from './reach.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance } from './prng.ts';
 import { compostMonth, trashFee, trashServed } from './trash.ts';
@@ -471,8 +472,9 @@ export function serviceLoads(state: GameState): Map<number, number> {
     if (!home) continue;
     const nearest = new Map<BuildingKind, { id: number; d: number }>();
     for (const b of served) {
+      // 2.6: el mismo alcance que dicen la ficha y «Qué falta» (reach.ts).
+      if (!reaches(state, b, home.x, home.y)) continue;
       const d = Math.abs(b.x - home.x) + Math.abs(b.y - home.y);
-      if (d > radiusOf(b)) continue;
       const best = nearest.get(b.kind);
       if (!best || d < best.d || (d === best.d && b.id < best.id)) nearest.set(b.kind, { id: b.id, d });
     }

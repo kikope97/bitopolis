@@ -4,6 +4,7 @@ import { BUILD_NAMES } from './commands.ts';
 import { directorOwns } from './director-core.ts';
 import { hash32 } from './hash.ts';
 import { levelOf, radiusOf } from './levels.ts';
+import { reaches } from './reach.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance, nextInt } from './prng.ts';
 import { addMemory } from './social.ts';
@@ -81,9 +82,9 @@ export const burntDown = (b: Building | undefined): boolean => b?.damaged?.cause
 
 /** Parques de bomberos que llegan a (x, y): en su radio y, en la colina, con cisterna (nivel 2). */
 export function fireStationsFor(state: GameState, x: number, y: number): Building[] {
-  const hill = terrainAt(state, x, y) === Terrain.Hill;
+  // 2.6: el predicado único (reach.ts) ya pide la cisterna en la colina.
   return state.buildings
-    .filter((b) => b.kind === 'firestation' && b.built && !b.damaged && dist(b, { x, y }) <= radiusOf(b) && (!hill || levelOf(b) >= FIRE.hillLevel))
+    .filter((b) => b.kind === 'firestation' && reaches(state, b, x, y))
     .sort((a, b) => dist(a, { x, y }) - dist(b, { x, y }) || a.id - b.id);
 }
 
