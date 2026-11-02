@@ -1,10 +1,10 @@
 import type { BuildKind } from '@bitopolis/shared';
-import { BUILD, FIRE } from './balance.ts';
-import { Terrain } from './terrain.ts';
+import { BUILD } from './balance.ts';
 import { isUnlocked } from './townhall.ts';
-import { levelOf, radiusOf, truckRouteOf } from './levels.ts';
+import { truckRouteOf } from './levels.ts';
 import { serviceSaturation } from './economy.ts';
-import { buildingAt, DIRS, footprint, type GameState, hasAdjacentRoad, inBounds, terrainAt, Tile, tileIndex, Zone } from './state.ts';
+import { reaches, servingOf } from './reach.ts';
+import { buildingAt, DIRS, footprint, type GameState, hasAdjacentRoad, inBounds, Tile, tileIndex, Zone } from './state.ts';
 import { truckRoutes } from './trash-core.ts';
 
 /**
@@ -97,15 +97,51 @@ export interface CoverageCtx {
   power: Set<number>;
   /** 2.1: calles por las que pasa el camión de la basura. */
   trash: Set<number>;
-  /** Algún camión ya recorre todo lo que da (falta ampliar el punto limpio o hacer otro). */
-  trashFull: boolean;
+  /** 2.6: trozo de la red de calles de cada carretera (−1 si no es carretera). */
+  roadPart: Int32Array;
+  /** 2.6: trozos de red donde un camión ya recorre todo lo que da (ahí falta ampliar el punto limpio u otro). */
+  trashFullParts: Set<number>;
   active: NeedKey[];
 }
+
+/** 2.6: cada carretera, con el número de su trozo de red (las que se tocan, el mismo). */
+export function roadParts(state: GameState): Int32Array {
+  const { tiles, w } = state.map;
+  const part = new Int32Array(tiles.length).fill(-1);
+  let n = 0;
+  for (let s = 0; s < tiles.length; s++) {
+    if (tiles[s] !== Tile.Road || part[s] !== -1) continue;
+    const queue = [s];
+    part[s] = n;
+    while (queue.length) {
+      const i = queue.pop()!;
+      const x = i % w;
+      const y = Math.floor(i / w);
+      for (const [dx, dy] of DIRS) {
+        if (!inBounds(state, x + dx, y + dy)) continue;
+        const j = tileIndex(state, x + dx, y + dy);
+        if (tiles[j] === Tile.Road && part[j] === -1) {
+          part[j] = n;
+          queue.push(j);
+        }
+      }
+    }
+    n++;
+  }
+  return part;
+}
+
 export function coverageCtx(state: GameState): CoverageCtx {
   const routes = truckRoutes(state);
   const trash = new Set(routes.flatMap((r) => r.roads));
-  const trashFull = routes.some((r) => r.roads.length >= truckRouteOf(state.buildings.find((b) => b.id === r.id)!));
-  return { water: networkRoads(state, 'water'), power: networkRoads(state, 'power'), trash, trashFull, active: activeNeeds(state) };
+  const roadPart = roadParts(state);
+  const trashFullParts = new Set<number>();
+  for (const r of routes) {
+    const p = state.buildings.find((b) => b.id === r.id)!;
+    if (r.roads.length < truckRouteOf(p)) continue;
+    for (const i of r.roads) trashFullParts.add(roadPart[i]!);
+  }
+  return { water: networkRoads(state, 'water'), power: networkRoads(state, 'power'), trash, roadPart, trashFullParts, active: activeNeeds(state) };
 }
 
 /**
@@ -116,37 +152,44 @@ export function coverageCtx(state: GameState): CoverageCtx {
 export function missingServices(state: GameState, x: number, y: number, ctx: CoverageCtx = coverageCtx(state)): CoverageNeed[] {
   const out: CoverageNeed[] = [];
   const b = buildingAt(state, x, y);
-  const roadNear = (set: Set<number>) =>
-    DIRS.some(([dx, dy]) => inBounds(state, x + dx, y + dy) && set.has(tileIndex(state, x + dx, y + dy)));
   for (const key of ctx.active) {
-    if (key === 'agua' || key === 'luz') {
-      if (b?.kind === 'water' || b?.kind === 'power' || b?.kind === 'solar' || b?.kind === 'wind') continue;
-      const ok = b && b.built ? (key === 'agua' ? b.hasWater : b.hasPower) : roadNear(key === 'agua' ? ctx.water : ctx.power);
-      if (!ok) out.push({ key, status: 'falta' });
-      continue;
-    }
-    if (key === 'basuras') {
-      // Llega si el camión pasa por alguna calle de al lado; «lleno» si hay punto limpio pero su camión no da para más.
-      if (b?.kind === 'cleanpoint') continue;
-      if (!roadNear(ctx.trash)) out.push({ key, status: ctx.trashFull ? 'lleno' : 'falta' });
-      continue;
-    }
-    const reach = state.buildings.filter(
-      (s) => s.built && !s.damaged && NEED_KINDS[key].includes(s.kind) && Math.abs(s.x - x) + Math.abs(s.y - y) <= radiusOf(s) && (key !== 'bomberos' || terrainAt(state, x, y) !== Terrain.Hill || levelOf(s) >= FIRE.hillLevel),
-    );
-    if (!reach.length) out.push({ key, status: 'falta' });
-    // Llega, pero todos los que llegan están saturados (atienden a menos del 90 % de quien lo usa).
-    else if (reach.every((s) => serviceSaturation(state, s.kind, s.id) < 0.9)) out.push({ key, status: 'lleno' });
+    const status = needStatus(state, key, x, y, ctx, b);
+    if (status) out.push({ key, status });
   }
   return out;
 }
+
+/** 2.6: cómo está UNA necesidad en (x, y): null si la tiene; si no, «falta» o «lleno». La usan `missingServices` y `coverageOf`. */
+export function needStatus(state: GameState, key: NeedKey, x: number, y: number, ctx: CoverageCtx, b = buildingAt(state, x, y)): CoverageNeed['status'] | null {
+  const roadNear = (set: Set<number>) => DIRS.some(([dx, dy]) => inBounds(state, x + dx, y + dy) && set.has(tileIndex(state, x + dx, y + dy)));
+  if (key === 'agua' || key === 'luz') {
+    if (b?.kind === 'water' || b?.kind === 'power' || b?.kind === 'solar' || b?.kind === 'wind') return null;
+    const ok = b && b.built ? (key === 'agua' ? b.hasWater : b.hasPower) : roadNear(key === 'agua' ? ctx.water : ctx.power);
+    return ok ? null : 'falta';
+  }
+  if (key === 'basuras') {
+    // Llega si el camión pasa por alguna calle de al lado; «lleno» si en SU trozo de red hay un camión que no da para más (2.6).
+    if (b?.kind === 'cleanpoint' || roadNear(ctx.trash)) return null;
+    const full = DIRS.some(([dx, dy]) => inBounds(state, x + dx, y + dy) && ctx.trashFullParts.has(ctx.roadPart[tileIndex(state, x + dx, y + dy)]!));
+    return full ? 'lleno' : 'falta';
+  }
+  // 2.6: el mismo alcance que la carga y la felicidad (reach.ts).
+  const reach = state.buildings.filter((s) => NEED_KINDS[key].includes(s.kind) && reaches(state, s, x, y));
+  const who = servingOf(reach, x, y);
+  if (!who) return 'falta';
+  // 2.6: «lleno» si el que atiende de verdad (el más cercano, como en serviceLoads) está saturado.
+  return serviceSaturation(state, who.kind, who.id) < 0.9 ? 'lleno' : null;
+}
+
+/** 2.6: edificios donde vive gente (casas, bloques y vivienda protegida). */
+export const isHomeKind = (kind: string): boolean => kind === 'house' || kind === 'res' || kind === 'vpo';
 
 /** Sitios donde vive o vivirá gente: viviendas y solares de zona R. */
 export function homeSites(state: GameState): { x: number; y: number }[] {
   const out: { x: number; y: number }[] = [];
   const homes = new Set<number>();
   for (const b of state.buildings) {
-    if (b.kind === 'house' || b.kind === 'res') {
+    if (isHomeKind(b.kind)) {
       out.push({ x: b.x, y: b.y });
       homes.add(b.y * state.map.w + b.x);
     }

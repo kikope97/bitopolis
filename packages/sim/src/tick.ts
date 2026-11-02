@@ -74,7 +74,8 @@ import { albumDay } from './album.ts';
 import { rankDay } from './rank.ts';
 import { crimeDay, jailNear } from './crime.ts';
 import { townLevel, zonesUnlocked } from './townhall.ts';
-import { finishUpgrades, jobsOf, maintenanceOf, plantCapacityOf, radiusOf, serviceHappiness } from './levels.ts';
+import { finishUpgrades, jobsOf, maintenanceOf, plantCapacityOf, serviceHappiness } from './levels.ts';
+import { reaches } from './reach.ts';
 import { lifeDay, lifeMonth, lifeYear } from './lifecycle.ts';
 import { burntDown, fireDay, fireTick, volunteersMonth } from './fire.ts';
 import { plansDay, turnsTick } from './turns.ts';
@@ -160,7 +161,17 @@ function dist(a: { x: number; y: number }, b: { x: number; y: number }): number 
  * por la red de carreteras conectada a ella, en orden de distancia, hasta su
  * capacidad. Devuelve qué tiles de carretera tienen agua y luz.
  */
-export function updateNetworks(state: GameState): { water: Set<number>; power: Set<number> } {
+/** 2.6: quién sirve a quién en la red (fuera del estado; lo rellena `updateNetworks` si se le pasa). Ver coverage.ts. */
+export interface NetworkTrace {
+  /** Edificio → planta que le da el servicio. */
+  water: Map<number, number>;
+  power: Map<number, number>;
+  /** Planta → calles a las que llega su red, y lo que da con el tiempo de hoy. */
+  roads: Map<number, number[]>;
+  capacity: Map<number, number>;
+}
+
+export function updateNetworks(state: GameState, trace?: NetworkTrace): { water: Set<number>; power: Set<number> } {
   const { w, tiles } = state.map;
   for (const b of state.buildings) {
     b.hasWater = false;
@@ -191,6 +202,7 @@ export function updateNetworks(state: GameState): { water: Set<number>; power: S
       let capacity = Math.round(plantCapacityOf(plant) * (isRenewable(plant.kind) ? renewableFx(state, plant.kind) : kind === 'water' ? weatherFx(state).water : weatherFx(state).power));
       // v1.7: una bomba a la orilla del río da agua a más edificios (2.4: si el río no baja sucio).
       if (kind === 'water' && riverside(state, plant.x, plant.y) && !pumpDirty(state, plant.x, plant.y)) capacity = Math.round(capacity * TERRAIN.riverPumpBonus);
+      trace?.capacity.set(plant.id, capacity);
       const queue: number[] = [];
       const seen = new Set<number>();
       for (const [dx, dy] of DIRS) {
@@ -205,11 +217,13 @@ export function updateNetworks(state: GameState): { water: Set<number>; power: S
       while (queue.length > 0) {
         const i = queue.shift()!;
         roadsWith[kind].add(i);
+        if (trace) traceRoad(trace, plant.id, i);
         for (const b of byRoad.get(i) ?? []) {
           if (b[flag] || !b.built) continue;
           if (capacity <= 0) continue;
           b[flag] = true;
           capacity--;
+          trace?.[kind].set(b.id, plant.id);
         }
         const x = i % w;
         const y = Math.floor(i / w);
@@ -227,6 +241,12 @@ export function updateNetworks(state: GameState): { water: Set<number>; power: S
     }
   }
   return roadsWith;
+}
+
+function traceRoad(trace: NetworkTrace, plantId: number, road: number): void {
+  const list = trace.roads.get(plantId);
+  if (list) list.push(road);
+  else trace.roads.set(plantId, [road]);
 }
 
 /* ---------- demanda RCI ---------- */
@@ -315,7 +335,8 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
     const full = new Set<string>();
     for (const b of state.buildings) {
       const s = SERVICE[b.kind];
-      if (!s || !b.built || b.damaged || dist(b, home) > radiusOf(b)) continue;
+      // 2.6: el mismo alcance que la ficha y «Qué falta» (en la colina, los bomberos solo con cisterna).
+      if (!s || !reaches(state, b, home.x, home.y)) continue;
       // Un servicio saturado rinde en proporción a los vecinos que puede atender.
       const load = serviceSaturation(state, b.kind, b.id);
       if (load < 0.9) full.add(b.kind);
@@ -370,7 +391,7 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
   if (fest) f.push(fest);
   if (c.kids?.length) f.push({ label: c.kids.length === 1 ? 'Un hijo en casa' : `${c.kids.length} hijos en casa`, value: 3 });
   // v1.7: la biblioteca, para quien quiere prosperar; sin cementerio, el duelo pesa.
-  if (home && c.desire === 'prosperar' && state.buildings.some((b) => b.kind === 'library' && b.built && !b.damaged && dist(b, home) <= radiusOf(b))) {
+  if (home && c.desire === 'prosperar' && state.buildings.some((b) => b.kind === 'library' && reaches(state, b, home.x, home.y))) {
     f.push({ label: 'Biblioteca cerca para formarse', value: SOCIAL_PLACES.libraryProsper });
   }
   if (!state.buildings.some((b) => b.kind === 'cemetery' && b.built) && c.memories.some((m) => m.kind === 'perdio_a' && state.tick - m.tick < 360 * TICKS_PER_DAY)) {

@@ -40,7 +40,7 @@ test('v0.3: tributos separados, capas, venta de vivienda, parte y vecinos', asyn
 
   // Capas de datos con leyenda.
   // v1.6: el chip abre una lista y se elige la capa por su nombre.
-  for (const label of ['Felicidad', 'Valor del suelo', 'Cobertura', 'Contaminación']) {
+  for (const label of ['Felicidad', 'Valor del suelo', 'Qué falta', 'Contaminación']) {
     await page.locator('#layers').click();
     await page.getByRole('radio', { name: label }).click();
     await expect(page.locator('#legend')).toContainText(label);

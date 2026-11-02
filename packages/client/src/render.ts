@@ -1,6 +1,7 @@
 import { tickToDate } from '@bitopolis/shared';
-import { ambulanceFor, busStation, buildingAt, type GameState, heritageVariant, isWater, seasonOf, streetSegment, Terrain, Tile, trashStateOf, truckRoutes, Zone } from '@bitopolis/sim';
+import { ambulanceFor, busStation, buildingAt, type GameState, type NeedKey, heritageVariant, isWater, seasonOf, streetSegment, Terrain, Tile, trashStateOf, truckRoutes, Zone } from '@bitopolis/sim';
 import { happinessMarks, type LayerId, layerCanvas, missingMarks, NEED_ICON, ruralMarks } from './layers.ts';
+import type { ReachOverlay } from './reach-ui.ts';
 import { pixelIcon } from './icons.ts';
 import { lotsOf } from './nucleo-ui.ts';
 
@@ -463,7 +464,7 @@ export function render(
   ctx: CanvasRenderingContext2D,
   state: GameState,
   cam: Camera,
-  opts: { preview?: Preview | null; selected?: { x: number; y: number } | null; cursor?: { x: number; y: number } | null; time: number; reducedMotion: boolean; layer?: LayerId; highlight?: { x: number; y: number; since: number } | null; labels?: boolean; fast?: boolean },
+  opts: { preview?: Preview | null; selected?: { x: number; y: number } | null; cursor?: { x: number; y: number } | null; time: number; reducedMotion: boolean; layer?: LayerId; highlight?: { x: number; y: number; since: number } | null; labels?: boolean; fast?: boolean; reach?: ReachOverlay | null; missingKey?: NeedKey | null },
 ): void {
   const z = cam.zoom;
   const ts = T * z;
@@ -517,6 +518,15 @@ export function render(
     const sw = Math.min(overlay.width - sx, Math.ceil(ctx.canvas.width / z) + 2);
     const sh = Math.min(overlay.height - sy, Math.ceil(ctx.canvas.height / z) + 2);
     if (sw > 0 && sh > 0) ctx.drawImage(overlay, sx, sy, sw, sh, sx * z - cam.x, sy * z - cam.y, sw * z, sh * z);
+  }
+  // 2.6: la zona de un servicio (al tocarlo, al colocarlo o con el filtro de «Qué falta»), también bajo los edificios.
+  if (opts.reach) {
+    const area = reachCanvas(state, opts.reach);
+    const sx = Math.max(0, Math.floor(cam.x / z));
+    const sy = Math.max(0, Math.floor(cam.y / z));
+    const sw = Math.min(area.width - sx, Math.ceil(ctx.canvas.width / z) + 2);
+    const sh = Math.min(area.height - sy, Math.ceil(ctx.canvas.height / z) + 2);
+    if (sw > 0 && sh > 0) ctx.drawImage(area, sx, sy, sw, sh, sx * z - cam.x, sy * z - cam.y, sw * z, sh * z);
   }
 
   const { w, h, tiles } = state.map;
@@ -745,7 +755,9 @@ export function render(
     // Ronda 13: sobre cada vivienda (o solar R), UN icono: lo que más falta, con marco rojo
     // (falta) o amarillo a trazos (llega, pero lleno), y «+N» si hay más. Muy alejado, solo un punto.
     const cssTile = ts / Math.max(1, typeof devicePixelRatio === 'number' ? devicePixelRatio : 1);
-    for (const m of missingMarks(state)) {
+    for (const mm of missingMarks(state)) {
+      // 2.6: con el filtro, solo las casas a las que les falta ESE servicio (con su icono).
+      const m = opts.missingKey ? { ...mm, needs: mm.needs.filter((n) => n.key === opts.missingKey) } : mm;
       if (!m.needs.length) continue;
       const top = m.needs[0]!;
       const built = !!buildingAt(state, m.x, m.y);
@@ -801,6 +813,8 @@ export function render(
   if (opts.labels) drawStreetNames(ctx, state, cam, mapSig);
   drawWeather(ctx, state, opts.time, opts.reducedMotion);
 
+  if (opts.reach) drawReachMarks(ctx, state, cam, opts.reach, !!opts.missingKey);
+
   const corner = (tx: number, ty: number, color: number, thick: number) => {
     const px = tx * ts - cam.x;
     const py = ty * ts - cam.y;
@@ -822,6 +836,119 @@ export function render(
   if (opts.selected) corner(opts.selected.x, opts.selected.y, 4, 2);
   // Cursor de teclado: esquinas blancas gruesas (se distingue de la selección por forma y color).
   if (opts.cursor) corner(opts.cursor.x, opts.cursor.y, 12, 3);
+}
+
+/* ---------- 2.6: zona de un servicio ---------- */
+
+let reachCache: { sig: string; canvas: HTMLCanvasElement } | null = null;
+/** Tinte de la zona a escala 1 (trama de la paleta; lo lleno, a rayas amarillas; fuera, velo con el filtro). */
+function reachCanvas(state: GameState, o: ReachOverlay): HTMLCanvasElement {
+  const { w, h } = state.map;
+  const sig = `${o.sig}:${w}x${h}`;
+  if (reachCache?.sig === sig) return reachCache.canvas;
+  const c = reachCache?.canvas ?? document.createElement('canvas');
+  c.width = w * T;
+  c.height = h * T;
+  const g = c.getContext('2d')!;
+  g.clearRect(0, 0, c.width, c.height);
+  const inside = new Uint8Array(w * h);
+  for (const a of o.areas) for (const i of a.tiles) inside[i] = Math.max(inside[i]!, a.full ? 2 : 1);
+  // Un servicio que no está lleno manda sobre otro lleno en la misma casilla (allí, alguien atiende).
+  for (const a of o.areas) if (!a.full) for (const i of a.tiles) inside[i] = 1;
+  if (o.veil) {
+    g.globalAlpha = 0.42;
+    g.fillStyle = P(0);
+    for (let i = 0; i < inside.length; i++) if (!inside[i]) g.fillRect((i % w) * T, Math.floor(i / w) * T, T, T);
+    g.globalAlpha = 1;
+  }
+  for (let i = 0; i < inside.length; i++) {
+    const v = inside[i];
+    if (!v) continue;
+    const px = (i % w) * T;
+    const py = Math.floor(i / w) * T;
+    if (v === 2) {
+      // Lleno: rayas diagonales amarillas (no solo el color lo distingue).
+      g.fillStyle = P(4);
+      for (let y = 0; y < T; y += 2) for (let x = 0; x < T; x += 2) if (((x + y) / 2) % 4 === 0) g.fillRect(px + x, py + y, 2, 2);
+    } else {
+      // Cubierto: damero de puntos celestes (más denso en las calles de una red).
+      g.fillStyle = P(o.roads ? 11 : 10);
+      for (let y = 0; y < T; y += 2) for (let x = 0; x < T; x += 2) if (o.roads ? (x + y) % 4 === 0 : (x % 4 === 0 && y % 4 === 0) || (x % 4 === 2 && y % 4 === 2)) g.fillRect(px + x, py + y, 2, 2);
+    }
+  }
+  reachCache = { sig, canvas: c };
+  return c;
+}
+
+/** Bordes de 1 px de cada rombo (los iguales, tenues y a trazos) y las marcas ✓ ✗ + • sobre las casas. */
+function drawReachMarks(ctx: CanvasRenderingContext2D, state: GameState, cam: Camera, o: ReachOverlay, filter: boolean): void {
+  const z = cam.zoom;
+  const ts = T * z;
+  const cssTile = ts / Math.max(1, typeof devicePixelRatio === 'number' ? devicePixelRatio : 1);
+  const { w, h } = state.map;
+  const line = Math.max(1, Math.round(z));
+  for (const b of o.borders) {
+    const color = b.ghost ? 13 : 12;
+    ctx.fillStyle = P(color);
+    const inR = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && Math.abs(x - b.x) + Math.abs(y - b.y) <= b.r;
+    for (let y = Math.max(0, b.y - b.r); y <= Math.min(h - 1, b.y + b.r); y++) {
+      const left = b.r - Math.abs(y - b.y);
+      for (let x = Math.max(0, b.x - left); x <= Math.min(w - 1, b.x + left); x++) {
+        const px = x * ts - cam.x;
+        const py = y * ts - cam.y;
+        if (px > ctx.canvas.width || py > ctx.canvas.height || px + ts < 0 || py + ts < 0) continue;
+        const seg = (sx: number, sy: number, sw: number, sh: number) => {
+          if (!b.ghost) return ctx.fillRect(sx, sy, sw, sh);
+          // A trazos: 4 px sí, 4 no.
+          const long = sw > sh;
+          const n = long ? sw : sh;
+          for (let k = 0; k < n; k += 8 * z) {
+            if (long) ctx.fillRect(sx + k, sy, Math.min(4 * z, n - k), sh);
+            else ctx.fillRect(sx, sy + k, sw, Math.min(4 * z, n - k));
+          }
+        };
+        if (!inR(x, y - 1)) seg(px, py, ts, line);
+        if (!inR(x, y + 1)) seg(px, py + ts - line, ts, line);
+        if (!inR(x - 1, y)) seg(px, py, line, ts);
+        if (!inR(x + 1, y)) seg(px + ts - line, py, line, ts);
+      }
+    }
+  }
+  // Muy alejado, solo el tinte (las marcas serían ruido); con el filtro, las ✗ ya las pone «Qué falta».
+  if (cssTile < 8) return;
+  // La placa ocupa algo más de media casilla (se lee también con el pueblo entero a la vista).
+  const s = Math.max(1, Math.round((ts * 0.6) / 9));
+  for (const m of o.marks) {
+    if (filter && m.t === 'no') continue;
+    const built = !!buildingAt(state, m.x, m.y);
+    const px = Math.round(m.x * ts - cam.x + ts - 9 * s);
+    const py = Math.round((m.y * T - (built ? BH - T : 0)) * z - cam.y + s);
+    if (px > ctx.canvas.width || py > ctx.canvas.height || px + 10 * s < 0 || py + 10 * s < 0) continue;
+    if (m.t === 'link') {
+      ctx.fillStyle = P(0);
+      ctx.fillRect(px + 2 * s, py + 2 * s, 5 * s, 5 * s);
+      ctx.fillStyle = P(11);
+      ctx.fillRect(px + 3 * s, py + 3 * s, 3 * s, 3 * s);
+      continue;
+    }
+    // Placa de 8×8 con borde oscuro: ✓ verde, ✗ roja, + blanca sobre verde.
+    ctx.fillStyle = P(0);
+    ctx.fillRect(px, py, 9 * s, 9 * s);
+    ctx.fillStyle = P(m.t === 'no' ? 2 : 6);
+    ctx.fillRect(px + s, py + s, 7 * s, 7 * s);
+    ctx.fillStyle = P(12);
+    const dot = (x: number, y: number) => ctx.fillRect(px + (1 + x) * s, py + (1 + y) * s, s, s);
+    if (m.t === 'ok') for (const [x, y] of [[1, 3], [2, 4], [3, 5], [4, 4], [5, 3], [6, 2], [5, 1]] as const) dot(x, y);
+    else if (m.t === 'no')
+      for (let k = 1; k < 6; k++) {
+        dot(k, k);
+        dot(6 - k, k);
+      }
+    else {
+      ctx.fillRect(px + 4 * s, py + 2 * s, s, 5 * s);
+      ctx.fillRect(px + 2 * s, py + 4 * s, 5 * s, s);
+    }
+  }
 }
 
 /** 2.2: dónde va el rótulo de cada calle con nombre (en medio de su tramo); se recalcula si cambia el mapa. */

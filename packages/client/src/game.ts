@@ -84,6 +84,9 @@ import {
   HERITAGE_NAMES,
   heritageVariant,
   touristified,
+  hasReach,
+  serviceReach,
+  SERVICE,
 } from '@bitopolis/sim';
 import { contractBox, openTender } from './tender-ui.ts';
 import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
@@ -108,6 +111,7 @@ import { openWhatsHappening, turnHeadline } from './ai-town-ui.ts';
 import { pocketMark } from './money-ui.ts';
 import { formatDate, money, MONTHS, plural, shortDate, t } from './i18n.ts';
 import { busTrips, type Camera, type Preview, render, restartAnimations, signSpot } from './render.ts';
+import { filterOverlay, overlayFor, placeLines, previewOverlay, reachLine, type ReachOverlay, TOOL_FOR_NEED } from './reach-ui.ts';
 import type { FromWorker, SaveBatch, ToWorker, Unsaved } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
 import { buildingSprite, landmarkSprite, letterSprite, resSprite, T, ZONE_COLOR } from './sprites.ts';
@@ -163,6 +167,9 @@ export function startGame(opts: GameOptions): void {
   let speed = 0;
   let preview: Preview | null = null;
   let layer: LayerId = 'none';
+  /** 2.6: filtro de «Qué falta» (un servicio) y la zona que se dibuja (memo por firma). */
+  let missingKey: NeedKey | null = null;
+  let reachMemo: { key: string; overlay: ReachOverlay | null } = { key: '', overlay: null };
   let selected: { x: number; y: number } | null = null;
   /** Primer toque de una carretera o zona (modo «toque inicio, toque fin»). */
   let anchor: { x: number; y: number } | null = null;
@@ -1204,10 +1211,22 @@ export function startGame(opts: GameOptions): void {
   function clampCam() {
     // Como mucho 2 casillas de borde (antes se podía dejar media pantalla vacía).
     const pad = Math.min(2 * tileSize(), Math.round(Math.min(canvas.width, canvas.height) * 0.15));
-    const axis = (pos: number, size: number, view: number) =>
-      size + 2 * pad <= view ? Math.round((size - view) / 2) : Math.max(-pad, Math.min(size - view + pad, pos));
-    cam.x = axis(cam.x, state.map.w * tileSize(), canvas.width);
-    cam.y = axis(cam.y, state.map.h * tileSize(), canvas.height);
+    // 2.6: con una hoja abierta encima del mapa (abajo o al lado), se puede llevar el borde del mapa hasta ella:
+    // si no, lo de abajo del pueblo nunca quedaba a la vista sobre la hoja.
+    const cover = sheetCover();
+    const axis = (pos: number, size: number, view: number, extra: number) =>
+      size + 2 * pad <= view - extra ? Math.round((size - view) / 2) : Math.max(-pad, Math.min(size - view + pad + extra, pos));
+    cam.x = axis(cam.x, state.map.w * tileSize(), canvas.width, cover.x);
+    cam.y = axis(cam.y, state.map.h * tileSize(), canvas.height, cover.y);
+  }
+  /** Lo que tapa del mapa la hoja abierta (en px del canvas): por abajo (móvil) o por la derecha (panel). */
+  function sheetCover(): { x: number; y: number } {
+    const el = currentSheet();
+    if (!el) return { x: 0, y: 0 };
+    const r = canvas.getBoundingClientRect();
+    const sr = el.getBoundingClientRect();
+    if (sr.left <= r.left + 8) return { x: 0, y: Math.max(0, r.bottom - sr.top) * dpr() };
+    return { x: Math.max(0, r.right - sr.left) * dpr(), y: 0 };
   }
   // v1.6.1: se puede alejar como antes de la 1.4 (≈11 px por casilla en un iPhone) para ver el pueblo.
   // Para construir con el dedo hacen falta casillas de al menos 24 px: por debajo, el primer toque acerca.
@@ -1649,7 +1668,10 @@ export function startGame(opts: GameOptions): void {
     // v1.9.1: si con lo que falta por pagar de las obras en marcha la caja quedaría en negativo, se avisa (no se bloquea).
     const after = v.ok && !demolishText ? state.treasury - commandOutlay(state, cmd) - pendingWorksCost(state) : 0;
     const warn = after < 0 ? h('span', { class: 'cc-warn' }, `⚠ Quedarías en −${money(-after)} con las obras en marcha`) : '';
-    $('#confirm-text').replaceChildren(h('span', { class: 'cc-what' }, what), demolishText || !cost ? '' : h('span', { class: 'cc-cost' }, v.ok ? cost : `Cuesta ${cost}`), warn);
+    // 2.6: lo que gana el pueblo con este servicio aquí («+14 casas con colegio · atenderá a ~38 de 60»).
+    const pl = v.ok && !demolishText && tool.build && tool.shape === 'tap' ? placeLines(state, tool.build, a.x, a.y) : null;
+    const reachText = pl ? h('span', { class: 'cc-reach', 'data-test': 'cc-reach' }, h('b', {}, pl.gain), ...pl.warn.map((w) => h('span', { class: 'cc-reach-warn' }, w))) : '';
+    $('#confirm-text').replaceChildren(h('span', { class: 'cc-what' }, what), demolishText || !cost ? '' : h('span', { class: 'cc-cost' }, v.ok ? cost : `Cuesta ${cost}`), reachText, warn);
     $('#confirm-bar').classList.toggle('warn', after < 0);
     const yes = $('#confirm-yes') as HTMLButtonElement;
     yes.textContent = demolishText ? 'Derribar' : tool.zone ? (tool.zone === 'none' ? 'Quitar zona' : 'Marcar zona') : tool.density !== undefined ? 'Marcar densidad' : tool.landmark ? 'Marcar el solar' : 'Construir';
@@ -2065,7 +2087,9 @@ export function startGame(opts: GameOptions): void {
       renderInspect(tile, fresh);
     };
     openInspect();
-    revealTile(tile);
+    // 2.6: un servicio enseña su zona: que quepa entera sobre la hoja (en el móvil, la mitad de arriba).
+    if (b && b.built && !b.damaged && hasReach(b.kind)) revealArea(serviceReach(state, b).tiles);
+    else revealTile(tile);
   }
 
   /** Nivel del servicio, lo que da y qué pide subirlo (con «Mejorar»). */
@@ -2075,7 +2099,7 @@ export function startGame(opts: GameOptions): void {
     const box = h('section', { class: 'level-box' }, h('h3', {}, pixelIcon('upgrade'), ` Nivel ${lv} de ${maxLevelOf(b)}`));
     const gives: string[] = [];
     if (radiusOf(b)) gives.push(`llega a ${radiusOf(b)} casillas`);
-    if (serviceCapacityOf(b)) gives.push(`atiende a ${serviceCapacityOf(b)} vecinos${served !== undefined ? ` (ahora ${served})` : ''}`);
+    if (serviceCapacityOf(b)) gives.push(`atiende a ${serviceCapacityOf(b)} ${b.kind === 'school' ? 'alumnos (vecinos y sus hijos)' : 'vecinos'}${served !== undefined ? ` (ahora ${served})` : ''}`);
     if (plantCapacityOf(b)) gives.push(`da ${b.kind === 'water' ? 'agua' : 'luz'} a ${plantCapacityOf(b)} edificios`);
     if (b.kind === 'police') gives.push(`${cellsOf(b)} calabozos`);
     if (b.kind === 'jail') gives.push(`${jailPlacesOf(b)} plazas`);
@@ -2100,6 +2124,112 @@ export function startGame(opts: GameOptions): void {
     btn.addEventListener('click', () => void command({ type: 'UpgradeBuilding', buildingId: b.id }));
     box.append(btn);
     return box;
+  }
+
+  /** 2.6: «Da servicio a N viviendas · atiende a X de un máximo de Y» y «Ver zona». */
+  function reachBox(b: Building): HTMLElement | null {
+    if (!b.built || b.damaged || !hasReach(b.kind)) return null;
+    const info = serviceReach(state, b);
+    const line = reachLine(state, info);
+    const see = h('button', { class: 'btn wide', 'data-test': 'see-zone' }, pixelIcon('layers'), ' Ver zona');
+    see.addEventListener('click', () => {
+      closeSheet();
+      revealArea(info.tiles.length ? info.tiles : [b.y * state.map.w + b.x]);
+    });
+    const full = !!info.capacity?.full;
+    return h(
+      'section',
+      { class: `reach-box${full ? ' full' : ''}`, 'data-test': 'reach-box' },
+      h('p', { class: 'reach-main', 'data-test': 'reach-line' }, line.main),
+      line.sub ? h('p', { class: 'muted small' }, `${line.sub}.`) : '',
+      h('p', { class: 'reach-key small' }, h('span', { class: 'rk ok', 'aria-hidden': 'true' }, '✓'), ' con servicio  ', h('span', { class: 'rk no', 'aria-hidden': 'true' }, '✗'), ' sin él o lleno', info.mode === 'radio' ? '  · borde: su alcance' : '  · calles: su red'),
+      see,
+    );
+  }
+
+  /** 2.6: que una zona entera (casillas) quepa en lo que se ve, sobre la hoja `.half` o al lado del panel. */
+  function revealArea(tiles: number[]) {
+    if (!tiles.length) return;
+    const w = state.map.w;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const i of tiles) {
+      const x = i % w;
+      const y = Math.floor(i / w);
+      x0 = Math.min(x0, x);
+      y0 = Math.min(y0, y);
+      x1 = Math.max(x1, x);
+      y1 = Math.max(y1, y);
+    }
+    const r = canvas.getBoundingClientRect();
+    const el = currentSheet();
+    let { right, bottom } = r;
+    const { left } = r;
+    // Bajo la barra de arriba no se ve nada.
+    const top = Math.max(r.top, document.querySelector('.topbar')?.getBoundingClientRect().bottom ?? r.top);
+    if (el) {
+      const sr = el.getBoundingClientRect();
+      if (sr.left <= r.left + 8) bottom = Math.min(bottom, sr.top);
+      else right = Math.min(right, sr.left);
+    }
+    bottom = Math.min(bottom, $('#strip').getBoundingClientRect().top || bottom);
+    const vw = (right - left) * dpr();
+    const vh = (bottom - top) * dpr();
+    if (vw < 40 || vh < 40) return;
+    const need = Math.max((x1 - x0 + 2) * T / vw, (y1 - y0 + 2) * T / vh);
+    // Se aleja lo justo para que quepa (nunca por debajo del mínimo); si ya cabe, no se acerca.
+    const fit = Math.max(minZoom(), Math.min(cam.zoom, Math.floor(1 / need)));
+    if (fit < cam.zoom) cam.zoom = fit;
+    const ts = tileSize();
+    cam.x = Math.round(((x0 + x1 + 1) / 2) * ts - ((left + right) / 2 - r.left) * dpr());
+    cam.y = Math.round(((y0 + y1 + 1) / 2) * ts - ((top + bottom) / 2 - r.top) * dpr());
+    clampCam();
+  }
+
+  /** 2.6: la zona que toca dibujar: la del servicio que se coloca, la del servicio tocado o la del filtro de «Qué falta». */
+  function currentReach(): ReachOverlay | null {
+    const blen = `${state.buildings.length}:${state.tick >> 3}`;
+    let key = '';
+    let make: () => ReachOverlay | null = () => null;
+    const t = preview?.tiles[0];
+    if (preview?.ok && t && tool.build && tool.shape === 'tap' && hasReach(tool.build)) {
+      const kind = tool.build;
+      key = `p:${kind}:${t.x},${t.y}:${blen}`;
+      make = () => {
+        const pl = placeLines(state, kind, t.x, t.y);
+        return pl ? previewOverlay(state, pl.info, t.x, t.y) : null;
+      };
+    } else if (selected && tool.id === 'inspect') {
+      const b = buildingAt(state, selected.x, selected.y);
+      if (b && b.built && !b.damaged && hasReach(b.kind)) {
+        key = `s:${b.id}:${b.level ?? 1}:${blen}`;
+        make = () => overlayFor(state, serviceReach(state, b));
+      }
+    }
+    if (!key && layer === 'missing' && missingKey) {
+      const k = missingKey;
+      key = `f:${k}:${blen}`;
+      make = () => filterOverlay(state, k);
+    }
+    if (key !== reachMemo.key) reachMemo = { key, overlay: key ? make() : null };
+    return reachMemo.overlay;
+  }
+
+  /** 2.6: con el ratón, lo que ganaría la obra bajo el cursor (en la franja de la herramienta). */
+  let hintKey = '';
+  function reachHint() {
+    const t = preview?.ok ? preview.tiles[0] : undefined;
+    const kind = tool.build && tool.shape === 'tap' && hasReach(tool.build) ? tool.build : null;
+    const key = t && kind && !pendingPlace ? `${kind}:${t.x},${t.y}:${state.buildings.length}` : '';
+    if (key === hintKey) return;
+    hintKey = key;
+    const info = $('#tool-info');
+    info.querySelector('.reach-hint')?.remove();
+    if (!key || !kind || !t) return;
+    const pl = placeLines(state, kind, t.x, t.y);
+    if (pl) info.append(h('span', { class: 'reach-hint', 'data-test': 'reach-hint' }, h('b', {}, pl.gain), ...pl.warn.map((w) => h('span', { class: 'reach-warn' }, w))));
   }
 
   /** Que la casilla quede a la vista, por encima (o al lado) de la hoja abierta (v1.6). */
@@ -2209,7 +2339,7 @@ export function startGame(opts: GameOptions): void {
         content.push(h('div', { class: 'petition danger-box', 'data-fire': 'ardiendo' }, pixelIcon('fire'), h('p', {}, h('strong', {}, '¡Ardiendo! '), b.fire.covered ? `Los bomberos lo están apagando: unas ${left > 48 ? plural(Math.ceil(left / 24), 'día', 'días') : plural(left, 'hora', 'horas')} más.` : `No hay bomberos que lleguen: arderá unas ${left > 48 ? plural(Math.ceil(left / 24), 'día', 'días') : plural(left, 'hora', 'horas')} y quedará destrozado. Puede saltar a lo de al lado.`)));
       } else if (b.risk) {
         const covered = fireCovered(state, b);
-        content.push(h('div', { class: 'petition warn-box', 'data-fire': 'riesgo' }, pixelIcon('fire'), h('p', {}, h('strong', {}, 'En riesgo de incendio '), `(${b.risk.why}). `, covered ? 'Los bomberos llegan a tiempo: si prende, solo será un susto.' : 'No hay bomberos cerca: si prende, quedará destrozado. Un parque de bomberos en 9 casillas lo evita.')));
+        content.push(h('div', { class: 'petition warn-box', 'data-fire': 'riesgo' }, pixelIcon('fire'), h('p', {}, h('strong', {}, 'En riesgo de incendio '), `(${b.risk.why}). `, covered ? 'Los bomberos llegan a tiempo: si prende, solo será un susto.' : `No hay bomberos cerca: si prende, quedará destrozado. Un parque de bomberos en ${SERVICE.firestation!.radius} casillas lo evita.`)));
       }
       // v1.8: destrozado en unos disturbios (2.1: o por el fuego): no funciona hasta que se repara.
       if (b.damaged) {
@@ -2230,6 +2360,9 @@ export function startGame(opts: GameOptions): void {
         }
         content.push(box);
       }
+      // 2.6 «Lo básico»: la zona que cubre, a cuántas casas da servicio y su máximo.
+      const rb = reachBox(b);
+      if (rb) content.push(rb);
       const home = b.kind === 'house' || b.kind === 'res';
       if (home) content.push(servicesTable(b));
       else {
@@ -2667,6 +2800,7 @@ export function startGame(opts: GameOptions): void {
   /** Capas: el chip dice cuál está puesta; al tocarlo se elige de una lista (antes, se cambiaba a ciegas). */
   function setLayer(id: LayerId) {
     layer = id;
+    if (id !== 'missing') missingKey = null;
     const def = LAYERS.find((l) => l.id === layer)!;
     const legend = $('#legend');
     legend.hidden = layer === 'none';
@@ -2693,13 +2827,53 @@ export function startGame(opts: GameOptions): void {
     legendDay = Math.floor(state.tick / 24);
     // Ronda 13: ordenada por lo que más falta, con «Construir» al lado; plegable para ver el mapa.
     const sum = coverageSummary(state).sort((a, b) => b.falta - a.falta || b.lleno - a.lleno);
-    const TOOL_FOR: Record<string, ToolId> = { agua: 'water', luz: 'power', colegio: 'school', salud: 'clinic', policia: 'police', ocio: 'park', bomberos: 'firestation', basuras: 'cleanpoint' };
+    const nameOf = (k: NeedKey) => `${NEED_LABEL[k][0]!.toUpperCase()}${NEED_LABEL[k].slice(1)}`;
+    const countOf = (r: { falta: number; lleno: number }) => (r.falta ? `falta en ${plural(r.falta, 'casa', 'casas')}` : `lleno en ${plural(r.lleno, 'casa', 'casas')}`);
+    const goBtn = (k: NeedKey) => {
+      const go = h('button', { class: 'legend-go', 'aria-label': `Construir: ${NEED_LABEL[k]}` }, pixelIcon('build'), h('span', { class: 'legend-go-text' }, 'Construir'));
+      // 2.6: «Construir» deja el filtro puesto (se ve dónde falta mientras se elige el sitio).
+      go.addEventListener('click', () => selectTool(TOOL_FOR_NEED[k] as ToolId));
+      return go;
+    };
+    const legend = $('#legend');
+    // 2.6: con un servicio elegido, la leyenda se pliega a una línea: «[icono] Policía · falta en 24 casas · [Construir] [✕]».
+    if (missingKey) {
+      const k = missingKey;
+      const r = sum.find((x) => x.key === k) ?? { key: k, falta: 0, lleno: 0 };
+      const off = h('button', { class: 'legend-off', 'aria-label': `Quitar el filtro: ${NEED_LABEL[k]}`, 'data-test': 'legend-off' }, '✕');
+      off.addEventListener('click', () => {
+        missingKey = null;
+        missingLegend();
+      });
+      const pick = h(
+        'button',
+        { class: 'legend-pick', 'aria-pressed': 'true', 'aria-label': `${nameOf(k)}: ${countOf(r)}. Quitar el filtro`, 'data-need': k },
+        pixelIcon(NEED_ICON[k]),
+        h('span', { class: 'legend-text' }, h('strong', {}, nameOf(k)), ` · ${r.falta || r.lleno ? countOf(r) : 'no falta en ninguna casa'}${r.falta && r.lleno ? ` (lleno en ${r.lleno})` : ''}`),
+      );
+      pick.addEventListener('click', () => off.click());
+      legend.classList.add('folded', 'filtered');
+      legend.replaceChildren(
+        h(
+          'span',
+          { class: 'legend-filter', 'data-test': 'legend-filter' },
+          pick,
+          goBtn(k),
+          off,
+        ),
+      );
+      return;
+    }
+    legend.classList.remove('filtered');
     const rows = sum.map((r) => {
-      const name = `${NEED_LABEL[r.key][0]!.toUpperCase()}${NEED_LABEL[r.key].slice(1)}`;
-      const count = r.falta ? `falta en ${plural(r.falta, 'casa', 'casas')}` : `lleno en ${plural(r.lleno, 'casa', 'casas')}`;
-      const go = h('button', { class: 'legend-go', 'aria-label': `Construir: ${NEED_LABEL[r.key]}` }, pixelIcon('build'), h('span', { class: 'legend-go-text' }, 'Construir'));
-      go.addEventListener('click', () => selectTool(TOOL_FOR[r.key]!));
-      return h('span', { class: 'legend-need' }, pixelIcon(NEED_ICON[r.key]), h('span', { class: 'legend-text' }, `${name}: ${count}`), go);
+      // 2.6: cada fila es un botón: filtra el mapa a ese servicio (casas sin él y la zona que cubren).
+      const pick = h('button', { class: 'legend-pick', 'aria-pressed': 'false', 'aria-label': `Ver en el mapa dónde falta ${NEED_LABEL[r.key]}`, 'data-need': r.key }, pixelIcon(NEED_ICON[r.key]), h('span', { class: 'legend-text' }, `${nameOf(r.key)}: ${countOf(r)}`));
+      pick.addEventListener('click', () => {
+        missingKey = r.key;
+        missingLegend();
+        $('#sr-live').textContent = `Qué falta: ${NEED_LABEL[r.key]}. ${countOf(r)}.`;
+      });
+      return h('span', { class: 'legend-need' }, pick, goBtn(r.key));
     });
     const more = legendFolded && rows.length > 2 ? h('span', { class: 'legend-more' }, ` · ver las ${rows.length}`) : '';
     const head = h('button', { class: 'legend-head', 'aria-expanded': String(!legendFolded) }, h('strong', {}, 'Qué falta'), h('span', { 'aria-hidden': 'true' }, legendFolded ? ' ▸' : ' ▾'), more);
@@ -2707,12 +2881,12 @@ export function startGame(opts: GameOptions): void {
       legendFolded = !legendFolded;
       missingLegend();
     });
-    $('#legend').classList.toggle('folded', legendFolded);
-    $('#legend').replaceChildren(
+    legend.classList.toggle('folded', legendFolded);
+    legend.replaceChildren(
       head,
       // Ronda 21: plegada sigue enseñando lo que más falta (el CSS deja 2–3 filas; en horizontal, ninguna).
       ...(rows.length ? rows : legendFolded ? [] : [h('span', {}, 'A ninguna vivienda le falta nada.')]),
-      ...(legendFolded ? [] : [h('span', { class: 'legend-note' }, 'Marco rojo: falta. Amarillo a trazos: llega, pero está lleno. Un icono por casa: lo que más falta.')]),
+      ...(legendFolded ? [] : [h('span', { class: 'legend-note' }, 'Toca un servicio para ver qué casas son y la zona que cubre. Marco rojo: falta. Amarillo a trazos: llega, pero está lleno.')]),
     );
   }
   function openLayers() {
@@ -2950,6 +3124,24 @@ export function startGame(opts: GameOptions): void {
     get busTrips() {
       return busTrips;
     },
+    /** 2.6: la zona que se dibuja ahora (resumen para las pruebas): cuántas casillas, marcas y si hay velo. */
+    get reach() {
+      const o = reachMemo.overlay;
+      if (!o) return null;
+      const count = (t: string) => o.marks.filter((m) => m.t === t).length;
+      return { tiles: o.areas.reduce((a, x) => a + x.tiles.length, 0), borders: o.borders.length, ok: count('ok'), no: count('no'), plus: count('plus'), link: count('link'), veil: o.veil, roads: o.roads };
+    },
+    /** 2.6: si una casilla está a la vista (no tapada por la hoja ni por la franja). */
+    visible(tx: number, ty: number) {
+      const r = canvas.getBoundingClientRect();
+      const x = r.left + ((tx + 0.5) * tileSize() - cam.x) / dpr();
+      const y = r.top + ((ty + 0.5) * tileSize() - cam.y) / dpr();
+      const sh = currentSheet()?.getBoundingClientRect();
+      const top = document.querySelector('.topbar')?.getBoundingClientRect().bottom ?? r.top;
+      const inMap = x >= r.left && x <= r.right && y >= top && y <= Math.min(r.bottom, $('#strip').getBoundingClientRect().top);
+      const underSheet = !!sh && x >= sh.left && x <= sh.right && y >= sh.top && y <= sh.bottom;
+      return inMap && !underSheet;
+    },
     /** Para las pruebas: centra la cámara en una casilla (no toca el estado). */
     centerOn(tx: number, ty: number) {
       centerOn(tx, ty);
@@ -2967,7 +3159,8 @@ export function startGame(opts: GameOptions): void {
     // La sacudida se aplica a una copia de la cámara: no cambia dónde mira el jugador.
     const [sx, sy] = shakeOffset(time);
     const view = sx || sy ? { ...cam, x: cam.x + sx * dpr(), y: cam.y + sy * dpr() } : cam;
-    render(ctx, state, view, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer, highlight, labels: cam.zoom >= touchZoom(), fast: speed >= 10 });
+    reachHint();
+    render(ctx, state, view, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer, highlight, labels: cam.zoom >= touchZoom(), fast: speed >= 10, reach: currentReach(), missingKey: layer === 'missing' ? missingKey : null });
     placeBubbles();
     requestAnimationFrame(frame);
   }

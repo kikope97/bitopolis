@@ -1401,3 +1401,30 @@ body.placing .tut-target::after { visibility: hidden; }
   .dock .tools { flex: 0 1 704px; }
   .dock #menu { flex: 0 1 176px; }
 }
+
+/* 2.6 «Lo básico»: la zona de cada servicio (ficha, colocar y filtro de «Qué falta»). */
+.reach-box { margin: 4px 0 8px; padding: 8px 12px; border: 2px solid #41a6f6; background: var(--bg); }
+.reach-box.full { border-color: #ffcd75; }
+.reach-main { margin: 0 0 4px; font-size: 1.1em; font-weight: 700; line-height: 1.3; }
+.reach-box .muted { margin: 0 0 6px; }
+.reach-key { margin: 0 0 6px; color: var(--muted); white-space: pre-wrap; }
+.rk { display: inline-block; min-width: 1.3em; text-align: center; font-weight: 700; color: #f4f4f4; }
+.rk.ok { background: #38b764; }
+.rk.no { background: #b13e53; }
+.reach-box .btn { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.cc-reach { display: flex; flex-direction: column; font-size: 0.9em; }
+.cc-reach b { color: #a7f070; }
+.cc-reach-warn, .reach-warn { color: var(--accent); }
+.reach-hint { display: block; }
+.reach-hint b { color: #a7f070 !important; }
+.reach-hint .reach-warn { margin-left: 8px; }
+.tool-info:has(.reach-hint) { -webkit-line-clamp: 3; }
+.legend-need { grid-template-columns: 1fr auto; }
+.legend-pick { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 4px; border: 2px solid transparent; }
+.legend-pick .px-icon { width: 16px; height: 16px; flex: 0 0 auto; }
+.legend-pick:hover { border-color: var(--line); }
+.legend-pick:focus-visible { outline: 3px solid var(--accent); }
+.legend-pick[aria-pressed='true'] { border-color: var(--accent); }
+.legend-filter { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; }
+.legend-off { min-width: 44px; min-height: 44px; background: var(--panel); border: 2px solid var(--line); color: var(--text); font: inherit; font-weight: 700; cursor: pointer; }
+.legend.filtered { padding-top: 4px; padding-bottom: 4px; }

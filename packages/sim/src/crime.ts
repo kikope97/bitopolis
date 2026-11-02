@@ -1,7 +1,8 @@
 import { TICKS_PER_DAY } from '@bitopolis/shared';
 import { CRIME } from './balance.ts';
 import { directorOwns } from './director-core.ts';
-import { cellsOf, jailPlacesOf, radiusOf } from './levels.ts';
+import { cellsOf, jailPlacesOf } from './levels.ts';
+import { reaches } from './reach.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance, nextInt } from './prng.ts';
 import { charge, totalDebt } from './household.ts';
@@ -42,7 +43,7 @@ const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.
 
 /** Comisarías que cubren un sitio (las más cercanas primero). */
 export function stationsFor(state: GameState, x: number, y: number): Building[] {
-  return state.buildings.filter((b) => b.kind === 'police' && b.built && !b.damaged && dist(b, { x, y }) <= radiusOf(b)).sort((a, b) => dist(a, { x, y }) - dist(b, { x, y }));
+  return state.buildings.filter((b) => b.kind === 'police' && reaches(state, b, x, y)).sort((a, b) => dist(a, { x, y }) - dist(b, { x, y }));
 }
 
 export function cellsUsed(state: GameState, stationId: number): number {
