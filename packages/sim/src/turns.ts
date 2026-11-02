@@ -791,6 +791,8 @@ export function mayorText(state: GameState, cmd: { type: string } & Record<strin
       return cmd.zone === 'none' ? null : { text: `marca zona ${cmd.zone === 'R' ? 'residencial' : cmd.zone === 'C' ? 'comercial' : cmd.zone === 'A' ? 'agraria' : 'industrial'}`, big: false };
     case 'Demolish': {
       const b = buildingAt(state, Number(cmd.x), Number(cmd.y));
+      // 2.6: deshacer una obra sin empezar no es un derribo (ni una medida gorda).
+      if (b && !b.built) return { text: `cancela la obra de ${(BUILD_NAMES[b.kind] ?? b.kind).toLowerCase()}`, big: false };
       return b ? { text: `derriba ${(b.name ?? BUILD_NAMES[b.kind] ?? b.kind).toLowerCase()}`, big: b.kind === 'house' || b.kind === 'res' || b.kind === 'shop' } : null;
     }
     case 'SetTax': {
