@@ -66,3 +66,4 @@ export * from './neighbor-prompt.ts';
 export * from './pleno-prompt.ts';
 export * from './letter-prompt.ts';
 export * from './nucleo.ts';
+export * from './upkeep.ts';

@@ -485,6 +485,8 @@ export interface GameState {
   coop: CoopState;
   /** 2.5: cartas de los que se fueron (post.ts). */
   letters: Letter[];
+  /** 2.6: mes en que empezó a cobrarse el gasto corriente (upkeep.ts; rampa para partidas de antes). */
+  upkeepFrom?: number;
   /** 2.5: los pueblos vecinos de la comarca (comarca.ts). */
   comarca: ComarcaState;
   /** 2.3: lo que necesitan recordar los logros entre meses (achievements.ts); se crea al primer cierre de mes. */
