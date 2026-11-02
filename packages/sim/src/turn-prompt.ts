@@ -6,7 +6,9 @@ import { CAUSE_ASK } from './associations.ts';
 import { DILEMMA, MIN_WAGE } from './balance.ts';
 import { dilemmaBrief } from './dilemmas.ts';
 import { BUILD_NAMES } from './commands.ts';
-import { freeShopLot } from './economy.ts';
+import { freeShopLot, saturated } from './economy.ts';
+import { coverageCtx, type CoverageCtx, missingServices, NEED_LABEL } from './coverage.ts';
+import { upkeepOf } from './upkeep.ts';
 import { debtBand, pocketOf } from './household.ts';
 import { jobsOf } from './levels.ts';
 import { trashStateOf } from './trash-core.ts';
@@ -40,7 +42,7 @@ import { GESTURES, gestureCandidates, isAiCitizen, PLANS, planText, SPEND, type 
  * La salida tiene un esquema fijo (sin uniones por vecino); cada parte se valida
  * en el motor con el menú del vecino. Nunca va texto libre del jugador.
  */
-export const TURN_PROMPT_VERSION = 15;
+export const TURN_PROMPT_VERSION = 16;
 
 export const TURN_SYSTEM = `Eres la mente de los vecinos de Bitópolis, un pueblo español pequeño. Cada semana decides, a la vez, qué hace cada vecino de la lista. Ellos viven de verdad: trabajan, compran, se enamoran, se enfadan, ahorran o se arruinan, y reaccionan a lo que hace quien gobierna: el alcalde (el jugador) o, si ganó las elecciones, el rival (mira "politica.gobierna"). El vecino que tenga "es_alcalde" gobierna él: piensa y actúa como alcalde.
 
@@ -51,7 +53,7 @@ Para cada vecino del lote devuelve exactamente un objeto con:
   Comarca (2.5): "hacerse_socio"/"darse_de_baja" de la cooperativa agraria (solo quien tiene finca) pesan la cuota, el sobreprecio de la cosecha y el reparto.
   Vivienda (2.5): "pedir_vpo" si le cuesta pagar el alquiler o gana poco (entra en el sorteo de la vivienda protegida).
 - "gesto": con quién (id de su lista "con_quien", o 0) y qué ("ninguno", "acercarse", "enfadarse", "hacer_las_paces", "pedir_salir", "romper").
-- "actitud": qué piensa ahora de quien gobierna, de -2 (muy en contra) a 2 (muy a favor). Tiene que salir de lo que vive: impuestos, servicios, su bolsillo, sus planes.
+- "actitud": qué piensa ahora de quien gobierna, de -2 (muy en contra) a 2 (muy a favor). Tiene que salir de lo que vive: impuestos, servicios, su bolsillo, sus planes. "en_su_casa" dice qué servicio le falta o va lleno en su calle, y "servicios_llenos" los que no dan abasto en el pueblo.
 - "gasto": dónde compra este mes ("pueblo", "fuera" o "ahorrar"), en qué tienda del pueblo si la prefiere (id de la lista de tiendas, o 0) y si se da algún capricho ("ocio"). Comer y lo básico se pagan siempre: tú decides dónde y si hay ocio. Si nadie compra en las tiendas del pueblo, cierran y su gente se queda sin trabajo: compra en el pueblo si le va bien y le compensa.
 - "plan": un ultimátum o propósito con plazo si de verdad le importa algo ("irse_si_no", "protestar_si_no", "votar_en_contra_si_no", con la "necesidad" de su lista y los "meses", de 1 a 6), o "ninguno". Úsalo con moderación: es una promesa que el pueblo recordará.
 - "pensamiento": una frase en primera persona, en español de España, con su tono y su vida (máx. 140 caracteres).
@@ -117,6 +119,13 @@ export function turnShared(state: GameState): string {
     impuestos: state.taxesSplit ? { ibi: lvl(state.taxes.ibi), tasas: lvl(state.taxes.tasas), plusvalia: lvl(state.taxes.plusvalia) } : lvl(state.taxLevel),
     sueldo_minimo_empresas: `${MIN_WAGE[state.minWage ?? 'none']} € al mes`,
     servicios: ['water', 'power', 'park', 'school', 'clinic', 'police', 'bar', 'chapel', 'cemetery', 'library', 'sports', 'jail', 'cleanpoint', 'nursery', 'residence', 'busstation', 'sewage', 'solar', 'wind'].filter((k) => kinds.has(k as never)).map((k) => BUILD_NAMES[k]!.toLowerCase()),
+    // Ronda 22: los servicios que no dan abasto y el gasto fijo del ayuntamiento, en palabras.
+    servicios_llenos: ['school', 'clinic', 'police', 'park', 'firestation'].filter((k) => kinds.has(k as never) && saturated(state, k as never)).map((k) => BUILD_NAMES[k]!.toLowerCase()),
+    gasto_fijo: band(
+      Object.values(upkeepOf(state)).reduce((a, v) => a + v, 0),
+      [300, 1_500, 4_000],
+      ['casi nada', 'bajo', 'notable', 'alto'],
+    ),
     economia: last
       ? {
           vecinos_con_deudas: last.debtors ?? 0,
@@ -218,6 +227,23 @@ function trashBrief(state: GameState, c: Citizen): string | null {
   return st === 'ratas' ? 'ratas en su portal: la basura lleva semanas sin recogerse' : st === 'bolsas' ? 'bolsas de basura amontonadas en su calle' : null;
 }
 
+/** Ronda 22: el contexto de cobertura se calcula una vez por estado y hora (no por vecino). */
+const ctxMemo = new WeakMap<GameState, { tick: number; ctx: CoverageCtx }>();
+function homeCtx(state: GameState): CoverageCtx {
+  const m = ctxMemo.get(state);
+  if (m && m.tick === state.tick) return m.ctx;
+  const ctx = coverageCtx(state);
+  ctxMemo.set(state, { tick: state.tick, ctx });
+  return ctx;
+}
+
+/** Ronda 22: lo que le falta a la casa del vecino, en palabras («sin policía cerca», «colegio lleno»). */
+function homeLacks(state: GameState, c: Citizen): string[] {
+  const home = state.buildings.find((b) => b.id === c.homeId);
+  if (!home) return [];
+  return missingServices(state, home.x, home.y, homeCtx(state)).map((n) => (n.status === 'lleno' ? `${NEED_LABEL[n.key]} lleno` : `sin ${NEED_LABEL[n.key]} cerca`));
+}
+
 function citizenBrief(state: GameState, c: Citizen) {
   const job = state.buildings.find((b) => b.id === c.jobId);
   const home = state.buildings.find((b) => b.id === c.homeId);
@@ -243,6 +269,7 @@ function citizenBrief(state: GameState, c: Citizen) {
     trabajo: job ? (job.name ?? BUILD_NAMES[job.kind] ?? job.kind) : c.unemployedSince !== undefined ? 'en paro' : 'fuera del pueblo',
     casa: home ? (c.owns ? 'vivienda en propiedad' : home.kind === 'house' ? 'casa municipal de alquiler' : 'piso de alquiler') : 'sin casa',
     hijos: c.kids?.length ?? 0,
+    ...(homeLacks(state, c).length ? { en_su_casa: homeLacks(state, c) } : {}),
     ...(trashBrief(state, c) ? { basura: trashBrief(state, c) } : {}),
 
     recuerdos: [...c.memories].sort((a, b) => b.importance - a.importance).slice(0, 3).map((m) => memoryText(state, m)),
