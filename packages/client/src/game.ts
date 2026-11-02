@@ -112,6 +112,7 @@ import SimWorker from './sim.worker.ts?worker';
 import { buildingSprite, landmarkSprite, letterSprite, resSprite, T, ZONE_COLOR } from './sprites.ts';
 import { bigCompanyContent, landmarkContent, openRegion, regionAttention, regionSummary } from './landmarks-ui.ts';
 import { comarcaPending, comarcaSummary, openComarca } from './comarca-ui.ts';
+import { type HubEntry, hubWants, Reveal, trayCatsWanted } from './progress.ts';
 import { commandFor, costText, isLocked, lockLong, lockShort, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayCost } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
 import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, h, isSheetOpen, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack } from './ui.ts';
@@ -145,6 +146,11 @@ export interface GameOptions {
   onExit: () => void;
 }
 
+/** 2.6: marca «Nuevo» (se quita al abrir lo marcado). */
+function newBadge(): HTMLElement {
+  return h('span', { class: 'new-badge', 'aria-hidden': 'true' }, 'Nuevo');
+}
+
 export function startGame(opts: GameOptions): void {
   const { token, sessionId } = opts;
   $('#start').hidden = true;
@@ -157,6 +163,11 @@ export function startGame(opts: GameOptions): void {
   const send = (m: ToWorker) => worker.postMessage(m);
 
   let state: GameState = opts.state;
+  /** 2.6: lo que ya salió en el panel «Pueblo» y la bandeja, y lo que lleva «Nuevo» (por partida, en este navegador). */
+  const reveal = new Reveal(`bitopolis.reveal.${token}`);
+  let revealKey = '';
+  // El «Nuevo» se lee como descripción (no cambia el nombre de los botones).
+  if (!document.getElementById('new-desc')) document.body.append(h('span', { id: 'new-desc', class: 'visually-hidden' }, 'Nuevo'));
   let tool: Tool = TOOLS[0]!;
   let speed = 0;
   let preview: Preview | null = null;
@@ -671,6 +682,13 @@ export function startGame(opts: GameOptions): void {
     // Ronda 21: el año va aparte; en pantallas estrechas se ve «21 dic» (antes, en 360 px, no se veía la fecha).
     const dateEl = $('#hud-date');
     const dateKey = shortDate(d);
+    // 2.6: lo que aparece en el panel «Pueblo» y en la bandeja (y sus «Nuevo»): una vez al día
+    // y al cambiar el nivel, los vecinos o los edificios (también en pausa, tras una orden).
+    const rk = `${dateKey}|${state.townhallLevel}|${state.citizens.length}|${state.buildings.length}|${state.loans?.length ?? 0}`;
+    if (rk !== revealKey) {
+      revealKey = rk;
+      refreshReveal();
+    }
     if (dateEl.dataset.v !== dateKey) {
       dateEl.dataset.v = dateKey;
       const [dd, mm, yy] = dateKey.split(' ');
@@ -1851,6 +1869,7 @@ export function startGame(opts: GameOptions): void {
         h('span', { class: 'tool-cost' }, trayCost(tl)),
       );
       btn.addEventListener('click', () => {
+        seenTrayCat(cat.title);
         if (isLocked(tl, state)) {
           // Ronda 12: tocar algo bloqueado no hacía nada; ahora explica qué falta.
           trayMsg.textContent = lockLong(tl, state);
@@ -1870,15 +1889,51 @@ export function startGame(opts: GameOptions): void {
     const fold = h('details', { class: 'tray-cat', open: '', 'data-cat': cat.title }, h('summary', {}, head), grid) as HTMLDetailsElement;
     // Si el jugador la abre o la cierra a mano, se respeta (hasta que cambie lo que hay disponible).
     fold.addEventListener('toggle', () => {
-      if (fold.dataset.auto !== String(fold.open)) fold.dataset.user = '1';
+      if (fold.dataset.auto !== String(fold.open)) {
+        fold.dataset.user = '1';
+        seenTrayCat(cat.title);
+      }
     });
     tray.append(fold);
   }
-  /** Pliega las categorías sin nada disponible y dice cuántas obras tienen y desde cuándo. */
+  refreshReveal();
+  /**
+   * 2.6: lo que pide ver el pueblo ahora (panel «Pueblo» y bandeja), todo de una vez: la
+   * primera vez en este navegador, todo entra sin «Nuevo» (una partida avanzada ve lo que usaba).
+   */
+  function refreshReveal() {
+    const want = hubWants(state);
+    const hub = (Object.keys(want) as HubEntry[]).filter((k) => want[k]).map((k) => `hub:${k}`);
+    const cats = trayCatsWanted(state).map((t) => `tray:${t}`);
+    const free = TRAY.filter((c) => c.tools.some((id) => !isLocked(TOOLS.find((x) => x.id === id)!, state))).map((c) => `trayfree:${c.title}`);
+    reveal.update([...hub, ...cats, ...free]);
+    refreshNewDots();
+  }
+  /** Punto «nuevo» en las pestañas «Pueblo» y «Construir». */
+  function refreshNewDots() {
+    $('#menu').classList.toggle('has-new', reveal.anyNew('hub:'));
+    document.querySelector('#tab-build')?.classList.toggle('has-new', TRAY.some((c) => trayCatNew(c.title)));
+  }
+  function trayCatNew(title: string) {
+    return reveal.isNew(`tray:${title}`) || reveal.isNew(`trayfree:${title}`);
+  }
+  function seenTrayCat(title: string) {
+    if (!trayCatNew(title)) return;
+    reveal.seen(`tray:${title}`);
+    reveal.seen(`trayfree:${title}`);
+    document.querySelector(`#tray details[data-cat="${title}"] .new-badge`)?.remove();
+    refreshNewDots();
+  }
+  /**
+   * Pliega las categorías sin nada disponible y dice cuántas obras tienen y desde cuándo.
+   * 2.6: oculta las que no se alcanzan ni con el siguiente nivel del ayuntamiento.
+   */
   function foldTray() {
+    refreshReveal();
     for (const cat of TRAY) {
       const fold = tray.querySelector<HTMLDetailsElement>(`details[data-cat="${cat.title}"]`);
       if (!fold) continue;
+      fold.hidden = !reveal.shown(`tray:${cat.title}`) && !reveal.shown(`trayfree:${cat.title}`);
       const tools = cat.tools.map((id) => TOOLS.find((x) => x.id === id)!);
       const free = tools.some((tl) => !isLocked(tl, state));
       const sig = free ? 'free' : 'locked';
@@ -1888,6 +1943,7 @@ export function startGame(opts: GameOptions): void {
       }
       const why = free ? '' : (tools.map((tl) => lockText(tl)).find((t) => /nivel/.test(t)) ?? lockText(tools[0]!));
       fold.querySelector('h3')!.textContent = free ? cat.title : `${cat.title} (${tools.length}${why ? ` · ${why.replace(/^ayto\. nivel/, 'desde nivel')}` : ''})`;
+      if (trayCatNew(cat.title)) fold.querySelector('h3')!.append(newBadge());
       if (fold.dataset.user) continue;
       fold.dataset.auto = String(free);
       fold.open = free;
@@ -2429,11 +2485,18 @@ export function startGame(opts: GameOptions): void {
   function openHub() {
     closeTray();
     const go = (fn: () => void) => () => withBack('Pueblo', openHub, fn);
-    const item = (label: string, fn: () => void, attn = false) => {
-      const b = h('button', { class: `btn${attn ? ' attn' : ''}` }, label);
-      b.addEventListener('click', fn);
+    // 2.6: el panel crece con el pueblo; lo que sale por primera vez lleva «Nuevo» hasta que se abre.
+    const show = hubShown();
+    const item = (label: string, fn: () => void, attn = false, id?: HubEntry) => {
+      const fresh = !!id && reveal.isNew(`hub:${id}`);
+      const b = h('button', { class: `btn${attn ? ' attn' : ''}${fresh ? ' is-new' : ''}`, ...(fresh ? { 'aria-describedby': 'new-desc' } : {}), ...(id ? { 'data-hub': id } : {}) }, label, fresh ? newBadge() : '');
+      b.addEventListener('click', () => {
+        if (id) seenHub(id);
+        fn();
+      });
       return b;
     };
+    const opt = (id: HubEntry, label: string, fn: () => void, attn = false) => (show[id] ? [item(label, fn, attn, id)] : []);
     const card = (icon: string, title: string, sum: (Node | string)[], ...buttons: Node[]) =>
       h('section', { class: 'hub-card' }, h('h3', {}, pixelIcon(icon), title), h('p', { class: 'hub-sum' }, ...sum), buttons.length ? h('div', { class: 'hub-grid' }, ...buttons) : '');
     const last = state.stats.at(-1);
@@ -2453,16 +2516,16 @@ export function startGame(opts: GameOptions): void {
     if (fiestaAsks) townSum.push('la comisión de festejos pide presupuesto');
     sheet(
       'Pueblo',
-      // 2.1: el rango y el escudo del pueblo, arriba del todo.
-      rankCard(state, go(() => openRank(state))),
+      // 2.1: el rango y el escudo del pueblo, arriba del todo (2.6: tras el primer mes).
+      ...(show.rank ? [hubRank()] : []),
       card(
         'coin',
         'Dinero',
         ['Caja: ', h('strong', {}, money(state.treasury)), net !== null ? ` · último mes: ${net >= 0 ? '+' : ''}${money(net)}` : ''],
         item('Parte mensual', go(openAccounts)),
         item('Impuestos', go(openTaxes)),
-        // 2.2: préstamos municipales (destaca con mucha carga o nota D).
-        item(`Préstamos · nota ${state.rating ?? 'B'}`, go(openLoansSheet), heavyLoad(state) || state.rating === 'D'),
+        // 2.2: préstamos municipales (destaca con mucha carga o nota D). 2.6: cuando la caja va justa o ya hay uno.
+        ...opt('loans', `Préstamos · nota ${state.rating ?? 'B'}`, go(openLoansSheet), heavyLoad(state) || state.rating === 'D'),
       ),
       card(
         'build',
@@ -2470,13 +2533,13 @@ export function startGame(opts: GameOptions): void {
         [townSum.join(' · ')],
         // v1.9.1: el ayuntamiento cuesta de encontrar en el mapa; desde aquí se llega a «Gestión del pueblo».
         item(`Nivel ${townLevel(state)} · ${townLevel(state) >= TOWNHALL_LEVELS.length ? 'Gestión' : 'Ampliar'}`, go(openHall), canUpgradeTownhall(state).ok),
-        item('Presupuesto y fiestas', go(() => openTownHall(social, fiestaAsks ? 'seasons' : undefined)), budgetOpen || offers > 0 || protest || fiestaAsks),
+        ...opt('budget', 'Presupuesto y fiestas', go(() => openTownHall(social, fiestaAsks ? 'seasons' : undefined)), budgetOpen || offers > 0 || protest || fiestaAsks),
         // 2.3: turismo (desde el nivel 3 o en cuanto hay visitantes).
         ...(townLevel(state) >= 3 || state.tourism.visitors > 0 ? [item(`Turismo · ${plural(state.tourism.visitors, 'visitante', 'visitantes')}`, go(() => openTownHall(social, 'tourism')), touristified(state))] : []),
         ...(state.dilemmas.some((d) => !d.resolved) ? [item('Un asunto difícil', go(() => openDilemmaSheet(dilemmaCtx, state.dilemmas.find((d) => !d.resolved)!.id)), true)] : []),
-        item('Pleno municipal', go(() => openPleno(social))),
-        item('Política y elecciones', go(() => openPolitics(social))),
-        item('Consejero', go(() => openAdvisor(social))),
+        ...opt('pleno', 'Pleno municipal', go(() => openPleno(social))),
+        ...opt('politics', 'Política y elecciones', go(() => openPolitics(social))),
+        ...opt('advisor', 'Consejero', go(() => openAdvisor(social))),
       ),
       card(
         'people',
@@ -2485,37 +2548,46 @@ export function startGame(opts: GameOptions): void {
         item('Vecinos', go(openPeople)),
         ...(state.aiMode ? [item('✦ Qué está pasando', go(openHappening), !!state.ai?.log.length)] : []),
         item('Felicidad', go(openHappiness)),
-        item('Diario del pueblo', go(() => openDiary(social))),
-        item('Álbum del pueblo', go(() => openAlbum(social))),
+        ...opt('diary', 'Diario del pueblo', go(() => openDiary(social))),
+        ...opt('album', 'Álbum del pueblo', go(() => openAlbum(social))),
         // 2.5: el buzón (cartas de los que se fueron), con correos o si ya llegó alguna.
         ...(state.letters.length || state.buildings.some((x) => x.kind === 'post') ? [item(`Buzón · ${plural(state.letters.length, 'carta', 'cartas')}`, go(openMail), unreadLetters(state, token) > 0)] : []),
         // 2.3: gráficas por años y récords.
-        item('Historia', go(() => openHistory(state))),
+        ...opt('history', 'Historia', go(() => openHistory(state))),
       ),
       // 2.3: la comarca (bonanza o crisis), la gran empresa y las grandes obras.
       // 2.5: los pueblos vecinos y sus alcaldes (ofertas con plazo).
-      card(
-        'town',
-        'Comarca',
-        [regionSummary(state), ' · ', comarcaSummary(state)],
-        item('Comarca y grandes obras', go(openRegionSheet), regionAttention(state)),
-        item('Pueblos vecinos', go(openComarcaSheet), comarcaPending(state) > 0),
-      ),
-      // 2.1: encargos del pueblo y El Eco de Bitópolis.
-      card(
-        'inspect',
-        'Encargos y El Eco',
-        [errandsSummary(state)],
-        item('Encargos del pueblo', go(openErrandsSheet), !!state.errands?.list.some((e) => e.status === 'ofrecido')),
-        item('El Eco de Bitópolis', go(openPressSheet), !!state.press?.editions.at(-1) && !state.press.editions.at(-1)!.answered),
-      ),
+      // 2.6: desde el ayuntamiento 3 (sin pueblos vecinos en «Pueblo sencillo»).
+      ...(show.region || show.neighbors
+        ? [
+            card(
+              'town',
+              'Comarca',
+              show.neighbors ? [regionSummary(state), ' · ', comarcaSummary(state)] : [regionSummary(state)],
+              ...opt('region', 'Comarca y grandes obras', go(openRegionSheet), regionAttention(state)),
+              ...opt('neighbors', 'Pueblos vecinos', go(openComarcaSheet), comarcaPending(state) > 0),
+            ),
+          ]
+        : []),
+      // 2.1: encargos del pueblo y El Eco de Bitópolis (2.6: cuando llega el primero).
+      ...(show.errands || show.press
+        ? [
+            card(
+              'inspect',
+              'Encargos y El Eco',
+              [errandsSummary(state)],
+              ...opt('errands', 'Encargos del pueblo', go(openErrandsSheet), !!state.errands?.list.some((e) => e.status === 'ofrecido')),
+              ...opt('press', 'El Eco de Bitópolis', go(openPressSheet), !!state.press?.editions.at(-1) && !state.press.editions.at(-1)!.answered),
+            ),
+          ]
+        : []),
       h(
         'section',
         { class: 'hub-card' },
         h('h3', {}, pixelIcon('smile'), 'Objetivos'),
         objectivesNode(state),
         // 2.3: medallas (logros del pueblo, también los encargos).
-        h('div', { class: 'hub-grid' }, item(`Medallas · ${medalCount(state).have} de ${medalCount(state).total}`, go(() => openMedals(state)))),
+        show.medals ? h('div', { class: 'hub-grid' }, item(`Medallas · ${medalCount(state).have} de ${medalCount(state).total}`, go(() => openMedals(state)), false, 'medals')) : '',
       ),
       ...(state.aiMode
         ? [card('inspect', 'IA', ['Los vecinos con nombre deciden con la IA.'], item('Gasto de la IA', () => void openUsage(token)), item('Qué se envía a la IA', () => void openPreview(token)))]
@@ -2534,6 +2606,33 @@ export function startGame(opts: GameOptions): void {
         }),
       ),
     );
+  }
+  /** 2.6: qué entradas del panel se ven (lo que pide el pueblo ahora y lo que ya salió alguna vez). */
+  function hubShown(): Record<HubEntry, boolean> {
+    refreshReveal();
+    const keys = Object.keys(hubWants(state)) as HubEntry[];
+    // En «Pueblo sencillo» no vuelve lo que apaga, aunque se viera antes.
+    const off: HubEntry[] = state.simple ? ['neighbors', 'errands', 'press'] : [];
+    return Object.fromEntries(keys.map((k) => [k, !off.includes(k) && reveal.shown(`hub:${k}`)])) as Record<HubEntry, boolean>;
+  }
+  function seenHub(id: HubEntry) {
+    reveal.seen(`hub:${id}`);
+    refreshNewDots();
+  }
+  /** El rango y el escudo (2.6: con «Nuevo» la primera vez). */
+  function hubRank() {
+    const card = rankCard(state, go(() => openRank(state)));
+    const btn = card.querySelector<HTMLElement>('.rank-card')!;
+    if (reveal.isNew('hub:rank')) {
+      btn.classList.add('is-new');
+      btn.setAttribute('aria-describedby', 'new-desc');
+      btn.append(newBadge());
+    }
+    btn.addEventListener('click', () => seenHub('rank'));
+    return card;
+    function go(fn: () => void) {
+      return () => withBack('Pueblo', openHub, fn);
+    }
   }
   // La pestaña «Pueblo» se marca mientras su panel (o una hoja abierta desde él) está a la vista.
   onSheetChange((title) => $('#menu').setAttribute('aria-expanded', String(title === 'Pueblo')));

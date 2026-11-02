@@ -62,9 +62,16 @@ export async function pickTool(page: Page, id: string) {
   await page.locator(`#tray [data-tool="${id}"]`).click();
 }
 
-/** Pruebas 2.5: las categorías de la bandeja sin nada disponible salen plegadas; esto abre la de `id`. */
+/**
+ * Pruebas 2.5: las categorías de la bandeja sin nada disponible salen plegadas; esto abre la de `id`.
+ * 2.6: las que no se alcanzan con el siguiente nivel del ayuntamiento van ocultas: también la enseña
+ * (para comprobar el candado de algo que aún queda lejos).
+ */
 export async function openTrayCat(page: Page, id: string) {
-  await page.locator(`#tray details:has([data-tool="${id}"])`).evaluate((d) => ((d as HTMLDetailsElement).open = true));
+  await page.locator(`#tray details:has([data-tool="${id}"])`).evaluate((d) => {
+    (d as HTMLDetailsElement).hidden = false;
+    (d as HTMLDetailsElement).open = true;
+  });
 }
 
 /** 2.2: si sale la hoja de la licitación (obras grandes), elige una oferta (por defecto, la local). */

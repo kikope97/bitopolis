@@ -43,7 +43,7 @@ async function call<T>(method: string, url: string, body?: unknown, keepalive = 
 export const api = {
   get: (token: string) => call<{ exists: false } | { exists: true; mode: string; summary: Summary }>('GET', `/api/games/${token}`),
   // 2.3: escenario y terreno solo se mandan si no son los de siempre (Libre y aleatorio).
-  create: (token: string, mode: 'normal' | 'ai', sessionId: string, start: { scenario?: ScenarioId; terrain?: TerrainShape } = {}) =>
+  create: (token: string, mode: 'normal' | 'ai', sessionId: string, start: { scenario?: ScenarioId; terrain?: TerrainShape; simple?: boolean } = {}) =>
     call<{ state: GameState; mode: string }>('POST', `/api/games/${token}`, { mode, sessionId, ...start }),
   claim: (token: string, sessionId: string, force = false) =>
     call<{ state: GameState; mode: string }>('POST', `/api/games/${token}/claim`, { sessionId, force }),
