@@ -1,6 +1,6 @@
 import { gzipSync } from 'node:zlib';
 import { expect, type Page, test } from '@playwright/test';
-import { type GameState, runSimulation, validateCommand } from '../packages/sim/src/index.ts';
+import { type GameState, OUTSIDE, runSimulation, transfer, TREASURY, validateCommand } from '../packages/sim/src/index.ts';
 import { chooseOffer, openTrayCat, pickTool, setSpeed, skipTutorial, state, tile } from './helpers.ts';
 
 /** 2.6 «Lo básico»: el panel «Pueblo» y la bandeja crecen con el pueblo; licitaciones solo en obras grandes; «Pueblo sencillo». */
@@ -128,6 +128,8 @@ test('2.6: con el ayuntamiento 3, el colegio va sin licitación', async ({ page,
   await viewport(page, info.project.name);
   const { state: s } = runSimulation({ seed: 3, days: 400, profile: 'casual', checkEveryDay: false });
   s.townhallLevel = Math.max(3, s.townhallLevel);
+  // Ronda 22: con el gasto corriente, a los 400 días la caja no llega para un colegio.
+  transfer(s, OUTSIDE, TREASURY, 20_000, 'subvencion');
   for (const b of s.buildings) {
     delete b.fire;
     delete b.risk;
