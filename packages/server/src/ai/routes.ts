@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { GameToken } from '@bitopolis/shared';
+import { GameToken, ScenarioId, TerrainShape } from '@bitopolis/shared';
 import {
   buildAdvisorRequest,
   buildChronicleRequest,
@@ -85,6 +85,10 @@ const ConfigBody = z.object({
   capMonth: z.number().min(0).max(10000).optional(),
   /** 2.0: % de vecinos con IA (solo con key propia; con la del servidor manda /admin). */
   aiShare: z.number().int().min(0).max(100).optional(),
+  /** Ronda 22: lo elegido al empezar, si la partida se crea aquí (Modo IA con key propia). */
+  scenario: ScenarioId.optional(),
+  terrain: TerrainShape.optional(),
+  simple: z.boolean().optional(),
   accepted: z.boolean(),
 });
 
@@ -149,7 +153,7 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
       if (!store.get().newGames) return bad(reply, 'Este servidor no admite partidas nuevas', 403);
       const seed = newSeed();
       const share = srv.configured ? (store.get().ai.aiShare ?? 50) : (d.aiShare ?? store.get().ai.aiShare ?? 50);
-      const state = createInitialState({ seed, aiMode: true, namedLimit: store.get().ai.maxCitizens, aiShare: share });
+      const state = createInitialState({ seed, aiMode: true, namedLimit: store.get().ai.maxCitizens, aiShare: share, scenario: d.scenario, terrain: d.terrain, simple: d.simple });
       const ts = new Date().toISOString();
       await db
         .insertInto('games')
@@ -161,6 +165,7 @@ export async function registerAiRoutes(app: FastifyInstance, db: Db, config: Con
           format_version: FORMAT_VERSION,
           state: JSON.stringify(state),
           seed,
+          scenario: state.scenario.id,
           lease_session: d.sessionId,
           lease_until: 0,
         })

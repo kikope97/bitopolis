@@ -1,7 +1,7 @@
 import { gzipSync } from 'node:zlib';
 import { expect, type Page, test } from '@playwright/test';
 import { createInitialState, cropAt, type GameState, isWater, runSimulation, Tile, Zone } from '../packages/sim/src/index.ts';
-import { pickTool, setSpeed, skipTutorial, state, tile } from './helpers.ts';
+import { openTrayCat, pickTool, setSpeed, skipTutorial, state, tile } from './helpers.ts';
 
 /** 2.2: el campo (zona agraria y fincas). */
 function pack(s: GameState) {
@@ -34,6 +34,8 @@ test('2.2: la zona agraria está en la bandeja (bloqueada hasta el nivel 2 y 20 
   await openTown(page, request, createInitialState({ seed: 21 }));
   await setSpeed(page, 0);
   await page.locator('#tab-build').click();
+  // Ronda 22: en el nivel 1, «Zonas» sale plegada (nada se puede usar aún).
+  await openTrayCat(page, 'zoneA');
   const item = page.locator('#tray [data-tool="zoneA"]');
   await expect(item).toBeVisible();
   await expect(item).toContainText('Zona agraria');

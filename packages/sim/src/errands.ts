@@ -8,6 +8,7 @@
 import { TICKS_PER_DAY } from '@bitopolis/shared';
 import { ERRANDS } from './balance.ts';
 import { directorOwns } from './director-core.ts';
+import { earlyReady, systemOn } from './gates.ts';
 import { coverageCtx, missingServices, NEED_KINDS, NEED_LABEL, type NeedKey } from './coverage.ts';
 import { totalDebt } from './household.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
@@ -71,7 +72,8 @@ const WANT: Partial<Record<NeedKey, string>> = { colegio: 'un colegio', salud: '
 /** Encargos posibles ahora mismo (deterministas; sin los que ya están o se hicieron hace poco). */
 export function errandCandidates(state: GameState): ErrandCandidate[] {
   const es = state.errands;
-  if (!es || state.citizens.length < ERRANDS.minPop) return [];
+  // 2.6: no antes de su momento (reglas, turno y director) y nunca en «Pueblo sencillo».
+  if (!es || state.citizens.length < ERRANDS.minPop || !earlyReady(state, 'errands') || !systemOn(state, 'errands')) return [];
   const busy = new Set([...es.list.map((e) => e.key), ...es.recent.filter((r) => state.tick - r.tick < ERRANDS.repeatDays * TICKS_PER_DAY).map((r) => r.key)]);
   const kindsBusy = new Set(es.list.map((e) => e.kind));
   const out: ErrandCandidate[] = [];

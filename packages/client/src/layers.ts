@@ -1,14 +1,14 @@
-import { coverageCtx, type GameState, protectedHeritage, TOURISM, touristified, homeSites, missingServices, pocketOf, radiusOf, type CoverageNeed, type NeedKey, SERVICE, trashServed, trashStateOf, truckRoutes } from '@bitopolis/sim';
+import { coverageCtx, type GameState, protectedHeritage, TOURISM, touristified, homeSites, missingServices, pocketOf, type CoverageNeed, type NeedKey, trashServed, trashStateOf, truckRoutes } from '@bitopolis/sim';
 import { PALETTE } from './palette.ts';
 import { prefs } from './prefs.ts';
 import { T } from './sprites.ts';
 
 /**
- * Capas de datos (spec §5.1): felicidad, valor del suelo, cobertura de
- * servicios y contaminación. Cada nivel usa una trama distinta además del
+ * Capas de datos (spec §5.1): felicidad, valor del suelo, qué falta (2.6: la
+ * antigua «Cobertura de servicios» va dentro, filtrando por servicio) y contaminación. Cada nivel usa una trama distinta además del
  * color, para que el color nunca sea la única señal.
  */
-export type LayerId = 'none' | 'missing' | 'happiness' | 'pocket' | 'land' | 'services' | 'pollution' | 'clean' | 'rural' | 'river' | 'density';
+export type LayerId = 'none' | 'missing' | 'happiness' | 'pocket' | 'land' | 'pollution' | 'clean' | 'rural' | 'river' | 'density';
 
 interface LayerDef {
   id: LayerId;
@@ -40,7 +40,6 @@ export const LAYERS: LayerDef[] = [
   // v1.9: cómo llegan a fin de mes los que viven en cada casa.
   { id: 'pocket', label: 'Bolsillo de los vecinos', colors: GOOD, legend: legend(['Endeudados', 'No llegan', 'Van justos', 'Holgados'], 'good') },
   { id: 'land', label: 'Valor del suelo', colors: GOOD, legend: legend(['Muy bajo', 'Bajo', 'Alto', 'Muy alto'], 'good') },
-  { id: 'services', label: 'Cobertura de servicios', colors: GOOD, legend: legend(['Ninguno', '1 servicio', '2 servicios', '3 o más'], 'good') },
   { id: 'pollution', label: 'Contaminación', colors: BAD, legend: legend(['Limpio', 'Algo', 'Bastante', 'Mucha'], 'bad') },
   // 2.1: basura. Por dónde pasa el camión y cómo está cada edificio.
   { id: 'clean', label: 'Limpieza', colors: GOOD, legend: legend(['Ratas', 'Bolsas en la calle', 'Sin camión', 'Pasa el camión'], 'good') },
@@ -110,21 +109,6 @@ function values(state: GameState, layer: LayerId): (number | null)[] {
       out[b.y * w + b.x] = b.rural ? 100 : dear && b.kind === 'res' && renters.has(b.id) ? 0 : 30;
     }
     return out;
-  }
-  if (layer === 'services') {
-    const kinds: Set<string>[] = Array.from({ length: n }, () => new Set());
-    for (const b of state.buildings) {
-      const s = SERVICE[b.kind];
-      if (!s || !b.built) continue;
-      // v1.8: el alcance crece con el nivel del servicio.
-      const r = radiusOf(b);
-      for (let y = Math.max(0, b.y - r); y <= Math.min(h - 1, b.y + r); y++) {
-        for (let x = Math.max(0, b.x - r); x <= Math.min(w - 1, b.x + r); x++) {
-          if (Math.abs(x - b.x) + Math.abs(y - b.y) <= r) kinds[y * w + x]!.add(b.kind);
-        }
-      }
-    }
-    return kinds.map((k) => Math.min(100, k.size * 34));
   }
   // Felicidad (o bolsillo): media de quienes viven en cada edificio.
   const out: (number | null)[] = new Array(n).fill(null);

@@ -1,4 +1,5 @@
 import { loansMonth } from './loans.ts';
+import { upkeepMonth } from './upkeep.ts';
 import { densityDay, homesOf, vpoMonth, vpoRentMonth } from './density.ts';
 import { attended, careMonth, careMood, childcareMonth, isRetired, pensionsMonth } from './care.ts';
 import { busDemandR, transitMonth, transitMood } from './transit.ts';
@@ -39,6 +40,7 @@ import {
   CIVIL,
   FARM,
   FIRE,
+  ZONE_GROWTH,
 } from './balance.ts';
 import { farmMonth, growFarms } from './farm.ts';
 import { coopFees, coopMonth } from './coop.ts';
@@ -73,7 +75,8 @@ import { albumDay } from './album.ts';
 import { rankDay } from './rank.ts';
 import { crimeDay, jailNear } from './crime.ts';
 import { townLevel, zonesUnlocked } from './townhall.ts';
-import { finishUpgrades, jobsOf, maintenanceOf, plantCapacityOf, radiusOf, serviceHappiness } from './levels.ts';
+import { finishUpgrades, jobsOf, maintenanceOf, plantCapacityOf, serviceHappiness } from './levels.ts';
+import { reaches } from './reach.ts';
 import { lifeDay, lifeMonth, lifeYear } from './lifecycle.ts';
 import { burntDown, fireDay, fireTick, volunteersMonth } from './fire.ts';
 import { plansDay, turnsTick } from './turns.ts';
@@ -159,7 +162,17 @@ function dist(a: { x: number; y: number }, b: { x: number; y: number }): number 
  * por la red de carreteras conectada a ella, en orden de distancia, hasta su
  * capacidad. Devuelve qué tiles de carretera tienen agua y luz.
  */
-export function updateNetworks(state: GameState): { water: Set<number>; power: Set<number> } {
+/** 2.6: quién sirve a quién en la red (fuera del estado; lo rellena `updateNetworks` si se le pasa). Ver coverage.ts. */
+export interface NetworkTrace {
+  /** Edificio → planta que le da el servicio. */
+  water: Map<number, number>;
+  power: Map<number, number>;
+  /** Planta → calles a las que llega su red, y lo que da con el tiempo de hoy. */
+  roads: Map<number, number[]>;
+  capacity: Map<number, number>;
+}
+
+export function updateNetworks(state: GameState, trace?: NetworkTrace): { water: Set<number>; power: Set<number> } {
   const { w, tiles } = state.map;
   for (const b of state.buildings) {
     b.hasWater = false;
@@ -190,6 +203,7 @@ export function updateNetworks(state: GameState): { water: Set<number>; power: S
       let capacity = Math.round(plantCapacityOf(plant) * (isRenewable(plant.kind) ? renewableFx(state, plant.kind) : kind === 'water' ? weatherFx(state).water : weatherFx(state).power));
       // v1.7: una bomba a la orilla del río da agua a más edificios (2.4: si el río no baja sucio).
       if (kind === 'water' && riverside(state, plant.x, plant.y) && !pumpDirty(state, plant.x, plant.y)) capacity = Math.round(capacity * TERRAIN.riverPumpBonus);
+      trace?.capacity.set(plant.id, capacity);
       const queue: number[] = [];
       const seen = new Set<number>();
       for (const [dx, dy] of DIRS) {
@@ -204,11 +218,13 @@ export function updateNetworks(state: GameState): { water: Set<number>; power: S
       while (queue.length > 0) {
         const i = queue.shift()!;
         roadsWith[kind].add(i);
+        if (trace) traceRoad(trace, plant.id, i);
         for (const b of byRoad.get(i) ?? []) {
           if (b[flag] || !b.built) continue;
           if (capacity <= 0) continue;
           b[flag] = true;
           capacity--;
+          trace?.[kind].set(b.id, plant.id);
         }
         const x = i % w;
         const y = Math.floor(i / w);
@@ -226,6 +242,12 @@ export function updateNetworks(state: GameState): { water: Set<number>; power: S
     }
   }
   return roadsWith;
+}
+
+function traceRoad(trace: NetworkTrace, plantId: number, road: number): void {
+  const list = trace.roads.get(plantId);
+  if (list) list.push(road);
+  else trace.roads.set(plantId, [road]);
 }
 
 /* ---------- demanda RCI ---------- */
@@ -247,6 +269,55 @@ export function computeDemand(state: GameState): GameState['demand'] {
   return { R: clamp(R), C: clamp(C), I: clamp(I) };
 }
 
+/** 2.6: un término de la demanda («Casas libres de sobra −12»), sin redondear. */
+export interface DemandFactor {
+  label: string;
+  value: number;
+}
+
+/**
+ * 2.6 «Lo básico»: de qué sale la demanda R/C/I, término a término, como
+ * `happinessFactors`. Suma lo mismo que `computeDemand` (antes de redondear y de
+ * acotar a ±100; hay test). Los términos que valen 0 no salen.
+ */
+export function demandFactors(state: GameState): { R: DemandFactor[]; C: DemandFactor[]; I: DemandFactor[] } {
+  const pop = state.citizens.length;
+  const jobless = state.citizens.filter((c) => c.jobId === null).length;
+  const shops = state.buildings.filter((b) => b.kind === 'shop').length;
+  const factories = state.buildings.filter((b) => b.kind === 'factory').length;
+  const free = freeHomes(state);
+  const happy = averageHappiness(state);
+  const zones = zonesUnlocked(state);
+  const R: DemandFactor[] = [
+    { label: 'Ganas de venir a vivir (base)', value: 40 },
+    { label: 'Estación de tren', value: stationDemandR(state) },
+    { label: `Empleos libres en el pueblo (${vacancies(state)})`, value: vacancies(state) * 5 },
+    { label: `Casas libres de sobra (${free}; a partir de 9 resta)`, value: -Math.max(0, free - 8) * 1.5 },
+    { label: `Felicidad media (${Math.round(happy)}; cuenta lo que pase de 55)`, value: happy - 55 },
+    { label: 'Impuestos', value: averageTaxMood(state) },
+    { label: `Paro (${jobless} sin trabajo en el pueblo)`, value: zones ? -jobless * 2 : 0 },
+    { label: 'Escenario', value: scenarioFx(state).demandR },
+    { label: 'Autobús', value: busDemandR(state) },
+  ];
+  const C: DemandFactor[] = !zones
+    ? []
+    : [
+        { label: `Vecinos (${pop}: piden una tienda cada 12)`, value: (pop / 12) * 25 },
+        { label: `Tiendas que ya hay (${shops})`, value: -shops * 25 },
+        { label: 'Sueldo mínimo (las tiendas suben precios)', value: -MIN_WAGE_STEP[state.minWage ?? 'none'] * MIN_WAGE_FX.demandC },
+      ];
+  const I: DemandFactor[] = !zones
+    ? []
+    : [
+        { label: 'Base', value: 20 },
+        { label: `Gente sin trabajo en el pueblo (${jobless})`, value: jobless * 6 },
+        { label: `Fábricas que ya hay (${factories})`, value: -factories * 10 },
+        { label: 'Comarca y gran empresa', value: regionFx(state).demandI },
+      ];
+  const live = (l: DemandFactor[]) => l.filter((f) => f.value !== 0);
+  return { R: live(R), C: live(C), I: live(I) };
+}
+
 /* ---------- felicidad ---------- */
 
 export function happinessFactors(state: GameState, c: Citizen): { label: string; value: number }[] {
@@ -265,7 +336,8 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
     const full = new Set<string>();
     for (const b of state.buildings) {
       const s = SERVICE[b.kind];
-      if (!s || !b.built || b.damaged || dist(b, home) > radiusOf(b)) continue;
+      // 2.6: el mismo alcance que la ficha y «Qué falta» (en la colina, los bomberos solo con cisterna).
+      if (!s || !reaches(state, b, home.x, home.y)) continue;
       // Un servicio saturado rinde en proporción a los vecinos que puede atender.
       const load = serviceSaturation(state, b.kind, b.id);
       if (load < 0.9) full.add(b.kind);
@@ -320,7 +392,7 @@ export function happinessFactors(state: GameState, c: Citizen): { label: string;
   if (fest) f.push(fest);
   if (c.kids?.length) f.push({ label: c.kids.length === 1 ? 'Un hijo en casa' : `${c.kids.length} hijos en casa`, value: 3 });
   // v1.7: la biblioteca, para quien quiere prosperar; sin cementerio, el duelo pesa.
-  if (home && c.desire === 'prosperar' && state.buildings.some((b) => b.kind === 'library' && b.built && !b.damaged && dist(b, home) <= radiusOf(b))) {
+  if (home && c.desire === 'prosperar' && state.buildings.some((b) => b.kind === 'library' && reaches(state, b, home.x, home.y))) {
     f.push({ label: 'Biblioteca cerca para formarse', value: SOCIAL_PLACES.libraryProsper });
   }
   if (!state.buildings.some((b) => b.kind === 'cemetery' && b.built) && c.memories.some((m) => m.kind === 'perdio_a' && state.tick - m.tick < 360 * TICKS_PER_DAY)) {
@@ -411,8 +483,40 @@ function progressProjects(state: GameState): void {
 
 /* ---------- crecimiento sobre zonas ---------- */
 
+/**
+ * 2.6: ¿está libre este solar de zona? (ni carretera ni edificio). Lo usan
+ * `growZones` y `lotStatus` (nucleo.ts), que explica por qué no crece.
+ */
+export function lotFree(state: GameState, x: number, y: number): boolean {
+  const i = y * state.map.w + x;
+  return state.map.tiles[i] !== Tile.Road && !buildingAt(state, x, y);
+}
+
+/** 2.6: ¿tiene el solar una carretera al lado con agua y luz? (la condición de `growZones`). */
+export function lotServed(state: GameState, served: { water: Set<number>; power: Set<number> }, x: number, y: number): boolean {
+  return DIRS.some(([dx, dy]) => {
+    const nx = x + dx;
+    const ny = y + dy;
+    if (!inBounds(state, nx, ny)) return false;
+    const j = tileIndex(state, nx, ny);
+    return served.water.has(j) && served.power.has(j);
+  });
+}
+
+/**
+ * 2.6: lo que para el crecimiento de una zona entera sin dados: demanda baja
+ * o, en R, casas libres de sobra. (Los locales reservados a quien emprende van
+ * con dados y solo frenan: `ZONE_GROWTH.founderSkip`.)
+ */
+export function zoneGate(state: GameState, kind: 'res' | 'shop' | 'factory', demand: number, free = kind === 'res' ? freeHomes(state) : 0): 'demanda' | 'casas_libres' | null {
+  if (demand <= ZONE_GROWTH.minDemand) return 'demanda';
+  if (kind === 'res' && free >= ZONE_GROWTH.maxFreeHomes) return 'casas_libres';
+  return null;
+}
+
 function growZones(state: GameState, served: { water: Set<number>; power: Set<number> }): void {
-  const { w, h, tiles, zones } = state.map;
+  const { w, h, zones } = state.map;
+  const tiles = state.map.tiles;
   const kinds = [
     [Zone.R, 'res', state.demand.R],
     [Zone.C, 'shop', state.demand.C],
@@ -421,26 +525,18 @@ function growZones(state: GameState, served: { water: Set<number>; power: Set<nu
   // Los locales comerciales se reservan para vecinos que quieren emprender.
   const localFounders = state.citizens.some((c) => c.money >= FOUND_MIN_MONEY);
   for (const [zone, kind, demand] of kinds) {
-    if (demand <= 15) continue;
-    if (kind === 'shop' && localFounders && chance(state.rng, 0.8)) continue;
-    // No se construyen más viviendas si ya sobran.
-    if (kind === 'res' && freeHomes(state) >= 6) continue;
+    if (demand <= ZONE_GROWTH.minDemand) continue;
+    if (kind === 'shop' && localFounders && chance(state.rng, ZONE_GROWTH.founderSkip)) continue;
+    // No se construyen más viviendas si ya sobran (zoneGate: la misma regla, sin dados).
+    if (zoneGate(state, kind, demand)) continue;
     if (!chance(state.rng, Math.min(0.9, demand / 80))) continue;
     // Solares válidos: zona correcta, libre, junto a carretera con agua y luz.
     const spots: number[] = [];
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const i = y * w + x;
-        if (zones[i] !== zone || tiles[i] === Tile.Road) continue;
-        if (buildingAt(state, x, y)) continue;
-        const ok = DIRS.some(([dx, dy]) => {
-          const nx = x + dx;
-          const ny = y + dy;
-          if (!inBounds(state, nx, ny)) return false;
-          const j = tileIndex(state, nx, ny);
-          return served.water.has(j) && served.power.has(j);
-        });
-        if (ok) spots.push(i);
+        if (zones[i] !== zone || !lotFree(state, x, y)) continue;
+        if (lotServed(state, served, x, y)) spots.push(i);
       }
     }
     if (spots.length === 0) continue;
@@ -737,6 +833,8 @@ function endOfMonth(state: GameState): void {
   transfer(state, OUTSIDE, TREASURY, pie, 'PIE');
   // El ayuntamiento cuesta más de mantener cuanto más grande (v1.8).
   for (const b of state.buildings) if (b.built) transfer(state, TREASURY, OUTSIDE, Math.round(maintenanceOf(b) * (b.kind === 'townhall' ? townLevel(state) : 1) * budgetFx(state).maintenance), 'mantenimiento');
+  // 2.6: gasto corriente que crece con el pueblo (vecinos, calles, casas municipales).
+  upkeepMonth(state);
   // 2.3: mantenimiento y cofinanciación de las grandes obras.
   landmarksMonth(state);
   lifeMonth(state);

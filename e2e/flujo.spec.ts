@@ -85,7 +85,11 @@ test('bandeja plegada, ampliación con aviso, pleno sin rojo y títulos de la co
 
   await page.locator('#tab-build').click();
   await expect(page.locator('#tray details[data-cat="Lo básico"]')).toHaveAttribute('open', '');
+  // 2.6: lo que no llega ni con el siguiente nivel (grandes obras) ni se ve; lo del nivel 2, plegado.
+  await expect(page.locator('#tray details[data-cat="Grandes obras"]')).toBeHidden();
+  // Si se enseña (como hace `openTrayCat`), sale plegada y dice cuántas obras tiene y desde qué nivel.
   const big = page.locator('#tray details[data-cat="Grandes obras"]');
+  await big.evaluate((d) => ((d as HTMLDetailsElement).hidden = false));
   await expect(big).not.toHaveAttribute('open', '');
   await expect(big.locator('summary')).toContainText(/Grandes obras \(\d+ · /);
   await big.locator('summary').click();
@@ -114,6 +118,12 @@ test('bandeja plegada, ampliación con aviso, pleno sin rojo y títulos de la co
   await dlg.getByRole('button', { name: 'No' }).click();
   await page.locator('.sheet-close').click();
 
+  // 2.6: la comarca y sus grandes obras salen en el panel con el ayuntamiento 3; con «Enseñar todo» (Ajustes), ya.
+  await page.locator('#menu').click();
+  await expect(page.getByRole('button', { name: /Comarca y grandes obras/ })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Ajustes', exact: true }).click();
+  await page.getByRole('checkbox', { name: /Enseñar todo desde el principio/ }).check();
+  await page.locator('.sheet-close').click();
   await page.locator('#menu').click();
   await page.getByRole('button', { name: /Comarca y grandes obras/ }).click();
   await expect(page.locator('.sheet h2')).toContainText('Comarca y grandes obras');

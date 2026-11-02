@@ -20,6 +20,7 @@ import {
   streetCandidates,
   streetNameAt,
   TENDER,
+  tenderApplies,
   tenderOffers,
   validateCommand,
 } from '../src/index.ts';
@@ -29,16 +30,26 @@ const days = (s: GameState, n: number) => {
 };
 
 /** Primer sitio donde se puede construir `kind`. */
-function spot(s: GameState, kind: 'water' | 'power' = 'water'): { x: number; y: number } {
+function spot(s: GameState, kind: 'water' | 'power' | 'market' = BIG): { x: number; y: number } {
   for (let y = 0; y < s.map.h; y++) {
     for (let x = 0; x < s.map.w; x++) if (validateCommand(s, { type: 'Build', kind, x, y }).ok) return { x, y };
   }
   throw new Error('sin sitio');
 }
 
+/**
+ * 2.6: solo se licitan las obras grandes (materiales desde `TENDER.minCost`) con el
+ * ayuntamiento 3: en las pruebas, el Mercado (6.000 €), con el nivel 4 y su hito.
+ */
+const BIG = 'market' as const;
+function bigReady(s: GameState) {
+  s.townhallLevel = 4;
+  if (!s.unlocked.includes('market')) s.unlocked.push('market');
+}
+
 /** Lucía (la concejala) con una tienda: hay primo. */
 function withCrony(s: GameState) {
-  s.townhallLevel = 2;
+  bigReady(s);
   const lucia = s.citizens[0]!;
   const hall = s.buildings[0]!;
   const shop = newBuilding(s, 'shop', hall.x - 3, hall.y + 2, lucia.id);
@@ -51,7 +62,7 @@ describe('licitaciones (2.2)', () => {
   it('«local» da el mismo hash que una obra sin licitación', () => {
     const a = createInitialState({ seed: 7 });
     const b = createInitialState({ seed: 7 });
-    const at = spot(a);
+    const at = spot(a, 'water');
     expect(applyCommand(a, { type: 'Build', kind: 'water', ...at }).ok).toBe(true);
     expect(applyCommand(b, { type: 'Build', kind: 'water', ...at, offer: 'local' }).ok).toBe(true);
     expect(hashState(a)).toBe(hashState(b));
@@ -63,13 +74,25 @@ describe('licitaciones (2.2)', () => {
 
   it('las obras pequeñas no se licitan', () => {
     const s = createInitialState({ seed: 7 });
-    const at = spot(s);
+    const at = spot(s, 'water');
     expect(materialsCost(s, 'house', at.x, at.y)).toBeLessThan(TENDER.minCost);
     expect(validateCommand(s, { type: 'Build', kind: 'house', ...at, offer: 'fuera' }).ok).toBe(false);
     // Y con el ayuntamiento de nivel 1, ninguna.
     expect(validateCommand(s, { type: 'Build', kind: 'water', ...at, offer: 'fuera' }).ok).toBe(false);
+    // 2.6: ni la bomba (3.000 €) ni el colegio (5.000 €) con el ayuntamiento 3; el Mercado (6.000 €) sí, y solo desde el 3.
+    s.townhallLevel = 3;
+    expect(tenderApplies(s, 'water', at.x, at.y)).toBe(false);
+    expect(tenderApplies(s, 'school', at.x, at.y)).toBe(false);
+    expect(tenderApplies(s, BIG, at.x, at.y)).toBe(true);
     s.townhallLevel = 2;
-    expect(validateCommand(s, { type: 'Build', kind: 'water', ...at, offer: 'fuera' }).ok).toBe(true);
+    expect(tenderApplies(s, BIG, at.x, at.y)).toBe(false);
+    bigReady(s);
+    const big = spot(s, BIG);
+    expect(validateCommand(s, { type: 'Build', kind: BIG, ...big, offer: 'fuera' }).ok).toBe(true);
+    // «Pueblo sencillo»: nunca.
+    s.simple = true;
+    expect(tenderApplies(s, BIG, big.x, big.y)).toBe(false);
+    expect(validateCommand(s, { type: 'Build', kind: BIG, ...big, offer: 'fuera' }).ok).toBe(false);
   });
 
   it('cada oferta cuadra el dinero y la de fuera no da jornal a los del pueblo', () => {
@@ -79,8 +102,8 @@ describe('licitaciones (2.2)', () => {
         withCrony(s);
         const at = spot(s);
         const before = s.treasury;
-        expect(applyCommand(s, { type: 'Build', kind: 'water', ...at, offer }).ok).toBe(true);
-        const mat = materialsCost(s, 'water', at.x, at.y);
+        expect(applyCommand(s, { type: 'Build', kind: BIG, ...at, offer }).ok).toBe(true);
+        const mat = materialsCost(s, BIG, at.x, at.y);
         const paid = before - s.treasury;
         if (offer === 'local') expect(paid).toBe(mat);
         else if (offer === 'fuera') expect(paid).toBe(Math.round(mat * TENDER.cheap.mat));
@@ -89,7 +112,7 @@ describe('licitaciones (2.2)', () => {
         days(s, 40);
         expect(moneyDrift(s)).toBe(0);
         expect(checkInvariants(s)).toEqual([]);
-        expect(s.buildings.find((b) => b.kind === 'water')!.built).toBe(true);
+        expect(s.buildings.find((b) => b.kind === BIG)!.built).toBe(true);
       }
     }
   });
@@ -99,32 +122,32 @@ describe('licitaciones (2.2)', () => {
     const { shop, lucia } = withCrony(s);
     expect(cronyOf(s)?.owner.id).toBe(lucia.id);
     const at = spot(s);
-    const mat = materialsCost(s, 'water', at.x, at.y);
-    expect(applyCommand(s, { type: 'Build', kind: 'water', ...at, offer: 'primo' }).ok).toBe(true);
+    const mat = materialsCost(s, BIG, at.x, at.y);
+    expect(applyCommand(s, { type: 'Build', kind: BIG, ...at, offer: 'primo' }).ok).toBe(true);
     expect(shop.cash).toBe(Math.round(mat * TENDER.crony.kick));
     expect(s.tenders![0]).toMatchObject({ offer: 'primo', councillorId: lucia.id, ownerId: lucia.id, status: 'firmado' });
   });
 
   it('sin primo con negocio no hay oferta del primo', () => {
     const s = createInitialState({ seed: 3 });
-    s.townhallLevel = 2;
+    bigReady(s);
     const at = spot(s);
-    expect(tenderOffers(s, 'water', at.x, at.y).find((o) => o.offer === 'primo')!.available).toBe(false);
-    expect(validateCommand(s, { type: 'Build', kind: 'water', ...at, offer: 'primo' }).ok).toBe(false);
+    expect(tenderOffers(s, BIG, at.x, at.y).find((o) => o.offer === 'primo')!.available).toBe(false);
+    expect(validateCommand(s, { type: 'Build', kind: BIG, ...at, offer: 'primo' }).ok).toBe(false);
   });
 
   it('el riesgo se dice en palabras, nunca en %', () => {
     const s = createInitialState({ seed: 3 });
     withCrony(s);
     const at = spot(s);
-    for (const o of tenderOffers(s, 'water', at.x, at.y)) expect(`${o.risk} ${o.who}`).not.toMatch(/%|\d+ ?por ?ciento/);
+    for (const o of tenderOffers(s, BIG, at.x, at.y)) expect(`${o.risk} ${o.who}`).not.toMatch(/%|\d+ ?por ?ciento/);
   });
 
   it('escándalo sin director: rumor a los 14 días y estallido a los 28', () => {
     const s = createInitialState({ seed: 3 });
     withCrony(s);
     const at = spot(s);
-    applyCommand(s, { type: 'Build', kind: 'water', ...at, offer: 'primo' });
+    applyCommand(s, { type: 'Build', kind: BIG, ...at, offer: 'primo' });
     const t = s.tenders![0]!;
     t.risk = true;
     s.politics.campaign.jubilados = TENDER.scandalCampaign + 1;
@@ -143,7 +166,7 @@ describe('licitaciones (2.2)', () => {
     const s = createInitialState({ seed: 3 });
     withCrony(s);
     const at = spot(s);
-    applyCommand(s, { type: 'Build', kind: 'water', ...at, offer: 'primo' });
+    applyCommand(s, { type: 'Build', kind: BIG, ...at, offer: 'primo' });
     const t = s.tenders![0]!;
     t.risk = true;
     expect(validateCommand(s, { type: 'ReviewContract', buildingId: t.buildingId }).ok).toBe(false);
@@ -160,7 +183,7 @@ describe('licitaciones (2.2)', () => {
   it('sin riesgo, el contrato se cierra sin rumor', () => {
     const s = createInitialState({ seed: 3 });
     withCrony(s);
-    applyCommand(s, { type: 'Build', kind: 'water', ...spot(s), offer: 'primo' });
+    applyCommand(s, { type: 'Build', kind: BIG, ...spot(s), offer: 'primo' });
     s.tenders![0]!.risk = false;
     days(s, TENDER.revealDays + 1);
     expect(s.tenders![0]!.status).toBe('cerrado');
@@ -170,7 +193,7 @@ describe('licitaciones (2.2)', () => {
   it('escándalo con director: no estalla solo; lo elige el director tras avisarlo', () => {
     const s = createInitialState({ seed: 3, aiMode: true });
     withCrony(s);
-    applyCommand(s, { type: 'Build', kind: 'water', ...spot(s), offer: 'primo' });
+    applyCommand(s, { type: 'Build', kind: BIG, ...spot(s), offer: 'primo' });
     const t = s.tenders![0]!;
     t.risk = true;
     // El director dirige: cada día, como si la IA hubiera respondido el turno.
@@ -193,7 +216,7 @@ describe('licitaciones (2.2)', () => {
   it('con director, si nunca lo elige, se olvida', () => {
     const s = createInitialState({ seed: 3, aiMode: true });
     withCrony(s);
-    applyCommand(s, { type: 'Build', kind: 'water', ...spot(s), offer: 'primo' });
+    applyCommand(s, { type: 'Build', kind: BIG, ...spot(s), offer: 'primo' });
     const t = s.tenders![0]!;
     t.risk = true;
     for (let i = 0; i < (TENDER.revealDays + TENDER.forgetDays + 1) * TICKS_PER_DAY; i++) {
@@ -206,7 +229,7 @@ describe('licitaciones (2.2)', () => {
   it('si el concejal se va, el contrato queda sin ids y las invariantes cuadran', () => {
     const s = createInitialState({ seed: 3 });
     withCrony(s);
-    applyCommand(s, { type: 'Build', kind: 'water', ...spot(s), offer: 'primo' });
+    applyCommand(s, { type: 'Build', kind: BIG, ...spot(s), offer: 'primo' });
     const t = s.tenders![0]!;
     t.councillorId = 9999;
     expect(checkInvariants(s).some((e) => e.includes('concejal'))).toBe(true);

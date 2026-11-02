@@ -54,6 +54,8 @@ test('2.5: Pueblo › Comarca: una tarjeta por pueblo y la oferta con Aceptar/Re
 
 test('2.5: Modo IA: los alcaldes vecinos hablan con el LLM falso y la oferta llega con aviso fijo', async ({ page }, info) => {
   test.setTimeout(300_000);
+  // 2.6: con un pueblo recién nacido, «Pueblos vecinos» aún no sale en el panel: «Enseñar todo» (Ajustes).
+  await page.addInitScript(() => localStorage.setItem('bitopolis.prefs', JSON.stringify({ fullHub: true })));
   await page.goto('/');
   await page.getByRole('radio', { name: /Modo IA/ }).click();
   await page.locator('details.advanced summary').first().click();

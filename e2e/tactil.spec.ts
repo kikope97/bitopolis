@@ -223,3 +223,26 @@ test('táctil: el dilema se abre y se resuelve con el dedo (2.4)', async ({ page
   await expect(page.locator('.sheet')).toContainText('Decidiste: Pedir el indulto');
   expect((await state(page)).dilemmas.at(-1).resolved).toBe('pedir_indulto');
 });
+
+test('táctil: al tocar un colegio con el dedo se ve su zona sobre la hoja y la línea de servicio (2.6)', async ({ page, request }, info) => {
+  test.skip(info.project.name !== 'movil');
+  test.setTimeout(120_000);
+  const { state: s } = runSimulation({ seed: 3, days: 300, profile: 'constructor' });
+  const school = s.buildings.find((b) => b.kind === 'school' && b.built && !b.damaged)!;
+  expect(school).toBeTruthy();
+  const data = gzipSync(JSON.stringify({ bitopolis: 1, formatVersion: s.formatVersion, exportedAt: '', mode: 'normal', state: s }));
+  const { token } = await (await request.post('/api/import', { data, headers: { 'content-type': 'application/octet-stream' } })).json();
+  await page.goto(`/p/${token}`);
+  await page.getByRole('button', { name: 'Continuar' }).click();
+  await skipTutorial(page);
+  await setSpeed(page, 0);
+  const t = await touch(page);
+  await page.evaluate(([a, b]) => (window as any).__bitopolis.centerOn(a, b), [school.x, school.y]);
+  const p = await tile(page, school.x, school.y);
+  await t.tap(p.x, p.y);
+  await expect(page.locator('.sheet [data-test="reach-line"]')).toContainText(/\d+ viviendas? · \d+ de/);
+  const r = await page.evaluate(() => (window as any).__bitopolis.reach);
+  expect(r?.borders).toBeGreaterThanOrEqual(1);
+  expect(await page.evaluate(([a, b]) => (window as any).__bitopolis.visible(a, b), [school.x, school.y])).toBe(true);
+  await page.screenshot({ path: `test-results/capturas/${info.project.name}-cobertura-tactil.png` });
+});

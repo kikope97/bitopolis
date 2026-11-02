@@ -1,5 +1,5 @@
 import type { BuildKind, Command, LandmarkKind, ZoneKind } from '@bitopolis/shared';
-import { BUILD, BUILD_LEVEL, buildCost, CARE, CIVIL, COOP, FARM, type GameState, hasRiver, LANDMARK_LATER, LANDMARKS, landmarkReqs, POST, Terrain, TERRAIN, TOWNHALL_LEVELS, townLevel, WATERWORKS, ZONE_COST_PER_TILE, DENSITY, VPO } from '@bitopolis/sim';
+import { BUILD, BUILD_LEVEL, buildCost, CARE, CIVIL, COOP, CRIME, FARM, JOBS, PLANT_CAPACITY, SERVICE, SERVICE_CAPACITY, SERVICE_LEVELS, TRASH, type GameState, hasRiver, LANDMARK_LATER, LANDMARKS, landmarkReqs, POST, Terrain, TERRAIN, TOWNHALL_LEVELS, townLevel, WATERWORKS, ZONE_COST_PER_TILE, DENSITY, VPO } from '@bitopolis/sim';
 import { money } from './i18n.ts';
 
 export type ToolId =
@@ -68,37 +68,43 @@ export interface Tool {
   help: string;
 }
 
+/** 2.6: radio de un servicio nuevo (nivel 1), de balance.ts (antes, escrito a mano en cada texto). */
+const R = (kind: keyof typeof SERVICE) => SERVICE[kind]?.radius ?? 0;
+/** «más alcance con cada nivel». */
+const LV = `(+${SERVICE_LEVELS.radiusPlus} por nivel)`;
+const CAP = (kind: 'school' | 'clinic' | 'police', who: string) => `Atiende a ${SERVICE_CAPACITY[kind]} ${who}; más allá, se llena.`;
+
 export const TOOLS: Tool[] = [
   { id: 'inspect', label: 'Mirar', shape: 'tap', key: '0', help: 'Toca un edificio para ver quién vive o trabaja allí.' },
   { id: 'road', label: 'Carretera', shape: 'line', build: 'road', key: '1', help: 'Arrastra en línea recta. Por debajo van el agua y la luz.' },
   { id: 'house', label: 'Casa', shape: 'tap', build: 'house', key: '2', help: 'Casa municipal para 3 vecinos. Cobras alquiler.' },
-  { id: 'water', label: 'Agua', shape: 'tap', build: 'water', key: '3', help: `Da agua por la red de carreteras a 30 edificios.` },
-  { id: 'power', label: 'Luz', shape: 'tap', build: 'power', key: '4', help: 'Da luz por la red de carreteras a 40 edificios.' },
+  { id: 'water', label: 'Agua', shape: 'tap', build: 'water', key: '3', help: `Da agua por la red de carreteras a ${PLANT_CAPACITY.water} edificios (junto al río limpio, un ${Math.round((TERRAIN.riverPumpBonus - 1) * 100)} % más).` },
+  { id: 'power', label: 'Luz', shape: 'tap', build: 'power', key: '4', help: `Da luz por la red de carreteras a ${PLANT_CAPACITY.power} edificios.` },
   { id: 'zoneR', label: 'Zona R', shape: 'rect', zone: 'R', key: '5', help: 'Residencial: aquí se construyen viviendas solas.' },
   { id: 'zoneC', label: 'Zona C', shape: 'rect', zone: 'C', key: '6', help: 'Comercial: tiendas que dan empleo y venden a los vecinos.' },
   { id: 'zoneI', label: 'Zona I', shape: 'rect', zone: 'I', key: '7', help: 'Industrial: talleres con empleo. Contaminan cerca.' },
   // 2.2: el campo.
   { id: 'zoneA', label: 'Zona agraria', shape: 'rect', zone: 'A', key: 'c', help: 'Fincas con un empleo y temporeros en la cosecha. Solo piden carretera (ni agua ni luz). Junto al río, huerta de regadío; en la colina, olivar o viñedo; en el resto, cereal de secano.' },
-  { id: 'park', label: 'Parque', shape: 'tap', build: 'park', key: '8', help: 'Más felicidad en 5 casillas a la redonda.' },
-  { id: 'school', label: 'Colegio', shape: 'tap', build: 'school', key: '9', help: 'Más felicidad en 8 casillas. 3 empleos.' },
-  { id: 'clinic', label: 'Salud', shape: 'tap', build: 'clinic', key: 'h', help: 'Centro de salud: más felicidad en 8 casillas.' },
-  { id: 'police', label: 'Policía', shape: 'tap', build: 'police', key: 'p', help: 'Baja la delincuencia en 10 casillas.' },
-  { id: 'plaza', label: 'Plaza', shape: 'tap', build: 'plaza', key: 'm', help: 'Plaza Mayor: mucha felicidad en 6 casillas. Premio del hito de 50 vecinos.' },
-  { id: 'market', label: 'Mercado', shape: 'tap', build: 'market', key: 'k', help: 'Mercado municipal: empleo y felicidad en 8 casillas. Premio del hito de 200 vecinos.' },
+  { id: 'park', label: 'Parque', shape: 'tap', build: 'park', key: '8', help: `Más felicidad en ${R('park')} casillas a la redonda ${LV}.` },
+  { id: 'school', label: 'Colegio', shape: 'tap', build: 'school', key: '9', help: `Más felicidad en ${R('school')} casillas ${LV}. ${CAP('school', 'alumnos (cada vecino y cada hijo cuentan)')} ${JOBS.school} empleos.` },
+  { id: 'clinic', label: 'Salud', shape: 'tap', build: 'clinic', key: 'h', help: `Centro de salud: más felicidad en ${R('clinic')} casillas ${LV}. ${CAP('clinic', 'vecinos')}` },
+  { id: 'police', label: 'Policía', shape: 'tap', build: 'police', key: 'p', help: `Baja la delincuencia en ${R('police')} casillas ${LV}. ${CAP('police', 'vecinos')}` },
+  { id: 'plaza', label: 'Plaza', shape: 'tap', build: 'plaza', key: 'm', help: `Plaza Mayor: mucha felicidad en ${R('plaza')} casillas. Premio del hito de 50 vecinos.` },
+  { id: 'market', label: 'Mercado', shape: 'tap', build: 'market', key: 'k', help: `Mercado municipal: empleo y felicidad en ${R('market')} casillas. Premio del hito de 200 vecinos.` },
   // v1.7: lugares de vida social.
-  { id: 'bar', label: 'Bar', shape: 'tap', build: 'bar', key: 'b', help: 'Felicidad en 5 casillas y amistades que nacen tomando algo. Hace algo de ruido.' },
-  { id: 'chapel', label: 'Ermita', shape: 'tap', build: 'chapel', key: 'e', help: 'Felicidad en 8 casillas. Con ermita, las fiestas alegran más.' },
+  { id: 'bar', label: 'Bar', shape: 'tap', build: 'bar', key: 'b', help: `Felicidad en ${R('bar')} casillas y amistades que nacen tomando algo. Hace algo de ruido.` },
+  { id: 'chapel', label: 'Ermita', shape: 'tap', build: 'chapel', key: 'e', help: `Felicidad en ${R('chapel')} casillas. Con ermita, las fiestas alegran más.` },
   { id: 'cemetery', label: 'Cementerio', shape: 'tap', build: 'cemetery', key: 'n', help: 'Para despedir a los que se van: el duelo pesa menos. Sin él, se nota.' },
-  { id: 'library', label: 'Biblioteca', shape: 'tap', build: 'library', key: 'y', help: 'Felicidad en 8 casillas; más aún para quien quiere prosperar.' },
-  { id: 'sports', label: 'Polideportivo', shape: 'tap', build: 'sports', key: 'g', help: 'Felicidad en 8 casillas; los mayores de cerca viven más.' },
+  { id: 'library', label: 'Biblioteca', shape: 'tap', build: 'library', key: 'y', help: `Felicidad en ${R('library')} casillas ${LV}; más aún para quien quiere prosperar.` },
+  { id: 'sports', label: 'Polideportivo', shape: 'tap', build: 'sports', key: 'g', help: `Felicidad en ${R('sports')} casillas ${LV}; los mayores de cerca viven más.` },
   // v1.8: la cárcel vacía los calabozos de las comisarías.
-  { id: 'jail', label: 'Cárcel', shape: 'tap', build: 'jail', key: 'j', help: '30 plazas: los detenidos pasan aquí y los calabozos de las comisarías se vacían. A los vecinos no les gusta tenerla cerca.' },
+  { id: 'jail', label: 'Cárcel', shape: 'tap', build: 'jail', key: 'j', help: `${CRIME.jailCapacity} plazas: los detenidos pasan aquí y los calabozos de las comisarías se vacían. A los vecinos no les gusta tenerla cerca.` },
   // 2.1: emergencias.
-  { id: 'firestation', label: 'Bomberos', shape: 'tap', build: 'firestation', key: 'f', help: 'Parque de bomberos: en 9 casillas apaga los incendios en pocas horas. Sin él, lo que arde queda destrozado. Con cisterna (nivel 2) llega a las colinas.' },
-  { id: 'civilprotection', label: 'Protección civil', shape: 'tap', build: 'civilprotection', key: 'v', help: 'Caseta de voluntarios: en 10 casillas, las riadas un 60 % menos y el quitanieves a mitad de precio. Permite levantar diques.' },
+  { id: 'firestation', label: 'Bomberos', shape: 'tap', build: 'firestation', key: 'f', help: `Parque de bomberos: en ${R('firestation')} casillas ${LV} apaga los incendios en pocas horas. Sin él, lo que arde queda destrozado. Con cisterna (nivel 2) llega a las colinas.` },
+  { id: 'civilprotection', label: 'Protección civil', shape: 'tap', build: 'civilprotection', key: 'v', help: `Caseta de voluntarios: en ${R('civilprotection')} casillas, las riadas un ${Math.round(CIVIL.floodCut * 100)} % menos y el quitanieves a mitad de precio. Permite levantar diques.` },
   { id: 'dike', label: 'Dique', shape: 'tap', key: 'q', help: 'Muro en una casilla junto al río: ahí y alrededor no llega la riada. Hace falta una caseta de protección civil.' },
   // 2.1: recogida de basura.
-  { id: 'cleanpoint', label: 'Punto limpio', shape: 'tap', build: 'cleanpoint', key: 'u', help: 'Su camión recoge la basura por las calles de alrededor (60 casillas al día). Solo quien tiene recogida paga la tasa de basuras.' },
+  { id: 'cleanpoint', label: 'Punto limpio', shape: 'tap', build: 'cleanpoint', key: 'u', help: `Su camión recoge la basura por las calles de alrededor (${TRASH.route} casillas de calle al día). Solo quien tiene recogida paga la tasa de basuras.` },
   // 2.3: turismo (uno por partida; su forma sale del terreno).
   { id: 'heritage', label: 'Patrimonio', shape: 'tap', build: 'heritage', key: '', help: 'Monumento que atrae visitantes (uno por pueblo): faro junto al mar, molino junto al río, castillo en la colina o rollo con plaza porticada en el llano. Turismo, en Pueblo › Ayuntamiento.' },
   // 2.3: grandes obras por fases (sin atajo de teclado: se eligen en la bandeja).
@@ -192,7 +198,7 @@ export function lockLong(tool: Tool, state: GameState): string {
 /** Coste corto para la barra de confirmación: «hasta 3.500 €». */
 export function shortCost(tool: Tool): string {
   if (tool.landmark) return landmarkCost(tool.landmark);
-  return tool.build && tool.build !== 'road' ? `hasta ${money(buildCost(tool.build))}` : costText(tool);
+  return tool.build && tool.build !== 'road' ? money(buildCost(tool.build)) : costText(tool);
 }
 
 /** Precio en una línea para la bandeja «Construir» (v1.6). */

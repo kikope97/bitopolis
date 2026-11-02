@@ -1,7 +1,7 @@
-import { canFundLandmarkPhase, canPauseLandmark, canStartLandmark, fundLandmarkPhase, pauseLandmark, startLandmark } from './landmarks.ts';
+import { canFundLandmarkPhase, canPauseLandmark, canStartLandmark, fundLandmarkPhase, isLandmarkKind, pauseLandmark, startLandmark } from './landmarks.ts';
 import { canBuildHeritage, canProtectArea, canSetTouristTax, canZoneProtected, protectArea, setTouristTax } from './tourism.ts';
 import { answerBigCompany, canAnswerBigCompany } from './region.ts';
-import { canRepayLoan, canRequestLoan, repayLoan, requestLoan } from './loans.ts';
+import { canRepayLoan, canRequestLoan, fmt, repayLoan, requestLoan } from './loans.ts';
 import { answerErrand, canAnswerErrand } from './errands.ts';
 import { farmZoneUnlocked } from './farm.ts';
 import { answerPress, canAnswerPress } from './press.ts';
@@ -31,6 +31,7 @@ import { campaign, canCampaign, canMotion, motion } from './politics.ts';
 import { addMemory, answerPetition, canConvenePleno, closePleno, convenePleno, talkTo } from './social.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import {
+  type Building,
   buildingAt,
   buildingById,
   type GameState,
@@ -306,6 +307,8 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       const t = state.map.tiles[tileIndex(state, cmd.x, cmd.y)];
       if (b?.fire) return { ok: false, error: 'Está ardiendo: espera a que se apague' };
       if (!b && t !== Tile.Road && !hasDike(state, cmd.x, cmd.y)) return { ok: false, error: 'No hay nada que derribar' };
+      // Ronda 22: «Cancelar la obra» y «Deshacer» solo valen si aún se devuelve lo pagado.
+      if (cmd.cancelOnly && (!b || cancelRefund(state, b) === 0)) return { ok: false, error: 'La obra ya ha empezado: no se puede cancelar' };
       return { ok: true };
     }
     case 'NotifyProject':
@@ -421,6 +424,21 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
   }
 }
 
+/**
+ * 2.6: lo que se devuelve al cancelar una obra del ayuntamiento que aún no ha
+ * empezado (sin un solo día de trabajo): los materiales, que se pagaron al
+ * ponerla. Sin trabajo hecho, la obra es de hoy (el trabajo y el presupuesto
+ * cambian al cerrar el día), así que el precio es el mismo que se pagó. Las
+ * licitaciones (otra oferta) y las grandes obras no se devuelven así.
+ */
+export function cancelRefund(state: GameState, b: Building): number {
+  if (b.built || b.owner !== TREASURY || isLandmarkKind(b.kind) || !(b.kind in BUILD)) return 0;
+  const p = state.projects.find((x) => x.buildingId === b.id);
+  if (!p || p.payer !== TREASURY || (p.offer ?? 'local') !== 'local' || p.workerDaysDone > 0) return 0;
+  // Ronda 22: lo que se pagó de verdad (el plan del presupuesto o el tiempo cambian el precio de hoy).
+  return p.paid ?? 0;
+}
+
 /** Quita un edificio cuidando que su dinero y sus vecinos queden en orden. */
 export function removeBuilding(state: GameState, id: number): void {
   const b = buildingById(state, id);
@@ -507,6 +525,7 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
         crew: [],
         outsideToday: 0,
         notify: false,
+        ...(offer === 'local' ? { paid: mat } : {}),
       });
       if (offer !== 'local') signTender(state, b, state.projects.at(-1)!, offer, mat);
       pushEvent(state, 'project', `Empieza la obra: ${BUILD_NAMES[cmd.kind]}`, { ref: b.id });
@@ -546,8 +565,18 @@ export function applyCommand(state: GameState, raw: unknown): CommandResult {
       const i = tileIndex(state, cmd.x, cmd.y);
       // 2.2: la calle (o la plaza) que pasaba por aquí pierde su nombre.
       forgetStreet(state, cmd.x, cmd.y);
-      if (b) removeBuilding(state, b.id);
-      else if (state.map.tiles[i] === Tile.Road) state.map.tiles[i] = Tile.Grass;
+      if (b) {
+        // 2.6: una obra sin empezar se cancela y devuelve los materiales (lo pagado al ponerla).
+        const refund = cancelRefund(state, b);
+        removeBuilding(state, b.id);
+        if (refund > 0) {
+          transfer(state, OUTSIDE, TREASURY, refund, 'obras');
+          // Es la misma obra del mes (sin trabajo, es de hoy): ni ingreso ni gasto de más en el parte.
+          state.month.income -= refund;
+          state.month.expenses -= refund;
+          pushEvent(state, 'info', `Obra cancelada: ${BUILD_NAMES[b.kind] ?? b.kind}. Se devuelven ${fmt(refund)} € de materiales`, { ref: b.id });
+        }
+      } else if (state.map.tiles[i] === Tile.Road) state.map.tiles[i] = Tile.Grass;
       else state.dikes = (state.dikes ?? []).filter((d) => d !== i);
       break;
     }

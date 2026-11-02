@@ -107,12 +107,12 @@ test('v1.8: los servicios muestran su nivel y qué pide mejorarlos', async ({ pa
   pump.level = 3;
   await openTown(page, request, state);
   await inspect(page, pump.x, pump.y);
-  await expect(page.locator('.sheet .level-box')).toContainText('Nivel 3 de 3');
-  await expect(page.locator('.sheet .level-box')).toContainText('nivel más alto');
+  await expect(page.locator('.sheet .level-box:not([data-test])')).toContainText('Nivel 3 de 3');
+  await expect(page.locator('.sheet .level-box:not([data-test])')).toContainText('nivel más alto');
   await page.locator('.sheet-close').click();
   const police = state.buildings.find((b) => b.kind === 'police' && b.built)!;
   await inspect(page, police.x, police.y);
-  await expect(page.locator('.sheet .level-box')).toContainText('Nivel 1 de 3');
+  await expect(page.locator('.sheet .level-box:not([data-test])')).toContainText('Nivel 1 de 3');
   await expect(page.locator('.sheet .level-box .reqs li')).toHaveCount(4);
   await expect(page.locator('.sheet')).toContainText('Calabozos');
   await page.screenshot({ path: `test-results/capturas/${info.project.name}-v18-4-nivel-servicio.png` });

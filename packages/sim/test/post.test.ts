@@ -23,6 +23,8 @@ import {
 /** Pueblo con correos, una pareja (Ana y Luis) y otros vecinos; Luis se va hace dos meses. */
 function fixture(opts: { post?: boolean } = {}) {
   const s = createInitialState({ seed: 21 });
+  // 2.6: las cartas llegan con el ayuntamiento 3 (o 30 vecinos).
+  s.townhallLevel = 3;
   const base = s.citizens[0]!;
   for (let k = 0; k < 8; k++) s.citizens.push({ ...structuredClone(base), id: s.nextId++, jobId: null, named: true, relations: [], memories: [], name: ['Ana García', 'Luis Pérez', 'Marta Ruiz', 'Pedro Gil', 'Elena Sanz', 'Jorge León', 'Rosa Vidal', 'Iván Mora'][k]! });
   s.ledger.initialTotal += 8 * base.money;

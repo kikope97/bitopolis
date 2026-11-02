@@ -2,6 +2,7 @@ import { tickToDate, type Command } from '@bitopolis/shared';
 import {
   BUILD_NAMES,
   buildingAt,
+  cancelRefund,
   isLandmarkKind,
   LANDMARKS,
   CROP_HINT,
@@ -83,6 +84,9 @@ import {
   HERITAGE_NAMES,
   heritageVariant,
   touristified,
+  hasReach,
+  serviceReach,
+  SERVICE,
 } from '@bitopolis/sim';
 import { contractBox, openTender } from './tender-ui.ts';
 import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
@@ -107,11 +111,13 @@ import { openWhatsHappening, turnHeadline } from './ai-town-ui.ts';
 import { pocketMark } from './money-ui.ts';
 import { formatDate, money, MONTHS, plural, shortDate, t } from './i18n.ts';
 import { busTrips, type Camera, type Preview, render, restartAnimations, signSpot } from './render.ts';
+import { filterOverlay, overlayFor, placeLines, previewOverlay, reachLine, type ReachOverlay, TOOL_FOR_NEED } from './reach-ui.ts';
 import type { FromWorker, SaveBatch, ToWorker, Unsaved } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
 import { buildingSprite, landmarkSprite, letterSprite, resSprite, T, ZONE_COLOR } from './sprites.ts';
 import { bigCompanyContent, landmarkContent, openRegion, regionAttention, regionSummary } from './landmarks-ui.ts';
 import { comarcaPending, comarcaSummary, openComarca } from './comarca-ui.ts';
+import { type HubEntry, hubWants, Reveal, trayCatsWanted, ZONE_HELPERS } from './progress.ts';
 import { commandFor, costText, isLocked, lockLong, lockShort, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayCost } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
 import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, h, isSheetOpen, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack } from './ui.ts';
@@ -125,6 +131,7 @@ import { openSettings } from './settings-ui.ts';
 import { shareBlock } from './share-ui.ts';
 import { openElectionNight, openPolitics, renderPollChip } from './politics-ui.ts';
 import { timeOfDay } from './render.ts';
+import { demandExtra, lotBox, monthlyText, networkRoom, networkWarnings, plantLoadBox } from './nucleo-ui.ts';
 
 /** Margen entre toque y arrastre: con el dedo, más (un temblor no es un arrastre). */
 const DRAG_PX = 10;
@@ -145,6 +152,11 @@ export interface GameOptions {
   onExit: () => void;
 }
 
+/** 2.6: marca «Nuevo» (se quita al abrir lo marcado). */
+function newBadge(): HTMLElement {
+  return h('span', { class: 'new-badge', 'aria-hidden': 'true' }, 'Nuevo');
+}
+
 export function startGame(opts: GameOptions): void {
   const { token, sessionId } = opts;
   $('#start').hidden = true;
@@ -157,10 +169,18 @@ export function startGame(opts: GameOptions): void {
   const send = (m: ToWorker) => worker.postMessage(m);
 
   let state: GameState = opts.state;
+  /** 2.6: lo que ya salió en el panel «Pueblo» y la bandeja, y lo que lleva «Nuevo» (por partida, en este navegador). */
+  const reveal = new Reveal(`bitopolis.reveal.${token}`);
+  let revealKey = '';
+  // El «Nuevo» se lee como descripción (no cambia el nombre de los botones).
+  if (!document.getElementById('new-desc')) document.body.append(h('span', { id: 'new-desc', class: 'visually-hidden' }, 'Nuevo'));
   let tool: Tool = TOOLS[0]!;
   let speed = 0;
   let preview: Preview | null = null;
   let layer: LayerId = 'none';
+  /** 2.6: filtro de «Qué falta» (un servicio) y la zona que se dibuja (memo por firma). */
+  let missingKey: NeedKey | null = null;
+  let reachMemo: { key: string; overlay: ReachOverlay | null } = { key: '', overlay: null };
   let selected: { x: number; y: number } | null = null;
   /** Primer toque de una carretera o zona (modo «toque inicio, toque fin»). */
   let anchor: { x: number; y: number } | null = null;
@@ -614,6 +634,13 @@ export function startGame(opts: GameOptions): void {
   let upgradeWarned = townLevel(state) - 1;
   const albumSeen = { n: state.album?.length ?? 0 };
   function onState() {
+    // 2.6: «Deshacer» solo mientras la obra no haya empezado; avisos de las redes, una vez al día.
+    checkUndo();
+    const netDay = Math.floor(state.tick / 24);
+    if (netDay !== lastNetDay) {
+      lastNetDay = netDay;
+      networkWarnings(state, (text, kind, ref) => toast(text, { kind, onClick: () => focusBuilding(ref.id) }));
+    }
     // v1.7: foto de cada momento nuevo del álbum (en este navegador).
     snapMoments(token, state, albumSeen);
     if (layer === 'missing' && Math.floor(state.tick / 24) !== legendDay) missingLegend();
@@ -671,6 +698,13 @@ export function startGame(opts: GameOptions): void {
     // Ronda 21: el año va aparte; en pantallas estrechas se ve «21 dic» (antes, en 360 px, no se veía la fecha).
     const dateEl = $('#hud-date');
     const dateKey = shortDate(d);
+    // 2.6: lo que aparece en el panel «Pueblo» y en la bandeja (y sus «Nuevo»): una vez al día
+    // y al cambiar el nivel, los vecinos o los edificios (también en pausa, tras una orden).
+    const rk = `${dateKey}|${state.townhallLevel}|${state.citizens.length}|${state.buildings.length}|${state.loans?.length ?? 0}`;
+    if (rk !== revealKey) {
+      revealKey = rk;
+      refreshReveal();
+    }
     if (dateEl.dataset.v !== dateKey) {
       dateEl.dataset.v = dateKey;
       const [dd, mm, yy] = dateKey.split(' ');
@@ -779,6 +813,8 @@ export function startGame(opts: GameOptions): void {
       btn.classList.toggle('locked', locked);
       btn.setAttribute('aria-disabled', String(locked));
       btn.querySelector('.tool-cost')!.textContent = locked ? `🔒 ${lockText(tl)}` : trayCost(tl);
+      const month = btn.querySelector<HTMLElement>('.tool-month');
+      if (month) month.textContent = locked ? '' : monthlyText(tl.build, state);
     }
   }
   /** Qué falta para desbloquear una herramienta, en pocas palabras. */
@@ -1193,10 +1229,22 @@ export function startGame(opts: GameOptions): void {
   function clampCam() {
     // Como mucho 2 casillas de borde (antes se podía dejar media pantalla vacía).
     const pad = Math.min(2 * tileSize(), Math.round(Math.min(canvas.width, canvas.height) * 0.15));
-    const axis = (pos: number, size: number, view: number) =>
-      size + 2 * pad <= view ? Math.round((size - view) / 2) : Math.max(-pad, Math.min(size - view + pad, pos));
-    cam.x = axis(cam.x, state.map.w * tileSize(), canvas.width);
-    cam.y = axis(cam.y, state.map.h * tileSize(), canvas.height);
+    // 2.6: con una hoja abierta encima del mapa (abajo o al lado), se puede llevar el borde del mapa hasta ella:
+    // si no, lo de abajo del pueblo nunca quedaba a la vista sobre la hoja.
+    const cover = sheetCover();
+    const axis = (pos: number, size: number, view: number, extra: number) =>
+      size + 2 * pad <= view - extra ? Math.round((size - view) / 2) : Math.max(-pad, Math.min(size - view + pad + extra, pos));
+    cam.x = axis(cam.x, state.map.w * tileSize(), canvas.width, cover.x);
+    cam.y = axis(cam.y, state.map.h * tileSize(), canvas.height, cover.y);
+  }
+  /** Lo que tapa del mapa la hoja abierta (en px del canvas): por abajo (móvil) o por la derecha (panel). */
+  function sheetCover(): { x: number; y: number } {
+    const el = currentSheet();
+    if (!el) return { x: 0, y: 0 };
+    const r = canvas.getBoundingClientRect();
+    const sr = el.getBoundingClientRect();
+    if (sr.left <= r.left + 8) return { x: 0, y: Math.max(0, r.bottom - sr.top) * dpr() };
+    return { x: Math.max(0, r.right - sr.left) * dpr(), y: 0 };
   }
   // v1.6.1: se puede alejar como antes de la 1.4 (≈11 px por casilla en un iPhone) para ver el pueblo.
   // Para construir con el dedo hacen falta casillas de al menos 24 px: por debajo, el primer toque acerca.
@@ -1365,7 +1413,7 @@ export function startGame(opts: GameOptions): void {
     if (g.mode === 'pan' && touchInput && performance.now() - fling.t < 80) startFling();
     const t1 = tileAt(e.clientX, e.clientY);
     if (g.mode === 'pending' && t1 && performance.now() >= quietUntil) {
-      if (touchInput && tool.id !== 'inspect' && cam.zoom < touchZoom()) {
+      if (touchInput && tool.id !== 'inspect' && cam.zoom < touchZoom() && !pendingPlace) {
         // Muy alejado para acertar con el dedo: este toque acerca ahí; el siguiente ya construye.
         const r = canvas.getBoundingClientRect();
         setZoom(touchZoom(), (e.clientX - r.left) * dpr(), (e.clientY - r.top) * dpr());
@@ -1413,6 +1461,10 @@ export function startGame(opts: GameOptions): void {
         return refreshStrip();
       }
       const people = b ? occupants(state, b).length + state.citizens.filter((c) => c.jobId === b.id).length : 0;
+      // 2.6: una obra sin empezar se cancela y devuelve los materiales.
+      const refund = b ? cancelRefund(state, b) : 0;
+      cancelProposal = refund > 0;
+      if (refund > 0) return proposePlace(tile, tile, `¿Cancelar la obra (${what.toLowerCase()})? Aún no ha empezado: se devuelven ${money(refund)} de materiales.`);
       return proposePlace(tile, tile, `¿Derribar ${what.toLowerCase()}? No se puede deshacer.${people > 0 ? ` Afecta a ${plural(people, 'vecino', 'vecinos')}.` : ''}`);
     }
     // Carretera y zonas: además de arrastrar, se puede tocar el inicio y luego el final.
@@ -1462,7 +1514,7 @@ export function startGame(opts: GameOptions): void {
       return proposePlace(tile, tile);
     }
     const cmd = commandFor(tool, tile, tile);
-    if (cmd) await placeBuild(cmd);
+    if (cmd && (await placeBuild(cmd)) && cmd.type === 'Build') offerUndo(cmd.x, cmd.y);
   }
 
   /**
@@ -1510,7 +1562,7 @@ export function startGame(opts: GameOptions): void {
     pendingDedication = v.ok ? tile : null;
     preview = seg ? { tiles: seg.tiles.map(([x, y]) => ({ x, y })), ok: v.ok } : { tiles: [tile], ok: false };
     const what = v.ok ? `¿Dedicar ${seg!.axis === 'plaza' ? 'la plaza' : 'esta calle'} a ${dedicating.name}?` : `No se puede (${v.error})`;
-    $('#confirm-text').replaceChildren(h('span', { class: 'cc-what' }, what), v.ok ? h('span', { class: 'cc-cost' }, `Placa: ${money(STREETS.plaque)}`) : '');
+    $('#confirm-text').replaceChildren(what ? h('span', { class: 'cc-what' }, what) : '', v.ok ? h('span', { class: 'cc-cost' }, `Placa: ${money(STREETS.plaque)}`) : '');
     const yes = $('#confirm-yes') as HTMLButtonElement;
     yes.textContent = 'Dedicar aquí';
     yes.className = 'btn primary';
@@ -1627,13 +1679,20 @@ export function startGame(opts: GameOptions): void {
     preview = previewFor(a, b);
     const v = validateCommand(state, cmd);
     const hill = (tool.build || tool.landmark) && tool.shape === 'tap' && terrainAt(state, a.x, a.y) === Terrain.Hill;
-    const cost = tool.id === 'dike' ? shortCost(tool) : tool.landmark ? `${shortCost(tool)}${hill ? ' (colina: +50 %)' : ''} · ahora solo el solar` : tool.build && tool.shape === 'tap' ? `${shortCost(tool)}${hill ? ' (colina: materiales +50 %)' : ''}` : lineText(a, b);
+    // 2.6: con lo que costará al mes («+1.050 €/mes (mantenimiento y 1 sueldo)»).
+    const pl0 = v.ok && !demolishText && tool.build && tool.shape === 'tap' && touchInput;
+    // Ronda 22: en la barra, corto («· +2450 €/mes»); el detalle de sueldos está en la bandeja.
+    const month = tool.build && tool.shape === 'tap' ? monthlyText(tool.build, state, true).replace(/\s*\(.*\)$/, '') : '';
+    const cost = tool.id === 'dike' ? shortCost(tool) : tool.landmark ? `${shortCost(tool)}${hill ? ' (colina: +50 %)' : ''} · ahora solo el solar` : tool.build && tool.shape === 'tap' ? `${shortCost(tool)}${hill ? ' (colina: materiales +50 %)' : ''}${month ? ` ${month}` : ''}` : lineText(a, b);
     // Ronda 13: el precio va en su propia línea y siempre se ve (también si no se puede: «no hay dinero»).
-    const what = demolishText && v.ok ? demolishText : v.ok ? `${tool.label} aquí` : `${tool.label}: no se puede (${v.error})`;
+    const what = demolishText && v.ok ? demolishText : v.ok ? (pl0 ? '' : `${tool.label} aquí`) : `${tool.label}: no se puede (${v.error})`;
     // v1.9.1: si con lo que falta por pagar de las obras en marcha la caja quedaría en negativo, se avisa (no se bloquea).
     const after = v.ok && !demolishText ? state.treasury - commandOutlay(state, cmd) - pendingWorksCost(state) : 0;
     const warn = after < 0 ? h('span', { class: 'cc-warn' }, `⚠ Quedarías en −${money(-after)} con las obras en marcha`) : '';
-    $('#confirm-text').replaceChildren(h('span', { class: 'cc-what' }, what), demolishText || !cost ? '' : h('span', { class: 'cc-cost' }, v.ok ? cost : `Cuesta ${cost}`), warn);
+    // 2.6: lo que gana el pueblo con este servicio aquí («+14 casas con colegio · atenderá a ~38 de 60»).
+    const pl = v.ok && !demolishText && tool.build && tool.shape === 'tap' ? placeLines(state, tool.build, a.x, a.y) : null;
+    const reachText = pl ? h('span', { class: 'cc-reach', 'data-test': 'cc-reach' }, h('b', { class: pl.none ? 'none' : '' }, pl.gain), ...pl.warn.map((w) => h('span', { class: 'cc-reach-warn' }, w))) : '';
+    $('#confirm-text').replaceChildren(h('span', { class: 'cc-what' }, what), demolishText || !cost ? '' : h('span', { class: 'cc-cost' }, v.ok ? cost : `Cuesta ${cost}`), reachText, warn);
     $('#confirm-bar').classList.toggle('warn', after < 0);
     const yes = $('#confirm-yes') as HTMLButtonElement;
     yes.textContent = demolishText ? 'Derribar' : tool.zone ? (tool.zone === 'none' ? 'Quitar zona' : 'Marcar zona') : tool.density !== undefined ? 'Marcar densidad' : tool.landmark ? 'Marcar el solar' : 'Construir';
@@ -1644,22 +1703,75 @@ export function startGame(opts: GameOptions): void {
     showBar(true);
     $('#confirm-bar').classList.toggle('danger', !!demolishText);
     document.body.classList.add('placing');
+    // Ronda 22: en el móvil la zona del servicio no cabía al acercar; se encuadra entera sobre la barra.
+    if (pl && pl.info.mode === 'radio' && touchInput) revealArea(pl.info.tiles);
   }
 
   /** Tras confirmar, unos instantes sin toques en el mapa: los toques repetidos no proponen otra obra. */
   let quietUntil = 0;
+  /** Ronda 22: la propuesta en curso es cancelar una obra (el motor la rechaza si ya empezó). */
+  let cancelProposal = false;
   async function confirmPlace() {
     const p = pendingPlace;
+    const cancelOnly = cancelProposal;
+    cancelProposal = false;
     quietUntil = performance.now() + 500;
     vibrate(15);
     cancelPlace();
     if (!p) return;
-    const cmd = commandFor(tool, p.a, p.b);
+    const cmd0 = commandFor(tool, p.a, p.b);
+    const cmd = cmd0 && cancelOnly && cmd0.type === 'Demolish' ? { ...cmd0, cancelOnly: true as const } : cmd0;
     const ok = cmd ? await placeBuild(cmd) : false;
     // Tras una carretera o zona, la franja vuelve a la ayuda de la herramienta (no a «toca dónde termina»).
     if (tool.shape !== 'tap') selectTool(tool.id);
     if (ok) warnZoneWithoutRoad(cmd);
+    if (ok && cmd?.type === 'Build') offerUndo(cmd.x, cmd.y);
   }
+
+  /**
+   * 2.6: «Deshacer» unos segundos tras poner una obra. Manda un `Demolish` que el
+   * motor convierte en cancelación con devolución de los materiales mientras la
+   * obra no haya empezado (`cancelRefund`). Si ya empezó (a x10 un día dura 2 s), se quita.
+   */
+  const UNDO_MS = 5000;
+  let undo: { x: number; y: number; id: number; until: number; timer: number } | null = null;
+  function undoTarget(): Building | null {
+    if (!undo) return null;
+    const b = buildingAt(state, undo.x, undo.y);
+    return b && b.id === undo.id && cancelRefund(state, b) > 0 ? b : null;
+  }
+  function offerUndo(x: number, y: number) {
+    const b = buildingAt(state, x, y);
+    const refund = b ? cancelRefund(state, b) : 0;
+    if (!b || refund <= 0) return;
+    hideUndo();
+    undo = { x, y, id: b.id, until: performance.now() + UNDO_MS, timer: window.setTimeout(hideUndo, UNDO_MS) };
+    $('#undo-text').textContent = `${BUILD_NAMES[b.kind] ?? b.kind}: obra puesta. Si te has equivocado, se devuelven ${money(refund)}.`;
+    $('#undo-bar').hidden = false;
+    refreshStrip();
+  }
+  function hideUndo() {
+    if (undo) window.clearTimeout(undo.timer);
+    undo = null;
+    $('#undo-bar').hidden = true;
+    refreshStrip();
+  }
+  /** Con cada estado nuevo: si la obra ya empezó (o ya no está), fuera «Deshacer». */
+  function checkUndo() {
+    if (undo && !undoTarget()) hideUndo();
+  }
+  $('#undo-btn').onclick = () => {
+    const b = undoTarget();
+    const at = undo;
+    hideUndo();
+    if (!b || !at) {
+      toast('La obra ya ha empezado: para quitarla, usa «Derribar» (ya no se devuelve nada).', { kind: 'warn' });
+      return;
+    }
+    void command({ type: 'Demolish', x: at.x, y: at.y, cancelOnly: true }).then((ok) => {
+      if (ok) $('#sr-live').textContent = 'Obra deshecha: se devuelven los materiales.';
+    });
+  };
 
   function cancelAnchor() {
     anchor = null;
@@ -1670,6 +1782,7 @@ export function startGame(opts: GameOptions): void {
 
   function cancelPlace() {
     pendingPlace = null;
+    cancelProposal = false;
     preview = null;
     showBar(false);
   }
@@ -1849,8 +1962,11 @@ export function startGame(opts: GameOptions): void {
         toolIcon(tl),
         h('span', { class: 'tool-label' }, tl.label),
         h('span', { class: 'tool-cost' }, trayCost(tl)),
+        // 2.6: lo que cuesta al mes, debajo del precio.
+        h('span', { class: 'tool-month' }, monthlyText(tl.build, state)),
       );
       btn.addEventListener('click', () => {
+        seenTrayCat(cat.title);
         if (isLocked(tl, state)) {
           // Ronda 12: tocar algo bloqueado no hacía nada; ahora explica qué falta.
           trayMsg.textContent = lockLong(tl, state);
@@ -1870,17 +1986,54 @@ export function startGame(opts: GameOptions): void {
     const fold = h('details', { class: 'tray-cat', open: '', 'data-cat': cat.title }, h('summary', {}, head), grid) as HTMLDetailsElement;
     // Si el jugador la abre o la cierra a mano, se respeta (hasta que cambie lo que hay disponible).
     fold.addEventListener('toggle', () => {
-      if (fold.dataset.auto !== String(fold.open)) fold.dataset.user = '1';
+      if (fold.dataset.auto !== String(fold.open)) {
+        fold.dataset.user = '1';
+        seenTrayCat(cat.title);
+      }
     });
     tray.append(fold);
   }
-  /** Pliega las categorías sin nada disponible y dice cuántas obras tienen y desde cuándo. */
+  refreshReveal();
+  /**
+   * 2.6: lo que pide ver el pueblo ahora (panel «Pueblo» y bandeja), todo de una vez: la
+   * primera vez en este navegador, todo entra sin «Nuevo» (una partida avanzada ve lo que usaba).
+   */
+  function refreshReveal() {
+    const want = hubWants(state);
+    const hub = (Object.keys(want) as HubEntry[]).filter((k) => want[k]).map((k) => `hub:${k}`);
+    const cats = trayCatsWanted(state).map((t) => `tray:${t}`);
+    const free = TRAY.filter((c) => c.tools.some((id) => !isLocked(TOOLS.find((x) => x.id === id)!, state))).map((c) => `trayfree:${c.title}`);
+    reveal.update([...hub, ...cats, ...free]);
+    refreshNewDots();
+  }
+  /** Punto «nuevo» en las pestañas «Pueblo» y «Construir». */
+  function refreshNewDots() {
+    $('#menu').classList.toggle('has-new', reveal.anyNew('hub:'));
+    document.querySelector('#tab-build')?.classList.toggle('has-new', TRAY.some((c) => trayCatNew(c.title)));
+  }
+  function trayCatNew(title: string) {
+    return reveal.isNew(`tray:${title}`) || reveal.isNew(`trayfree:${title}`);
+  }
+  function seenTrayCat(title: string) {
+    if (!trayCatNew(title)) return;
+    reveal.seen(`tray:${title}`);
+    reveal.seen(`trayfree:${title}`);
+    document.querySelector(`#tray details[data-cat="${title}"] .new-badge`)?.remove();
+    refreshNewDots();
+  }
+  /**
+   * Pliega las categorías sin nada disponible y dice cuántas obras tienen y desde cuándo.
+   * 2.6: oculta las que no se alcanzan ni con el siguiente nivel del ayuntamiento.
+   */
   function foldTray() {
+    refreshReveal();
     for (const cat of TRAY) {
       const fold = tray.querySelector<HTMLDetailsElement>(`details[data-cat="${cat.title}"]`);
       if (!fold) continue;
+      fold.hidden = !prefs().fullHub && !reveal.shown(`tray:${cat.title}`) && !reveal.shown(`trayfree:${cat.title}`);
       const tools = cat.tools.map((id) => TOOLS.find((x) => x.id === id)!);
-      const free = tools.some((tl) => !isLocked(tl, state));
+      const zonesOpen = !isLocked(TOOLS.find((x) => x.id === 'zoneR')!, state);
+      const free = tools.some((tl) => !isLocked(tl, state) && (zonesOpen || !ZONE_HELPERS.has(tl.id)));
       const sig = free ? 'free' : 'locked';
       if (fold.dataset.sig !== sig) {
         fold.dataset.sig = sig;
@@ -1888,6 +2041,7 @@ export function startGame(opts: GameOptions): void {
       }
       const why = free ? '' : (tools.map((tl) => lockText(tl)).find((t) => /nivel/.test(t)) ?? lockText(tools[0]!));
       fold.querySelector('h3')!.textContent = free ? cat.title : `${cat.title} (${tools.length}${why ? ` · ${why.replace(/^ayto\. nivel/, 'desde nivel')}` : ''})`;
+      if (trayCatNew(cat.title)) fold.querySelector('h3')!.append(newBadge());
       if (fold.dataset.user) continue;
       fold.dataset.auto = String(free);
       fold.open = free;
@@ -1917,7 +2071,7 @@ export function startGame(opts: GameOptions): void {
   /** La franja de abajo: fecha y demanda, la ayuda de la herramienta o la barra de confirmar. */
   function refreshStrip() {
     const strip = $('#strip');
-    strip.dataset.mode = !$('#confirm-bar').hidden ? 'confirm' : $('#tool-info').textContent ? 'tool' : 'info';
+    strip.dataset.mode = !$('#confirm-bar').hidden ? 'confirm' : !$('#undo-bar').hidden ? 'undo' : $('#tool-info').textContent ? 'tool' : 'info';
   }
   function showBar(on: boolean) {
     if (on && $('#confirm-bar').hidden) barShownAt = performance.now();
@@ -1932,11 +2086,15 @@ export function startGame(opts: GameOptions): void {
     if (tl.id === 'road') return coarse ? 'toca el inicio y luego el final (o arrastra desde el inicio).' : 'arrastra en línea recta. Por debajo van el agua y la luz.';
     if ((tl.zone && tl.zone !== 'none') || tl.density !== undefined) return coarse ? `Toca una esquina y luego la otra. ${tl.help}` : tl.help;
     if (tl.id === 'demolish') return 'toca lo que quieras derribar. Te pedirá confirmación.';
+    // 2.6: cuánto margen queda en las redes de agua y luz.
+    if (tl.build === 'water' || tl.build === 'power' || tl.build === 'solar' || tl.build === 'wind') return `${tl.help} ${networkRoom(state, tl.build === 'water' ? 'water' : 'power')}`;
     return tl.help;
   }
 
   function selectTool(id: ToolId) {
     const tl = TOOLS.find((x) => x.id === id)!;
+    // Ronda 22: con otra herramienta, la franja enseña su ayuda (no el «Deshacer» de la obra anterior).
+    if (undo && id !== tool.id) hideUndo();
     tool = tl;
     const inTray = TRAY.some((c) => c.tools.includes(id));
     for (const b of [tabInspect, tabRoad, tabDemolish]) b.setAttribute('aria-pressed', String(b.dataset.tool === id));
@@ -1956,7 +2114,9 @@ export function startGame(opts: GameOptions): void {
     else if (tl.id === 'inspect') info.textContent = '';
     else {
       const cost = trayCost(tl) || costText(tl);
-      info.replaceChildren(h('b', {}, tl.label), cost ? ` · ${cost} · ` : ': ', toolHelp(tl));
+      // 2.6: y lo que costará cada mes (mantenimiento y sueldos).
+      const month = monthlyText(tl.build, state, true);
+      info.replaceChildren(h('b', {}, tl.label), cost ? ` · ${cost}${month ? ` ${month}` : ''} · ` : ': ', toolHelp(tl));
     }
     selected = null;
     anchor = null;
@@ -1997,7 +2157,9 @@ export function startGame(opts: GameOptions): void {
       renderInspect(tile, fresh);
     };
     openInspect();
-    revealTile(tile);
+    // 2.6: un servicio enseña su zona: que quepa entera sobre la hoja (en el móvil, la mitad de arriba).
+    if (b && b.built && !b.damaged && hasReach(b.kind)) revealArea(serviceReach(state, b).tiles);
+    else revealTile(tile);
   }
 
   /** Nivel del servicio, lo que da y qué pide subirlo (con «Mejorar»). */
@@ -2007,7 +2169,7 @@ export function startGame(opts: GameOptions): void {
     const box = h('section', { class: 'level-box' }, h('h3', {}, pixelIcon('upgrade'), ` Nivel ${lv} de ${maxLevelOf(b)}`));
     const gives: string[] = [];
     if (radiusOf(b)) gives.push(`llega a ${radiusOf(b)} casillas`);
-    if (serviceCapacityOf(b)) gives.push(`atiende a ${serviceCapacityOf(b)} vecinos${served !== undefined ? ` (ahora ${served})` : ''}`);
+    if (serviceCapacityOf(b)) gives.push(`atiende a ${serviceCapacityOf(b)} ${b.kind === 'school' ? 'alumnos (vecinos y sus hijos)' : 'vecinos'}${served !== undefined ? ` (ahora ${served})` : ''}`);
     if (plantCapacityOf(b)) gives.push(`da ${b.kind === 'water' ? 'agua' : 'luz'} a ${plantCapacityOf(b)} edificios`);
     if (b.kind === 'police') gives.push(`${cellsOf(b)} calabozos`);
     if (b.kind === 'jail') gives.push(`${jailPlacesOf(b)} plazas`);
@@ -2032,6 +2194,115 @@ export function startGame(opts: GameOptions): void {
     btn.addEventListener('click', () => void command({ type: 'UpgradeBuilding', buildingId: b.id }));
     box.append(btn);
     return box;
+  }
+
+  /** 2.6: «Da servicio a N viviendas · atiende a X de un máximo de Y» y «Ver zona». */
+  function reachBox(b: Building): HTMLElement | null {
+    if (!b.built || b.damaged || !hasReach(b.kind)) return null;
+    const info = serviceReach(state, b);
+    const line = reachLine(state, info);
+    const see = h('button', { class: 'btn wide', 'data-test': 'see-zone' }, pixelIcon('layers'), ' Ver zona');
+    see.addEventListener('click', () => {
+      closeSheet();
+      revealArea(info.tiles.length ? info.tiles : [b.y * state.map.w + b.x]);
+    });
+    const full = !!info.capacity?.full;
+    return h(
+      'section',
+      { class: `reach-box${full ? ' full' : ''}`, 'data-test': 'reach-box' },
+      // Ronda 22: en la bomba y la central la cifra principal ya está en su ficha de carga.
+      info.mode === 'red' ? '' : h('p', { class: 'reach-main', 'data-test': 'reach-line' }, line.main),
+      see,
+      line.sub ? h('p', { class: 'muted small' }, `${line.sub}.`) : '',
+      h('p', { class: 'reach-key small' }, h('span', { class: 'rk ok', 'aria-hidden': 'true' }, '✓'), ' con servicio  ', h('span', { class: 'rk no', 'aria-hidden': 'true' }, '✗'), ' sin él o lleno', info.mode === 'radio' ? '  · borde: su alcance' : '  · calles: su red'),
+    );
+  }
+
+  /** 2.6: que una zona entera (casillas) quepa en lo que se ve, sobre la hoja `.half` o al lado del panel. */
+  function revealArea(tiles: number[]) {
+    if (!tiles.length) return;
+    const w = state.map.w;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const i of tiles) {
+      const x = i % w;
+      const y = Math.floor(i / w);
+      x0 = Math.min(x0, x);
+      y0 = Math.min(y0, y);
+      x1 = Math.max(x1, x);
+      y1 = Math.max(y1, y);
+    }
+    const r = canvas.getBoundingClientRect();
+    const el = currentSheet();
+    let { right, bottom } = r;
+    const { left } = r;
+    // Bajo la barra de arriba no se ve nada.
+    const top = Math.max(r.top, document.querySelector('.topbar')?.getBoundingClientRect().bottom ?? r.top);
+    if (el) {
+      const sr = el.getBoundingClientRect();
+      if (sr.left <= r.left + 8) bottom = Math.min(bottom, sr.top);
+      else right = Math.min(right, sr.left);
+    }
+    bottom = Math.min(bottom, $('#strip').getBoundingClientRect().top || bottom);
+    const vw = (right - left) * dpr();
+    const vh = (bottom - top) * dpr();
+    if (vw < 40 || vh < 40) return;
+    const need = Math.max((x1 - x0 + 2) * T / vw, (y1 - y0 + 2) * T / vh);
+    // Se aleja lo justo para que quepa (nunca por debajo del mínimo); si ya cabe, no se acerca.
+    // Ronda 22: sin bajar de un zoom en el que se lean los ✓ y ✗ (~14 px CSS por casilla); si no cabe, se centra.
+    const legible = Math.max(minZoom(), Math.ceil((14 * dpr()) / T));
+    const fit = Math.max(legible, Math.min(cam.zoom, Math.floor(1 / need)));
+    if (fit < cam.zoom) cam.zoom = fit;
+    const ts = tileSize();
+    cam.x = Math.round(((x0 + x1 + 1) / 2) * ts - ((left + right) / 2 - r.left) * dpr());
+    cam.y = Math.round(((y0 + y1 + 1) / 2) * ts - ((top + bottom) / 2 - r.top) * dpr());
+    clampCam();
+  }
+
+  /** 2.6: la zona que toca dibujar: la del servicio que se coloca, la del servicio tocado o la del filtro de «Qué falta». */
+  function currentReach(): ReachOverlay | null {
+    const blen = `${state.buildings.length}:${state.tick >> 3}:${state.month.expenses}`;
+    let key = '';
+    let make: () => ReachOverlay | null = () => null;
+    const t = preview?.tiles[0];
+    if (preview?.ok && t && tool.build && tool.shape === 'tap' && hasReach(tool.build)) {
+      const kind = tool.build;
+      key = `p:${kind}:${t.x},${t.y}:${blen}`;
+      make = () => {
+        const pl = placeLines(state, kind, t.x, t.y);
+        return pl ? previewOverlay(state, pl.info, t.x, t.y) : null;
+      };
+    } else if (layer === 'missing' && missingKey) {
+      // Ronda 22: el filtro elegido manda sobre lo último que se tocó.
+      const k = missingKey;
+      key = `f:${k}:${blen}`;
+      make = () => filterOverlay(state, k);
+    } else if (selected && tool.id === 'inspect') {
+      const b = buildingAt(state, selected.x, selected.y);
+      if (b && b.built && !b.damaged && hasReach(b.kind)) {
+        key = `s:${b.id}:${b.level ?? 1}:${blen}`;
+        make = () => overlayFor(state, serviceReach(state, b));
+      }
+    }
+    if (key !== reachMemo.key) reachMemo = { key, overlay: key ? make() : null };
+    return reachMemo.overlay;
+  }
+
+  /** 2.6: con el ratón, lo que ganaría la obra bajo el cursor (en la franja de la herramienta). */
+  let hintKey = '';
+  function reachHint() {
+    const t = preview?.ok ? preview.tiles[0] : undefined;
+    const kind = tool.build && tool.shape === 'tap' && hasReach(tool.build) ? tool.build : null;
+    const key = t && kind && !pendingPlace ? `${kind}:${t.x},${t.y}:${state.buildings.length}` : '';
+    if (key === hintKey) return;
+    hintKey = key;
+    const info = $('#tool-info');
+    info.querySelector('.reach-hint')?.remove();
+    if (!key || !kind || !t) return;
+    const pl = placeLines(state, kind, t.x, t.y);
+    if (pl) info.append(h('span', { class: 'reach-hint', 'data-test': 'reach-hint' }, h('b', { class: pl.none ? 'none' : '' }, pl.gain), ...pl.warn.map((w) => h('span', { class: 'reach-warn' }, w))));
   }
 
   /** Que la casilla quede a la vista, por encima (o al lado) de la hoja abierta (v1.6). */
@@ -2077,7 +2348,8 @@ export function startGame(opts: GameOptions): void {
       const noRoad = zoneLotWithoutRoad(state, tile.x, tile.y)
         ? h('p', { class: 'pocket-warn', 'data-test': 'lot-no-road' }, '⚠ Falta carretera: aquí no se construirá nada hasta que pase una carretera al lado.')
         : '';
-      sheet(name, h('p', {}, zone), noRoad, h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`)).classList.add('half');
+      // 2.6: y si toca carretera, por qué crece o no (agua, luz, demanda, casas libres).
+      sheet(name, h('p', {}, zone), noRoad || lotBox(state, tile.x, tile.y), h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`)).classList.add('half');
       openInspect = null;
       inspectSheet = null;
       return;
@@ -2140,7 +2412,7 @@ export function startGame(opts: GameOptions): void {
         content.push(h('div', { class: 'petition danger-box', 'data-fire': 'ardiendo' }, pixelIcon('fire'), h('p', {}, h('strong', {}, '¡Ardiendo! '), b.fire.covered ? `Los bomberos lo están apagando: unas ${left > 48 ? plural(Math.ceil(left / 24), 'día', 'días') : plural(left, 'hora', 'horas')} más.` : `No hay bomberos que lleguen: arderá unas ${left > 48 ? plural(Math.ceil(left / 24), 'día', 'días') : plural(left, 'hora', 'horas')} y quedará destrozado. Puede saltar a lo de al lado.`)));
       } else if (b.risk) {
         const covered = fireCovered(state, b);
-        content.push(h('div', { class: 'petition warn-box', 'data-fire': 'riesgo' }, pixelIcon('fire'), h('p', {}, h('strong', {}, 'En riesgo de incendio '), `(${b.risk.why}). `, covered ? 'Los bomberos llegan a tiempo: si prende, solo será un susto.' : 'No hay bomberos cerca: si prende, quedará destrozado. Un parque de bomberos en 9 casillas lo evita.')));
+        content.push(h('div', { class: 'petition warn-box', 'data-fire': 'riesgo' }, pixelIcon('fire'), h('p', {}, h('strong', {}, 'En riesgo de incendio '), `(${b.risk.why}). `, covered ? 'Los bomberos llegan a tiempo: si prende, solo será un susto.' : `No hay bomberos cerca: si prende, quedará destrozado. Un parque de bomberos en ${SERVICE.firestation!.radius} casillas lo evita.`)));
       }
       // v1.8: destrozado en unos disturbios (2.1: o por el fuego): no funciona hasta que se repara.
       if (b.damaged) {
@@ -2161,6 +2433,9 @@ export function startGame(opts: GameOptions): void {
         }
         content.push(box);
       }
+      // 2.6 «Lo básico»: la zona que cubre, a cuántas casas da servicio y su máximo.
+      const rb = reachBox(b);
+      if (rb) content.push(rb);
       const home = b.kind === 'house' || b.kind === 'res';
       if (home) content.push(servicesTable(b));
       else {
@@ -2231,6 +2506,9 @@ export function startGame(opts: GameOptions): void {
       if (viv) content.push(viv);
       // v1.8 (petición del creador): los servicios suben de nivel.
       if (UPGRADABLE.includes(b.kind)) content.push(levelBox(b));
+      // 2.6: la carga de la bomba o la central (cuántos piden y quién se queda sin).
+      const plant = plantLoadBox(state, b);
+      if (plant) content.push(plant);
       const res = occupants(state, b);
       const workers = state.citizens.filter((c) => c.jobId === b.id);
       if (home && res.length) {
@@ -2429,11 +2707,18 @@ export function startGame(opts: GameOptions): void {
   function openHub() {
     closeTray();
     const go = (fn: () => void) => () => withBack('Pueblo', openHub, fn);
-    const item = (label: string, fn: () => void, attn = false) => {
-      const b = h('button', { class: `btn${attn ? ' attn' : ''}` }, label);
-      b.addEventListener('click', fn);
+    // 2.6: el panel crece con el pueblo; lo que sale por primera vez lleva «Nuevo» hasta que se abre.
+    const show = hubShown();
+    const item = (label: string, fn: () => void, attn = false, id?: HubEntry) => {
+      const fresh = !!id && reveal.isNew(`hub:${id}`);
+      const b = h('button', { class: `btn${attn ? ' attn' : ''}${fresh ? ' is-new' : ''}`, ...(fresh ? { 'aria-describedby': 'new-desc' } : {}), ...(id ? { 'data-hub': id } : {}) }, label, fresh ? newBadge() : '');
+      b.addEventListener('click', () => {
+        if (id) seenHub(id);
+        fn();
+      });
       return b;
     };
+    const opt = (id: HubEntry, label: string, fn: () => void, attn = false) => (show[id] ? [item(label, fn, attn, id)] : []);
     const card = (icon: string, title: string, sum: (Node | string)[], ...buttons: Node[]) =>
       h('section', { class: 'hub-card' }, h('h3', {}, pixelIcon(icon), title), h('p', { class: 'hub-sum' }, ...sum), buttons.length ? h('div', { class: 'hub-grid' }, ...buttons) : '');
     const last = state.stats.at(-1);
@@ -2453,16 +2738,16 @@ export function startGame(opts: GameOptions): void {
     if (fiestaAsks) townSum.push('la comisión de festejos pide presupuesto');
     sheet(
       'Pueblo',
-      // 2.1: el rango y el escudo del pueblo, arriba del todo.
-      rankCard(state, go(() => openRank(state))),
+      // 2.1: el rango y el escudo del pueblo, arriba del todo (2.6: tras el primer mes).
+      ...(show.rank ? [hubRank()] : []),
       card(
         'coin',
         'Dinero',
         ['Caja: ', h('strong', {}, money(state.treasury)), net !== null ? ` · último mes: ${net >= 0 ? '+' : ''}${money(net)}` : ''],
         item('Parte mensual', go(openAccounts)),
         item('Impuestos', go(openTaxes)),
-        // 2.2: préstamos municipales (destaca con mucha carga o nota D).
-        item(`Préstamos · nota ${state.rating ?? 'B'}`, go(openLoansSheet), heavyLoad(state) || state.rating === 'D'),
+        // 2.2: préstamos municipales (destaca con mucha carga o nota D). 2.6: cuando la caja va justa o ya hay uno.
+        ...opt('loans', `Préstamos · nota ${state.rating ?? 'B'}`, go(openLoansSheet), heavyLoad(state) || state.rating === 'D'),
       ),
       card(
         'build',
@@ -2470,13 +2755,13 @@ export function startGame(opts: GameOptions): void {
         [townSum.join(' · ')],
         // v1.9.1: el ayuntamiento cuesta de encontrar en el mapa; desde aquí se llega a «Gestión del pueblo».
         item(`Nivel ${townLevel(state)} · ${townLevel(state) >= TOWNHALL_LEVELS.length ? 'Gestión' : 'Ampliar'}`, go(openHall), canUpgradeTownhall(state).ok),
-        item('Presupuesto y fiestas', go(() => openTownHall(social, fiestaAsks ? 'seasons' : undefined)), budgetOpen || offers > 0 || protest || fiestaAsks),
+        ...opt('budget', 'Presupuesto y fiestas', go(() => openTownHall(social, fiestaAsks ? 'seasons' : undefined)), budgetOpen || offers > 0 || protest || fiestaAsks),
         // 2.3: turismo (desde el nivel 3 o en cuanto hay visitantes).
         ...(townLevel(state) >= 3 || state.tourism.visitors > 0 ? [item(`Turismo · ${plural(state.tourism.visitors, 'visitante', 'visitantes')}`, go(() => openTownHall(social, 'tourism')), touristified(state))] : []),
         ...(state.dilemmas.some((d) => !d.resolved) ? [item('Un asunto difícil', go(() => openDilemmaSheet(dilemmaCtx, state.dilemmas.find((d) => !d.resolved)!.id)), true)] : []),
-        item('Pleno municipal', go(() => openPleno(social))),
-        item('Política y elecciones', go(() => openPolitics(social))),
-        item('Consejero', go(() => openAdvisor(social))),
+        ...opt('pleno', 'Pleno municipal', go(() => openPleno(social))),
+        ...opt('politics', 'Política y elecciones', go(() => openPolitics(social))),
+        ...opt('advisor', 'Consejero', go(() => openAdvisor(social))),
       ),
       card(
         'people',
@@ -2485,37 +2770,46 @@ export function startGame(opts: GameOptions): void {
         item('Vecinos', go(openPeople)),
         ...(state.aiMode ? [item('✦ Qué está pasando', go(openHappening), !!state.ai?.log.length)] : []),
         item('Felicidad', go(openHappiness)),
-        item('Diario del pueblo', go(() => openDiary(social))),
-        item('Álbum del pueblo', go(() => openAlbum(social))),
+        ...opt('diary', 'Diario del pueblo', go(() => openDiary(social))),
+        ...opt('album', 'Álbum del pueblo', go(() => openAlbum(social))),
         // 2.5: el buzón (cartas de los que se fueron), con correos o si ya llegó alguna.
         ...(state.letters.length || state.buildings.some((x) => x.kind === 'post') ? [item(`Buzón · ${plural(state.letters.length, 'carta', 'cartas')}`, go(openMail), unreadLetters(state, token) > 0)] : []),
         // 2.3: gráficas por años y récords.
-        item('Historia', go(() => openHistory(state))),
+        ...opt('history', 'Historia', go(() => openHistory(state))),
       ),
       // 2.3: la comarca (bonanza o crisis), la gran empresa y las grandes obras.
       // 2.5: los pueblos vecinos y sus alcaldes (ofertas con plazo).
-      card(
-        'town',
-        'Comarca',
-        [regionSummary(state), ' · ', comarcaSummary(state)],
-        item('Comarca y grandes obras', go(openRegionSheet), regionAttention(state)),
-        item('Pueblos vecinos', go(openComarcaSheet), comarcaPending(state) > 0),
-      ),
-      // 2.1: encargos del pueblo y El Eco de Bitópolis.
-      card(
-        'inspect',
-        'Encargos y El Eco',
-        [errandsSummary(state)],
-        item('Encargos del pueblo', go(openErrandsSheet), !!state.errands?.list.some((e) => e.status === 'ofrecido')),
-        item('El Eco de Bitópolis', go(openPressSheet), !!state.press?.editions.at(-1) && !state.press.editions.at(-1)!.answered),
-      ),
+      // 2.6: desde el ayuntamiento 3 (sin pueblos vecinos en «Pueblo sencillo»).
+      ...(show.region || show.neighbors
+        ? [
+            card(
+              'town',
+              'Comarca',
+              show.neighbors ? [regionSummary(state), ' · ', comarcaSummary(state)] : [regionSummary(state)],
+              ...opt('region', 'Comarca y grandes obras', go(openRegionSheet), regionAttention(state)),
+              ...opt('neighbors', 'Pueblos vecinos', go(openComarcaSheet), comarcaPending(state) > 0),
+            ),
+          ]
+        : []),
+      // 2.1: encargos del pueblo y El Eco de Bitópolis (2.6: cuando llega el primero).
+      ...(show.errands || show.press
+        ? [
+            card(
+              'inspect',
+              'Encargos y El Eco',
+              [errandsSummary(state)],
+              ...opt('errands', 'Encargos del pueblo', go(openErrandsSheet), !!state.errands?.list.some((e) => e.status === 'ofrecido')),
+              ...opt('press', 'El Eco de Bitópolis', go(openPressSheet), !!state.press?.editions.at(-1) && !state.press.editions.at(-1)!.answered),
+            ),
+          ]
+        : []),
       h(
         'section',
         { class: 'hub-card' },
         h('h3', {}, pixelIcon('smile'), 'Objetivos'),
         objectivesNode(state),
         // 2.3: medallas (logros del pueblo, también los encargos).
-        h('div', { class: 'hub-grid' }, item(`Medallas · ${medalCount(state).have} de ${medalCount(state).total}`, go(() => openMedals(state)))),
+        show.medals ? h('div', { class: 'hub-grid' }, item(`Medallas · ${medalCount(state).have} de ${medalCount(state).total}`, go(() => openMedals(state)), false, 'medals')) : '',
       ),
       ...(state.aiMode
         ? [card('inspect', 'IA', ['Los vecinos con nombre deciden con la IA.'], item('Gasto de la IA', () => void openUsage(token)), item('Qué se envía a la IA', () => void openPreview(token)))]
@@ -2534,6 +2828,34 @@ export function startGame(opts: GameOptions): void {
         }),
       ),
     );
+  }
+  /** 2.6: qué entradas del panel se ven (lo que pide el pueblo ahora y lo que ya salió alguna vez). */
+  function hubShown(): Record<HubEntry, boolean> {
+    refreshReveal();
+    const keys = Object.keys(hubWants(state)) as HubEntry[];
+    // En «Pueblo sencillo» no vuelve lo que apaga, aunque se viera antes. Con «Enseñar todo» (Ajustes), todo lo demás.
+    const off: HubEntry[] = state.simple ? ['neighbors', 'errands', 'press'] : [];
+    const all = prefs().fullHub;
+    return Object.fromEntries(keys.map((k) => [k, !off.includes(k) && (all || reveal.shown(`hub:${k}`))])) as Record<HubEntry, boolean>;
+  }
+  function seenHub(id: HubEntry) {
+    reveal.seen(`hub:${id}`);
+    refreshNewDots();
+  }
+  /** El rango y el escudo (2.6: con «Nuevo» la primera vez). */
+  function hubRank() {
+    const card = rankCard(state, go(() => openRank(state)));
+    const btn = card.querySelector<HTMLElement>('.rank-card')!;
+    if (reveal.isNew('hub:rank')) {
+      btn.classList.add('is-new');
+      btn.setAttribute('aria-describedby', 'new-desc');
+      btn.append(newBadge());
+    }
+    btn.addEventListener('click', () => seenHub('rank'));
+    return card;
+    function go(fn: () => void) {
+      return () => withBack('Pueblo', openHub, fn);
+    }
   }
   // La pestaña «Pueblo» se marca mientras su panel (o una hoja abierta desde él) está a la vista.
   onSheetChange((title) => $('#menu').setAttribute('aria-expanded', String(title === 'Pueblo')));
@@ -2595,6 +2917,7 @@ export function startGame(opts: GameOptions): void {
   /** Capas: el chip dice cuál está puesta; al tocarlo se elige de una lista (antes, se cambiaba a ciegas). */
   function setLayer(id: LayerId) {
     layer = id;
+    if (id !== 'missing') missingKey = null;
     const def = LAYERS.find((l) => l.id === layer)!;
     const legend = $('#legend');
     legend.hidden = layer === 'none';
@@ -2614,18 +2937,64 @@ export function startGame(opts: GameOptions): void {
   }
   /** Leyenda de «Qué falta»: cuántas viviendas (y solares R) carecen de cada servicio. */
   let legendDay = -1;
+  /** 2.6: último día en que se miró la carga de las redes. */
+  let lastNetDay = -1;
   let legendFolded = false;
   function missingLegend() {
     legendDay = Math.floor(state.tick / 24);
     // Ronda 13: ordenada por lo que más falta, con «Construir» al lado; plegable para ver el mapa.
     const sum = coverageSummary(state).sort((a, b) => b.falta - a.falta || b.lleno - a.lleno);
-    const TOOL_FOR: Record<string, ToolId> = { agua: 'water', luz: 'power', colegio: 'school', salud: 'clinic', policia: 'police', ocio: 'park', bomberos: 'firestation', basuras: 'cleanpoint' };
+    const nameOf = (k: NeedKey) => `${NEED_LABEL[k][0]!.toUpperCase()}${NEED_LABEL[k].slice(1)}`;
+    const countOf = (r: { falta: number; lleno: number }) => (r.falta ? `falta en ${plural(r.falta, 'casa', 'casas')}` : `lleno en ${plural(r.lleno, 'casa', 'casas')}`);
+    const goBtn = (k: NeedKey) => {
+      const go = h('button', { class: 'legend-go', 'aria-label': `Construir: ${NEED_LABEL[k]}` }, pixelIcon('build'), h('span', { class: 'legend-go-text' }, 'Construir'));
+      // 2.6: «Construir» deja el filtro puesto (se ve dónde falta mientras se elige el sitio).
+      go.addEventListener('click', () => selectTool(TOOL_FOR_NEED[k] as ToolId));
+      return go;
+    };
+    const legend = $('#legend');
+    // 2.6: con un servicio elegido, la leyenda se pliega a una línea: «[icono] Policía · falta en 24 casas · [Construir] [✕]».
+    if (missingKey) {
+      const k = missingKey;
+      const r = sum.find((x) => x.key === k) ?? { key: k, falta: 0, lleno: 0 };
+      const off = h('button', { class: 'legend-off', 'aria-label': `Quitar el filtro: ${NEED_LABEL[k]}`, 'data-test': 'legend-off' }, '✕');
+      off.addEventListener('click', () => {
+        missingKey = null;
+        missingLegend();
+      });
+      const pick = h(
+        'button',
+        { class: 'legend-pick', 'aria-pressed': 'true', 'aria-label': `${nameOf(k)}: ${countOf(r)}. Quitar el filtro`, 'data-need': k },
+        pixelIcon(NEED_ICON[k]),
+        h('span', { class: 'legend-text' }, h('strong', {}, nameOf(k)), ` · ${r.falta || r.lleno ? countOf(r) : 'no falta en ninguna casa'}${r.falta && r.lleno ? ` (lleno en ${r.lleno})` : ''}`),
+      );
+      pick.addEventListener('click', () => off.click());
+      legend.classList.add('folded', 'filtered');
+      legend.replaceChildren(
+        h(
+          'span',
+          { class: 'legend-filter', 'data-test': 'legend-filter' },
+          pick,
+          goBtn(k),
+          off,
+        ),
+      );
+      return;
+    }
+    legend.classList.remove('filtered');
     const rows = sum.map((r) => {
-      const name = `${NEED_LABEL[r.key][0]!.toUpperCase()}${NEED_LABEL[r.key].slice(1)}`;
-      const count = r.falta ? `falta en ${plural(r.falta, 'casa', 'casas')}` : `lleno en ${plural(r.lleno, 'casa', 'casas')}`;
-      const go = h('button', { class: 'legend-go', 'aria-label': `Construir: ${NEED_LABEL[r.key]}` }, pixelIcon('build'), h('span', { class: 'legend-go-text' }, 'Construir'));
-      go.addEventListener('click', () => selectTool(TOOL_FOR[r.key]!));
-      return h('span', { class: 'legend-need' }, pixelIcon(NEED_ICON[r.key]), h('span', { class: 'legend-text' }, `${name}: ${count}`), go);
+      // 2.6: cada fila es un botón: filtra el mapa a ese servicio (casas sin él y la zona que cubren).
+      const pick = h('button', { class: 'legend-pick', 'aria-pressed': 'false', 'aria-label': `Ver en el mapa dónde falta ${NEED_LABEL[r.key]}`, 'data-need': r.key }, pixelIcon(NEED_ICON[r.key]), h('span', { class: 'legend-text' }, `${nameOf(r.key)}: ${countOf(r)}`));
+      pick.addEventListener('click', () => {
+        missingKey = r.key;
+        selected = null;
+        missingLegend();
+        // Ronda 22: el mapa va a las casas a las que les falta (si no se ven).
+        const lack = filterOverlay(state, r.key).marks.map((m) => m.y * state.map.w + m.x);
+        if (lack.length) revealArea(lack);
+        $('#sr-live').textContent = `Qué falta: ${NEED_LABEL[r.key]}. ${countOf(r)}.`;
+      });
+      return h('span', { class: 'legend-need' }, pick, goBtn(r.key));
     });
     const more = legendFolded && rows.length > 2 ? h('span', { class: 'legend-more' }, ` · ver las ${rows.length}`) : '';
     const head = h('button', { class: 'legend-head', 'aria-expanded': String(!legendFolded) }, h('strong', {}, 'Qué falta'), h('span', { 'aria-hidden': 'true' }, legendFolded ? ' ▸' : ' ▾'), more);
@@ -2633,12 +3002,12 @@ export function startGame(opts: GameOptions): void {
       legendFolded = !legendFolded;
       missingLegend();
     });
-    $('#legend').classList.toggle('folded', legendFolded);
-    $('#legend').replaceChildren(
+    legend.classList.toggle('folded', legendFolded);
+    legend.replaceChildren(
       head,
       // Ronda 21: plegada sigue enseñando lo que más falta (el CSS deja 2–3 filas; en horizontal, ninguna).
       ...(rows.length ? rows : legendFolded ? [] : [h('span', {}, 'A ninguna vivienda le falta nada.')]),
-      ...(legendFolded ? [] : [h('span', { class: 'legend-note' }, 'Marco rojo: falta. Amarillo a trazos: llega, pero está lleno. Un icono por casa: lo que más falta.')]),
+      ...(legendFolded ? [] : [h('span', { class: 'legend-note' }, 'Toca un servicio para ver qué casas son y la zona que cubre. Marco rojo: falta. Amarillo a trazos: llega, pero está lleno.')]),
     );
   }
   function openLayers() {
@@ -2680,6 +3049,8 @@ export function startGame(opts: GameOptions): void {
           )
         : h('p', {}, `Las zonas R (viviendas), C (tiendas) e I (industria) llegan con el ayuntamiento de nivel 2: pide ${TOWNHALL_LEVELS[1]!.pop} vecinos (ahora hay ${state.citizens.length}) y ${money(TOWNHALL_LEVELS[1]!.cost)}. Toca el ayuntamiento para ampliarlo.`),
       h('p', { class: 'muted small' }, 'Cuanto más alta la barra, más falta hace. Si está en negativo, sobra.'),
+      // 2.6: por qué no crecen los solares y de qué sale cada número.
+      ...(unlocked ? (['R', 'C', 'I'] as const).flatMap((z) => demandExtra(state, z)) : demandExtra(state, 'R')),
     ).classList.add('half');
   }
 
@@ -2874,6 +3245,24 @@ export function startGame(opts: GameOptions): void {
     get busTrips() {
       return busTrips;
     },
+    /** 2.6: la zona que se dibuja ahora (resumen para las pruebas): cuántas casillas, marcas y si hay velo. */
+    get reach() {
+      const o = reachMemo.overlay;
+      if (!o) return null;
+      const count = (t: string) => o.marks.filter((m) => m.t === t).length;
+      return { tiles: o.areas.reduce((a, x) => a + x.tiles.length, 0), borders: o.borders.length, ok: count('ok'), no: count('no'), plus: count('plus'), link: count('link'), veil: o.veil, roads: o.roads };
+    },
+    /** 2.6: si una casilla está a la vista (no tapada por la hoja ni por la franja). */
+    visible(tx: number, ty: number) {
+      const r = canvas.getBoundingClientRect();
+      const x = r.left + ((tx + 0.5) * tileSize() - cam.x) / dpr();
+      const y = r.top + ((ty + 0.5) * tileSize() - cam.y) / dpr();
+      const sh = currentSheet()?.getBoundingClientRect();
+      const top = document.querySelector('.topbar')?.getBoundingClientRect().bottom ?? r.top;
+      const inMap = x >= r.left && x <= r.right && y >= top && y <= Math.min(r.bottom, $('#strip').getBoundingClientRect().top);
+      const underSheet = !!sh && x >= sh.left && x <= sh.right && y >= sh.top && y <= sh.bottom;
+      return inMap && !underSheet;
+    },
     /** Para las pruebas: centra la cámara en una casilla (no toca el estado). */
     centerOn(tx: number, ty: number) {
       centerOn(tx, ty);
@@ -2891,7 +3280,8 @@ export function startGame(opts: GameOptions): void {
     // La sacudida se aplica a una copia de la cámara: no cambia dónde mira el jugador.
     const [sx, sy] = shakeOffset(time);
     const view = sx || sy ? { ...cam, x: cam.x + sx * dpr(), y: cam.y + sy * dpr() } : cam;
-    render(ctx, state, view, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer, highlight, labels: cam.zoom >= touchZoom(), fast: speed >= 10 });
+    reachHint();
+    render(ctx, state, view, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer, highlight, labels: cam.zoom >= touchZoom(), fast: speed >= 10, reach: currentReach(), missingKey: layer === 'missing' ? missingKey : null });
     placeBubbles();
     requestAnimationFrame(frame);
   }

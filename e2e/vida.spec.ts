@@ -40,6 +40,8 @@ async function openTown(page: Page, request: import('@playwright/test').APIReque
 }
 
 async function inspect(page: Page, x: number, y: number) {
+  // Ronda 22: en el CI, a x10 puede haberse abierto otra hoja (un dilema, un aviso): se cierra antes de tocar.
+  for (let i = 0; i < 3 && (await page.locator('.sheet-close').first().isVisible()); i++) await page.locator('.sheet-close').first().click();
   await page.evaluate(([a, b]) => (window as any).__bitopolis.centerOn(a, b), [x, y]);
   const p = await tile(page, x, y);
   await page.mouse.click(p.x, p.y);

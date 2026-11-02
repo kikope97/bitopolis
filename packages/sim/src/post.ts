@@ -18,6 +18,7 @@ import { DAYS_PER_YEAR, TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared
 import { POST } from './balance.ts';
 import type { Departed } from './family.ts';
 import { familyOf } from './family.ts';
+import { earlyReady } from './gates.ts';
 import { hash32 } from './hash.ts';
 import { OUTSIDE, transfer } from './money.ts';
 import { newResident } from './resident.ts';
@@ -112,7 +113,8 @@ export function wouldReturn(state: GameState, letterId: number, freeHome: boolea
  * presenta al pueblo como a cualquier recién llegado).
  */
 export function postMonth(state: GameState, freeHome: boolean): Citizen | null {
-  if (!postOffice(state) || !Array.isArray(state.letters)) return null;
+  // 2.6: las cartas, no con un pueblo recién nacido.
+  if (!postOffice(state) || !Array.isArray(state.letters) || !earlyReady(state, 'letters')) return null;
   const month = Math.floor(state.tick / TICKS_PER_MONTH);
   const sentThisMonth = state.letters.filter((l) => Math.floor(l.tick / TICKS_PER_MONTH) === month).length;
   if (sentThisMonth >= POST.lettersPerMonth) return null;

@@ -21,7 +21,7 @@ import type { Tender } from './tenders.ts';
 import type { StreetName } from './streets.ts';
 
 /** Sube con cada cambio de forma del estado; ver migrations.ts. */
-export const FORMAT_VERSION = 18;
+export const FORMAT_VERSION = 19;
 
 export const MAP_W = 48;
 export const MAP_H = 48;
@@ -157,6 +157,8 @@ export interface Project {
   notify: boolean;
   /** 2.2: oferta de la licitación (sin definir = local, la de siempre). */
   offer?: 'local' | 'fuera' | 'primo';
+  /** Ronda 22: materiales pagados al ponerla (lo que devuelve una cancelación). */
+  paid?: number;
 }
 
 export interface Citizen {
@@ -401,6 +403,8 @@ export interface GameState {
   stats: MonthStat[];
   /** Modo IA: las decisiones de los vecinos con nombre pueden venir del LLM. */
   aiMode: boolean;
+  /** 2.6: «Pueblo sencillo» (al crear la partida): sin encargos, El Eco, comarca, licitaciones ni dilemas (gates.ts). */
+  simple: boolean;
   /** Máximo de vecinos con nombre. */
   namedLimit: number;
   pending: Pending[];
@@ -485,6 +489,8 @@ export interface GameState {
   coop: CoopState;
   /** 2.5: cartas de los que se fueron (post.ts). */
   letters: Letter[];
+  /** 2.6: mes en que empezó a cobrarse el gasto corriente (upkeep.ts; rampa para partidas de antes). */
+  upkeepFrom?: number;
   /** 2.5: los pueblos vecinos de la comarca (comarca.ts). */
   comarca: ComarcaState;
   /** 2.3: lo que necesitan recordar los logros entre meses (achievements.ts); se crea al primer cierre de mes. */
@@ -713,11 +719,13 @@ export interface NewGameOptions {
   /** 2.3: escenario (por defecto, Libre) y forma del terreno (por defecto, aleatorio: lo de siempre). */
   scenario?: ScenarioId;
   terrain?: TerrainShape;
+  /** 2.6: «Pueblo sencillo» (apagado por defecto). */
+  simple?: boolean;
 }
 
 export const INITIAL_SUBSIDY = 30_000;
 
-export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiShare = 50, scenario = 'libre', terrain: shape = 'aleatorio' }: NewGameOptions): GameState {
+export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiShare = 50, scenario = 'libre', terrain: shape = 'aleatorio', simple = false }: NewGameOptions): GameState {
   const rng = seedRng(seed);
   const tiles = new Array<number>(MAP_W * MAP_H).fill(Tile.Grass);
   const zones = new Array<number>(MAP_W * MAP_H).fill(Zone.None);
@@ -743,6 +751,7 @@ export function createInitialState({ seed, aiMode = false, namedLimit = 20, aiSh
     events: [],
     stats: [],
     aiMode,
+    simple,
     namedLimit,
     pending: [],
     decisionLog: [],

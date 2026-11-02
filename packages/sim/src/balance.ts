@@ -160,6 +160,28 @@ export const MAINTENANCE: Record<BuildingKind, number> = {
   post: 120,
 };
 
+/**
+ * 2.6 (bloque D, «a media partida el dinero deja de importar»): gasto corriente
+ * que crece con el pueblo (upkeep.ts). Lo cobra el ayuntamiento cada mes, con el
+ * factor de mantenimiento del presupuesto.
+ */
+export const UPKEEP = {
+  /**
+   * Alumbrado, limpieza y oficinas: € por vecino y mes según el nivel del ayuntamiento (índice = nivel).
+   * Casi nada hasta el nivel 3. Ronda 22: subida suave (antes 4/30/42): el salto del 3 al 4 era una
+   * trampa (el casual cerraba el año en −37k y el constructor no llegaba nunca al 5).
+   */
+  perCitizen: [0, 0, 0, 8, 16, 24],
+  /** Conservación de calles: € por casilla de carretera y mes (las primeras, gratis: el pueblo de siempre). */
+  road: 6,
+  freeRoads: 20,
+  /** Comunidad y reparaciones de cada casa municipal de más (las primeras, sin coste). */
+  municipalHouse: 40,
+  freeHouses: 4,
+  /** Entra poco a poco: nada el primer año (meses de partida), entero desde el tercero. */
+  rampMonths: [12, 36],
+} as const;
+
 /** Radio de cobertura de los servicios (tiles) y su efecto en la felicidad. */
 export const SERVICE: Partial<Record<BuildingKind, { radius: number; happiness: number }>> = {
   park: { radius: 5, happiness: 6 },
@@ -350,13 +372,13 @@ export const LOANS = {
 /** Con esta población el impuesto único se separa en IBI, tasas y plusvalía. */
 export const TAX_SPLIT_POP = 50;
 /** IBI anual sobre el valor del inmueble (escala del juego). */
-export const IBI_RATE = { low: 0.05, medium: 0.07, high: 0.1 } as const;
+export const IBI_RATE = { low: 0.05, medium: 0.07, high: 0.085 } as const;
 /**
  * Tasa de basuras por vecino y mes, y de terrazas por comercio y mes.
  * 2.1: la de basuras solo la paga quien tiene recogida (trash.ts); como ya paga
  * un servicio de verdad (camión y punto limpio), sube un 20 % (10/15/24 → 12/18/28).
  */
-export const TASA_BASURAS = { low: 12, medium: 18, high: 28 } as const;
+export const TASA_BASURAS = { low: 12, medium: 18, high: 24 } as const;
 export const TASA_TERRAZAS = { low: 40, medium: 60, high: 95 } as const;
 /** Plusvalía municipal sobre la ganancia de una compraventa. */
 export const PLUSVALIA_RATE = { low: 0.1, medium: 0.2, high: 0.3 } as const;
@@ -913,9 +935,11 @@ export const TRASH = {
  * primo del concejal. `mat` multiplica los materiales y `days` el plazo.
  */
 export const TENDER = {
-  minCost: 2_500,
-  /** Llegan con el ayuntamiento de este nivel (las primeras obras, las del tutorial, van sin licitación). */
-  fromLevel: 2,
+  // 2.6 (lo básico): antes 2.500 € y nivel 2: casi toda obra pasaba por la hoja de tres ofertas.
+  /** Materiales desde los que se licita (la colina y el presupuesto cuentan): solo las obras grandes. */
+  minCost: 6_000,
+  /** Llegan con el ayuntamiento de este nivel (antes, las obras van sin licitación). */
+  fromLevel: 3,
   /** Barata de fuera: su cuadrilla cobra `wage` al día (no los parados del pueblo); con p, sobrecoste al terminar. */
   cheap: { mat: 0.8, days: 1.3, wage: 60, overrun: 0.25, p: 0.4 },
   // Ronda 18: antes (0,15 y 0,25) la de fuera salía siempre a cuenta.
@@ -936,6 +960,23 @@ export const TENDER = {
   offendedGrudge: 4,
   /** Licitaciones guardadas (las 10 últimas; las vivas no se borran). */
   keep: 10,
+} as const;
+
+/**
+ * 2.6 (lo básico, petición del creador): los sucesos que piden respuesta no
+ * llegan con un pueblo recién nacido. Cada uno aparece a partir de `pop`
+ * vecinos o del ayuntamiento de nivel `level` (lo primero que pase), en Modo
+ * normal y con el director (gates.ts). Se suman a los umbrales propios de cada
+ * sistema (los dilemas ya piden `DILEMMA.minPop`; la gran empresa, sus vecinos).
+ */
+export const EARLY = {
+  dilemmas: { pop: 30, level: 3 },
+  letters: { pop: 30, level: 3 },
+  neighborOffers: { pop: 30, level: 3 },
+  bigCompany: { pop: 30, level: 3 },
+  errands: { pop: 30, level: 3 },
+  /** El Eco sale a la vez que llegan los encargos (van juntos en el panel «Pueblo»). */
+  press: { pop: 30, level: 3 },
 } as const;
 
 /** 2.2: calles y plazas con nombre de vecinos (streets.ts). */
@@ -1359,7 +1400,7 @@ export const DILEMMA = {
   /** Por reglas, como mucho uno cada tantos meses (con director manda el cupo de drama). */
   ruleGapMonths: 3,
   /** Desde cuántos vecinos hay dilemas (con un pueblo recién nacido aún no). */
-  minPop: 40,
+  minPop: 30,
   /** Presentación del director (IA), en caracteres. */
   introMax: 200,
   /** La última plaza de la residencia: ánimo de quien entra y de quien se queda fuera (y su rencor). */
@@ -1585,4 +1626,19 @@ export const COMARCA = {
   turnDays: 5,
   /** Declaración de un alcalde, como mucho. */
   maxSaid: 140,
+};
+
+/**
+ * 2.6 «Lo básico»: las reglas con las que crecen las zonas (las usan `growZones`
+ * y `lotStatus`, que explica por qué un solar no crece).
+ */
+export const ZONE_GROWTH = {
+  /** Por debajo o igual de esta demanda no se construye nada en la zona. */
+  minDemand: 15,
+  /** Con tantas casas libres (o más), no se hacen más viviendas. */
+  maxFreeHomes: 6,
+  /** Con vecinos que pueden emprender, los locales se reservan para ellos: la C se salta este tanto por uno de los días. */
+  founderSkip: 0.8,
+  /** Uso de una bomba o central desde el que se avisa (una vez) de que se está llenando. */
+  plantWarnAt: 0.9,
 };
