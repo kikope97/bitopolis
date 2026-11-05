@@ -402,6 +402,11 @@ export function signSpot(state: GameState, sig = mapSignature(state)): { x: numb
   return signAt === null ? null : { x: signAt % w, y: Math.floor(signAt / w) };
 }
 
+/** 2.7: el dibujo de un edificio tal como se ve en el mapa (de día), para la cabecera de su ficha. */
+export function buildingPicture(b: GameState['buildings'][number], state: GameState): HTMLCanvasElement {
+  return bSprite(b, 'day', false, state);
+}
+
 /** Imagen de las herramientas: un sprite reducido a su caja. */
 export function toolCanvas(kind: string): HTMLCanvasElement {
   return buildingSprite(kind, 1);

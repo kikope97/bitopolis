@@ -1,6 +1,6 @@
 import { gzipSync } from 'node:zlib';
 import { expect, type Page, test } from '@playwright/test';
-import { commandOutlay, createInitialState, type GameState, OUTSIDE, runSimulation, transfer, TREASURY, validateCommand } from '../packages/sim/src/index.ts';
+import { commandOutlay, createInitialState, type GameState, levelOf, maxLevelOf, OUTSIDE, runSimulation, transfer, TREASURY, UPGRADABLE, validateCommand } from '../packages/sim/src/index.ts';
 import { pickTool, setSpeed, skipTutorial, tile } from './helpers.ts';
 
 /**
@@ -504,3 +504,118 @@ test('2.7: una calle suelta avisa de que no está unida al agua ni a la luz', as
   await expect(page.locator('[data-test="cc-network"]')).toContainText('no está unida al agua ni a la luz');
   await page.screenshot({ path: 'test-results/capturas/movil2-360-calle-suelta.png' });
 });
+/**
+ * 2.7 «Pueblo 2.0» y fichas: el mismo pueblo, con la caja casi vacía y un mes en
+ * negativo (para que haya algo en «Lo urgente») y un servicio que se puede ampliar.
+ */
+let hubTown: { buf: Buffer; service: { x: number; y: number; kind: string } } | null = null;
+function hubPack() {
+  if (!hubTown) {
+    const { state: s } = runSimulation({ seed: 4, days: 1200, profile: 'constructor', checkEveryDay: false });
+    for (const b of s.buildings) {
+      delete b.fire;
+      delete b.risk;
+    }
+    if (s.treasury > 400) transfer(s, TREASURY, OUTSIDE, s.treasury - 400, 'mantenimiento');
+    const last = s.stats.at(-1)!;
+    last.expenses = last.income + 2_000;
+    const svc = s.buildings.find((b) => b.built && !b.damaged && UPGRADABLE.includes(b.kind) && levelOf(b) < maxLevelOf(b) && b.kind !== 'townhall')!;
+    hubTown = {
+      buf: gzipSync(JSON.stringify({ bitopolis: 1, formatVersion: (s as GameState).formatVersion, exportedAt: '', mode: 'normal', state: s })),
+      service: { x: svc.x, y: svc.y, kind: svc.kind },
+    };
+  }
+  return hubTown;
+}
+
+for (const size of SIZES.slice(0, 2)) {
+  test(`2.7: panel «Pueblo» y ficha de un servicio a ${size.name}`, async ({ page, request }, info) => {
+    test.skip(info.project.name !== 'escritorio', 'el tamaño lo pone la propia prueba');
+    test.setTimeout(120_000);
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.setViewportSize({ width: size.w, height: size.h });
+    const town = hubPack();
+    const { token } = await (await request.post('/api/import', { data: town.buf, headers: { 'content-type': 'application/octet-stream' } })).json();
+    // Tres entradas con «Nuevo»: como mucho se marcan dos a la vez.
+    await page.addInitScript((t) => {
+      if (localStorage.getItem(`bitopolis.reveal.${t}`)) return;
+      localStorage.setItem(`bitopolis.reveal.${t}`, JSON.stringify({ known: ['hub:diary', 'hub:album', 'hub:history'], fresh: ['hub:diary', 'hub:album', 'hub:history'] }));
+    }, token);
+    await page.goto(`/p/${token}`);
+    await page.getByRole('button', { name: 'Continuar' }).click();
+    await skipTutorial(page);
+    await setSpeed(page, 0);
+    for (let i = 0; i < 3 && (await page.locator('.sheet-close').first().isVisible()); i++) await page.locator('.sheet-close').first().click();
+
+    await page.locator('#menu').click();
+    await expect(page.locator('#sheet-title')).toHaveText('Pueblo');
+    // Cuatro tarjetas de resumen en 2×2, a la vista sin desplazar.
+    const stats = page.locator('.sheet .hub-stat');
+    await expect(stats).toHaveCount(4);
+    const boxes = await stats.evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => ({ x: r.x, y: r.y, b: r.bottom })));
+    expect(Math.abs(boxes[0]!.y - boxes[1]!.y), 'dos por fila').toBeLessThan(2);
+    expect(boxes[2]!.y, 'la segunda fila, debajo').toBeGreaterThan(boxes[0]!.y + 20);
+    expect(boxes[3]!.b, 'las cuatro se ven sin desplazar').toBeLessThanOrEqual(size.h);
+    await expect(stats.first()).toContainText('Dinero');
+    // «Lo urgente»: la caja aguanta poco → «Ver cuentas».
+    const urgent = page.locator('.sheet .hub-urgent');
+    await expect(urgent).toBeVisible();
+    const cards = urgent.locator('.hu-card');
+    expect(await cards.count()).toBeGreaterThanOrEqual(1);
+    expect(await cards.count()).toBeLessThanOrEqual(3);
+    await expect(urgent.getByRole('button', { name: 'Ver cuentas' })).toBeVisible();
+    // La lista: filas de 48 px o más, con su icono; lo frecuente a la vista.
+    const rows = await page.locator('.sheet .hub-row').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
+    expect(rows.length).toBeGreaterThan(5);
+    expect(rows.every((r) => r >= 48), `filas: ${rows.join(', ')}`).toBe(true);
+    await expect(page.getByRole('button', { name: 'Impuestos' })).toBeVisible();
+    // «Nuevo»: como mucho dos, y en una sola línea.
+    const badges = await page.locator('.sheet .new-badge').evaluateAll((els) => els.map((e) => ({ h: e.getBoundingClientRect().height, fs: parseFloat(getComputedStyle(e).fontSize), lh: parseFloat(getComputedStyle(e).lineHeight) || 0 })));
+    expect(badges.length).toBeGreaterThanOrEqual(1);
+    expect(badges.length).toBeLessThanOrEqual(2);
+    for (const b of badges) expect(b.h, '«Nuevo» no se parte').toBeLessThan(Math.max(b.lh, b.fs * 1.6) + 2);
+    expect(await page.locator('.sheet').evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
+    await page.screenshot({ path: `test-results/capturas/movil2-${size.name}-pueblo.png` });
+    await page.locator('.sheet-body').evaluate((el) => el.scrollTo(0, el.scrollHeight));
+    await page.screenshot({ path: `test-results/capturas/movil2-${size.name}-pueblo-abajo.png` });
+    // Lo frecuente, a dos toques: «Pueblo» › «Impuestos».
+    await page.getByRole('button', { name: 'Impuestos' }).click();
+    await expect(page.locator('#sheet-title')).not.toHaveText('Pueblo');
+    await page.locator('.sheet-close').click();
+
+    // Ficha de un servicio: estado (número y palabra) y botón principal sin desplazar.
+    await page.evaluate(([a, b]) => (window as any).__bitopolis.centerOn(a, b), [town.service.x, town.service.y]);
+    const p = await tile(page, town.service.x, town.service.y);
+    await page.mouse.click(p.x, p.y);
+    await expect(page.locator('.sheet')).toBeVisible();
+    const status = page.locator('.sheet [data-test="fiche-status"]');
+    const main = page.locator('.sheet [data-test="fiche-main"]');
+    await expect(status).toBeVisible();
+    await expect(status).toHaveText(/\S/);
+    await expect(main).toBeVisible();
+    await expect(main).toContainText('Ampliar a nivel');
+    const view = await page.locator('.sheet-body').evaluate((el) => ({ top: el.scrollTop, bottom: el.getBoundingClientRect().bottom }));
+    expect(view.top).toBe(0);
+    for (const el of [status, main]) {
+      const r = (await el.boundingBox())!;
+      expect(r.y + r.height, 'a la vista sin desplazar').toBeLessThanOrEqual(view.bottom + 1);
+      expect(r.y + r.height).toBeLessThanOrEqual(size.h);
+    }
+    expect((await main.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await page.screenshot({ path: `test-results/capturas/movil2-${size.name}-ficha-servicio.png` });
+    await page.locator('.sheet-close').click();
+
+    // Ficha de un vecino: retrato y frase arriba, el ánimo con palabra y número, «Hablar».
+    await page.locator('#menu').click();
+    await page.getByRole('button', { name: 'Vecinos', exact: true }).click();
+    await page.locator('.person-row').first().click();
+    await expect(page.locator('.sheet .cz-head .cz-face')).toBeVisible();
+    await expect(page.locator('.sheet .cz-head [data-test="fiche-status"]')).toHaveText(/(Contento|Regular|Descontento).*\d+ de 100/);
+    const talk = page.getByRole('button', { name: '¿Cómo estás?' });
+    await expect(talk).toBeVisible();
+    expect((await talk.boundingBox())!.y + 44).toBeLessThanOrEqual(size.h);
+    await page.screenshot({ path: `test-results/capturas/movil2-${size.name}-ficha-vecino.png` });
+    expect(errors).toEqual([]);
+  });
+}

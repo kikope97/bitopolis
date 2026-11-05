@@ -1,5 +1,6 @@
 import type { Command } from '@bitopolis/shared';
-import { pocketBox } from './money-ui.ts';
+import { POCKET_TEXT, pocketBox } from './money-ui.ts';
+import { fold, statusBar } from './hub-ui.ts';
 import { mindBox } from './ai-town-ui.ts';
 import {
   activeObjectives,
@@ -32,6 +33,8 @@ import {
   streetCandidates,
   plenoLines,
   PLENO_REACTION_TEXT,
+  pocketOf,
+  totalDebt,
 } from '@bitopolis/sim';
 import { tickToDate } from '@bitopolis/shared';
 import { api } from './api.ts';
@@ -84,8 +87,9 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
   const worries = worriesOf(state, c).map((f) => f.label);
   const answer = h('p', { class: 'answer', 'aria-live': 'polite' });
   const ask = h('div', { class: 'ask' });
-  for (const q of QUESTIONS) {
-    const b = h('button', { class: 'btn small' }, QUESTION_TEXT[q]);
+  for (const [i, q] of QUESTIONS.entries()) {
+    // 2.7: «Hablar» es la acción principal de la ficha: la primera pregunta, destacada.
+    const b = h('button', { class: `btn small${i === 0 ? ' primary' : ''}` }, QUESTION_TEXT[q]);
     b.addEventListener('click', async () => {
       await ctx.command({ type: 'TalkTo', citizenId: c.id, question: q });
       answer.textContent = `«${ruleAnswer(ctx.state(), c, q, worries[0])}»`;
@@ -113,21 +117,39 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
     .slice(0, 3);
   const hook = hookFor(state, c.id);
   // Retrato pixel art (12×18) ampliado ×4.
-  const face = portraitCanvas(c.id, 4);
+  const face = portraitCanvas(c.id, 4, 'portrait cz-face');
   const owner = isFemaleName(c.name) ? 'Propietaria' : 'Propietario';
+  // 2.7: arriba, el retrato y una frase suya; el ánimo y el dinero en palabras, con su número.
+  const happy = Math.round(c.happiness);
+  const mood = moodWord(happy);
+  const debt = totalDebt(c);
+  const pocket = pocketOf(c);
+  const moneyWords = debt > 0 ? `debe ${money(debt)}` : `${POCKET_TEXT[pocket]} · ahorros: ${money(c.money)}`;
+  const said = last[0] ? `«${last[0].motivo}»` : worries[0] ? `Le preocupa ${lowerFirst(worries[0])}.` : `Quiere ${DESIRE_TEXT[c.desire]}.`;
+  const relations = c.relations.length ? h('ul', { class: 'people' }, ...c.relations.map((r) => h('li', {}, `${nameOf(r.id)}: ${RELATION_TEXT[r.kind]}`))) : h('p', { class: 'muted' }, 'Aún no tiene relaciones en el pueblo.');
+  const memories = c.memories.length ? h('ul', { class: 'people' }, ...memoryLines(state, c).map((t) => h('li', {}, t))) : h('p', { class: 'muted' }, 'Nada que contar todavía.');
   sheet(
     h('span', {}, h('span', { 'aria-hidden': 'true' }, '★ '), c.name),
-    face,
-    h('p', {}, `${c.profession ? professionOf(c) : 'Sin oficio conocido'}, ${c.age} años · ${moodWord(c.happiness)} (${Math.round(c.happiness)}) · ${money(c.money)}`),
-    c.kids?.length ? h('p', { class: 'muted small' }, c.kids.length === 1 ? 'Tiene un hijo en casa.' : `Tiene ${c.kids.length} hijos en casa.`) : '',
+    h(
+      'div',
+      { class: 'fc-head cz-head', 'data-test': 'fiche-head' },
+      h(
+        'div',
+        { class: 'fc-top' },
+        face,
+        h('div', { class: 'fc-lines' }, h('p', { class: 'fc-line' }, `${c.profession ? professionOf(c) : 'Sin oficio conocido'}, ${c.age} años`), h('p', { class: 'cz-quote' }, said)),
+      ),
+      statusBar(happy >= 65 ? 'ok' : happy >= 40 ? 'warn' : 'bad', mood[0]!.toUpperCase() + mood.slice(1), `${happy} de 100`, moneyWords),
+      h('div', { class: 'fc-main cz-talk' }, h('p', { class: 'cz-talk-h' }, 'Hablar'), ask, answer),
+    ),
     h('p', {}, `${c.owns ? (c.mortgage > 0 ? `${owner} (le quedan ${money(c.mortgage)} de hipoteca)` : owner) : c.homeId === null ? 'Sin casa' : 'De alquiler'} · ${job ? `trabaja en ${workplaceText(job)}` : c.unemployedSince !== undefined ? 'en paro' : 'trabaja fuera'}`),
+    c.kids?.length ? h('p', { class: 'muted small' }, c.kids.length === 1 ? 'Tiene un hijo en casa.' : `Tiene ${c.kids.length} hijos en casa.`) : '',
+    hook ? h('p', { class: 'hook' }, h('strong', {}, 'Ahora mismo: '), `${HOOK_TEXT[hook.kind]}.`) : '',
     // 2.0: lo que piensa y planea (si piensa con IA).
     mindBox(state, c) ?? '',
-    // v1.9: su balance y sus deudas.
-    h('h3', {}, 'Su bolsillo'),
-    pocketBox(ctx, c, () => openCitizen(ctx, citizenId)),
+    // v1.9: su balance y sus deudas (2.7: abierto si debe o no llega).
+    fold('cz-pocket', `Su bolsillo · ${debt > 0 ? `debe ${money(debt)}` : POCKET_TEXT[pocket]}`, debt > 0 || pocket === 'no_llega', pocketBox(ctx, c, () => openCitizen(ctx, citizenId))),
     h('p', {}, `Quiere ${DESIRE_TEXT[c.desire]}; teme ${FEAR_TEXT[c.fear]}. Meta: ${GOAL_TEXT[c.goal]} ${goalDone(state, c) ? '✓' : ''}`),
-    hook ? h('p', { class: 'hook' }, h('strong', {}, 'Ahora mismo: '), `${HOOK_TEXT[hook.kind]}.`) : '',
     politicsActive(state)
       ? h(
           'p',
@@ -136,19 +158,10 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
           state.politics.party?.leaderId === c.id ? h('strong', {}, ` Lidera «${state.politics.party.name}»${state.politics.mayor === c.id ? ' y es el alcalde' : ''}.`) : '',
         )
       : '',
-    h('h3', {}, 'Hablar'),
-    ask,
-    answer,
-    familyButton(ctx, c.id),
-    // 2.5: cartas de los que se fueron.
-    lettersButton(ctx, c.id),
-    h('h3', {}, 'Relaciones'),
-    c.relations.length ? h('ul', { class: 'people' }, ...c.relations.map((r) => h('li', {}, `${nameOf(r.id)}: ${RELATION_TEXT[r.kind]}`))) : h('p', { class: 'muted' }, 'Aún no tiene relaciones en el pueblo.'),
-    h('h3', {}, 'Recuerdos'),
-    c.memories.length ? h('ul', { class: 'people' }, ...memoryLines(state, c).map((t) => h('li', {}, t))) : h('p', { class: 'muted' }, 'Nada que contar todavía.'),
-    worries.length ? h('p', {}, `Le preocupa: ${worries.slice(0, 3).map(lowerFirst).join(', ')}.`) : '',
-    last.length ? h('h3', {}, 'Lo último que ha dicho') : '',
-    ...last.map((d) => h('p', { class: 'quote' }, `«${d.motivo}» `, d.source === 'ai' ? h('span', { class: 'ai-badge' }, 'IA') : '')),
+    h('div', { class: 'cz-links' }, familyButton(ctx, c.id), lettersButton(ctx, c.id)),
+    fold('cz-rel', `Relaciones (${c.relations.length})`, false, relations),
+    fold('cz-mem', `Recuerdos (${c.memories.length})`, false, memories, worries.length ? h('p', {}, `Le preocupa: ${worries.slice(0, 3).map(lowerFirst).join(', ')}.`) : ''),
+    last.length ? fold('cz-said', 'Lo último que ha dicho', false, ...last.map((d) => h('p', { class: 'quote' }, `«${d.motivo}» `, d.source === 'ai' ? h('span', { class: 'ai-badge' }, 'IA') : ''))) : '',
     h('details', { class: 'advanced' }, h('summary', {}, 'Personalidad'), traits, c.summary ? h('p', {}, c.summary) : ''),
   ).classList.add('half', 'ficha'); // 2.7: la ficha del vecino abre a media altura
 }
@@ -428,7 +441,16 @@ export function objectivesNode(state: GameState): HTMLElement {
     ? h('p', { class: 'scenario-goal', 'data-scenario': sc.id }, h('strong', {}, `${sc.name}: `), sc.goal, h('br', {}), h('small', {}, `${sc.progress}. ${sc.monthsLeft === 1 ? 'Queda 1 mes' : `Quedan ${sc.monthsLeft} meses`}.`))
     : '';
   if (!list.length) return h('div', {}, goal, h('p', { class: 'muted' }, 'Todos los objetivos cumplidos.'));
-  return h('div', {}, goal, h('ul', { class: 'obj-list' }, ...list.map((o) => h('li', {}, `○ ${o.text}`, h('small', {}, ` +${money(o.reward)}${o.unlock ? ' y un edificio' : ''}`)))));
+  return h('div', {}, goal, h('ul', { class: 'obj-list' }, ...list.map((o) => h('li', {}, `○ ${objectiveText(state, o)}`, h('small', {}, ` +${money(o.reward)}${o.unlock ? ' y un edificio' : ''}`)))));
+}
+
+/**
+ * 2.7: el texto del objetivo según el pueblo: lo que va entre paréntesis
+ * («llega con el ayuntamiento de nivel 2») sobra cuando ya se tiene.
+ */
+export function objectiveText(state: GameState, o: { id: string; text: string }): string {
+  if (o.id === 'pleno' && plenoUnlocked(state)) return 'Celebra un pleno (Pueblo › Pleno municipal)';
+  return o.text;
 }
 
 /** Retrato de un vecino (12×18 píxeles) a la escala pedida. */
