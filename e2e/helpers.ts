@@ -79,3 +79,10 @@ export async function chooseOffer(page: Page, offer: 'local' | 'fuera' | 'primo'
   const card = page.locator(`.tender-card[data-offer="${offer}"]`);
   if (await card.waitFor({ state: 'visible', timeout: 2000 }).then(() => true, () => false)) await card.click();
 }
+
+/** 2.7: un dato de la barra de arriba; si no cabe en la fila, está en «⋯» (Más). */
+export async function topbarItem(page: Page, id: 'hud-pop' | 'hud-happy' | 'hud-poll' | 'ai-chip') {
+  if (await page.locator(`#${id}`).isVisible()) return page.locator(`#${id}`).click();
+  await page.locator('#hud-more').click();
+  await page.locator(`.more-row[data-for="${id}"]`).click();
+}

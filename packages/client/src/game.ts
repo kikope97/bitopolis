@@ -655,7 +655,7 @@ export function startGame(opts: GameOptions): void {
     const add = (sel: string, label: string) => {
       const src = document.querySelector<HTMLElement>(sel);
       if (!src || src.hidden) return;
-      const b = h('button', { class: 'btn wide more-row' }, label);
+      const b = h('button', { class: 'btn wide more-row', 'data-for': sel.slice(1) }, label);
       b.addEventListener('click', () => {
         closeSheet();
         src.click();

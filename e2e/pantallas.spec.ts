@@ -63,7 +63,9 @@ for (const d of DEVICES) {
         const errors: string[] = [];
         page.on('pageerror', (e) => errors.push(e.message));
         await openTown(page, request);
-        await expect(page.locator('#hud-poll')).toBeVisible();
+        // 2.7: la barra va en una fila; lo que no cabe (vecinos, votos) pasa a «⋯».
+        const more = await page.locator('#hud-more').isVisible();
+        if (!more) await expect(page.locator('#hud-poll')).toBeVisible();
         await shot(page, '1-pantalla');
         if (d.viewport.width >= 1600) {
           // Pantalla grande: la barra y la franja con letra mayor (petición del creador).
@@ -74,7 +76,9 @@ for (const d of DEVICES) {
         // --- barra de arriba: nada se sale, cada dato con su icono y separado del siguiente ---
         const bar = await page.locator('.topbar').evaluate((el) => ({ sw: el.scrollWidth, cw: el.clientWidth }));
         expect.soft(bar.sw, 'la barra no se desborda').toBeLessThanOrEqual(bar.cw + 1);
-        const ids = ['#play-pause', '#speed', '#hud-money', '#hud-pop', '#hud-happy', '#hud-poll', '#bell'];
+        const shown = async (id: string) => page.locator(id).isVisible();
+        const ids: string[] = [];
+        for (const id of ['#play-pause', '#speed', '#hud-money', '#hud-pop', '#hud-happy', '#hud-poll', '#hud-more', '#bell']) if (await shown(id)) ids.push(id);
         const boxes: Box[] = [];
         for (const id of ids) {
           const b = await rect(page, id);
@@ -83,7 +87,7 @@ for (const d of DEVICES) {
           expect.soft(b.width, `${id} se toca bien (ancho)`).toBeGreaterThanOrEqual(44);
           expect.soft(b.x + b.width, `${id} cabe en la pantalla`).toBeLessThanOrEqual(d.viewport.width + 1);
         }
-        for (const id of ['#hud-money', '#hud-pop', '#hud-happy']) {
+        for (const id of ['#hud-money', '#hud-pop', '#hud-happy'].filter((x) => ids.includes(x))) {
           const icon = await page.locator(`${id} .px-icon`).evaluate((el) => (el as HTMLElement).offsetWidth);
           expect.soft(icon, `${id} conserva su icono`).toBeGreaterThan(0);
         }
@@ -95,7 +99,7 @@ for (const d of DEVICES) {
             return (k as HTMLElement).getBoundingClientRect();
           }).filter((r) => r.width > 0);
           return { left: Math.min(...kids.map((r) => r.left)), right: Math.max(...kids.map((r) => r.right)), mid: (kids[0]!.top + kids[0]!.bottom) / 2 };
-        }), ['#hud-money', '#hud-pop', '#hud-happy', '#hud-poll']);
+        }), ['#hud-money', '#hud-pop', '#hud-happy', '#hud-poll'].filter((x) => ids.includes(x)));
         // Solo entre datos de la misma fila (con texto grande en el móvil, la barra va en dos filas).
         for (let i = 1; i < inner.length; i++) if (Math.abs(inner[i]!.mid - inner[i - 1]!.mid) < 10) expect.soft(inner[i]!.left - inner[i - 1]!.right, `hueco entre los datos ${i - 1} y ${i}`).toBeGreaterThanOrEqual(4);
 
@@ -107,7 +111,11 @@ for (const d of DEVICES) {
         expect.soft(strip.sw, 'la franja no se desborda').toBeLessThanOrEqual(strip.cw + 1);
 
         // --- lista de vecinos: el detalle va a lo ancho, no en una columna estrecha ---
-        await page.locator('#hud-pop').click();
+        if (await page.locator('#hud-pop').isVisible()) await page.locator('#hud-pop').click();
+        else {
+          await page.locator('#hud-more').click();
+          await page.locator('.more-row[data-for="hud-pop"]').click();
+        }
         const row = page.locator('.people .person-row').first();
         await expect(row).toBeVisible();
         await shot(page, '2-vecinos');

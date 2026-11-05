@@ -1,6 +1,6 @@
 import { gzipSync } from 'node:zlib';
 import { expect, test } from '@playwright/test';
-import { setSpeed, skipTutorial } from './helpers.ts';
+import { setSpeed, skipTutorial, topbarItem } from './helpers.ts';
 import { runSimulation } from '../packages/sim/src/index.ts';
 
 /** Pueblo a 10 días de votar con dos candidaturas en la oposición (semilla medida). */
@@ -26,7 +26,7 @@ test('2.2: candidaturas con estilo y promesas; noche electoral con una barra por
   await setSpeed(page, 0);
 
   // Hoja de política: una barra de intención de voto y una tarjeta por candidatura.
-  await page.locator('#hud-poll').click();
+  await topbarItem(page, 'hud-poll');
   const sheet = page.locator('.sheet');
   await expect(sheet).toContainText('Intención de voto');
   await expect(sheet.locator('.pol-bar.rival')).toHaveCount(lists.length);

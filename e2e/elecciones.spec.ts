@@ -1,6 +1,6 @@
 import { gzipSync } from 'node:zlib';
 import { expect, test } from '@playwright/test';
-import { setSpeed, skipTutorial } from './helpers.ts';
+import { setSpeed, skipTutorial, topbarItem } from './helpers.ts';
 import { runSimulation } from '../packages/sim/src/index.ts';
 
 /** Pueblo con impuestos altos a 4 días de votar: hay partido rival y la intención de voto es baja. */
@@ -24,7 +24,7 @@ test('v1.0: intención de voto, facciones, noche electoral y oposición', async 
   await expect(page.locator('#hud-poll')).toContainText('%');
   // Quedan menos de 3 meses: el indicador lleva la cuenta atrás (v1.3).
   await expect(page.locator('#hud-poll')).toHaveText(/· \d+ d$/);
-  await page.locator('#hud-poll').click();
+  await topbarItem(page, 'hud-poll');
   await expect(page.locator('.sheet')).toContainText('Intención de voto');
   // El partido rival depende de la semilla: basta con que la hoja lo enseñe.
   await expect(page.locator('.sheet')).toContainText(/Oposición«|«.+»/);
@@ -55,7 +55,7 @@ test('v1.0: intención de voto, facciones, noche electoral y oposición', async 
     await shot('3-oposicion');
     await page.locator('.sheet-close').click();
     // Moción desde la oposición: el pleno la aprueba o la rechaza, y queda registrada.
-    await page.locator('#hud-poll').click();
+    await topbarItem(page, 'hud-poll');
     // Ronda 15: la primera moción puede estar bloqueada (el gobierno ya se comprometió); se usa una disponible.
     await expect(page.getByRole('button', { name: /Presentar moción/ }).first()).toBeVisible();
     const motion = page.locator('button:not([aria-disabled="true"])', { hasText: 'Presentar moción' }).first();

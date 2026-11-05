@@ -52,6 +52,12 @@ html[data-text='200'] { --ui: 2; }
   html[data-text='150'] { --ui: 1.6; }
   html[data-text='200'] { --ui: 2.1; }
 }
+/* Pantallas grandes (1920×1080, petición del creador): como antes, la letra un punto mayor. */
+@media (min-width: 1600px) and (min-height: 900px) {
+  :root { --ui: 1.25; }
+  html[data-text='150'] { --ui: 1.75; }
+  html[data-text='200'] { --ui: 2.3; }
+}
 
 /* El pellizco sobre la interfaz no amplía la página (solo el mapa tiene gestos). */
 .topbar, .strip, .dock, .tray, .sheet, #toasts, .map-btns, .legend, .modal-backdrop, .start { touch-action: manipulation; }
