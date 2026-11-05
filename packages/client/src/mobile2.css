@@ -295,6 +295,8 @@ body.in-game:has(> .sheet:not(.ficha)) .dock #menu .tab-label { color: var(--acc
   /* La franja (fecha, «Construir / ✕») sigue entera debajo del panel; los avisos se apartan de él. */
   body.sheet-open.in-game #toasts { left: calc(var(--sheet-w) + 8px); right: calc(var(--dock-w) + 8px); }
   .tray { top: var(--sheet-top); }
+}
+
 /* ---------- accesibilidad y capas ---------- */
 /* Contraste: todo texto a 4,5:1 o más sobre su fondo (R y C de la franja, ánimo en verde de la lista de vecinos). */
 :root { --good-text: #a7f070; }
@@ -375,6 +377,69 @@ body.cal-on .legend { top: auto; max-height: min(50%, calc(100% - 16px - var(--t
 
 /* ---- inicio: «Cargando» desde el primer momento y el tamaño del texto a mano ---- */
 .boot {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--c-ink);
+  color: #f4f4f4;
+  font-family: system-ui, sans-serif;
+  font-size: var(--fs-m);
+}
+.boot-logo { font: 900 2.5rem/1 ui-monospace, monospace; color: var(--c-gold); text-shadow: 3px 3px 0 #b13e53; letter-spacing: 2px; }
+.boot-bar { width: 160px; height: 8px; border: 2px solid var(--c-surface-line); background: linear-gradient(90deg, var(--c-gold) 0 30%, transparent 30%) 0 0 / 200% 100% no-repeat; }
+@media (prefers-reduced-motion: no-preference) {
+  .boot-bar { animation: boot-run 1.2s steps(8) infinite; }
+}
+@keyframes boot-run { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.start-top { flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.start-text .field { margin: 0; display: flex; align-items: center; gap: 6px; }
+.start-text .field-label { display: inline; margin: 0; font-size: 14px; color: var(--muted); }
+.start-text .seg { gap: 4px; flex-wrap: nowrap; }
+.start-text .seg-btn { min-height: 44px; min-width: 44px; padding: 4px 8px; font-size: 14px; }
+/* En el móvil, el título y el dibujo encogen: «Jugar» se ve sin desplazar (además va pegado abajo). */
+@media (max-height: 760px) {
+  .start { gap: 8px; }
+  .start .skyline { max-height: 48px; width: auto; }
+  .logo { margin-top: 0; }
+}
+
+/* ---- tutorial: pegado a la franja, con estilo de tarjeta (el amarillo es de «?»), botones aparte ---- */
+.tut-box {
+  left: 0;
+  right: var(--dock-w);
+  bottom: calc(var(--dock-h) + var(--strip-h));
+  max-width: none;
+  margin: 0;
+  padding: 6px max(8px, env(safe-area-inset-right)) 6px max(10px, env(safe-area-inset-left));
+  gap: 8px;
+  background: var(--c-card);
+  color: #f4f4f4;
+  border: 0;
+  border-top: 3px solid var(--c-info);
+  border-radius: 0;
+  opacity: 1;
+  font-size: var(--fs-s);
+  font-weight: 600;
+  line-height: 1.3;
+  z-index: var(--z-bars);
+}
+.tut-box p { min-width: 0; }
+.tut-actions { flex: none; display: flex; gap: 6px; align-self: stretch; align-items: center; padding-left: 8px; border-left: 2px solid var(--c-card-line); pointer-events: auto; }
+.tut-box .tut-skip, .tut-box .tut-next { min-height: 44px; min-width: 44px; padding: 0 10px; border-radius: 2px; font: inherit; font-weight: 700; cursor: pointer; }
+.tut-box .tut-skip { background: var(--c-surface); color: #f4f4f4; border: 2px solid var(--c-surface-line); }
+.tut-box .tut-next { background: var(--c-gold); color: var(--c-ink); border: 2px solid var(--c-gold-line); pointer-events: auto; }
+body.tray-open .tut-box { bottom: var(--dock-h); }
+html[data-text='200'] .tut-box { max-height: 30dvh; overflow: auto; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .tut-box { bottom: var(--strip-h); right: var(--dock-w); }
+  body.tray-open .tut-box { bottom: var(--strip-h); right: calc(var(--dock-w) + min(360px, 62vw)); }
+}
+
 /* ---------- campana y Hoy ---------- */
 /* La píldora: la primera frase entera (nada de «…»); lo largo se lee en la campana. */
 body.in-game .toast-text { display: block; -webkit-line-clamp: unset; overflow: visible; }
@@ -442,64 +507,6 @@ body.in-game .toast-text { display: block; -webkit-line-clamp: unset; overflow: 
   inset: 0;
   z-index: var(--z-dialog);
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  background: var(--c-ink);
-  color: #f4f4f4;
-  font-family: system-ui, sans-serif;
-  font-size: var(--fs-m);
-}
-.boot-logo { font: 900 2.5rem/1 ui-monospace, monospace; color: var(--c-gold); text-shadow: 3px 3px 0 #b13e53; letter-spacing: 2px; }
-.boot-bar { width: 160px; height: 8px; border: 2px solid var(--c-surface-line); background: linear-gradient(90deg, var(--c-gold) 0 30%, transparent 30%) 0 0 / 200% 100% no-repeat; }
-@media (prefers-reduced-motion: no-preference) {
-  .boot-bar { animation: boot-run 1.2s steps(8) infinite; }
-}
-@keyframes boot-run { from { background-position: 100% 0; } to { background-position: -100% 0; } }
-.start-top { flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
-.start-text .field { margin: 0; display: flex; align-items: center; gap: 6px; }
-.start-text .field-label { display: inline; margin: 0; font-size: 14px; color: var(--muted); }
-.start-text .seg { gap: 4px; flex-wrap: nowrap; }
-.start-text .seg-btn { min-height: 44px; min-width: 44px; padding: 4px 8px; font-size: 14px; }
-/* En el móvil, el título y el dibujo encogen: «Jugar» se ve sin desplazar (además va pegado abajo). */
-@media (max-height: 760px) {
-  .start { gap: 8px; }
-  .start .skyline { max-height: 48px; width: auto; }
-  .logo { margin-top: 0; }
-}
-
-/* ---- tutorial: pegado a la franja, con estilo de tarjeta (el amarillo es de «?»), botones aparte ---- */
-.tut-box {
-  left: 0;
-  right: var(--dock-w);
-  bottom: calc(var(--dock-h) + var(--strip-h));
-  max-width: none;
-  margin: 0;
-  padding: 6px max(8px, env(safe-area-inset-right)) 6px max(10px, env(safe-area-inset-left));
-  gap: 8px;
-  background: var(--c-card);
-  color: #f4f4f4;
-  border: 0;
-  border-top: 3px solid var(--c-info);
-  border-radius: 0;
-  opacity: 1;
-  font-size: var(--fs-s);
-  font-weight: 600;
-  line-height: 1.3;
-  z-index: var(--z-bars);
-}
-.tut-box p { min-width: 0; }
-.tut-actions { flex: none; display: flex; gap: 6px; align-self: stretch; align-items: center; padding-left: 8px; border-left: 2px solid var(--c-card-line); pointer-events: auto; }
-.tut-box .tut-skip, .tut-box .tut-next { min-height: 44px; min-width: 44px; padding: 0 10px; border-radius: 2px; font: inherit; font-weight: 700; cursor: pointer; }
-.tut-box .tut-skip { background: var(--c-surface); color: #f4f4f4; border: 2px solid var(--c-surface-line); }
-.tut-box .tut-next { background: var(--c-gold); color: var(--c-ink); border: 2px solid var(--c-gold-line); pointer-events: auto; }
-body.tray-open .tut-box { bottom: var(--dock-h); }
-html[data-text='200'] .tut-box { max-height: 30dvh; overflow: auto; }
-@media (orientation: landscape) and (max-height: 500px) {
-  .tut-box { bottom: var(--strip-h); right: var(--dock-w); }
-  body.tray-open .tut-box { bottom: var(--strip-h); right: calc(var(--dock-w) + min(360px, 62vw)); }
-}
   align-items: flex-end;
   justify-content: center;
   padding: max(var(--sp-3), env(safe-area-inset-top)) max(var(--sp-3), env(safe-area-inset-right)) max(var(--sp-3), env(safe-area-inset-bottom)) max(var(--sp-3), env(safe-area-inset-left));
@@ -575,6 +582,7 @@ html[data-text='200'] .tut-box { max-height: 30dvh; overflow: auto; }
 html[data-text='200'] .hoy-ask { grid-template-columns: 1fr; }
 html[data-text='200'] .hoy-face { flex-direction: column; align-items: flex-start; }
 html[data-text='200'] .hoy-ask .hoy-ask-go { grid-column: 1; grid-row: auto; }
+
 /* ---------- construir ---------- */
 /* 2.7 «Construir 2.0»: chips de categoría arriba (fila que se desplaza de lado) y tarjetas en 3 columnas.
    En vertical, como mucho el 55 % del alto: el mapa se ve encima. */
@@ -663,6 +671,7 @@ html[data-text='200'] .tray-grid, html[data-text='150'] .tray-grid { grid-templa
 .confirm-bar.runway { box-shadow: inset 0 3px 0 var(--c-warn); }
 /* Casilla que no vale: la franja dice por qué (el mapa la marca en rojo un momento). */
 .tool-info .bad-why { color: var(--bad); font-weight: 600; }
+
 /* ---------- Pueblo y fichas ---------- */
 /* Panel «Pueblo» 2.0: 4 tarjetas de resumen (2×2), «Lo urgente» y una lista. */
 .hub-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); margin: var(--sp-1) 0 var(--sp-3); }
@@ -809,3 +818,4 @@ details.fold .people { padding: 0; }
 .mg-fold > .btn { margin: 0 var(--sp-3) var(--sp-3); }
 .fc-head h3::before { content: none; }
 html[data-text='200'] .hub-stat { min-height: 0; }
+
