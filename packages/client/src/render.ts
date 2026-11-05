@@ -754,7 +754,11 @@ export function render(
   if (layer === 'missing') {
     // Ronda 13: sobre cada vivienda (o solar R), UN icono: lo que más falta, con marco rojo
     // (falta) o amarillo a trazos (llega, pero lleno), y «+N» si hay más. Muy alejado, solo un punto.
-    const cssTile = ts / Math.max(1, typeof devicePixelRatio === 'number' ? devicePixelRatio : 1);
+    const dprNow = Math.max(1, typeof devicePixelRatio === 'number' ? devicePixelRatio : 1);
+    const cssTile = ts / dprNow;
+    // 2.7: los iconos miden al menos 16 px CSS (antes ~8 px alejado): la unidad nunca baja de lo que da 16 px.
+    const uDot = Math.max(z, (16 * dprNow) / 10);
+    const uIcon = Math.max(z, (16 * dprNow) / 12);
     for (const mm of missingMarks(state)) {
       // 2.6: con el filtro, solo las casas a las que les falta ESE servicio (con su icono).
       const m = opts.missingKey ? { ...mm, needs: mm.needs.filter((n) => n.key === opts.missingKey) } : mm;
@@ -764,39 +768,41 @@ export function render(
       const falta = top.status === 'falta';
       if (cssTile < 22) {
         // Punto de 10×10 con borde claro: rojo lleno si falta, amarillo con hueco si está lleno.
-        const cx = m.x * ts - cam.x + 11 * z;
-        const cy = (m.y * T - (built ? BH - T : 0) + 6) * z - cam.y;
+        const u = uDot;
+        const cx = m.x * ts - cam.x + 16 * z - 5 * u;
+        const cy = (m.y * T - (built ? BH - T : 0) + 11) * z - cam.y - 5 * u;
         ctx.fillStyle = P(12);
-        ctx.fillRect(cx - z, cy - z, 12 * z, 12 * z);
+        ctx.fillRect(cx - u, cy - u, 12 * u, 12 * u);
         ctx.fillStyle = P(falta ? 2 : 4);
-        ctx.fillRect(cx, cy, 10 * z, 10 * z);
+        ctx.fillRect(cx, cy, 10 * u, 10 * u);
         if (!falta) {
           ctx.fillStyle = P(0);
-          ctx.fillRect(cx + 3 * z, cy + 3 * z, 4 * z, 4 * z);
+          ctx.fillRect(cx + 3 * u, cy + 3 * u, 4 * u, 4 * u);
         }
         continue;
       }
-      const px = m.x * ts - cam.x + 8 * z;
-      const py = (m.y * T - (built ? BH - T : 0)) * z - cam.y + 2 * z;
+      const u = uIcon;
+      const px = m.x * ts - cam.x + 15 * z - 7 * u;
+      const py = (m.y * T - (built ? BH - T : 0)) * z - cam.y + 9 * z - 7 * u;
       // Marco de 2 px: rojo continuo o amarillo a trazos (no solo el color distingue).
       ctx.fillStyle = P(falta ? 2 : 4);
-      ctx.fillRect(px - 2 * z, py - 2 * z, 18 * z, 18 * z);
+      ctx.fillRect(px - 2 * u, py - 2 * u, 18 * u, 18 * u);
       if (!falta) {
         ctx.fillStyle = P(0);
         for (let k = 0; k < 18; k += 4) {
-          ctx.fillRect(px - 2 * z + k * z, py - 2 * z, 2 * z, 2 * z);
-          ctx.fillRect(px - 2 * z + k * z, py + 14 * z, 2 * z, 2 * z);
+          ctx.fillRect(px - 2 * u + k * u, py - 2 * u, 2 * u, 2 * u);
+          ctx.fillRect(px - 2 * u + k * u, py + 14 * u, 2 * u, 2 * u);
         }
       }
       ctx.fillStyle = P(0);
-      ctx.fillRect(px, py, 14 * z, 14 * z);
-      ctx.drawImage(icon(NEED_ICON[top.key]), px + z, py + z, 12 * z, 12 * z);
+      ctx.fillRect(px, py, 14 * u, 14 * u);
+      ctx.drawImage(icon(NEED_ICON[top.key]), px + u, py + u, 12 * u, 12 * u);
       if (m.needs.length > 1) {
         // «+N»: cuadradito con tantos puntos como necesidades más (hasta 3).
         ctx.fillStyle = P(0);
-        ctx.fillRect(px + 16 * z, py, 6 * z, 9 * z);
+        ctx.fillRect(px + 16 * u, py, 6 * u, 9 * u);
         ctx.fillStyle = P(12);
-        for (let k = 0; k < Math.min(3, m.needs.length - 1); k++) ctx.fillRect(px + 18 * z, py + (1 + k * 3) * z, 2 * z, 2 * z);
+        for (let k = 0; k < Math.min(3, m.needs.length - 1); k++) ctx.fillRect(px + 18 * u, py + (1 + k * 3) * u, 2 * u, 2 * u);
       }
     }
   }

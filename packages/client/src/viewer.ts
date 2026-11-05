@@ -44,6 +44,7 @@ export function displayState(v: ViewSnapshot): GameState {
 }
 
 function failed(text: string): void {
+  document.getElementById('boot')?.remove();
   const app = document.querySelector('#app')!;
   app.replaceChildren(
     h('main', { class: 'start viewer-gone' }, h('h1', { class: 'logo' }, 'Bitópolis'), h('p', {}, text), h('a', { class: 'btn primary big', href: '/' }, 'Haz tu pueblo')),
@@ -56,9 +57,10 @@ export async function showViewer(viewToken: string): Promise<void> {
     snap = (await api.view(viewToken)).snapshot;
   } catch (e) {
     if (e instanceof ApiError && e.status === 429) return failed('Demasiadas visitas seguidas. Prueba en un minuto.');
-    if (e instanceof ApiError && e.status === 401) return;
+    if (e instanceof ApiError && e.status === 401) return document.getElementById('boot')?.remove();
     return failed('Este enlace ya no funciona: quizá su alcalde ha dejado de compartirlo.');
   }
+  document.getElementById('boot')?.remove();
   const state = displayState(snap);
   const sum = snap.summary;
   document.title = `${sum.name} · Bitópolis`;

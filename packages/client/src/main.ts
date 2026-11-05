@@ -28,6 +28,8 @@ const last = (() => {
     return null;
   }
 })();
+// 2.7: fuera el «Cargando» (el visor lo quita él mismo cuando llega el pueblo).
+if (!view) document.getElementById('boot')?.remove();
 if (view) {
   void showViewer(view[1]!);
 } else if (m) {

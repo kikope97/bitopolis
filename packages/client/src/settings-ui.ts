@@ -94,17 +94,10 @@ export function openSettings(ai?: AiShareCtl, share?: Node): void {
   }
   sheet(
     'Ajustes',
-    ...(share ? [share] : []),
-    ...aiBlock,
-    h('h3', {}, 'Sonido'),
-    toggle('Efectos de sonido', 'sfx'),
-    volume('Volumen de los efectos', 'sfxDb', 'sfx'),
-    toggle('Música', 'music'),
-    volume('Volumen de la música', 'musicDb', 'music'),
-    toggle('Ambiente', 'ambience', '(pájaros de día, grillos de noche)'),
-    volume('Volumen del ambiente', 'ambDb', 'ambience'),
-    toggle('Vibración', 'vibrate', '(en móviles que la admiten)'),
-    h('h3', {}, 'Lectura'),
+    // 2.7: «Accesibilidad» primero (antes estaba al final de una hoja de ~1.800 px).
+    h('h3', {}, 'Accesibilidad'),
+    h('h4', { class: 'set-sub' }, 'Lectura'),
+    textSizeGroup(),
     radioGroup<Prefs['font']>(
       'Letra',
       [
@@ -113,16 +106,6 @@ export function openSettings(ai?: AiShareCtl, share?: Node): void {
       ],
       p.font,
       (v) => setPrefs({ font: v }),
-    ),
-    radioGroup<Prefs['text']>(
-      'Tamaño del texto',
-      [
-        [100, '100 %'],
-        [150, '150 %'],
-        [200, '200 %'],
-      ],
-      p.text,
-      (v) => setPrefs({ text: v }),
     ),
     radioGroup<Prefs['contrast']>(
       'Contraste',
@@ -143,7 +126,16 @@ export function openSettings(ai?: AiShareCtl, share?: Node): void {
       p.colorblind,
       (v) => setPrefs({ colorblind: v }),
     ),
-    h('h3', {}, 'Ritmo y movimiento'),
+    radioGroup<Prefs['motion']>(
+      'Animaciones',
+      [
+        ['sistema', 'Según el sistema'],
+        ['reducido', 'Reducidas'],
+      ],
+      p.motion,
+      (v) => setPrefs({ motion: v }),
+    ),
+    h('h4', { class: 'set-sub' }, 'Ritmo'),
     toggle('Modo tranquilo', 'calm', '(velocidad x1, pausa en los eventos importantes y avisos sin tiempo límite)'),
     // 2.7: a x3/x10 el tiempo se frenaba solo cada poco por cosas menores.
     radioGroup<Prefs['slowFor']>(
@@ -156,21 +148,36 @@ export function openSettings(ai?: AiShareCtl, share?: Node): void {
       p.slowFor,
       (v) => setPrefs({ slowFor: v }),
     ),
-    radioGroup<Prefs['motion']>(
-      'Animaciones',
-      [
-        ['sistema', 'Según el sistema'],
-        ['reducido', 'Reducidas'],
-      ],
-      p.motion,
-      (v) => setPrefs({ motion: v }),
-    ),
+    h('h4', { class: 'set-sub' }, 'Teclado'),
+    toggle('Atajos de una tecla', 'shortcuts', '(W A S D, L, O y las herramientas; con lector de pantalla puede ir mejor sin ellos)'),
+    ...(share ? [share] : []),
+    ...aiBlock,
+    h('h3', {}, 'Sonido'),
+    toggle('Efectos de sonido', 'sfx'),
+    volume('Volumen de los efectos', 'sfxDb', 'sfx'),
+    toggle('Música', 'music'),
+    volume('Volumen de la música', 'musicDb', 'music'),
+    toggle('Ambiente', 'ambience', '(pájaros de día, grillos de noche)'),
+    volume('Volumen del ambiente', 'ambDb', 'ambience'),
+    toggle('Vibración', 'vibrate', '(en móviles que la admiten)'),
     h('h3', {}, 'Panel «Pueblo»'),
     toggle('Enseñar todo desde el principio', 'fullHub', '(sin esperar a que el pueblo crezca: préstamos, política, comarca, historia…)'),
-    h('h3', {}, 'Teclado'),
-    toggle('Atajos de una tecla', 'shortcuts', '(W A S D, L, O y las herramientas; con lector de pantalla puede ir mejor sin ellos)'),
     h('p', { class: 'muted small' }, 'Se guardan en este dispositivo.'),
     // Petición del creador: la versión, abajo del todo.
     h('p', { class: 'muted small app-version' }, `Bitópolis ${__APP_VERSION__}`),
+  );
+}
+
+/** 2.7: «Tamaño del texto» (en Ajustes y en la pantalla de inicio). */
+export function textSizeGroup(): HTMLElement {
+  return radioGroup<Prefs['text']>(
+    'Tamaño del texto',
+    [
+      [100, '100 %'],
+      [150, '150 %'],
+      [200, '200 %'],
+    ],
+    prefs().text,
+    (v) => setPrefs({ text: v }),
   );
 }
