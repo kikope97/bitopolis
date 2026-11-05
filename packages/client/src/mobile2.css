@@ -173,3 +173,146 @@ html[data-text='150'] .tab-label, html[data-text='200'] .tab-label { display: bl
 html[data-text='150'] .tab-label .tl-long, html[data-text='200'] .tab-label .tl-long { display: none; }
 html[data-text='150'] .tab-label .tl-short, html[data-text='200'] .tab-label .tl-short { display: inline; }
 .tab-label { overflow-wrap: normal; word-break: normal; }
+
+/* ---------- campana y Hoy ---------- */
+/* La píldora: la primera frase entera (nada de «…»); lo largo se lee en la campana. */
+body.in-game .toast-text { display: block; -webkit-line-clamp: unset; overflow: visible; }
+.toast-go { display: inline-block; margin-left: 4px; padding: 0 6px; background: var(--c-gold); color: var(--c-ink); font-weight: 700; white-space: nowrap; border-radius: 2px; }
+.toast.warn .toast-go { background: var(--c-warn); }
+/* El número de la campana: rojo con borde si te piden algo. */
+.bell-n.asks { background: var(--c-urgent); box-shadow: 0 0 0 2px var(--c-ink); }
+
+/* Campana 2.0: dos pestañas. */
+.log-tabs { display: flex; gap: var(--sp-1); margin: 0 0 var(--sp-3); border-bottom: 2px solid var(--c-card-line); }
+.log-tab {
+  flex: 1 1 0;
+  min-height: 48px;
+  padding: var(--sp-2);
+  background: none;
+  border: 0;
+  border-bottom: 4px solid transparent;
+  margin-bottom: -2px;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--fs-m);
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+}
+.log-tab[aria-selected='true'] { color: var(--c-gold); border-bottom-color: var(--c-gold); }
+.log-tab-n { min-width: 22px; padding: 0 6px; background: var(--c-urgent); color: #f4f4f4; font-size: var(--fs-xs); line-height: 22px; border-radius: 2px; }
+.log-group { border-bottom: 1px solid var(--line); }
+.log-group details > summary { list-style: none; display: flex; gap: var(--sp-2); align-items: center; min-height: 48px; cursor: pointer; font-weight: 700; }
+.log-group details > summary::-webkit-details-marker { display: none; }
+.log-group details > summary::after { content: '▾'; margin-left: auto; color: var(--accent); }
+.log-group details[open] > summary::after { content: '▴'; }
+.log-group .log { margin-left: var(--sp-5); }
+.log-group .log li:last-child { border-bottom: 0; }
+
+/* «Te piden»: una tarjeta por cosa, con su plazo y el botón a mano. */
+.asks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.ask-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-3);
+  background: var(--c-card);
+  border: 2px solid var(--c-card-line);
+  border-left: 6px solid var(--c-warn);
+  border-radius: 2px;
+  padding: var(--sp-2) var(--sp-3);
+}
+.ask-card .ask-text { grid-column: 1; margin: 0; overflow-wrap: anywhere; }
+.ask-card .ask-due { grid-column: 1; margin: 0; }
+.ask-card .ask-go { grid-column: 2; grid-row: 1 / span 2; min-height: 48px; min-width: 48px; }
+.ask-due { color: var(--c-warn); font-size: var(--fs-s); }
+.ask-due.soon { color: #ff8fa3; font-weight: 700; }
+@media (max-width: 400px) {
+  html[data-text='150'] .ask-card, html[data-text='200'] .ask-card { grid-template-columns: 1fr; }
+  html[data-text='150'] .ask-card .ask-go, html[data-text='200'] .ask-card .ask-go { grid-column: 1; grid-row: auto; width: 100%; }
+}
+
+/* «Hoy en Bitópolis»: una sola tarjeta sobre el mapa (el juego espera en pausa). */
+.hoy-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: max(var(--sp-3), env(safe-area-inset-top)) max(var(--sp-3), env(safe-area-inset-right)) max(var(--sp-3), env(safe-area-inset-bottom)) max(var(--sp-3), env(safe-area-inset-left));
+  background: rgba(20, 20, 40, 0.72);
+  touch-action: manipulation;
+}
+@media (min-height: 600px) { .hoy-backdrop { align-items: center; } }
+.hoy {
+  width: min(100%, 520px);
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--c-card);
+  border: 2px solid var(--c-gold-line);
+  border-radius: 2px;
+  box-shadow: 0 4px 0 var(--c-deep);
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  font-size: var(--fs-m);
+  overflow-wrap: anywhere;
+}
+.hoy-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-2); }
+.hoy-head h2 { margin: 0; font-size: var(--fs-xl); color: var(--c-gold); line-height: 1.15; }
+.hoy-date { margin: var(--sp-1) 0 0; color: var(--muted); font-size: var(--fs-s); }
+.hoy-close { flex: none; min-width: 48px; min-height: 48px; background: var(--c-surface); border: 2px solid var(--c-surface-line); color: #f4f4f4; font: inherit; cursor: pointer; border-radius: 2px; }
+.hoy-line { margin: 0; line-height: 1.4; }
+.hoy-since { color: var(--muted); }
+.hoy h3 { margin: 0 0 var(--sp-2); font-size: var(--fs-s); color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.hoy-asks ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.hoy-ask {
+  width: 100%;
+  min-height: 56px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px var(--sp-2);
+  align-items: center;
+  text-align: left;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--c-surface);
+  border: 2px solid var(--c-surface-line);
+  border-left: 6px solid var(--c-warn);
+  border-radius: 2px;
+  color: #f4f4f4;
+  font: inherit;
+  cursor: pointer;
+}
+.hoy-ask .hoy-ask-text { grid-column: 1; }
+.hoy-ask .ask-due { grid-column: 1; }
+.hoy-ask .hoy-ask-go { grid-column: 2; grid-row: 1 / span 2; color: var(--c-gold); font-weight: 700; white-space: nowrap; }
+.hoy-ask[aria-disabled='true'] { opacity: 0.7; cursor: default; }
+.hoy-face {
+  width: 100%;
+  min-height: 56px;
+  display: flex;
+  gap: var(--sp-3);
+  align-items: center;
+  text-align: left;
+  padding: var(--sp-2);
+  background: var(--c-deep);
+  border: 2px solid var(--c-card-line);
+  border-radius: 2px;
+  color: #f4f4f4;
+  font: inherit;
+  cursor: pointer;
+}
+.hoy-portrait { flex: none; width: 36px; height: 54px; image-rendering: pixelated; }
+.hoy-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hoy-sub { color: var(--muted); font-size: var(--fs-s); }
+.hoy-quote { font-style: italic; }
+.hoy-go { width: 100%; min-height: 56px; font-size: var(--fs-l); position: sticky; bottom: 0; flex: none; }
+html[data-text='200'] .hoy-ask { grid-template-columns: 1fr; }
+html[data-text='200'] .hoy-face { flex-direction: column; align-items: flex-start; }
+html[data-text='200'] .hoy-ask .hoy-ask-go { grid-column: 1; grid-row: auto; }

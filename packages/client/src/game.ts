@@ -1,4 +1,4 @@
-import { tickToDate, type Command } from '@bitopolis/shared';
+import { TICKS_PER_DAY, tickToDate, type Command } from '@bitopolis/shared';
 import {
   BUILD_NAMES,
   buildingAt,
@@ -99,7 +99,8 @@ import { openMailbox, unreadLetters } from './mail-ui.ts';
 import { viviendaBox } from './vivienda-ui.ts';
 import { openTownHall } from './civic-ui.ts';
 import { openAlbum, snapMoments } from './album-ui.ts';
-import { openAway } from './away-ui.ts';
+import { type AwaySince, hoyHasNews, isHoyOpen, openHoy } from './hoy-ui.ts';
+import { type Ask, dueSoon, dueText, pendingAsks } from './asks.ts';
 import { openRank, rankCard } from './rank-ui.ts';
 import { dilemmaSpot, openDilemmaSheet, type DilemmaCtx } from './dilemma-ui.ts';
 import { objectivesNode, openAdvisor, openCitizen, openDiary, openPleno, portraitCanvas, rememberSeen, renderObjectives, resumeSummary, type SocialCtx } from './social-ui.ts';
@@ -120,7 +121,7 @@ import { comarcaPending, comarcaSummary, openComarca } from './comarca-ui.ts';
 import { type HubEntry, hubWants, Reveal, trayCatsWanted, ZONE_HELPERS } from './progress.ts';
 import { commandFor, costText, isLocked, lockLong, lockShort, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayCost } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
-import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, h, isSheetOpen, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack } from './ui.ts';
+import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, entryAction, h, isSheetOpen, type LogEntry, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack } from './ui.ts';
 import { pixelIcon } from './icons.ts';
 import { openHistory } from './charts-ui.ts';
 import { medalCount, openMedals } from './medals-ui.ts';
@@ -435,7 +436,7 @@ export function startGame(opts: GameOptions): void {
     const look = () => centerOn(wx, wy);
     setTimeout(() => {
       if (reducedMotion()) {
-        toast(text, { kind: 'info', sticky: true, onClick: look });
+        toast(text, { kind: 'info', sticky: true, go: `at:${wx},${wy}` });
         return;
       }
       const from = { x: cam.x, y: cam.y };
@@ -443,7 +444,7 @@ export function startGame(opts: GameOptions): void {
         look();
         return { x: cam.x, y: cam.y };
       }, () => {
-        toast(text, { kind: 'info', sticky: true, onClick: look });
+        toast(text, { kind: 'info', sticky: true, go: `at:${wx},${wy}` });
         setTimeout(() => glide({ x: cam.x, y: cam.y }, () => from, () => {}), 3500);
       });
     }, 1500);
@@ -543,7 +544,7 @@ export function startGame(opts: GameOptions): void {
     if (at) highlight = { x: at.x, y: at.y, since: performance.now() };
     slowDown('el nuevo rango');
     calmPause();
-    toast(`${text}. Toca para ver el escudo.`, { kind: 'good', sticky: true, onClick: () => withBack('Pueblo', openHub, () => openRank(state)) });
+    toast(`${text}. Toca para ver el escudo.`, { kind: 'good', sticky: true, go: 'rank' });
     $('#sr-live').textContent = text;
     const th = hallSpot();
     if (th) coins(...screenOf(th.x, th.y), 12);
@@ -676,10 +677,11 @@ export function startGame(opts: GameOptions): void {
   function onState() {
     // 2.6: «Deshacer» solo mientras la obra no haya empezado; avisos de las redes, una vez al día.
     checkUndo();
+    refreshAsks();
     const netDay = Math.floor(state.tick / 24);
     if (netDay !== lastNetDay) {
       lastNetDay = netDay;
-      networkWarnings(state, (text, kind, ref) => toast(text, { kind, onClick: () => focusBuilding(ref.id) }));
+      networkWarnings(state, (text, kind, ref) => toast(text, { kind, go: `b:${ref.id}` }));
     }
     // v1.7: foto de cada momento nuevo del álbum (en este navegador).
     snapMoments(token, state, albumSeen);
@@ -690,13 +692,13 @@ export function startGame(opts: GameOptions): void {
     if (canUpgradeTownhall(state).ok && upgradeWarned < lv) {
       upgradeWarned = lv;
       const hall = hallSpot();
-      toast(`Ya puedes ampliar el ayuntamiento a nivel ${lv + 1}: toca el ayuntamiento para ver qué desbloquea.`, { kind: 'good', sticky: true, onClick: hall ? () => focusBuilding(hall.id) : undefined });
+      toast(`Ya puedes ampliar el ayuntamiento a nivel ${lv + 1}: toca el ayuntamiento para ver qué desbloquea.`, { kind: 'good', sticky: true, go: hall ? `b:${hall.id}` : undefined });
       if (hall) highlight = { x: hall.x, y: hall.y, since: performance.now() };
     }
     if (lastLevel < 2 && lv >= 2) {
       sfx.milestone();
       vibrate(120);
-      toast('¡Zonas desbloqueadas! Toca aquí o «Construir» para pintar zonas R, C e I junto a la carretera.', { kind: 'good', sticky: true, onClick: () => openTray() });
+      toast('¡Zonas desbloqueadas! Toca aquí o «Construir» para pintar zonas R, C e I junto a la carretera.', { kind: 'good', sticky: true, go: 'tray' });
       tabBuild.classList.add('pulse');
       setTimeout(() => tabBuild.classList.remove('pulse'), 8000);
     }
@@ -706,14 +708,14 @@ export function startGame(opts: GameOptions): void {
     if (lastTurn && lastTurn.n > turnLogSeen) {
       turnLogSeen = lastTurn.n;
       const head = turnHeadline(state);
-      if (head && speed < 10) toast(head, { kind: 'info', onClick: openHappening });
+      if (head && speed < 10) toast(head, { kind: 'info', go: 'happening' });
     }
     if (state.stats.length !== lastStats) {
       lastStats = state.stats.length;
       const m = state.stats.at(-1);
       if (m) {
         const net = m.income - m.expenses;
-        toast(`Parte del mes: ${net >= 0 ? '▲ +' : '▼ '}${money(net)}. Toca para verlo.`, { kind: net >= 0 ? 'good' : 'warn', onClick: openAccounts });
+        toast(`Parte del mes: ${net >= 0 ? '▲ +' : '▼ '}${money(net)}. Toca para verlo.`, { kind: net >= 0 ? 'good' : 'warn', go: 'accounts' });
         if (net > 0) {
           sfx.coin();
           const th = state.buildings.find((b) => b.kind === 'townhall');
@@ -722,13 +724,13 @@ export function startGame(opts: GameOptions): void {
         // Ronda 15: los cierres del mes, juntos y también a x10, con la causa.
         if ((m.closures ?? 0) > 0) {
           const wage = (m.wage ?? 0) > 900 ? ` (sueldo mínimo ${money(m.wage ?? 0)})` : '';
-          toast(`${m.closures === 1 ? 'Cierra 1 empresa' : `Cierran ${m.closures} empresas`} este mes: no llegaban a las nóminas${wage}. Toca para ver el parte.`, { kind: 'warn', onClick: openAccounts });
+          toast(`${m.closures === 1 ? 'Cierra 1 empresa' : `Cierran ${m.closures} empresas`} este mes: no llegaban a las nóminas${wage}. Toca para ver el parte.`, { kind: 'warn', go: 'accounts' });
         }
         // v1.9: un solo aviso al mes con quien no ha podido pagar.
         if ((m.unpaid ?? 0) > 0 && (m.debtors ?? 0) > 0) {
           toast(`${m.debtors} ${m.debtors === 1 ? 'vecino debe' : 'vecinos deben'} dinero; este mes quedaron ${money(m.unpaid ?? 0)} sin pagar al ayuntamiento. Toca para verlos.`, {
             kind: 'warn',
-            onClick: () => openNeighbours(state, (c) => withBack('Vecinos', () => openNeighbours(state, () => {}, true), () => openCitizen(social, c.id)), true),
+            go: 'debtors',
           });
         }
       }
@@ -904,7 +906,7 @@ export function startGame(opts: GameOptions): void {
     const notified = built.filter((e) => e.notify);
     if (quiet && notified.length > 1) toast(`${notified.length} obras terminadas`, { kind: 'good' });
     for (const e of quiet && notified.length > 1 ? [] : notified) {
-      toast(e.text, { kind: 'good', sticky: !quiet, onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+      toast(e.text, { kind: 'good', sticky: !quiet, go: e.ref ? `b:${e.ref}` : undefined });
       vibrate(80);
       calmPause();
     }
@@ -916,7 +918,7 @@ export function startGame(opts: GameOptions): void {
         // 2.2: el rumor de la obra del primo lleva a su ficha, con «Revisar el contrato».
         sfx.warn();
         calmPause();
-        toast(e.text, { kind: 'warn', sticky: true, onClick: () => focusBuilding(e.ref!) });
+        toast(e.text, { kind: 'warn', sticky: true, go: `b:${e.ref}` });
       } else if (e.kind === 'warning' && e.text.startsWith('Un asunto difícil')) {
         // 2.4: un dilema con plazo: destello en el sitio, vuelta a x1 y aviso fijo que abre la hoja.
         // Ronda 20: el dilema de este aviso (el más reciente sin resolver de ese vecino), y siempre a x1.
@@ -924,7 +926,7 @@ export function startGame(opts: GameOptions): void {
         sfx.warn();
         calmPause();
         attention(d ? dilemmaSpot(state, d.id) : undefined, true, 'un asunto difícil', 'importante');
-        toast(e.text, { kind: 'warn', sticky: true, onClick: d ? () => openDilemmaSheet(dilemmaCtx, d.id) : undefined });
+        toast(e.text, { kind: 'warn', sticky: true, go: d ? `dilemma:${d.id}` : undefined });
       } else if (e.kind === 'warning' && e.text.startsWith('No decidiste a tiempo')) {
         toast(e.text, { kind: 'warn', sticky: true });
       } else if (e.kind === 'bankrupt' || e.kind === 'warning') {
@@ -932,16 +934,13 @@ export function startGame(opts: GameOptions): void {
         duck(1.5);
         if (e.kind === 'bankrupt') shake(4, 400);
         calmPause();
-        toast(e.kind === 'warning' ? `${e.text}. ${nextHint(state).text}` : e.text, {
-          kind: 'warn',
-          sticky: true,
-          onClick: openAccounts,
-        });
+        // 2.7: un aviso, un mensaje (antes se le pegaba el consejo del «?»: «la caja aguanta 1 mes. 24 sin colegio…»).
+        toast(e.text, { kind: 'warn', sticky: true, go: 'accounts' });
       } else if (e.kind === 'milestone' && e.text.startsWith('¡Bitópolis ya es')) {
         // 2.1: subida de rango: fanfarria, el cartel destella y un aviso que abre el escudo.
         celebrateRank(e.text);
       } else if (e.kind === 'milestone' && e.text.startsWith('El escudo estrena')) {
-        toast(e.text, { kind: 'good', onClick: () => withBack('Pueblo', openHub, () => openRank(state)) });
+        toast(e.text, { kind: 'good', go: 'rank' });
       } else if (e.kind === 'milestone') {
         toast(e.text, { kind: 'good', sticky: true });
         vibrate(120);
@@ -961,37 +960,46 @@ export function startGame(opts: GameOptions): void {
         openElectionNight(social);
       } else if (e.kind === 'info' && /ofrece un acuerdo de/.test(e.text)) {
         // 2.5: oferta de un pueblo vecino con plazo: aviso fijo que lleva a «Comarca», y se frena.
-        toast(e.text, { kind: 'warn', sticky: true, onClick: () => withBack('Pueblo', openHub, openComarcaSheet) });
+        toast(e.text, { kind: 'warn', sticky: true, go: 'comarca' });
         slowDown('la oferta de un pueblo vecino');
         calmPause();
+      } else if (e.kind === 'info' && e.text.startsWith('Encargo del pueblo')) {
+        // 2.7: un encargo espera respuesta (antes no se avisaba y se perdía): aviso fijo que abre «Encargos».
+        toast(e.text, { kind: 'warn', sticky: true, go: 'errands' });
+        slowDown('un encargo');
+      } else if (e.kind === 'info' && e.text.startsWith('Sale El Eco')) {
+        if (!quiet) toast(e.text, { kind: 'info', go: 'press' });
+      } else if (e.kind === 'info' && e.text.includes('recibe carta de')) {
+        if (!quiet) toast(e.text, { kind: 'info', go: 'mail' });
       } else if (/quiere montar|Fondos europeos|ofrece pagar el/.test(e.text)) {
         // Ronda 19: la gran empresa, el FEDER y la cofinanciación son decisiones con plazo: aviso fijo y se frena.
-        toast(e.text, { kind: 'warn', sticky: true, onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+        // 2.7: abre la tarjeta donde se responde (antes, el edificio si lo había).
+        toast(e.text, { kind: 'warn', sticky: true, go: /quiere montar/.test(e.text) ? 'region' : 'th:grants' });
         calmPause();
       } else if (e.kind === 'info' && /Diputación|fiestas|Subvención/.test(e.text)) {
         // v1.5: ofertas de subvención y fiestas: llevan a su sección del Ayuntamiento.
         // Si hay que decidir algo con plazo, el juego baja a x1 para que dé tiempo (ronda 11).
         const decide = /Responde antes|puedes organizarlas/.test(e.text);
         if (decide) slowDown(/fiestas/i.test(e.text) ? 'las fiestas' : 'la subvención');
-        toast(e.text, { kind: 'info', sticky: decide, onClick: () => openTownHall(social, /fiestas/i.test(e.text) ? 'festival' : 'grants') });
+        toast(e.text, { kind: 'info', sticky: decide, go: /fiestas/i.test(e.text) ? 'th:festival' : 'th:grants' });
       } else if (e.kind === 'info' && /^(Nieva|Ola de calor|Tormenta sobre|El río crece)/.test(e.text)) {
         // v1.7: el tiempo que cambia algo (no el sol ni las nubes).
         toast(e.text, { kind: 'info' });
       } else if (e.kind === 'info' && /^(Desahucian|El banco se queda)/.test(e.text)) {
         // v1.9: desahucios y embargos.
-        if (!quiet) toast(e.text, { kind: 'warn', onClick: e.ref ? () => openCitizen(social, e.ref!) : undefined });
+        if (!quiet) toast(e.text, { kind: 'warn', go: e.ref ? `c:${e.ref}` : undefined });
       } else if (e.kind === 'info' && e.text.startsWith('El río se desborda')) {
         sfx.warn();
         vibrate(80);
         calmPause();
         attention(refSpot(e.ref), false, 'la riada');
-        toast(e.text, { kind: 'warn', sticky: true, onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+        toast(e.text, { kind: 'warn', sticky: true, go: e.ref ? `b:${e.ref}` : undefined });
       } else if (e.kind === 'crime') {
         // v1.8: robos, detenciones, calabozos llenos y disturbios.
         // Ronda 15: los robos en casas (muchos) se avisan sin parar el juego ni llamar la atención.
         const home = e.text.startsWith('Entran a robar en casa') || e.text.startsWith('Intentan robar');
         if (home) {
-          if (!quiet) toast(e.text, { kind: e.text.includes('escapa') ? 'warn' : 'info', onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+          if (!quiet) toast(e.text, { kind: e.text.includes('escapa') ? 'warn' : 'info', go: e.ref ? `b:${e.ref}` : undefined });
           continue;
         }
         // Ronda 18: el escándalo de una licitación es una mala noticia (fija, con aviso y lleva a la obra).
@@ -1003,30 +1011,30 @@ export function startGame(opts: GameOptions): void {
           calmPause();
           if (/Disturbios|llenos|^Escándalo/.test(e.text)) attention(refSpot(e.ref) ?? state.buildings.find((b) => b.kind === 'police' && b.built), false, /Disturbios/.test(e.text) ? 'los disturbios' : /llenos/.test(e.text) ? 'los calabozos llenos' : 'el escándalo', /Disturbios/.test(e.text) ? 'emergencia' : 'importante');
         }
-        toast(e.text, { kind: bad ? 'warn' : 'good', sticky: /Disturbios|llenos|^Escándalo/.test(e.text), onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+        toast(e.text, { kind: bad ? 'warn' : 'good', sticky: /Disturbios|llenos|^Escándalo/.test(e.text), go: e.ref ? `b:${e.ref}` : undefined });
       } else if (e.kind === 'fire') {
         // 2.1: riesgos, incendios, bomberos y urgencias.
-        const go = e.ref !== undefined ? () => focusBuilding(e.ref!) : undefined;
+        const go = e.ref !== undefined ? `b:${e.ref}` : undefined;
         if (e.text.startsWith('¡Fuego') || e.text.startsWith('El fuego salta')) {
           sfx.warn();
           duck(1.5);
           calmPause();
           attention(refSpot(e.ref), false, 'el incendio');
-          toast(e.text, { kind: 'warn', sticky: true, onClick: go });
+          toast(e.text, { kind: 'warn', sticky: true, go });
         } else if (e.text.startsWith('El fuego deja')) {
           sfx.warn();
-          toast(e.text, { kind: 'warn', sticky: true, onClick: go });
+          toast(e.text, { kind: 'warn', sticky: true, go });
         } else if (e.text.startsWith('Riesgo de incendio')) {
-          if (!quiet) toast(e.text, { kind: 'warn', onClick: go });
+          if (!quiet) toast(e.text, { kind: 'warn', go });
         } else if (!quiet || e.text.startsWith('Urgencia')) {
-          toast(e.text, { kind: /no llega/.test(e.text) ? 'warn' : 'good', onClick: go });
+          toast(e.text, { kind: /no llega/.test(e.text) ? 'warn' : 'good', go });
         }
       } else if (e.kind === 'protest') {
         sfx.warn();
         duck(1.5);
         calmPause();
         attention(hallSpot(), false, 'la manifestación');
-        toast(e.text, { kind: 'warn', sticky: true, onClick: () => openTownHall(social, 'associations') });
+        toast(e.text, { kind: 'warn', sticky: true, go: 'th:associations' });
       } else if (e.kind === 'politics' && /Asociación|asociación/.test(e.text)) {
         // v1.7: asociaciones. Si convocan una manifestación, hay 3 días para reunirse con ellos: baja a x1.
         const urgent = e.text.includes('convoca una manifestación');
@@ -1034,29 +1042,29 @@ export function startGame(opts: GameOptions): void {
           const a = state.associations?.find((x) => x.id === e.ref);
           attention(a?.x !== undefined && a.y !== undefined ? { x: a.x, y: a.y } : hallSpot(), false, 'la manifestación convocada');
         }
-        toast(e.text, { kind: urgent ? 'warn' : 'info', sticky: urgent || e.text.startsWith('Nace'), onClick: () => openTownHall(social, 'associations') });
+        toast(e.text, { kind: urgent ? 'warn' : 'info', sticky: urgent || e.text.startsWith('Nace'), go: 'th:associations' });
       } else if (e.kind === 'politics' && /comisión de festejos/.test(e.text)) {
         // 2.4: la comisión de festejos pide presupuesto: aviso fijo que lleva a su sección.
         slowDown('la comisión de festejos');
-        toast(e.text, { kind: 'info', sticky: true, onClick: () => openTownHall(social, 'seasons') });
+        toast(e.text, { kind: 'info', sticky: true, go: 'th:seasons' });
       } else if (e.kind === 'politics' && /presupuesto/i.test(e.text)) {
         const decide = e.text.startsWith('Toca presentar');
         if (decide) slowDown('el presupuesto');
-        toast(e.text, { kind: e.text.includes('rechaza') ? 'warn' : 'info', sticky: decide, onClick: () => openTownHall(social, 'budget') });
+        toast(e.text, { kind: e.text.includes('rechaza') ? 'warn' : 'info', sticky: decide, go: 'th:budget' });
       } else if (e.kind === 'politics' && /, alcalde de |baja los impuestos: atraerá/.test(e.text)) {
         // 2.5: lo que dicen los alcaldes vecinos (lleva a «Comarca»; a x10, nada).
-        if (!quiet) toast(e.text, { kind: 'info', onClick: () => withBack('Pueblo', openHub, openComarcaSheet) });
+        if (!quiet) toast(e.text, { kind: 'info', go: 'comarca' });
       } else if (e.kind === 'politics') {
         // Lo que responde a una acción tuya (moción, campaña) se avisa siempre.
         if (quiet && !e.text.startsWith('Faltan') && !/moción|campaña/i.test(e.text)) continue;
-        toast(e.text, { kind: e.text.startsWith('Faltan') && state.politics.approval < 50 ? 'warn' : 'info', sticky: e.text.startsWith('Faltan'), onClick: () => openPolitics(social) });
+        toast(e.text, { kind: e.text.startsWith('Faltan') && state.politics.approval < 50 ? 'warn' : 'info', sticky: e.text.startsWith('Faltan'), go: 'politics' });
         if (e.text.startsWith('Faltan') || e.text.includes('funda')) calmPause();
       } else if (e.kind === 'departure' || e.kind === 'business') {
         // Ronda 15: una apertura es buena noticia; los cierres van además agrupados a fin de mes.
         const opens = e.kind === 'business' && / abre /.test(e.text);
         // Ronda 21: los que se van a un pueblo vecino llevan a la Comarca (por qué se van), también a x10.
         const toTown = /se van? a .*: (allí se vive|ha bajado los impuestos)/.test(e.text);
-        if (!quiet || toTown) toast(e.text, { kind: opens ? 'good' : 'warn', onClick: toTown ? () => withBack('Pueblo', openHub, openComarcaSheet) : e.ref ? () => focusBuilding(e.ref!) : undefined });
+        if (!quiet || toTown) toast(e.text, { kind: opens ? 'good' : 'warn', go: toTown ? 'comarca' : e.ref ? `b:${e.ref}` : undefined });
         if (!opens) calmPause();
       }
     }
@@ -2944,31 +2952,198 @@ export function startGame(opts: GameOptions): void {
     );
   }
 
-  /** La campana: todos los avisos recientes; los que llevan a algo, se tocan (v1.6). */
-  function openLog() {
-    markLogRead();
-    const items = toastLog();
-    const icon = { info: 'ℹ', warn: '⚠', good: '✔' };
-    const ul = h('ul', { class: 'log' });
-    for (const e of items) {
-      const btn = h('button', { class: 'log-item', ...(e.onClick ? { 'data-go': '1' } : {}) }, h('span', { class: 'toast-icon', 'aria-hidden': 'true' }, icon[e.kind]), h('span', {}, e.text, ' ', h('span', { class: 'when' }, e.when)));
-      if (e.onClick) btn.addEventListener('click', () => withBack('Avisos', openLog, e.onClick!));
-      else btn.setAttribute('tabindex', '-1');
-      ul.append(h('li', { class: e.kind }, btn));
+  /**
+   * 2.7: de una referencia guardable (la de los avisos y de «Te piden») a lo que abre.
+   * Si lo que señalaba ya no existe, nada (la campana lo enseña sin botón).
+   */
+  function goTo(ref: string): (() => void) | undefined {
+    const at = ref.indexOf(':');
+    const k = at < 0 ? ref : ref.slice(0, at);
+    const arg = at < 0 ? '' : ref.slice(at + 1);
+    const id = Number(arg);
+    const hub = (fn: () => void) => () => withBack('Pueblo', openHub, fn);
+    switch (k) {
+      case 'b':
+        return state.buildings.some((b) => b.id === id) ? () => focusBuilding(id) : undefined;
+      case 'c':
+        return state.citizens.some((c) => c.id === id) ? () => openCitizen(social, id) : undefined;
+      case 'at': {
+        const [x, y] = arg.split(',').map(Number);
+        return Number.isFinite(x) && Number.isFinite(y) ? () => centerOn(x!, y!) : undefined;
+      }
+      case 'th':
+        return ['budget', 'festival', 'seasons', 'grants', 'associations', 'tourism'].includes(arg) ? () => openTownHall(social, arg as 'grants') : () => openTownHall(social);
+      case 'dilemma':
+        return state.dilemmas.some((d) => d.id === id && !d.resolved) ? () => openDilemmaSheet(dilemmaCtx, id) : undefined;
+      case 'debtors':
+        return () => openNeighbours(state, (c) => withBack('Vecinos', () => openNeighbours(state, () => {}, true), () => openCitizen(social, c.id)), true);
+      case 'accounts':
+        return openAccounts;
+      case 'rank':
+        return hub(() => openRank(state));
+      case 'politics':
+        return () => openPolitics(social);
+      case 'happening':
+        return openHappening;
+      case 'tray':
+        return () => openTray();
+      case 'mail':
+        return hub(openMail);
+      case 'comarca':
+        return hub(openComarcaSheet);
+      case 'region':
+        return hub(openRegionSheet);
+      case 'errands':
+        return hub(openErrandsSheet);
+      case 'press':
+        return hub(openPressSheet);
+      default:
+        return undefined;
     }
-    sheet('Avisos', items.length ? ul : h('p', { class: 'muted' }, 'Sin avisos todavía.'));
+  }
+
+  /** 2.7: lo que se repite en una semana va junto en «Ha pasado» («3 robos esta semana»). */
+  const LOG_GROUPS: [RegExp, string, string][] = [
+    [/^(Roban en|Intentan robar|Entran a robar)/, 'robo', 'robos'],
+    [/se muda al pueblo|^Llegan \d+ vecinos|vuelve al pueblo|^¡Llega un bebé/, 'llegada', 'llegadas'],
+    [/se va del pueblo|^Un vecino se va|vecinos se van/, 'despedida', 'despedidas'],
+    [/^Terminada la obra|obras terminadas/, 'obra terminada', 'obras terminadas'],
+    [/^(Nieva|Ola de calor|Tormenta sobre|El río crece)/, 'aviso del tiempo', 'avisos del tiempo'],
+    [/^Riesgo de incendio/, 'riesgo de incendio', 'riesgos de incendio'],
+    [/^(Desahucian|El banco se queda)/, 'desahucio o embargo', 'desahucios y embargos'],
+  ];
+  /** El número de la campana: lo que te piden más lo importante sin mirar. */
+  let asksNow: Ask[] = [];
+  let bellKey = '';
+  let unreadNow = 0;
+  function paintBell(unread = unreadNow) {
+    unreadNow = unread;
+    const asks = asksNow.length;
+    const n = asks + unread;
+    const key = `${asks}|${unread}`;
+    if (key === bellKey) return;
+    bellKey = key;
+    bellBadge.hidden = n === 0;
+    bellBadge.textContent = n > 9 ? '9+' : String(n);
+    bellBadge.classList.toggle('asks', asks > 0);
+    $('#bell').setAttribute('aria-label', n ? `Avisos: ${n} sin leer${asks ? ` (${asks === 1 ? '1 te pide respuesta' : `${asks} te piden respuesta`})` : ''}` : 'Avisos');
+  }
+  let asksDay = -1;
+  /** Una vez por hora de juego (o al responder): «Te piden» sale del estado. */
+  function refreshAsks(force = false) {
+    if (!force && state.tick === asksDay) return;
+    asksDay = state.tick;
+    asksNow = pendingAsks(state);
+    paintBell();
+  }
+
+  /** Una fila de «Te piden»: qué, plazo y botón. */
+  function askRow(a: Ask, back: () => void): HTMLElement {
+    const fn = goTo(a.go);
+    const due = dueText(state.tick, a.due);
+    const btn = h('button', { class: 'btn primary ask-go' }, a.action);
+    if (fn) btn.addEventListener('click', () => withBack('Avisos', back, fn));
+    else btn.setAttribute('aria-disabled', 'true');
+    return h(
+      'li',
+      { class: 'ask-card', 'data-ask': a.key },
+      h('p', { class: 'ask-text' }, a.text),
+      due ? h('p', { class: `ask-due${dueSoon(state.tick, a.due) ? ' soon' : ''}` }, `⏳ ${due}`) : '',
+      btn,
+    );
+  }
+
+  /** La campana 2.0: «Te piden» (lo que espera respuesta) y «Ha pasado» (agrupado). */
+  function openLog(tab?: 'asks' | 'past') {
+    markLogRead();
+    refreshAsks(true);
+    const asks = asksNow;
+    const pick = tab ?? (asks.length ? 'asks' : 'past');
+    const icon = { info: 'ℹ', warn: '⚠', good: '✔' };
+    const back = () => openLog(pick);
+    // «Ha pasado»: lo más nuevo arriba; lo que se repite en la misma semana, junto.
+    const items = toastLog();
+    const week = (t?: number) => (t === undefined ? -1 : Math.floor(t / (7 * TICKS_PER_DAY)));
+    const nowWeek = week(state.tick);
+    const groups = new Map<string, { label: [string, string]; list: LogEntry[] }>();
+    const order: (LogEntry | string)[] = [];
+    for (const e of items) {
+      const g = LOG_GROUPS.find(([re]) => re.test(e.text));
+      if (!g || e.tick === undefined) {
+        order.push(e);
+        continue;
+      }
+      const key = `${g[1]}|${week(e.tick)}`;
+      const have = groups.get(key);
+      if (have) have.list.push(e);
+      else {
+        groups.set(key, { label: [g[1], g[2]], list: [e] });
+        order.push(key);
+      }
+    }
+    const row = (e: LogEntry) => {
+      const fn = entryAction(e);
+      const btn = h('button', { class: 'log-item', ...(fn ? { 'data-go': '1' } : {}) }, h('span', { class: 'toast-icon', 'aria-hidden': 'true' }, icon[e.kind]), h('span', {}, e.text, ' ', h('span', { class: 'when' }, e.when)));
+      if (fn) btn.addEventListener('click', () => withBack('Avisos', back, fn));
+      else btn.setAttribute('tabindex', '-1');
+      return h('li', { class: e.kind }, btn);
+    };
+    const ul = h('ul', { class: 'log' });
+    for (const o of order) {
+      if (typeof o !== 'string') {
+        ul.append(row(o));
+        continue;
+      }
+      const g = groups.get(o)!;
+      if (g.list.length === 1) {
+        ul.append(row(g.list[0]!));
+        continue;
+      }
+      const w = week(g.list[0]!.tick);
+      const when = w === nowWeek ? 'esta semana' : w === nowWeek - 1 ? 'la semana pasada' : `la semana del ${g.list.at(-1)!.when}`;
+      const kind = g.list.some((e) => e.kind === 'warn') ? 'warn' : g.list[0]!.kind;
+      ul.append(
+        h(
+          'li',
+          { class: `${kind} log-group` },
+          h('details', {}, h('summary', { class: 'log-sum' }, h('span', { class: 'toast-icon', 'aria-hidden': 'true' }, icon[kind]), `${g.list.length} ${g.label[1]} ${when}`), h('ul', { class: 'log' }, ...g.list.map(row))),
+        ),
+      );
+    }
+    const askList = h('ul', { class: 'asks' }, ...asks.map((a) => askRow(a, back)));
+    const panelAsks = h('div', { id: 'log-asks', role: 'tabpanel', 'aria-labelledby': 'log-tab-asks' }, asks.length ? askList : h('p', { class: 'muted' }, 'Nadie espera respuesta ahora mismo.'));
+    const panelPast = h('div', { id: 'log-past', role: 'tabpanel', 'aria-labelledby': 'log-tab-past' }, items.length ? ul : h('p', { class: 'muted' }, 'Sin avisos todavía.'));
+    const tabAsks = h('button', { id: 'log-tab-asks', class: 'log-tab', role: 'tab', 'aria-controls': 'log-asks' }, 'Te piden', asks.length ? h('span', { class: 'log-tab-n' }, String(asks.length)) : '');
+    const tabPast = h('button', { id: 'log-tab-past', class: 'log-tab', role: 'tab', 'aria-controls': 'log-past' }, 'Ha pasado');
+    const show = (t: 'asks' | 'past') => {
+      tabAsks.setAttribute('aria-selected', String(t === 'asks'));
+      tabPast.setAttribute('aria-selected', String(t === 'past'));
+      tabAsks.tabIndex = t === 'asks' ? 0 : -1;
+      tabPast.tabIndex = t === 'past' ? 0 : -1;
+      panelAsks.hidden = t !== 'asks';
+      panelPast.hidden = t !== 'past';
+    };
+    tabAsks.addEventListener('click', () => show('asks'));
+    tabPast.addEventListener('click', () => show('past'));
+    const tabs = h('div', { class: 'log-tabs', role: 'tablist', 'aria-label': 'Avisos' }, tabAsks, tabPast);
+    tabs.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const next = tabAsks.getAttribute('aria-selected') === 'true' ? 'past' : 'asks';
+      show(next);
+      (next === 'asks' ? tabAsks : tabPast).focus();
+    });
+    show(pick);
+    sheet('Avisos', tabs, panelAsks, panelPast);
   }
   const bellBadge = document.querySelector<HTMLElement>('#bell .bell-n')!;
   $('#bell').prepend(pixelIcon('bell'));
   onToastLog(
-    (n) => {
-      bellBadge.hidden = n === 0;
-      bellBadge.textContent = n > 9 ? '9+' : String(n);
-      $('#bell').setAttribute('aria-label', n ? `Avisos: ${n} sin mirar` : 'Avisos');
-    },
-    openLog,
+    (n) => paintBell(n),
+    () => openLog('past'),
     () => shortDate(tickToDate(state.tick)),
+    { token, tick: () => state.tick, resolve: goTo },
   );
+  refreshAsks(true);
 
   /** Capas: el chip dice cuál está puesta; al tocarlo se elige de una lista (antes, se cambiaba a ciegas). */
   function setLayer(id: LayerId) {
@@ -3179,13 +3354,38 @@ export function startGame(opts: GameOptions): void {
     sp.setAttribute('aria-label', `Velocidad x${lastSpeed}. Toca para cambiarla`);
   }
 
+  /**
+   * 2.7: «Hoy en Bitópolis»: el juego espera en pausa con la tarjeta abierta y
+   * «▶ Seguir» lo pone a la velocidad guardada (al volver se sabe si está en marcha).
+   */
+  function showHoy(since: AwaySince) {
+    if (speed > 0) setSpeed(0);
+    refreshAsks(true);
+    const go = savedSpeed() || lastSpeed || 1;
+    openHoy(state, since, asksNow, {
+      speed: go,
+      go: goTo,
+      openCitizen: (id) => openCitizen(social, id),
+      resume: () => userSpeed(go),
+      closed: () => rememberSeen(token, state),
+    });
+    $('#sr-live').textContent = 'Hoy en Bitópolis. El juego espera en pausa.';
+  }
   const onVisibility = () => {
     if (document.hidden) {
+      rememberSeen(token, state);
       setSpeed(0);
       send({ type: 'flush' });
-    } else if (speed === 0 && !lost && !isSheetOpen() && savedSpeed() > 0) {
-      // Al volver a la pestaña, sigue como lo dejó el jugador.
-      setSpeed(savedSpeed());
+    } else if (!lost && !isHoyOpen()) {
+      // 2.7: tras un buen rato fuera, «Hoy en Bitópolis» (en pausa) en vez de seguir sin más.
+      const away = speed === 0 && !tutorial.active ? resumeSummary(token, state) : null;
+      if (away && hoyHasNews(state, away, pendingAsks(state))) {
+        if (isSheetOpen()) closeSheet();
+        showHoy(away);
+      } else if (speed === 0 && !isSheetOpen() && savedSpeed() > 0) {
+        // Al volver a la pestaña, sigue como lo dejó el jugador.
+        setSpeed(savedSpeed());
+      }
     }
   };
   const onPageHide = () => {
@@ -3194,7 +3394,12 @@ export function startGame(opts: GameOptions): void {
   };
   document.addEventListener('visibilitychange', onVisibility);
   window.addEventListener('pagehide', onPageHide);
-  const heartbeat = setInterval(() => !document.hidden && !lost && send({ type: 'flush' }), 30_000);
+  const heartbeat = setInterval(() => {
+    if (document.hidden || lost) return;
+    send({ type: 'flush' });
+    // 2.7: la última visita se apunta mientras se juega (para que «Hoy» no salga a destiempo).
+    rememberSeen(token, state);
+  }, 30_000);
 
   // Atrás sin hojas abiertas: pausa y pregunta antes de salir de la partida (ronda 10).
   history.pushState({ ...(history.state ?? {}), game: true }, '');
@@ -3259,7 +3464,7 @@ export function startGame(opts: GameOptions): void {
   };
   $('#hud-pop').onclick = () => withBack('Pueblo', openHub, openPeople);
   $('#hud-happy').onclick = () => withBack('Pueblo', openHub, openHappiness);
-  $('#bell').onclick = openLog;
+  $('#bell').onclick = () => openLog();
   $('#strip-info').onclick = openDemand;
   // Ronda 21: la ayuda de la franja se corta a dos líneas; al tocarla se lee entera (y otro toque la recoge).
   const toolInfo = $('#tool-info');
@@ -3371,8 +3576,8 @@ export function startGame(opts: GameOptions): void {
   const away = resumeSummary(token, state);
   tutorial.start(state);
   tutorial.update(state, tool.id);
-  // 2.1: «Mientras no estabas», una tarjeta que se desliza (no durante el tutorial).
-  if (away && !tutorial.active) openAway(token, state, away, { openCitizen: (id) => openCitizen(social, id), openRank: () => openRank(state) });
+  // 2.7: «Hoy en Bitópolis» al volver tras una ausencia, si hay algo que contar (no durante el tutorial).
+  if (away && !tutorial.active && hoyHasNews(state, away, pendingAsks(state))) showHoy(away);
   introGeography();
   // 2.7: en pausa, ⏯ late (antes, un aviso fijo tapaba la parte de arriba del mapa).
   if (!tutorial.active && resume === 0) $('#sr-live').textContent = 'En pausa. Pulsa ▶ para que pase el tiempo.';
