@@ -78,3 +78,97 @@ for (const size of SIZES) {
     });
   }
 }
+
+/** Arrastre con el dedo de verdad (eventos táctiles por CDP, como e2e/tactil.spec.ts). */
+async function finger(page: Page) {
+  const cdp = await page.context().newCDPSession(page);
+  const send = (type: string, x: number, y: number) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] } as never);
+  return async (x: number, y0: number, y1: number) => {
+    await send('touchStart', x, y0);
+    for (let i = 1; i <= 10; i++) await send('touchMove', x, y0 + ((y1 - y0) * i) / 10);
+    await send('touchEnd', x, y1);
+    await page.waitForTimeout(300);
+  };
+}
+
+const sheetBox = (page: Page) => page.locator('.sheet').evaluate((el) => {
+  const r = el.getBoundingClientRect();
+  return { top: r.top, height: r.height, snap: (el as HTMLElement).dataset.snap ?? '' };
+});
+
+test('2.7: la ficha abre asomada, el asa sube y baja de altura, abajo se cierra y la cámara vuelve', async ({ page, request }, info) => {
+  test.skip(info.project.name !== 'movil', 'hace falta pantalla táctil');
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page, request, 100);
+  const s = await page.evaluate(() => (window as unknown as { __bitopolis: { state: GameState } }).__bitopolis.state);
+  const house = s.buildings.find((b) => b.kind === 'house' && b.built)!;
+  await page.locator('#tab-inspect').click();
+  const cam0 = await page.evaluate(([x, y]) => (window as unknown as { __bitopolis: { tileCenter(a: number, b: number): { x: number; y: number } } }).__bitopolis.tileCenter(x!, y!), [house.x, house.y]);
+  await page.mouse.click(cam0.x, cam0.y);
+  await expect(page.locator('.sheet.ficha')).toBeVisible();
+  await page.waitForTimeout(300);
+  const peek = await sheetBox(page);
+  expect(peek.height, 'asomada: el mapa queda a la vista').toBeLessThan(844 * 0.4);
+  await page.screenshot({ path: `test-results/capturas/movil2-hoja-asomada.png` });
+  const drag = await finger(page);
+  const gripX = 195;
+  // Hacia arriba: media y luego completa (sin tapar la barra de arriba).
+  await drag(gripX, peek.top + 8, peek.top - 220);
+  expect((await sheetBox(page)).snap).toBe('mid');
+  const mid = await sheetBox(page);
+  await drag(gripX, mid.top + 8, 40);
+  const full = await sheetBox(page);
+  expect(full.snap).toBe('full');
+  const barBottom = await page.locator('.topbar').evaluate((el) => el.getBoundingClientRect().bottom);
+  expect(full.top, 'la completa no tapa la barra de arriba').toBeGreaterThanOrEqual(barBottom - 1);
+  await page.screenshot({ path: `test-results/capturas/movil2-hoja-completa.png` });
+  // Hacia abajo, escalón a escalón: media, asomada y cerrada.
+  await drag(gripX, full.top + 8, full.top + 200);
+  expect((await sheetBox(page)).snap).toBe('mid');
+  await drag(gripX, (await sheetBox(page)).top + 8, (await sheetBox(page)).top + 200);
+  expect((await sheetBox(page)).snap).toBe('peek');
+  await drag(gripX, (await sheetBox(page)).top + 8, 830);
+  await expect(page.locator('.sheet')).toHaveCount(0);
+  // La cámara vuelve: la casa está donde se tocó.
+  const back = await page.evaluate(([x, y]) => (window as unknown as { __bitopolis: { tileCenter(a: number, b: number): { x: number; y: number } } }).__bitopolis.tileCenter(x!, y!), [house.x, house.y]);
+  expect(Math.abs(back.x - cam0.x) + Math.abs(back.y - cam0.y)).toBeLessThan(2);
+  // Con Dinero abierto se marca «Pueblo», no «Mirar».
+  await page.locator('#hud-money').click();
+  await expect(page.locator('.sheet')).toBeVisible();
+  const tabs = await page.evaluate(() => ['#tab-inspect', '#menu'].map((s) => getComputedStyle(document.querySelector(`${s} .tab-label`)!).color));
+  expect(tabs[0]).not.toBe(tabs[1]);
+  expect(tabs[1]).toBe('rgb(255, 205, 117)');
+});
+
+test('2.7: en horizontal (740×360), el dock es un riel con nombre y las hojas van al otro lado sin tapar la barra', async ({ page, request }, info) => {
+  test.skip(info.project.name !== 'movil', 'móvil girado');
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 740, height: 360 });
+  await open(page, request, 100);
+  const dock = await page.locator('#dock').boundingBox();
+  expect(dock!.width, 'riel de 56 px o más').toBeGreaterThanOrEqual(56);
+  expect(dock!.x + dock!.width).toBeLessThanOrEqual(741);
+  for (const t of await page.locator('.dock .tab').all()) {
+    const b = (await t.boundingBox())!;
+    expect(b.width).toBeGreaterThanOrEqual(44);
+    expect(b.height).toBeGreaterThanOrEqual(44);
+    const label = await t.locator('.tab-label').evaluate((el) => ({ w: (el as HTMLElement).offsetWidth, sw: el.scrollWidth, text: (el as HTMLElement).innerText.trim() }));
+    expect(label.text.length, 'cada pestaña lleva su nombre').toBeGreaterThan(2);
+    expect(label.sw, 'el nombre no se corta').toBeLessThanOrEqual(label.w + 1);
+  }
+  const bar = (await page.locator('.topbar').boundingBox())!;
+  const s = await page.evaluate(() => (window as unknown as { __bitopolis: { state: GameState } }).__bitopolis.state);
+  const th = s.buildings.find((b) => b.kind === 'townhall')!;
+  const p = await page.evaluate(([x, y]) => (window as unknown as { __bitopolis: { tileCenter(a: number, b: number): { x: number; y: number } } }).__bitopolis.tileCenter(x!, y!), [th.x, th.y]);
+  await page.locator('#tab-inspect').click();
+  await page.mouse.click(p.x, p.y);
+  await expect(page.locator('.sheet h2')).toHaveText('Gestión del pueblo');
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: `test-results/capturas/movil2-horiz-gestion.png` });
+  const sh = (await page.locator('.sheet').boundingBox())!;
+  expect(sh.y, 'no tapa la barra de arriba').toBeGreaterThanOrEqual(bar.y + bar.height - 1);
+  expect(sh.x + sh.width, 'va al otro lado del riel').toBeLessThanOrEqual(dock!.x);
+  expect(sh.width, 'no es pantalla completa').toBeLessThan(740 - dock!.width - 100);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+});
