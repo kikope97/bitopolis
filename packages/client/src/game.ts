@@ -2968,7 +2968,8 @@ export function startGame(opts: GameOptions): void {
       });
     } else {
       const goals = activeObjectives(state);
-      const objSub = goals[0] ? lowerFirst(objectiveText(state, goals[0])) : 'todos cumplidos';
+      // Sin el paréntesis («Pueblo › Pleno municipal»): la tarjeta no se llama como las filas de la lista.
+      const objSub = goals[0] ? lowerFirst(objectiveText(state, goals[0]).replace(/\s*\(.*\)$/, '')) : 'todos cumplidos';
       fourth = statCard({
         icon: 'medal',
         label: 'Objetivos',
@@ -3059,7 +3060,7 @@ export function startGame(opts: GameOptions): void {
         ...opt('neighbors', 'town', 'Pueblos vecinos', go(openComarcaSheet), { datum: comarcaPending(state) ? `${comarcaPending(state)} por responder` : undefined, attn: comarcaPending(state) > 0 }),
       ]),
       // 2.1: encargos del pueblo y El Eco de Bitópolis (2.6: cuando llega el primero).
-      listGroup('Noticias', [
+      listGroup('Encargos y El Eco', [
         ...opt('errands', 'scroll', 'Encargos del pueblo', go(openErrandsSheet), { datum: errandsOffered ? `${errandsOffered} por responder` : undefined, attn: errandsOffered > 0 }),
         ...opt('press', 'news', 'El Eco de Bitópolis', go(openPressSheet), { attn: !!lastEd && !lastEd.answered }),
       ]),
