@@ -171,6 +171,8 @@ test('2.7: en horizontal (740×360), el dock es un riel con nombre y las hojas v
   expect(sh.x + sh.width, 'va al otro lado del riel').toBeLessThanOrEqual(dock!.x);
   expect(sh.width, 'no es pantalla completa').toBeLessThan(740 - dock!.width - 100);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+});
+
 /* ---------- 2.7: accesibilidad, leyendas y capas, inicio y tutorial ---------- */
 
 /**
