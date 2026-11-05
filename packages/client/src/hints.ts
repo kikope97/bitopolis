@@ -1,4 +1,6 @@
 import { buildingAt, canUpgradeTownhall, LANDMARK_KINDS, LANDMARK_NAMES, landmarkReqs, phaseCost, coverageSummary, type GameState, NEED_LABEL, TOWNHALL_LEVELS, freeHomes, taxLevels, zonesUnlocked } from '@bitopolis/sim';
+import { monthFlow, monthsText, runwayMonths } from './cash.ts';
+import { money } from './i18n.ts';
 import type { ToolId } from './tools.ts';
 
 export interface Hint {
@@ -18,6 +20,18 @@ export function nextHint(state: GameState): Hint {
       return { text: 'La caja está en negativo y los impuestos ya están altos. No construyas; prueba un presupuesto austero (Pueblo › Ayuntamiento) o derriba lo que no se usa.' };
     }
     return { text: 'La caja está en negativo. Sube un poco los impuestos (Pueblo › Impuestos) y espera a que lleguen ingresos antes de construir.' };
+  }
+  // 2.7: el dinero primero. Si a este ritmo la caja aguanta menos de 3 meses (con el gasto
+  // corriente, sin las obras), el consejo es de dinero, no otro servicio que costaría más cada mes.
+  const runway = runwayMonths(state);
+  if (runway !== null && runway < 3) {
+    const f = monthFlow(state);
+    const allHigh = Object.values(taxLevels(state)).every((l) => l === 'high');
+    const why = `A este ritmo la caja aguanta ${monthsText(runway)}: entran ${money(f.income)} al mes y el gasto corriente es de ${money(f.running)}.`;
+    const fix = allHigh
+      ? 'Los impuestos ya están altos: prueba un presupuesto austero (Pueblo › Ayuntamiento) o pide un préstamo (Pueblo › Dinero).'
+      : 'Sube un poco los impuestos (Pueblo › Impuestos) o pide un préstamo (Pueblo › Dinero).';
+    return { text: `${why} ${fix} No empieces obras nuevas hasta que el mes salga en positivo.` };
   }
   if (roads <= 7) return { text: 'Alarga la calle: elige Carretera y arrastra desde la calle del ayuntamiento.', tool: 'road' };
   if (!has('water')) return { text: 'Sin agua nadie quiere vivir aquí. Construye una bomba de agua junto a una carretera.', tool: 'water' };

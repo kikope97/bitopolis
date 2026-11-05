@@ -1,4 +1,4 @@
-import { openSettings } from './settings-ui.ts';
+import { openSettings, textSizeGroup } from './settings-ui.ts';
 import { drawSkyline } from './skyline.ts';
 import { openAiConfig } from './ai-ui.ts';
 import { type AiMeta, api, ApiError, type Summary } from './api.ts';
@@ -111,6 +111,8 @@ export async function showStart(token: string): Promise<void> {
   const sid = sessionId();
   const root = $('#start');
   root.hidden = false;
+  // 2.7: el tamaño del texto también se elige aquí (antes solo en Ajustes, al final de la hoja).
+  $('#start-text').replaceChildren(textSizeGroup());
   drawSkyline();
   $('#game').hidden = true;
   let info: Awaited<ReturnType<typeof api.get>>;

@@ -210,7 +210,7 @@ function bigCompanyMonth(state: GameState): void {
   if (!state.bigCompany) {
     if (!bigCompanyReady(state)) return;
     state.bigCompany = { name: companyName(state.seed), status: 'oferta', offeredTick: state.tick, deadline: state.tick + c.offerDays * TICKS_PER_DAY, jobs: c.jobs };
-    pushEvent(state, 'business', `${state.bigCompany.name} quiere montar una fábrica grande en la zona industrial: ${c.jobs} empleos. Responde antes de ${c.offerDays} días (Pueblo › Gran empresa)`);
+    pushEvent(state, 'business', `${state.bigCompany.name} quiere montar una fábrica grande en la zona industrial: ${c.jobs} empleos. Responde antes de ${c.offerDays} días`);
     return;
   }
   const bc = state.bigCompany;

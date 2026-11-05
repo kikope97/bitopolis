@@ -1,6 +1,7 @@
 import type { Command, TaxLevel } from '@bitopolis/shared';
-import { BUILD_NAMES, ownIncome, totalDebt, type Citizen, type GameState, IBI_RATE, MIN_WAGE, type MinWageLevel, PLUSVALIA_RATE, TASA_BASURAS, TASA_TERRAZAS, TAX_SPLIT_POP, trashActive, trashFee, trashServed, unitValue } from '@bitopolis/sim';
+import { BUILD_NAMES, ownIncome, worksSpent, totalDebt, type Citizen, type GameState, IBI_RATE, MIN_WAGE, type MinWageLevel, PLUSVALIA_RATE, TASA_BASURAS, TASA_TERRAZAS, TAX_SPLIT_POP, trashActive, trashFee, trashServed, unitValue } from '@bitopolis/sim';
 import { money, MONTHS } from './i18n.ts';
+import { splitText } from './cash.ts';
 import { economyLines } from './money-ui.ts';
 import { maintenanceSection } from './nucleo-ui.ts';
 import { h, sheet } from './ui.ts';
@@ -215,7 +216,7 @@ export function openReport(state: GameState): void {
   const sentence =
     net >= 0
       ? `Sobran ${money(net)}.${biggest ? ` Tu mayor gasto: ${(CONCEPT[biggest[0]] ?? biggest[0]).toLowerCase()} (${money(-biggest[1])}).` : ''}`
-      : `Por qué baja tu saldo: ${reasons.join('; ')}.`;
+      : `Por qué baja tu saldo: ${reasons.join('; ')}.${net + worksSpent(last) >= 0 ? ` Sin las obras, el mes habría salido en +${money(net + worksSpent(last))}: el gasto de cada mes se cubre.` : ''}`;
   const live = Object.keys(state.month.breakdown).length;
   sheet(
     `Parte de ${monthName}`,
@@ -224,6 +225,8 @@ export function openReport(state: GameState): void {
     h('h3', {}, `Entra: ${money(last.income)}`),
     rows(income, prev?.breakdown),
     h('h3', {}, `Sale: ${money(last.expenses)}`),
+    // 2.7: el gasto de cada mes y las obras (que se pagan una vez), por separado.
+    worksSpent(last) ? h('p', { class: 'muted small', 'data-test': 'report-split' }, `${splitText(last)}. Las obras se pagan una vez; el gasto corriente, cada mes.`) : '',
     rows(spend, prev?.breakdown),
     // 2.6: el mantenimiento, por tipo de edificio.
     maintenanceSection(state),

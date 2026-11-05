@@ -13,9 +13,12 @@
   <body>
     <div id="toasts" aria-live="polite"></div>
     <p id="sr-live" class="visually-hidden" aria-live="polite"></p>
+    <!-- 2.7: visible desde el primer momento (con la red lenta se veía un fondo negro); main.ts lo quita. -->
+    <div id="boot" class="boot" role="status"><span class="boot-logo">Bitópolis</span><span class="boot-text">Cargando el pueblo…</span><span class="boot-bar" aria-hidden="true"></span></div>
 
     <main id="start" class="start" hidden>
       <div class="start-top">
+        <div id="start-text" class="start-text"></div>
         <button id="configure" class="btn small">⚙ Configurar</button>
       </div>
       <canvas id="skyline" class="skyline" width="320" height="64" aria-hidden="true"></canvas>
@@ -34,6 +37,8 @@
     </main>
 
     <div id="game" class="game" hidden>
+      <!-- 2.7: título de la pantalla de juego para los lectores de pantalla (el nombre del pueblo). -->
+      <h1 id="town-h1" class="visually-hidden">Bitópolis</h1>
       <!-- v1.6: una sola barra arriba con lo que se consulta (cada dato se toca para ver más). -->
       <header class="topbar" aria-label="Estado del pueblo">
         <button id="play-pause" class="tb-btn tb-time" aria-label="Poner en marcha">▶</button>
@@ -43,6 +48,10 @@
         <button id="hud-happy" class="tb-btn tb-stat" aria-label="Felicidad media: ver por qué"></button>
         <button id="hud-poll" class="tb-btn" hidden></button>
         <button id="ai-chip" class="ai-chip" hidden>IA ✦</button>
+        <!-- 2.7: lo que no cabe en una fila (vecinos, votos, IA) va aquí; la barra nunca pasa a dos filas. -->
+        <button id="hud-more" class="tb-btn" aria-label="Más datos del pueblo: vecinos, votos e IA">⋯</button>
+        <div id="calendar" class="calendar" hidden aria-hidden="true"><span class="cal-m"></span><span class="cal-d"></span></div>
+        <span id="saved" class="saved" aria-live="off"></span>
         <button id="bell" class="tb-btn tb-bell" aria-label="Avisos"><span class="bell-n" hidden></span></button>
       </header>
       <div class="map-wrap">
@@ -52,9 +61,8 @@
           <button id="zoom-out" class="fab zoom" aria-label="Alejar">−</button>
           <button id="layers" class="chip" aria-label="Capas de datos: sin capa" aria-haspopup="dialog"><span class="chip-text">Capas</span></button>
           <button id="whatnow" class="chip chip-help" aria-label="¿Qué hago ahora?">?</button>
+          <button id="home" class="fab fab-home" aria-label="Volver al ayuntamiento">⌂</button>
         </div>
-        <span id="saved" class="saved" aria-live="off"></span>
-        <div id="calendar" class="calendar" hidden aria-hidden="true"><span class="cal-m"></span><span class="cal-d"></span></div>
         <div id="bubbles" class="bubbles"></div>
         <div id="legend" class="legend" hidden></div>
         <div id="objectives" class="objectives" hidden></div>
@@ -90,7 +98,7 @@
       </div>
       <div id="tray" class="tray" role="dialog" aria-label="Construir" hidden></div>
       <!-- v1.6: cinco pestañas grandes; el resto de herramientas, en la bandeja «Construir». -->
-      <nav id="dock" class="dock" aria-label="Herramientas">
+      <nav id="dock" class="dock" role="toolbar" aria-label="Herramientas">
         <div id="tools" class="tools"></div>
         <button id="menu" class="tab" aria-label="Pueblo: dinero, gente, ayuntamiento y ajustes"></button>
       </nav>

@@ -1,7 +1,7 @@
 import { gzipSync } from 'node:zlib';
 import { expect, type Page, test } from '@playwright/test';
 import { canUpgradeTownhall, type GameState, OUTSIDE, runSimulation, transfer, TREASURY } from '../packages/sim/src/index.ts';
-import { drag, pickTool, setSpeed, skipTutorial, state, tap, tile } from './helpers.ts';
+import { drag, pickTool, setSpeed, skipTutorial, state, tap, tile, confirmIfAsked } from './helpers.ts';
 
 /**
  * 2.5.1: lo que se hace en pausa se guarda en el acto (antes esperaba al cierre del día, que en
@@ -119,6 +119,7 @@ test('ampliar el ayuntamiento en pausa sobrevive a la recarga', async ({ page, r
   const p = await tile(page, hall.x, hall.y);
   await page.mouse.click(p.x, p.y);
   await page.getByRole('button', { name: /Ampliar a nivel 2/ }).click();
+  await confirmIfAsked(page);
   await expect(page.locator('.sheet')).toContainText('Nivel 2 de 5');
   const s1 = await state(page);
   expect(s1.townhallLevel).toBe(2);

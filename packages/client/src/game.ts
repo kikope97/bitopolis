@@ -1,4 +1,4 @@
-import { tickToDate, type Command } from '@bitopolis/shared';
+import { DAYS_PER_MONTH, TICKS_PER_DAY, tickToDate, type Command } from '@bitopolis/shared';
 import {
   BUILD_NAMES,
   buildingAt,
@@ -63,6 +63,11 @@ import {
   roadCost,
   commandOutlay,
   pendingWorksCost,
+  monthlyCostOf,
+  networkRoads,
+  BUILD,
+  WAGE_OUTSIDE,
+  maintenanceOf,
   zoneChanges,
   Terrain,
   terrainAt,
@@ -87,6 +92,12 @@ import {
   hasReach,
   serviceReach,
   SERVICE,
+  townNameOf,
+  activeObjectives,
+  daysToElection,
+  nextLevel,
+  OBJECTIVES,
+  politicsActive,
 } from '@bitopolis/sim';
 import { contractBox, openTender } from './tender-ui.ts';
 import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
@@ -97,30 +108,33 @@ import { vidaBox } from './vida-ui.ts';
 import { coopPostBox } from './coop-ui.ts';
 import { openMailbox, unreadLetters } from './mail-ui.ts';
 import { viviendaBox } from './vivienda-ui.ts';
-import { openTownHall } from './civic-ui.ts';
+import { openTourism, openTownHall } from './civic-ui.ts';
 import { openAlbum, snapMoments } from './album-ui.ts';
-import { openAway } from './away-ui.ts';
+import { type AwaySince, closeHoy, hoyHasNews, isHoyOpen, openHoy } from './hoy-ui.ts';
+import { type Ask, dueSoon, dueText, pendingAsks } from './asks.ts';
 import { openRank, rankCard } from './rank-ui.ts';
 import { dilemmaSpot, openDilemmaSheet, type DilemmaCtx } from './dilemma-ui.ts';
-import { objectivesNode, openAdvisor, openCitizen, openDiary, openPleno, portraitCanvas, rememberSeen, renderObjectives, resumeSummary, type SocialCtx } from './social-ui.ts';
+import { objectiveText, objectivesNode, openAdvisor, openCitizen, openDiary, openPleno, portraitCanvas, rememberSeen, renderObjectives, resumeSummary, type SocialCtx } from './social-ui.ts';
 import { api, ApiError } from './api.ts';
 import { nextHint } from './hints.ts';
+import { buildCostParts, monthsText, runwayMonths, runwayWarn } from './cash.ts';
 import { openManagement } from './manage-ui.ts';
-import { errandsSummary, openErrands, openPress } from './town-news-ui.ts';
+import { openErrands, openPress } from './town-news-ui.ts';
 import { openWhatsHappening, turnHeadline } from './ai-town-ui.ts';
 import { pocketMark } from './money-ui.ts';
 import { formatDate, money, MONTHS, plural, shortDate, t } from './i18n.ts';
-import { busTrips, type Camera, type Preview, render, restartAnimations, signSpot } from './render.ts';
+import { buildingPicture, busTrips, type Camera, type Preview, render, restartAnimations, signSpot } from './render.ts';
 import { filterOverlay, overlayFor, placeLines, previewOverlay, reachLine, type ReachOverlay, TOOL_FOR_NEED } from './reach-ui.ts';
 import type { FromWorker, SaveBatch, ToWorker, Unsaved } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
 import { buildingSprite, landmarkSprite, letterSprite, resSprite, T, ZONE_COLOR } from './sprites.ts';
-import { bigCompanyContent, landmarkContent, openRegion, regionAttention, regionSummary } from './landmarks-ui.ts';
-import { comarcaPending, comarcaSummary, openComarca } from './comarca-ui.ts';
+import { bigCompanyContent, landmarkContent, openRegion, regionAttention } from './landmarks-ui.ts';
+import { comarcaPending, openComarca } from './comarca-ui.ts';
+import { ficheHead, fold, listGroup, listRow, spriteCopy, statCard, statGrid, statusBar, type UrgentItem, urgentBlock } from './hub-ui.ts';
 import { type HubEntry, hubWants, Reveal, trayCatsWanted, ZONE_HELPERS } from './progress.ts';
-import { commandFor, costText, isLocked, lockLong, lockShort, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayCost } from './tools.ts';
+import { commandFor, costText, isLocked, lockLong, lockShort, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayChipName, trayCost } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
-import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, h, isSheetOpen, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack } from './ui.ts';
+import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, entryAction, h, isSheetOpen, type LogEntry, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack, setSheetSnap, setFastToasts } from './ui.ts';
 import { pixelIcon } from './icons.ts';
 import { openHistory } from './charts-ui.ts';
 import { medalCount, openMedals } from './medals-ui.ts';
@@ -162,6 +176,8 @@ export function startGame(opts: GameOptions): void {
   $('#start').hidden = true;
   $('#game').hidden = false;
   document.body.classList.add('in-game');
+  // 2.7: un h1 (oculto) con el nombre del pueblo.
+  $('#town-h1').textContent = townNameOf(opts.state);
 
   const canvas = $('#map') as HTMLCanvasElement;
   const ctx = canvas.getContext('2d')!;
@@ -221,7 +237,10 @@ export function startGame(opts: GameOptions): void {
   function paintSaved() {
     const el = $('#saved');
     const text = saveError ? t('saveFailed') : savePending() ? t('saving') : el.textContent ? t('saved') : '';
-    if (el.textContent !== text) el.textContent = text;
+    if (el.textContent !== text) {
+      el.textContent = text;
+      el.title = text;
+    }
     el.classList.toggle('err', saveError);
     el.dataset.pending = String(savePending());
   }
@@ -356,6 +375,8 @@ export function startGame(opts: GameOptions): void {
           sfx.error();
         }
         if (ok) feedback(cmd);
+        // 2.7: en pausa el tick no cambia: «Te piden» se recalcula al responder.
+        if (ok) queueMicrotask(() => refreshAsks(true));
         resolve(ok);
       });
       send({ type: 'command', cmd, id });
@@ -432,7 +453,7 @@ export function startGame(opts: GameOptions): void {
     const look = () => centerOn(wx, wy);
     setTimeout(() => {
       if (reducedMotion()) {
-        toast(text, { kind: 'info', sticky: true, onClick: look });
+        toast(text, { kind: 'info', sticky: true, go: `at:${wx},${wy}` });
         return;
       }
       const from = { x: cam.x, y: cam.y };
@@ -440,7 +461,7 @@ export function startGame(opts: GameOptions): void {
         look();
         return { x: cam.x, y: cam.y };
       }, () => {
-        toast(text, { kind: 'info', sticky: true, onClick: look });
+        toast(text, { kind: 'info', sticky: true, go: `at:${wx},${wy}` });
         setTimeout(() => glide({ x: cam.x, y: cam.y }, () => from, () => {}), 3500);
       });
     }, 1500);
@@ -453,6 +474,8 @@ export function startGame(opts: GameOptions): void {
     if (cal.hidden === on) {
       cal.hidden = !on;
       document.body.classList.toggle('cal-on', on);
+      // Ronda 23: el calendario va en la barra: hay que volver a encajarla (si no, la campana se salía).
+      fitTopbar();
     }
     if (!on || d.day === calDay) return;
     calDay = d.day;
@@ -495,9 +518,12 @@ export function startGame(opts: GameOptions): void {
    */
   let highlight: { x: number; y: number; since: number } | null = null;
   let lastAttention = -Infinity;
-  function attention(at: { x: number; y: number } | undefined, force = false, why?: string) {
+  function attention(at: { x: number; y: number } | undefined, force = false, why?: string, level: 'emergencia' | 'importante' = 'emergencia') {
     const now = performance.now();
     if (at) highlight = { x: at.x, y: at.y, since: now };
+    // 2.7: el jugador elige qué frena el tiempo (por defecto, solo las emergencias).
+    const slowFor = prefs().slowFor;
+    if (slowFor === 'nada' || (level === 'importante' && slowFor !== 'importante')) return;
     if (force && speed >= 3) lastAttention = -Infinity;
     // Ronda 14: si en este mismo lote ya se bajó a x1 (una oferta con plazo), el motivo
     // que llega detrás sí se enseña; si no, como mucho una parada cada 45 s.
@@ -537,14 +563,14 @@ export function startGame(opts: GameOptions): void {
     if (at) highlight = { x: at.x, y: at.y, since: performance.now() };
     slowDown('el nuevo rango');
     calmPause();
-    toast(`${text}. Toca para ver el escudo.`, { kind: 'good', sticky: true, onClick: () => withBack('Pueblo', openHub, () => openRank(state)) });
+    toast(`${text}. Toca para ver el escudo.`, { kind: 'good', sticky: true, go: 'rank' });
     $('#sr-live').textContent = text;
     const th = hallSpot();
     if (th) coins(...screenOf(th.x, th.y), 12);
   }
   /** Una oferta con plazo baja a x1 (sin temblor) y cuenta como parada (ronda 14). */
   function slowDown(why?: string) {
-    if (speed < 3) return;
+    if (speed < 3 || prefs().slowFor !== 'importante') return;
     const before = speed;
     setSpeed(1);
     slowNote(before, why);
@@ -560,11 +586,16 @@ export function startGame(opts: GameOptions): void {
   function slowNote(before: number, why?: string) {
     const note = $('#slow-note');
     slowFrom = before;
-    note.querySelector('.slow-text')!.textContent = `Bajo a x1${why ? ` por ${why}` : ' para que lo veas'}.`;
+    note.querySelector('.slow-text')!.textContent = `Bajo a x1${why ? ` por ${why}` : ' para que lo veas'}. Vuelvo a x${before} en 20 s.`;
     $('#slow-back').textContent = `Volver a x${before}`;
     note.hidden = false;
     clearTimeout(slowTimer);
-    slowTimer = window.setTimeout(hideSlowNote, 20_000);
+    // 2.7: pasado el susto, vuelve sola a la velocidad de antes (si nadie la ha tocado).
+    slowTimer = window.setTimeout(() => {
+      const to = slowFrom;
+      hideSlowNote();
+      if (to > 1 && speed === 1 && !isSheetOpen() && !document.querySelector('.modal-backdrop, .hoy-backdrop')) setSpeed(to);
+    }, 20_000);
   }
   function hideSlowNote() {
     clearTimeout(slowTimer);
@@ -607,7 +638,9 @@ export function startGame(opts: GameOptions): void {
   /* ---------- HUD (v1.6: iconos de píxeles y cifras; cada dato se toca) ---------- */
   const moneyText = h('span', { class: 'tb-text' });
   const moneyTrend = h('span', { class: 'trend', 'aria-hidden': 'true' });
-  $('#hud-money').replaceChildren(pixelIcon('coin'), moneyText, moneyTrend);
+  const runway = h('span', { class: 'tb-runway', 'aria-hidden': 'true' });
+  runway.hidden = true;
+  $('#hud-money').replaceChildren(pixelIcon('coin'), moneyText, moneyTrend, runway);
   const popText = h('span', { class: 'tb-text' });
   $('#hud-pop').replaceChildren(pixelIcon('people'), popText);
   const happyText = h('span', { class: 'tb-text' });
@@ -618,17 +651,47 @@ export function startGame(opts: GameOptions): void {
    * Los iconos nunca se quitan (sin ellos, «77 61» no se entendía).
    */
   let topbarKey = '';
+  /**
+   * 2.7: la barra de arriba va siempre en una fila. Si no cabe, primero sin la flecha, el «€» ni el «%»;
+   * si aún no cabe, vecinos, votos e IA pasan a «⋯» (Más). Los iconos nunca se quitan.
+   */
   function fitTopbar() {
     const bar = $('.topbar');
     const over = () => bar.scrollWidth > bar.clientWidth + 1;
-    bar.classList.remove('tb-tight', 'tb-rows');
+    bar.classList.remove('tb-tight', 'tb-rows', 'tb-more', 'tb-more2', 'tb-nounit', 'tb-nocal');
     if (!over()) return;
     bar.classList.add('tb-tight');
     if (!over()) return;
-    // En dos filas hay sitio de sobra: vuelven el «€», el «%» y la flecha (si caben).
-    bar.classList.replace('tb-tight', 'tb-rows');
+    bar.classList.add('tb-more');
+    // Con lo demás en «Más», a lo mejor ya caben la flecha y el «€».
+    bar.classList.remove('tb-tight');
     if (over()) bar.classList.add('tb-tight');
+    // Último escalón (320 px con letra grande): también la felicidad va a «Más».
+    if (over()) bar.classList.add('tb-more2');
+    // Y si ni así cabe, el calendario (es un adorno; la fecha está en la franja).
+    if (over()) bar.classList.add('tb-nocal');
+    // 2.7: el «€» se queda mientras quepa; solo se quita si aún no cabe nada más.
+    if (over()) bar.classList.add('tb-nounit');
   }
+  /** 2.7: «⋯» enseña lo que no cupo en la barra (cada fila abre lo mismo que su botón). */
+  $('#hud-more').addEventListener('click', () => {
+    const rows: HTMLElement[] = [];
+    const add = (sel: string, label: string) => {
+      const src = document.querySelector<HTMLElement>(sel);
+      // Solo lo que de verdad no se ve en la barra (oculto o mandado a «Más» por el CSS).
+      if (!src || src.hidden || src.offsetParent !== null) return;
+      const b = h('button', { class: 'btn wide more-row', 'data-for': sel.slice(1) }, label);
+      // Abre su hoja encima (sin cerrar esta antes: el «atrás» del historial cerraría la nueva).
+      b.addEventListener('click', () => src.click());
+      rows.push(b);
+    };
+    add('#hud-pop', `Vecinos: ${state.citizens.length}`);
+    add('#hud-happy', `Felicidad: ${happyText.textContent}`);
+    add('#hud-poll', $('#hud-poll').getAttribute('aria-label') ?? 'Intención de voto');
+    add('#ai-chip', 'Lo que piensa el pueblo (IA)');
+    const el = sheet('Más datos', ...rows);
+    el.classList.add('half');
+  });
   let lastStats = state.stats.length;
   let lastLevel = townLevel(state);
   let upgradeWarned = townLevel(state) - 1;
@@ -636,10 +699,11 @@ export function startGame(opts: GameOptions): void {
   function onState() {
     // 2.6: «Deshacer» solo mientras la obra no haya empezado; avisos de las redes, una vez al día.
     checkUndo();
+    refreshAsks();
     const netDay = Math.floor(state.tick / 24);
     if (netDay !== lastNetDay) {
       lastNetDay = netDay;
-      networkWarnings(state, (text, kind, ref) => toast(text, { kind, onClick: () => focusBuilding(ref.id) }));
+      networkWarnings(state, (text, kind, ref) => toast(text, { kind, go: `b:${ref.id}` }));
     }
     // v1.7: foto de cada momento nuevo del álbum (en este navegador).
     snapMoments(token, state, albumSeen);
@@ -650,13 +714,13 @@ export function startGame(opts: GameOptions): void {
     if (canUpgradeTownhall(state).ok && upgradeWarned < lv) {
       upgradeWarned = lv;
       const hall = hallSpot();
-      toast(`Ya puedes ampliar el ayuntamiento a nivel ${lv + 1}: toca el ayuntamiento para ver qué desbloquea.`, { kind: 'good', sticky: true, onClick: hall ? () => focusBuilding(hall.id) : undefined });
+      toast(`Ya puedes ampliar el ayuntamiento a nivel ${lv + 1}: toca el ayuntamiento para ver qué desbloquea.`, { kind: 'good', sticky: true, go: hall ? `b:${hall.id}` : undefined });
       if (hall) highlight = { x: hall.x, y: hall.y, since: performance.now() };
     }
     if (lastLevel < 2 && lv >= 2) {
       sfx.milestone();
       vibrate(120);
-      toast('¡Zonas desbloqueadas! Toca aquí o «Construir» para pintar zonas R, C e I junto a la carretera.', { kind: 'good', sticky: true, onClick: () => openTray() });
+      toast('¡Zonas desbloqueadas! Toca aquí o «Construir» para pintar zonas R, C e I junto a la carretera.', { kind: 'good', sticky: true, go: 'tray' });
       tabBuild.classList.add('pulse');
       setTimeout(() => tabBuild.classList.remove('pulse'), 8000);
     }
@@ -666,14 +730,14 @@ export function startGame(opts: GameOptions): void {
     if (lastTurn && lastTurn.n > turnLogSeen) {
       turnLogSeen = lastTurn.n;
       const head = turnHeadline(state);
-      if (head && speed < 10) toast(head, { kind: 'info', onClick: openHappening });
+      if (head && speed < 10) toast(head, { kind: 'info', go: 'happening' });
     }
     if (state.stats.length !== lastStats) {
       lastStats = state.stats.length;
       const m = state.stats.at(-1);
       if (m) {
         const net = m.income - m.expenses;
-        toast(`Parte del mes: ${net >= 0 ? '▲ +' : '▼ '}${money(net)}. Toca para verlo.`, { kind: net >= 0 ? 'good' : 'warn', onClick: openAccounts });
+        toast(`Parte del mes: ${net >= 0 ? '▲ +' : '▼ '}${money(net)}. Toca para verlo.`, { kind: net >= 0 ? 'good' : 'warn', go: 'accounts' });
         if (net > 0) {
           sfx.coin();
           const th = state.buildings.find((b) => b.kind === 'townhall');
@@ -682,13 +746,13 @@ export function startGame(opts: GameOptions): void {
         // Ronda 15: los cierres del mes, juntos y también a x10, con la causa.
         if ((m.closures ?? 0) > 0) {
           const wage = (m.wage ?? 0) > 900 ? ` (sueldo mínimo ${money(m.wage ?? 0)})` : '';
-          toast(`${m.closures === 1 ? 'Cierra 1 empresa' : `Cierran ${m.closures} empresas`} este mes: no llegaban a las nóminas${wage}. Toca para ver el parte.`, { kind: 'warn', onClick: openAccounts });
+          toast(`${m.closures === 1 ? 'Cierra 1 empresa' : `Cierran ${m.closures} empresas`} este mes: no llegaban a las nóminas${wage}. Toca para ver el parte.`, { kind: 'warn', go: 'accounts' });
         }
         // v1.9: un solo aviso al mes con quien no ha podido pagar.
         if ((m.unpaid ?? 0) > 0 && (m.debtors ?? 0) > 0) {
           toast(`${m.debtors} ${m.debtors === 1 ? 'vecino debe' : 'vecinos deben'} dinero; este mes quedaron ${money(m.unpaid ?? 0)} sin pagar al ayuntamiento. Toca para verlos.`, {
             kind: 'warn',
-            onClick: () => openNeighbours(state, (c) => withBack('Vecinos', () => openNeighbours(state, () => {}, true), () => openCitizen(social, c.id)), true),
+            go: 'debtors',
           });
         }
       }
@@ -734,13 +798,23 @@ export function startGame(opts: GameOptions): void {
       moneyText.dataset.v = moneyNum;
       moneyText.replaceChildren(moneyNum, h('span', { class: 'tb-unit' }, ' €'));
     }
+    // 2.7: si el mes va en negativo, cuántos meses aguanta la caja (en rojo si son menos de 3).
+    // Con el gasto corriente: las obras se pagan una vez (antes, el mes de una obra grande decía «<1 m»).
+    const rm = state.treasury > 0 ? runwayMonths(state) : null;
+    const months = rm === null ? -1 : Math.floor(rm);
+    const runKey = months >= 0 && months < 3 ? (months === 0 ? '<1 m' : `${months} m`) : '';
+    if (runway.dataset.v !== runKey) {
+      runway.dataset.v = runKey;
+      runway.textContent = runKey;
+      runway.hidden = !runKey;
+    }
     moneyTrend.textContent = diff > 0 ? '▲' : diff < 0 ? '▼' : '';
     moneyTrend.className = `trend ${diff > 0 ? 'up' : diff < 0 ? 'down' : ''}`;
     $('#hud-money').classList.toggle('neg', state.treasury < 0);
     // 2.2: en ámbar si los préstamos se llevan más del 25 % de lo que entra.
     const heavy = state.treasury >= 0 && heavyLoad(state);
     $('#hud-money').classList.toggle('load', heavy);
-    $('#hud-money').setAttribute('aria-label', `Caja del ayuntamiento: ${money(state.treasury)}${diff > 0 ? ', subiendo' : diff < 0 ? ', bajando' : ''}${heavy ? `; los préstamos se llevan el ${loadPct(state)} % de lo que entra` : ''}. Ver cuentas`);
+    $('#hud-money').setAttribute('aria-label', `Caja del ayuntamiento: ${money(state.treasury)}${diff > 0 ? ', subiendo' : diff < 0 ? ', bajando' : ''}${heavy ? `; los préstamos se llevan el ${loadPct(state)} % de lo que entra` : ''}${runKey ? `; a este ritmo la caja aguanta ${months === 0 ? 'menos de un mes' : months === 1 ? '1 mes' : `${months} meses`}` : ''}. Ver cuentas`);
     popText.textContent = String(state.citizens.length);
     $('#hud-pop').setAttribute('aria-label', `Habitantes: ${state.citizens.length}. Ver la lista`);
     const happy = state.citizens.length ? Math.round(state.citizens.reduce((s, c) => s + c.happiness, 0) / state.citizens.length) : 0;
@@ -749,7 +823,7 @@ export function startGame(opts: GameOptions): void {
     $('#hud-happy').setAttribute('aria-label', `Felicidad media ${happy} de 100: ver por qué`);
     renderPollChip(state, () => openPolitics(social));
     // Ronda 21: si cambia lo largo de las cifras, se vuelve a encajar la barra de arriba.
-    const barKey = `${moneyNum}|${popText.textContent}|${happyText.textContent}|${$('#hud-poll').textContent}|${$('#hud-poll').hidden}|${$('#ai-chip').hidden}`;
+    const barKey = `${moneyNum.length}|${runKey}|${popText.textContent}|${happyText.textContent}|${$('#hud-poll').textContent}|${$('#hud-poll').hidden}|${$('#ai-chip').hidden}`;
     if (barKey !== topbarKey) {
       topbarKey = barKey;
       fitTopbar();
@@ -807,14 +881,16 @@ export function startGame(opts: GameOptions): void {
       const locked = isLocked(tl, state);
       // Ronda 14: también cambia el motivo («ayto. nivel 2» → «25 vecinos»), no solo el candado.
       const sig = locked ? lockText(tl) : '';
+      // 2.7: el gasto al mes cambia con el presupuesto: se pone al día aunque no cambie el candado.
+      const month = btn.querySelector<HTMLElement>('.tool-month');
+      const monthNow = locked ? '' : monthlyText(tl.build, state);
+      if (month && month.textContent !== monthNow) month.textContent = monthNow;
       if (btn.dataset.ready && btn.dataset.lock === sig) continue;
       btn.dataset.ready = '1';
       btn.dataset.lock = sig;
       btn.classList.toggle('locked', locked);
       btn.setAttribute('aria-disabled', String(locked));
       btn.querySelector('.tool-cost')!.textContent = locked ? `🔒 ${lockText(tl)}` : trayCost(tl);
-      const month = btn.querySelector<HTMLElement>('.tool-month');
-      if (month) month.textContent = locked ? '' : monthlyText(tl.build, state);
     }
   }
   /** Qué falta para desbloquear una herramienta, en pocas palabras. */
@@ -854,7 +930,7 @@ export function startGame(opts: GameOptions): void {
     const notified = built.filter((e) => e.notify);
     if (quiet && notified.length > 1) toast(`${notified.length} obras terminadas`, { kind: 'good' });
     for (const e of quiet && notified.length > 1 ? [] : notified) {
-      toast(e.text, { kind: 'good', sticky: !quiet, onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+      toast(e.text, { kind: 'good', sticky: !quiet, go: e.ref ? `b:${e.ref}` : undefined });
       vibrate(80);
       calmPause();
     }
@@ -866,15 +942,15 @@ export function startGame(opts: GameOptions): void {
         // 2.2: el rumor de la obra del primo lleva a su ficha, con «Revisar el contrato».
         sfx.warn();
         calmPause();
-        toast(e.text, { kind: 'warn', sticky: true, onClick: () => focusBuilding(e.ref!) });
+        toast(e.text, { kind: 'warn', sticky: true, go: `b:${e.ref}` });
       } else if (e.kind === 'warning' && e.text.startsWith('Un asunto difícil')) {
         // 2.4: un dilema con plazo: destello en el sitio, vuelta a x1 y aviso fijo que abre la hoja.
         // Ronda 20: el dilema de este aviso (el más reciente sin resolver de ese vecino), y siempre a x1.
         const d = [...state.dilemmas].reverse().find((x) => !x.resolved && (e.ref === undefined || x.citizenIds[0] === e.ref));
         sfx.warn();
         calmPause();
-        attention(d ? dilemmaSpot(state, d.id) : undefined, true, 'un asunto difícil');
-        toast(e.text, { kind: 'warn', sticky: true, onClick: d ? () => openDilemmaSheet(dilemmaCtx, d.id) : undefined });
+        attention(d ? dilemmaSpot(state, d.id) : undefined, true, 'un asunto difícil', 'importante');
+        toast(e.text, { kind: 'warn', sticky: true, go: d ? `dilemma:${d.id}` : undefined });
       } else if (e.kind === 'warning' && e.text.startsWith('No decidiste a tiempo')) {
         toast(e.text, { kind: 'warn', sticky: true });
       } else if (e.kind === 'bankrupt' || e.kind === 'warning') {
@@ -882,16 +958,13 @@ export function startGame(opts: GameOptions): void {
         duck(1.5);
         if (e.kind === 'bankrupt') shake(4, 400);
         calmPause();
-        toast(e.kind === 'warning' ? `${e.text}. ${nextHint(state).text}` : e.text, {
-          kind: 'warn',
-          sticky: true,
-          onClick: openAccounts,
-        });
+        // 2.7: un aviso, un mensaje (antes se le pegaba el consejo del «?»: «la caja aguanta 1 mes. 24 sin colegio…»).
+        toast(e.text, { kind: 'warn', sticky: true, go: 'accounts' });
       } else if (e.kind === 'milestone' && e.text.startsWith('¡Bitópolis ya es')) {
         // 2.1: subida de rango: fanfarria, el cartel destella y un aviso que abre el escudo.
         celebrateRank(e.text);
       } else if (e.kind === 'milestone' && e.text.startsWith('El escudo estrena')) {
-        toast(e.text, { kind: 'good', onClick: () => withBack('Pueblo', openHub, () => openRank(state)) });
+        toast(e.text, { kind: 'good', go: 'rank' });
       } else if (e.kind === 'milestone') {
         toast(e.text, { kind: 'good', sticky: true });
         vibrate(120);
@@ -911,37 +984,46 @@ export function startGame(opts: GameOptions): void {
         openElectionNight(social);
       } else if (e.kind === 'info' && /ofrece un acuerdo de/.test(e.text)) {
         // 2.5: oferta de un pueblo vecino con plazo: aviso fijo que lleva a «Comarca», y se frena.
-        toast(e.text, { kind: 'warn', sticky: true, onClick: () => withBack('Pueblo', openHub, openComarcaSheet) });
+        toast(e.text, { kind: 'warn', sticky: true, go: 'comarca' });
         slowDown('la oferta de un pueblo vecino');
         calmPause();
+      } else if (e.kind === 'info' && e.text.startsWith('Encargo del pueblo')) {
+        // 2.7: un encargo espera respuesta (antes no se avisaba y se perdía): aviso fijo que abre «Encargos».
+        toast(e.text, { kind: 'warn', sticky: true, go: 'errands' });
+        slowDown('un encargo');
+      } else if (e.kind === 'info' && e.text.startsWith('Sale El Eco')) {
+        if (!quiet) toast(e.text, { kind: 'info', go: 'press' });
+      } else if (e.kind === 'info' && e.text.includes('recibe carta de')) {
+        if (!quiet) toast(e.text, { kind: 'info', go: 'mail' });
       } else if (/quiere montar|Fondos europeos|ofrece pagar el/.test(e.text)) {
         // Ronda 19: la gran empresa, el FEDER y la cofinanciación son decisiones con plazo: aviso fijo y se frena.
-        toast(e.text, { kind: 'warn', sticky: true, onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+        // 2.7: abre la tarjeta donde se responde (antes, el edificio si lo había).
+        toast(e.text, { kind: 'warn', sticky: true, go: /quiere montar/.test(e.text) ? 'region' : 'th:grants' });
         calmPause();
       } else if (e.kind === 'info' && /Diputación|fiestas|Subvención/.test(e.text)) {
         // v1.5: ofertas de subvención y fiestas: llevan a su sección del Ayuntamiento.
         // Si hay que decidir algo con plazo, el juego baja a x1 para que dé tiempo (ronda 11).
         const decide = /Responde antes|puedes organizarlas/.test(e.text);
         if (decide) slowDown(/fiestas/i.test(e.text) ? 'las fiestas' : 'la subvención');
-        toast(e.text, { kind: 'info', sticky: decide, onClick: () => openTownHall(social, /fiestas/i.test(e.text) ? 'festival' : 'grants') });
+        toast(e.text, { kind: 'info', sticky: decide, go: /fiestas/i.test(e.text) ? 'th:festival' : 'th:grants' });
       } else if (e.kind === 'info' && /^(Nieva|Ola de calor|Tormenta sobre|El río crece)/.test(e.text)) {
         // v1.7: el tiempo que cambia algo (no el sol ni las nubes).
         toast(e.text, { kind: 'info' });
       } else if (e.kind === 'info' && /^(Desahucian|El banco se queda)/.test(e.text)) {
         // v1.9: desahucios y embargos.
-        if (!quiet) toast(e.text, { kind: 'warn', onClick: e.ref ? () => openCitizen(social, e.ref!) : undefined });
+        if (!quiet) toast(e.text, { kind: 'warn', go: e.ref ? `c:${e.ref}` : undefined });
       } else if (e.kind === 'info' && e.text.startsWith('El río se desborda')) {
         sfx.warn();
         vibrate(80);
         calmPause();
         attention(refSpot(e.ref), false, 'la riada');
-        toast(e.text, { kind: 'warn', sticky: true, onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+        toast(e.text, { kind: 'warn', sticky: true, go: e.ref ? `b:${e.ref}` : undefined });
       } else if (e.kind === 'crime') {
         // v1.8: robos, detenciones, calabozos llenos y disturbios.
         // Ronda 15: los robos en casas (muchos) se avisan sin parar el juego ni llamar la atención.
         const home = e.text.startsWith('Entran a robar en casa') || e.text.startsWith('Intentan robar');
         if (home) {
-          if (!quiet) toast(e.text, { kind: e.text.includes('escapa') ? 'warn' : 'info', onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+          if (!quiet) toast(e.text, { kind: e.text.includes('escapa') ? 'warn' : 'info', go: e.ref ? `b:${e.ref}` : undefined });
           continue;
         }
         // Ronda 18: el escándalo de una licitación es una mala noticia (fija, con aviso y lleva a la obra).
@@ -951,32 +1033,32 @@ export function startGame(opts: GameOptions): void {
         if (bad) {
           sfx.warn();
           calmPause();
-          if (/Disturbios|llenos|^Escándalo/.test(e.text)) attention(refSpot(e.ref) ?? state.buildings.find((b) => b.kind === 'police' && b.built), false, /Disturbios/.test(e.text) ? 'los disturbios' : /llenos/.test(e.text) ? 'los calabozos llenos' : 'el escándalo');
+          if (/Disturbios|llenos|^Escándalo/.test(e.text)) attention(refSpot(e.ref) ?? state.buildings.find((b) => b.kind === 'police' && b.built), false, /Disturbios/.test(e.text) ? 'los disturbios' : /llenos/.test(e.text) ? 'los calabozos llenos' : 'el escándalo', /Disturbios/.test(e.text) ? 'emergencia' : 'importante');
         }
-        toast(e.text, { kind: bad ? 'warn' : 'good', sticky: /Disturbios|llenos|^Escándalo/.test(e.text), onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
+        toast(e.text, { kind: bad ? 'warn' : 'good', sticky: /Disturbios|llenos|^Escándalo/.test(e.text), go: e.ref ? `b:${e.ref}` : undefined });
       } else if (e.kind === 'fire') {
         // 2.1: riesgos, incendios, bomberos y urgencias.
-        const go = e.ref !== undefined ? () => focusBuilding(e.ref!) : undefined;
+        const go = e.ref !== undefined ? `b:${e.ref}` : undefined;
         if (e.text.startsWith('¡Fuego') || e.text.startsWith('El fuego salta')) {
           sfx.warn();
           duck(1.5);
           calmPause();
           attention(refSpot(e.ref), false, 'el incendio');
-          toast(e.text, { kind: 'warn', sticky: true, onClick: go });
+          toast(e.text, { kind: 'warn', sticky: true, go });
         } else if (e.text.startsWith('El fuego deja')) {
           sfx.warn();
-          toast(e.text, { kind: 'warn', sticky: true, onClick: go });
+          toast(e.text, { kind: 'warn', sticky: true, go });
         } else if (e.text.startsWith('Riesgo de incendio')) {
-          if (!quiet) toast(e.text, { kind: 'warn', onClick: go });
+          if (!quiet) toast(e.text, { kind: 'warn', go });
         } else if (!quiet || e.text.startsWith('Urgencia')) {
-          toast(e.text, { kind: /no llega/.test(e.text) ? 'warn' : 'good', onClick: go });
+          toast(e.text, { kind: /no llega/.test(e.text) ? 'warn' : 'good', go });
         }
       } else if (e.kind === 'protest') {
         sfx.warn();
         duck(1.5);
         calmPause();
         attention(hallSpot(), false, 'la manifestación');
-        toast(e.text, { kind: 'warn', sticky: true, onClick: () => openTownHall(social, 'associations') });
+        toast(e.text, { kind: 'warn', sticky: true, go: 'th:associations' });
       } else if (e.kind === 'politics' && /Asociación|asociación/.test(e.text)) {
         // v1.7: asociaciones. Si convocan una manifestación, hay 3 días para reunirse con ellos: baja a x1.
         const urgent = e.text.includes('convoca una manifestación');
@@ -984,29 +1066,29 @@ export function startGame(opts: GameOptions): void {
           const a = state.associations?.find((x) => x.id === e.ref);
           attention(a?.x !== undefined && a.y !== undefined ? { x: a.x, y: a.y } : hallSpot(), false, 'la manifestación convocada');
         }
-        toast(e.text, { kind: urgent ? 'warn' : 'info', sticky: urgent || e.text.startsWith('Nace'), onClick: () => openTownHall(social, 'associations') });
+        toast(e.text, { kind: urgent ? 'warn' : 'info', sticky: urgent || e.text.startsWith('Nace'), go: 'th:associations' });
       } else if (e.kind === 'politics' && /comisión de festejos/.test(e.text)) {
         // 2.4: la comisión de festejos pide presupuesto: aviso fijo que lleva a su sección.
         slowDown('la comisión de festejos');
-        toast(e.text, { kind: 'info', sticky: true, onClick: () => openTownHall(social, 'seasons') });
+        toast(e.text, { kind: 'info', sticky: true, go: 'th:seasons' });
       } else if (e.kind === 'politics' && /presupuesto/i.test(e.text)) {
         const decide = e.text.startsWith('Toca presentar');
         if (decide) slowDown('el presupuesto');
-        toast(e.text, { kind: e.text.includes('rechaza') ? 'warn' : 'info', sticky: decide, onClick: () => openTownHall(social, 'budget') });
+        toast(e.text, { kind: e.text.includes('rechaza') ? 'warn' : 'info', sticky: decide, go: 'th:budget' });
       } else if (e.kind === 'politics' && /, alcalde de |baja los impuestos: atraerá/.test(e.text)) {
         // 2.5: lo que dicen los alcaldes vecinos (lleva a «Comarca»; a x10, nada).
-        if (!quiet) toast(e.text, { kind: 'info', onClick: () => withBack('Pueblo', openHub, openComarcaSheet) });
+        if (!quiet) toast(e.text, { kind: 'info', go: 'comarca' });
       } else if (e.kind === 'politics') {
         // Lo que responde a una acción tuya (moción, campaña) se avisa siempre.
         if (quiet && !e.text.startsWith('Faltan') && !/moción|campaña/i.test(e.text)) continue;
-        toast(e.text, { kind: e.text.startsWith('Faltan') && state.politics.approval < 50 ? 'warn' : 'info', sticky: e.text.startsWith('Faltan'), onClick: () => openPolitics(social) });
+        toast(e.text, { kind: e.text.startsWith('Faltan') && state.politics.approval < 50 ? 'warn' : 'info', sticky: e.text.startsWith('Faltan'), go: 'politics' });
         if (e.text.startsWith('Faltan') || e.text.includes('funda')) calmPause();
       } else if (e.kind === 'departure' || e.kind === 'business') {
         // Ronda 15: una apertura es buena noticia; los cierres van además agrupados a fin de mes.
         const opens = e.kind === 'business' && / abre /.test(e.text);
         // Ronda 21: los que se van a un pueblo vecino llevan a la Comarca (por qué se van), también a x10.
         const toTown = /se van? a .*: (allí se vive|ha bajado los impuestos)/.test(e.text);
-        if (!quiet || toTown) toast(e.text, { kind: opens ? 'good' : 'warn', onClick: toTown ? () => withBack('Pueblo', openHub, openComarcaSheet) : e.ref ? () => focusBuilding(e.ref!) : undefined });
+        if (!quiet || toTown) toast(e.text, { kind: opens ? 'good' : 'warn', go: toTown ? 'comarca' : e.ref ? `b:${e.ref}` : undefined });
         if (!opens) calmPause();
       }
     }
@@ -1425,7 +1507,9 @@ export function startGame(opts: GameOptions): void {
       if (touchInput) proposePlace(g.startTile, t1);
       else {
         const cmd = commandFor(tool, g.startTile, t1);
-        if (cmd) void command(cmd).then((ok) => ok && warnZoneWithoutRoad(cmd));
+        const net = cmd?.type === 'BuildRoad' && validateCommand(state, cmd).ok ? roadNetworkWarn(cmd) : '';
+        if (cmd && !validateCommand(state, cmd).ok) flashBad(previewFor(g.startTile, t1)?.tiles ?? [t1]);
+        if (cmd) void command(cmd).then((ok) => ok && (warnZoneWithoutRoad(cmd), net && warnRoadNetwork(net)));
       }
     }
     // Con un inicio marcado (dos toques) o una obra por confirmar se mantiene la vista previa.
@@ -1493,8 +1577,10 @@ export function startGame(opts: GameOptions): void {
         pendingEnd = tile;
         preview = previewFor(anchor, tile);
         const v = validateCommand(state, line);
+        if (!v.ok) flashBad(preview?.tiles ?? [tile]);
+        const net = v.ok && line.type === 'BuildRoad' ? roadNetworkWarn(line) : '';
         const msg = v.ok
-          ? `${tool.label}: ${lineText(anchor, tile)}. Haz clic otra vez en el final para confirmar.`
+          ? `${tool.label}: ${lineText(anchor, tile)}.${net ? ` ${net}` : ''} Haz clic otra vez en el final para confirmar.`
           : `${tool.label}: no se puede (${v.error}). Elige otro final o pulsa Esc.`;
         $('#tool-info').textContent = msg;
         refreshStrip();
@@ -1506,7 +1592,11 @@ export function startGame(opts: GameOptions): void {
       preview = null;
       document.body.classList.remove('placing');
       selectTool(tool.id);
-      if (await command(line)) warnZoneWithoutRoad(line);
+      const net = line.type === 'BuildRoad' && validateCommand(state, line).ok ? roadNetworkWarn(line) : '';
+      if (await command(line)) {
+        warnZoneWithoutRoad(line);
+        if (net) warnRoadNetwork(net);
+      }
       return;
     }
     if (touchInput && (tool.build || tool.id === 'dike' || tool.landmark)) {
@@ -1514,6 +1604,9 @@ export function startGame(opts: GameOptions): void {
       return proposePlace(tile, tile);
     }
     const cmd = commandFor(tool, tile, tile);
+    // 2.7: un clic donde no se puede ya no se queda en un aviso suelto: la casilla parpadea y la franja dice por qué.
+    const v = cmd ? validateCommand(state, cmd) : null;
+    if (cmd && v && !v.ok) return flashBad([tile], v.error);
     if (cmd && (await placeBuild(cmd)) && cmd.type === 'Build') offerUndo(cmd.x, cmd.y);
   }
 
@@ -1630,6 +1723,12 @@ export function startGame(opts: GameOptions): void {
     }).length;
     return n ? `⚠ ${plural(n, 'casilla', 'casillas')} sin carretera: ${n === 1 ? 'ahí' : 'aquí'} no se construirá` : '';
   }
+  /** 2.7: tras trazar con el ratón una calle sin agua o luz, la franja lo dice. */
+  function warnRoadNetwork(text: string) {
+    $('#tool-info').replaceChildren(h('b', {}, tool.label), `: ${text}`);
+    refreshStrip();
+    $('#sr-live').textContent = text;
+  }
   /** Tras marcar una zona, si parte no toca carretera, la franja lo dice. */
   function warnZoneWithoutRoad(cmd: Command | null | undefined) {
     if (cmd?.type !== 'Zone') return;
@@ -1668,6 +1767,56 @@ export function startGame(opts: GameOptions): void {
     return cmd ? tilesOf(cmd).filter((t) => terrainAt(state, t.x, t.y) === Terrain.River && state.map.tiles[t.y * state.map.w + t.x] !== Tile.Road).length : 0;
   }
 
+  /**
+   * 2.7: las calles nuevas que no tocan la red del agua o de la luz (`networkRoads`, lo mismo
+   * que `siteNetworkWarn` para los edificios). Solo si ya hay planta de esa red.
+   */
+  let netCache: { s: GameState; water: Set<number>; power: Set<number> } | null = null;
+  function roadNetworkWarn(cmd: Extract<Command, { type: 'BuildRoad' }>): string {
+    if (netCache?.s !== state) netCache = { s: state, water: networkRoads(state, 'water'), power: networkRoads(state, 'power') };
+    const { w, h: hh } = state.map;
+    const tiles = tilesOf(cmd);
+    const plantOf = (kind: string, net: 'water' | 'power') => kind === net || (net === 'power' && (kind === 'solar' || kind === 'wind'));
+    const missing: string[] = [];
+    for (const net of ['water', 'power'] as const) {
+      if (!state.buildings.some((b) => b.built && plantOf(b.kind, net))) continue;
+      const set = netCache[net];
+      const touches = tiles.some((t) => {
+        if (set.has(t.y * w + t.x)) return true;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+          const x = t.x + dx;
+          const y = t.y + dy;
+          if (x < 0 || y < 0 || x >= w || y >= hh) continue;
+          if (set.has(y * w + x)) return true;
+          const b = buildingAt(state, x, y);
+          if (b?.built && plantOf(b.kind, net)) return true;
+        }
+        return false;
+      });
+      if (!touches) missing.push(net === 'water' ? 'agua' : 'luz');
+    }
+    if (!missing.length) return '';
+    const to = missing.length === 2 ? 'al agua ni a la luz' : missing[0] === 'agua' ? 'al agua' : 'a la luz';
+    return `⚠ Esta calle no está unida ${to}: únela a la red o junto a ella no habrá ${missing.join(' ni ')}.`;
+  }
+
+  /** 2.7: qué hacer si la caja va a quedar justa (en la barra «Construir»). */
+  function runwayAdvice(): string {
+    return 'Quizá convenga esperar a cobrar o subir los impuestos.';
+  }
+
+  /** 2.7: la casilla que no vale parpadea en rojo; si se dice por qué, va en la franja. */
+  let badFlash: { tiles: { x: number; y: number }[]; since: number } | null = null;
+  function flashBad(tiles: { x: number; y: number }[], why?: string) {
+    badFlash = { tiles, since: performance.now() };
+    if (!why) return;
+    $('#tool-info').replaceChildren(h('b', {}, tool.label), ': ', h('span', { class: 'bad-why' }, `aquí no: ${why}`), '. Elige otra casilla.');
+    refreshStrip();
+    $('#sr-live').textContent = `${tool.label}: aquí no se puede, ${why}.`;
+    sfx.error();
+    vibrate(30);
+  }
+
   /** Enseña la obra (fantasma) y la barra «Construir / ✕». Nada se gasta hasta confirmar. */
   function proposePlace(a: { x: number; y: number }, b: { x: number; y: number }, demolishText?: string) {
     const cmd = commandFor(tool, a, b);
@@ -1679,21 +1828,51 @@ export function startGame(opts: GameOptions): void {
     preview = previewFor(a, b);
     const v = validateCommand(state, cmd);
     const hill = (tool.build || tool.landmark) && tool.shape === 'tap' && terrainAt(state, a.x, a.y) === Terrain.Hill;
-    // 2.6: con lo que costará al mes («+1.050 €/mes (mantenimiento y 1 sueldo)»).
+    // 2.6: con lo que costará al mes. 2.7: como gasto («−1050 €/mes»).
     const pl0 = v.ok && !demolishText && tool.build && tool.shape === 'tap' && touchInput;
-    // Ronda 22: en la barra, corto («· +2450 €/mes»); el detalle de sueldos está en la bandeja.
+    // Ronda 22: en la barra, corto («· −2450 €/mes»); el detalle de sueldos está en la bandeja.
     const month = tool.build && tool.shape === 'tap' ? monthlyText(tool.build, state, true).replace(/\s*\(.*\)$/, '') : '';
-    const cost = tool.id === 'dike' ? shortCost(tool) : tool.landmark ? `${shortCost(tool)}${hill ? ' (colina: +50 %)' : ''} · ahora solo el solar` : tool.build && tool.shape === 'tap' ? `${shortCost(tool)}${hill ? ' (colina: materiales +50 %)' : ''}${month ? ` ${month}` : ''}` : lineText(a, b);
+    // 2.7: la obra explicada: lo que se paga al poner la obra y lo que irá en obreros («Agua 4200 €» cobraba 3000 y luego devolvía 3000).
+    const parts = tool.build && tool.build !== 'road' && tool.shape === 'tap' ? buildCostParts(state, tool.build, a.x, a.y) : null;
+    const monthSpan = month ? h('span', { class: 'cc-month' }, ` · ${month}`) : '';
+    const cost: (Node | string)[] | string =
+      tool.id === 'dike'
+        ? shortCost(tool)
+        : tool.landmark
+          ? `${shortCost(tool)}${hill ? ' (colina: +50 %)' : ''} · ahora solo el solar`
+          : parts
+            ? [`${parts.text}${hill ? ' (colina: materiales +50 %)' : ''}`, monthSpan]
+            : lineText(a, b);
     // Ronda 13: el precio va en su propia línea y siempre se ve (también si no se puede: «no hay dinero»).
     const what = demolishText && v.ok ? demolishText : v.ok ? (pl0 ? '' : `${tool.label} aquí`) : `${tool.label}: no se puede (${v.error})`;
     // v1.9.1: si con lo que falta por pagar de las obras en marcha la caja quedaría en negativo, se avisa (no se bloquea).
-    const after = v.ok && !demolishText ? state.treasury - commandOutlay(state, cmd) - pendingWorksCost(state) : 0;
-    const warn = after < 0 ? h('span', { class: 'cc-warn' }, `⚠ Quedarías en −${money(-after)} con las obras en marcha`) : '';
+    const outlay = v.ok && !demolishText ? commandOutlay(state, cmd) : 0;
+    const after = v.ok && !demolishText ? state.treasury - outlay - pendingWorksCost(state) : 0;
+    // 2.7: y si la caja queda para menos de 2 meses con el gasto corriente (y lo que costará esta obra al mes).
+    const runway = v.ok && !demolishText && after >= 0 && outlay > 0 ? runwayWarn(state, outlay, tool.build && tool.build !== 'road' ? monthlyCostOf(tool.build, state).total : 0) : '';
+    // 2.7: una calle que no toca la red de agua o de luz no lleva ni agua ni luz a lo que se construya junto a ella.
+    const netWarn = v.ok && !demolishText && cmd.type === 'BuildRoad' ? roadNetworkWarn(cmd) : '';
+    const warn = after < 0
+      ? h('span', { class: 'cc-warn' }, `⚠ Quedarías en −${money(-after)} con las obras en marcha`)
+      : runway
+        ? h('span', { class: 'cc-warn cc-runway', 'data-test': 'cc-runway' }, `${runway}. ${runwayAdvice()}`)
+        : '';
+    const netSpan = netWarn ? h('span', { class: 'cc-warn cc-runway', 'data-test': 'cc-network' }, netWarn) : '';
     // 2.6: lo que gana el pueblo con este servicio aquí («+14 casas con colegio · atenderá a ~38 de 60»).
     const pl = v.ok && !demolishText && tool.build && tool.shape === 'tap' ? placeLines(state, tool.build, a.x, a.y) : null;
     const reachText = pl ? h('span', { class: 'cc-reach', 'data-test': 'cc-reach' }, h('b', { class: pl.none ? 'none' : '' }, pl.gain), ...pl.warn.map((w) => h('span', { class: 'cc-reach-warn' }, w))) : '';
-    $('#confirm-text').replaceChildren(h('span', { class: 'cc-what' }, what), demolishText || !cost ? '' : h('span', { class: 'cc-cost' }, v.ok ? cost : `Cuesta ${cost}`), reachText, warn);
+    const costNodes = typeof cost === 'string' ? [cost] : cost;
+    $('#confirm-text').replaceChildren(
+      h('span', { class: 'cc-what' }, what),
+      demolishText || !cost.length ? '' : h('span', { class: 'cc-cost' }, ...(v.ok ? costNodes : ['Cuesta ', ...costNodes])),
+      reachText,
+      netSpan,
+      warn,
+    );
     $('#confirm-bar').classList.toggle('warn', after < 0);
+    $('#confirm-bar').classList.toggle('runway', !!runway || !!netWarn);
+    // 2.7: lo que no se puede, también en el mapa (la casilla parpadea en rojo).
+    if (!v.ok && !demolishText) flashBad(preview?.tiles ?? [a]);
     const yes = $('#confirm-yes') as HTMLButtonElement;
     yes.textContent = demolishText ? 'Derribar' : tool.zone ? (tool.zone === 'none' ? 'Quitar zona' : 'Marcar zona') : tool.density !== undefined ? 'Marcar densidad' : tool.landmark ? 'Marcar el solar' : 'Construir';
     yes.className = demolishText ? 'btn danger' : 'btn primary';
@@ -1721,10 +1900,12 @@ export function startGame(opts: GameOptions): void {
     if (!p) return;
     const cmd0 = commandFor(tool, p.a, p.b);
     const cmd = cmd0 && cancelOnly && cmd0.type === 'Demolish' ? { ...cmd0, cancelOnly: true as const } : cmd0;
+    const net = cmd?.type === 'BuildRoad' && validateCommand(state, cmd).ok ? roadNetworkWarn(cmd) : '';
     const ok = cmd ? await placeBuild(cmd) : false;
     // Tras una carretera o zona, la franja vuelve a la ayuda de la herramienta (no a «toca dónde termina»).
     if (tool.shape !== 'tap') selectTool(tool.id);
     if (ok) warnZoneWithoutRoad(cmd);
+    if (ok && net) warnRoadNetwork(net);
     if (ok && cmd?.type === 'Build') offerUndo(cmd.x, cmd.y);
   }
 
@@ -1746,7 +1927,8 @@ export function startGame(opts: GameOptions): void {
     if (!b || refund <= 0) return;
     hideUndo();
     undo = { x, y, id: b.id, until: performance.now() + UNDO_MS, timer: window.setTimeout(hideUndo, UNDO_MS) };
-    $('#undo-text').textContent = `${BUILD_NAMES[b.kind] ?? b.kind}: obra puesta. Si te has equivocado, se devuelven ${money(refund)}.`;
+    // 2.7: lo que se recupera es justo lo pagado hasta ahora (los materiales; los obreros aún no han cobrado).
+    $('#undo-text').textContent = `${BUILD_NAMES[b.kind] ?? b.kind}: obra puesta (pagados ${money(refund)} de materiales). Deshacer: recuperas ${money(refund)}.`;
     $('#undo-bar').hidden = false;
     refreshStrip();
   }
@@ -1819,7 +2001,7 @@ export function startGame(opts: GameOptions): void {
   }
 
   window.addEventListener('keydown', (e) => {
-    if (document.querySelector('.modal-backdrop')) return;
+    if (document.querySelector('.modal-backdrop, .hoy-backdrop')) return;
     const target = e.target as HTMLElement;
     if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
     const step = Math.round(64 * dpr());
@@ -1928,8 +2110,12 @@ export function startGame(opts: GameOptions): void {
   const bar = $('#tools');
   const tray = $('#tray');
   const coarse = matchMedia('(pointer: coarse)').matches;
+  /** 2.7: el nombre de la pestaña, con uno corto para el texto grande (nunca solo el icono). */
+  const SHORT: Record<string, string> = { Carretera: 'Calle', Construir: 'Obras', Derribar: 'Quitar' };
+  const tabLabel = (label: string, short = SHORT[label] ?? label) =>
+    h('span', { class: 'tab-label', 'aria-hidden': 'true' }, h('span', { class: 'tl-long' }, label), h('span', { class: 'tl-short' }, short));
   const tab = (id: string, icon: string, label: string, cls = '') => {
-    const b = h('button', { class: `tab ${cls}`, id: `tab-${id}`, 'aria-label': label }, pixelIcon(icon), h('span', { class: 'tab-label', 'aria-hidden': 'true' }, label));
+    const b = h('button', { class: `tab ${cls}`, id: `tab-${id}`, 'aria-label': label }, pixelIcon(icon), tabLabel(label));
     return b;
   };
   const tabInspect = tab('inspect', 'inspect', 'Mirar');
@@ -1946,12 +2132,65 @@ export function startGame(opts: GameOptions): void {
   tabRoad.onclick = () => selectTool('road');
   tabDemolish.onclick = () => selectTool('demolish');
   tabBuild.onclick = () => (tray.hidden ? openTray() : closeTray());
-  $('#menu').replaceChildren(pixelIcon('town'), h('span', { class: 'tab-label', 'aria-hidden': 'true' }, 'Pueblo'));
+  $('#menu').replaceChildren(pixelIcon('town'), tabLabel('Pueblo'));
   $('#menu').classList.add('tab');
+  // 2.7: el dock es una barra de herramientas: las flechas pasan de una pestaña a otra.
+  $('#dock').addEventListener('keydown', (e) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+    const tabs = [...$('#dock').querySelectorAll<HTMLElement>('.tab')].filter((b) => b.offsetParent !== null);
+    const i = tabs.indexOf(document.activeElement as HTMLElement);
+    if (i < 0) return;
+    e.preventDefault();
+    e.stopPropagation(); // el mapa no se mueve por detrás
+    const n = tabs.length;
+    const j = e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : (i + (e.key === 'ArrowRight' ? 1 : n - 1)) % n;
+    tabs[j]!.focus();
+  });
 
   // La bandeja: por categorías, con precio y lo que falta para lo bloqueado.
+  // 2.7 «Construir 2.0»: chips de categoría en una fila (se desplaza de lado) y tarjetas en 3 columnas.
+  // Se construye una sola vez: al abrirla solo se ponen al día precios, bloqueos y categorías.
+  const trayChips = h('div', { class: 'tray-chips', role: 'toolbar', 'aria-label': 'Categorías' });
   const trayMsg = h('p', { class: 'tray-msg muted small', 'aria-live': 'polite' }, 'Elige qué construir. Los precios incluyen la obra.');
-  tray.replaceChildren(trayMsg);
+  tray.replaceChildren(h('div', { class: 'tray-head' }, trayChips, trayMsg));
+  /** Lleva a una categoría: la abre y la deja arriba (bajo los chips). */
+  function goTrayCat(title: string) {
+    const fold = tray.querySelector<HTMLDetailsElement>(`details[data-cat="${title}"]`);
+    if (!fold) return;
+    if (!fold.open) {
+      fold.dataset.user = '1';
+      fold.open = true;
+    }
+    seenTrayCat(title);
+    const head = tray.querySelector<HTMLElement>('.tray-head')!;
+    tray.scrollTo({ top: fold.offsetTop - head.offsetHeight - 2, behavior: reducedMotion() ? 'auto' : 'smooth' });
+    markTrayChip(title);
+  }
+  function markTrayChip(title: string) {
+    for (const c of trayChips.querySelectorAll<HTMLElement>('.tray-chip')) {
+      const on = c.dataset.cat === title;
+      if (on !== (c.getAttribute('aria-current') === 'true')) c.setAttribute('aria-current', String(on));
+      if (on) {
+        const r = c.offsetLeft - (trayChips.clientWidth - c.offsetWidth) / 2;
+        if (c.offsetLeft < trayChips.scrollLeft || c.offsetLeft + c.offsetWidth > trayChips.scrollLeft + trayChips.clientWidth) trayChips.scrollTo({ left: r });
+      }
+    }
+  }
+  /** Al desplazar la bandeja, el chip de la categoría que está arriba se marca. */
+  let trayScrollRaf = 0;
+  tray.addEventListener('scroll', () => {
+    if (trayScrollRaf) return;
+    trayScrollRaf = requestAnimationFrame(() => {
+      trayScrollRaf = 0;
+      const top = tray.scrollTop + tray.querySelector<HTMLElement>('.tray-head')!.offsetHeight + 8;
+      let cur = '';
+      for (const fold of tray.querySelectorAll<HTMLDetailsElement>('details.tray-cat')) {
+        if (fold.hidden) continue;
+        if (!cur || fold.offsetTop <= top) cur = fold.dataset.cat!;
+      }
+      if (cur) markTrayChip(cur);
+    });
+  }, { passive: true });
   for (const cat of TRAY) {
     const grid = h('div', { class: 'tray-grid' });
     for (const id of cat.tools) {
@@ -1962,7 +2201,7 @@ export function startGame(opts: GameOptions): void {
         toolIcon(tl),
         h('span', { class: 'tool-label' }, tl.label),
         h('span', { class: 'tool-cost' }, trayCost(tl)),
-        // 2.6: lo que cuesta al mes, debajo del precio.
+        // 2.6: lo que cuesta al mes, debajo del precio (2.7: como gasto, «−1050 €/mes»).
         h('span', { class: 'tool-month' }, monthlyText(tl.build, state)),
       );
       btn.addEventListener('click', () => {
@@ -1992,6 +2231,9 @@ export function startGame(opts: GameOptions): void {
       }
     });
     tray.append(fold);
+    const chip = h('button', { class: 'tray-chip', 'data-cat': cat.title, 'aria-current': 'false' }, h('span', { class: 'tc-name' }, trayChipName(cat.title)));
+    chip.addEventListener('click', () => goTrayCat(cat.title));
+    trayChips.append(chip);
   }
   refreshReveal();
   /**
@@ -2019,6 +2261,7 @@ export function startGame(opts: GameOptions): void {
     reveal.seen(`tray:${title}`);
     reveal.seen(`trayfree:${title}`);
     document.querySelector(`#tray details[data-cat="${title}"] .new-badge`)?.remove();
+    document.querySelector(`#tray .tray-chip[data-cat="${title}"]`)?.classList.remove('has-new');
     refreshNewDots();
   }
   /**
@@ -2042,6 +2285,14 @@ export function startGame(opts: GameOptions): void {
       const why = free ? '' : (tools.map((tl) => lockText(tl)).find((t) => /nivel/.test(t)) ?? lockText(tools[0]!));
       fold.querySelector('h3')!.textContent = free ? cat.title : `${cat.title} (${tools.length}${why ? ` · ${why.replace(/^ayto\. nivel/, 'desde nivel')}` : ''})`;
       if (trayCatNew(cat.title)) fold.querySelector('h3')!.append(newBadge());
+      // 2.7: su chip, igual (oculto, con candado si no hay nada disponible y con el punto de «Nuevo»).
+      const chip = trayChips.querySelector<HTMLButtonElement>(`.tray-chip[data-cat="${cat.title}"]`);
+      if (chip) {
+        chip.hidden = fold.hidden;
+        chip.classList.toggle('locked', !free);
+        chip.classList.toggle('has-new', trayCatNew(cat.title));
+        chip.setAttribute('aria-label', `${cat.title}${free ? '' : ': aún bloqueada'}${trayCatNew(cat.title) ? ' (nuevo)' : ''}`);
+      }
       if (fold.dataset.user) continue;
       fold.dataset.auto = String(free);
       fold.open = free;
@@ -2058,7 +2309,13 @@ export function startGame(opts: GameOptions): void {
     tabBuild.setAttribute('aria-expanded', 'true');
     document.body.classList.add('tray-open');
     tutorial.update(state, tool.id);
-    (tray.querySelector<HTMLElement>('[aria-pressed="true"]') ?? tray.querySelector<HTMLElement>('.tool:not(.locked)'))?.focus();
+    const target = tray.querySelector<HTMLElement>('[aria-pressed="true"]') ?? tray.querySelector<HTMLElement>('details:not([hidden]) .tool:not(.locked)');
+    // 2.7: el chip de la categoría de lo elegido (o de lo primero que se puede construir) queda marcado.
+    const cat = target?.closest<HTMLElement>('details.tray-cat')?.dataset.cat ?? TRAY[0]!.title;
+    markTrayChip(cat);
+    target?.focus({ preventScroll: true });
+    if (target && target.getAttribute('aria-pressed') === 'true') goTrayCat(cat);
+    else tray.scrollTop = 0;
   }
   function closeTray() {
     if (tray.hidden) return;
@@ -2096,13 +2353,15 @@ export function startGame(opts: GameOptions): void {
     // Ronda 22: con otra herramienta, la franja enseña su ayuda (no el «Deshacer» de la obra anterior).
     if (undo && id !== tool.id) hideUndo();
     tool = tl;
+    // 2.7: con una herramienta elegida, lo que flota sobre el mapa (burbujas) no roba toques.
+    document.body.classList.toggle('tool-active', id !== 'inspect');
     const inTray = TRAY.some((c) => c.tools.includes(id));
     for (const b of [tabInspect, tabRoad, tabDemolish]) b.setAttribute('aria-pressed', String(b.dataset.tool === id));
     tabBuild.setAttribute('aria-pressed', String(inTray));
     for (const b of tray.querySelectorAll('.tool')) b.setAttribute('aria-pressed', String(b.getAttribute('data-tool') === id));
     // La pestaña «Construir» enseña lo elegido: se ve qué hay en la mano.
-    if (inTray) tabBuild.replaceChildren(h('span', { class: 'tab-sprite' }, toolIcon(tl)), h('span', { class: 'tab-label', 'aria-hidden': 'true' }, tl.label));
-    else tabBuild.replaceChildren(pixelIcon('build'), h('span', { class: 'tab-label', 'aria-hidden': 'true' }, 'Construir'));
+    if (inTray) tabBuild.replaceChildren(h('span', { class: 'tab-sprite' }, toolIcon(tl)), tabLabel(tl.label, 'Obras'));
+    else tabBuild.replaceChildren(pixelIcon('build'), tabLabel('Construir'));
     tabBuild.setAttribute('aria-label', inTray ? `Construir: ${tl.label} elegido. Cambiar` : 'Construir');
     // Ronda 21: al trazar (carretera, zonas, densidad), «Capas» y «?» se apartan: un toque en esa esquina
     // abría las capas en vez de marcar la casilla. Vuelven con «Mirar» o con otra herramienta.
@@ -2114,9 +2373,11 @@ export function startGame(opts: GameOptions): void {
     else if (tl.id === 'inspect') info.textContent = '';
     else {
       const cost = trayCost(tl) || costText(tl);
-      // 2.6: y lo que costará cada mes (mantenimiento y sueldos).
+      // 2.6: y lo que costará cada mes (mantenimiento y sueldos). 2.7: como gasto y con la obra explicada.
       const month = monthlyText(tl.build, state, true);
-      info.replaceChildren(h('b', {}, tl.label), cost ? ` · ${cost}${month ? ` ${month}` : ''} · ` : ': ', toolHelp(tl));
+      const spec = tl.build && tl.build !== 'road' && tl.shape === 'tap' ? BUILD[tl.build] : null;
+      const why = spec && spec.workers ? ` (${money(spec.materials)} al empezar + hasta ${money(spec.workers * spec.days * WAGE_OUTSIDE)} de obreros)` : '';
+      info.replaceChildren(h('b', {}, tl.label), cost ? ` · ${cost}${why}` : ': ', month ? h('span', { class: 'cc-month' }, ` · ${month}`) : '', cost ? ' · ' : '', toolHelp(tl));
     }
     selected = null;
     anchor = null;
@@ -2135,6 +2396,8 @@ export function startGame(opts: GameOptions): void {
 
   /* ---------- inspección ---------- */
   let openInspect: (() => void) | null = null;
+  /** 2.7: la fila de servicios de la casa, abierta (detalle) o en iconos. */
+  let svcOpen = false;
   let inspectSheet: HTMLElement | null = null;
 
   function focusBuilding(id: number) {
@@ -2188,12 +2451,100 @@ export function startGame(opts: GameOptions): void {
       h('p', {}, `Para el nivel ${lv + 1} (más alcance y más capacidad; cuesta más mantenerlo):`),
       h('ul', { class: 'reqs' }, ...reqs.map((r) => h('li', { class: r.ok ? 'ok' : 'no' }, h('span', { 'aria-hidden': 'true' }, r.ok ? '✓ ' : '✗ '), r.label, h('span', { class: 'visually-hidden' }, r.ok ? ' (cumplido)' : ' (falta)')))),
     );
-    const ok = canUpgradeBuilding(state, b, served).ok;
-    const btn = h('button', { class: 'btn primary wide' }, `Mejorar · ${money(upgradeCost(b))}`) as HTMLButtonElement;
-    btn.disabled = !ok;
-    btn.addEventListener('click', () => void command({ type: 'UpgradeBuilding', buildingId: b.id }));
-    box.append(btn);
+    // 2.7: el botón va arriba, en la cabecera de la ficha (upgradeButton).
     return box;
+  }
+
+  /** 2.7: «Ampliar a nivel N» (botón principal de la ficha); desactivado, con candado y lo que falta. */
+  function upgradeButton(b: Building): HTMLElement | null {
+    if (!UPGRADABLE.includes(b.kind) || b.upgradeUntil !== undefined || levelOf(b) >= maxLevelOf(b) || !b.built || b.damaged) return null;
+    const served = serviceCounts(state).get(b.id);
+    const ok = canUpgradeBuilding(state, b, served).ok;
+    const btn = h('button', { class: 'btn primary big wide', 'data-test': 'fiche-main' }, pixelIcon('upgrade'), ` Ampliar a nivel ${levelOf(b) + 1} · ${money(upgradeCost(b))}`) as HTMLButtonElement;
+    btn.disabled = !ok;
+    btn.addEventListener('click', async () => {
+      // 2.7: una mejora que se lleva más del 20 % de la caja se confirma (antes, 10.000 € de un toque).
+      const cost = upgradeCost(b);
+      if (cost > 0.2 * Math.max(0, state.treasury)) {
+        const left = state.treasury - cost;
+        const extra = Math.max(0, Math.round(maintenanceOf({ ...b, level: levelOf(b) + 1 }) - maintenanceOf(b)));
+        const m = runwayMonths(state, left - pendingWorksCost(state), extra);
+        const run = m !== null && m < 2 ? ` ⚠ Con el gasto de cada mes, la caja aguantaría ${monthsText(m)}.` : '';
+        const ok2 = await confirmDialog(
+          `¿Ampliar a nivel ${levelOf(b) + 1}?`,
+          `Cuesta ${money(cost)} (el ${Math.round((100 * cost) / Math.max(1, state.treasury))} % de la caja): te quedarán ${money(left)}.${extra ? ` El mantenimiento sube ${money(extra)} al mes.` : ''}${run}`,
+          'Ampliar',
+          { safe: !run },
+        );
+        if (!ok2) return;
+      }
+      void command({ type: 'UpgradeBuilding', buildingId: b.id });
+    });
+    if (ok) return btn;
+    const miss = upgradeReqs(state, b, served).filter((r) => !r.ok).map((r) => lowerFirst(r.label));
+    return h('div', {}, btn, miss.length ? h('p', { class: 'muted small fc-why' }, `Falta: ${miss.join('; ')}.`) : '');
+  }
+
+  /** 2.7: la barra de estado de la ficha: una palabra y su número. */
+  function buildingStatus(b: Building, p: GameState['projects'][number] | undefined): HTMLElement {
+    if (p) {
+      const pct = Math.round((100 * p.workerDaysDone) / p.workerDaysNeeded);
+      return statusBar('info', 'En obra', `${pct} %`, `faltan ${plural(Math.ceil((p.workerDaysNeeded - p.workerDaysDone) / p.workersNeeded), 'día', 'días')}`);
+    }
+    if (b.fire) return statusBar('bad', 'Ardiendo', undefined, b.fire.covered ? 'los bomberos lo apagan' : 'sin bomberos cerca');
+    if (b.damaged) return b.damaged.repairUntil >= 0 ? statusBar('warn', 'En reparación', undefined, `hasta el ${formatDate(tickToDate(b.damaged.repairUntil))}`) : statusBar('bad', b.damaged.cause === 'fuego' ? 'Quemado' : 'Destrozado', undefined, 'no funciona');
+    if (b.upgradeUntil !== undefined) return statusBar('info', 'Ampliándose', `a nivel ${levelOf(b) + 1}`, 'sigue abierto');
+    const needsNet = b.kind !== 'water' && b.kind !== 'power' && b.kind !== 'farm';
+    if (needsNet && !b.hasWater) return statusBar('bad', 'Sin agua', b.dryDays ? plural(b.dryDays, 'día', 'días') : undefined);
+    if (needsNet && !b.hasPower) return statusBar('bad', 'Sin luz', b.darkDays ? plural(b.darkDays, 'día', 'días') : undefined);
+    if (b.risk) return statusBar('warn', 'Riesgo de incendio', undefined, b.risk.why);
+    if (trashStateOf(b) === 'ratas') return statusBar('warn', 'Ratas', undefined, bagsText(b));
+    if (b.kind === 'house' || b.kind === 'res' || b.kind === 'vpo') {
+      const res = occupants(state, b);
+      if (!res.length) return statusBar('info', 'Vacía', undefined, 'aún no vive nadie');
+      const avg = Math.round(res.reduce((t, c) => t + c.happiness, 0) / res.length);
+      const one = res.length === 1;
+      const word = avg >= 65 ? (one ? 'Contento' : 'Contentos') : avg >= 40 ? 'Regular' : one ? 'Descontento' : 'Descontentos';
+      const lack = missingServices(state, b.x, b.y).filter((n) => n.status === 'falta').length;
+      return statusBar(avg >= 65 ? 'ok' : avg >= 40 ? 'warn' : 'bad', word, `${avg} de 100`, `${plural(res.length, 'vecino', 'vecinos')}${lack ? ` · le ${lack === 1 ? 'falta un servicio' : `faltan ${lack} servicios`}` : ''}`);
+    }
+    if (hasReach(b.kind)) {
+      const cap = serviceReach(state, b).capacity;
+      if (cap && cap.of > 0) {
+        const pct = Math.round((100 * cap.used) / cap.of);
+        const tone = pct > 100 ? 'bad' : cap.full || pct >= 90 ? 'warn' : 'ok';
+        return statusBar(tone, pct > 100 ? 'Lleno' : tone === 'warn' ? 'Casi lleno' : 'Funciona', `${pct} %`, `${cap.used} de ${cap.of} ${cap.unit}`);
+      }
+    }
+    if ((b.kind === 'shop' || b.kind === 'factory') && b.books) {
+      const profit = b.books.sales - b.books.wages - b.books.taxes;
+      return profit < 0 ? statusBar('warn', 'Pierde dinero', `−${money(-profit)}`, 'el mes pasado') : statusBar('ok', 'Funciona', `+${money(profit)}`, 'el mes pasado');
+    }
+    return statusBar('ok', 'Funciona');
+  }
+
+  /** 2.7: cabecera de la ficha: sprite pequeño, de quién es, estado y botón principal. */
+  function inspectHead(b: Building, p: GameState['projects'][number] | undefined): HTMLElement {
+    const owner = b.owner === 0 ? 'Municipal' : b.owner === -1 ? 'Privado (inversor de fuera)' : `Negocio de ${state.citizens.find((c) => c.id === b.owner)?.name ?? 'un antiguo vecino'}`;
+    const lv = UPGRADABLE.includes(b.kind) ? `Nivel ${levelOf(b)} de ${maxLevelOf(b)}` : '';
+    let main: HTMLElement | null = null;
+    if (b.damaged && b.damaged.repairUntil < 0 && !p) {
+      const fix = h('button', { class: 'btn primary big wide', 'data-test': 'fiche-main' }, pixelIcon('repair'), ` Reparar · ${money(b.damaged.cost)}`);
+      fix.addEventListener('click', () => void command({ type: 'RepairBuilding', buildingId: b.id }));
+      main = fix;
+    } else if (!p) main = upgradeButton(b);
+    if (!main && b.kind === 'heritage' && b.built) {
+      const go = h('button', { class: 'btn primary big wide', id: 'heritage-tourism', 'data-test': 'fiche-main' }, pixelIcon('camera'), ' Turismo: tasa y entorno');
+      go.addEventListener('click', () => withBack('Ficha', () => focusBuilding(b.id), () => openTourism(social)));
+      main = go;
+    }
+    let pic: HTMLCanvasElement | null = null;
+    try {
+      pic = spriteCopy(buildingPicture(b, state));
+    } catch {
+      /* sin sprite: solo el texto */
+    }
+    return ficheHead(pic, [owner, lv], buildingStatus(b, p), main);
   }
 
   /** 2.6: «Da servicio a N viviendas · atiende a X de un máximo de Y» y «Ver zona». */
@@ -2236,15 +2587,10 @@ export function startGame(opts: GameOptions): void {
     }
     const r = canvas.getBoundingClientRect();
     const el = currentSheet();
-    let { right, bottom } = r;
-    const { left } = r;
+    let { left, right, bottom } = r;
     // Bajo la barra de arriba no se ve nada.
     const top = Math.max(r.top, document.querySelector('.topbar')?.getBoundingClientRect().bottom ?? r.top);
-    if (el) {
-      const sr = el.getBoundingClientRect();
-      if (sr.left <= r.left + 8) bottom = Math.min(bottom, sr.top);
-      else right = Math.min(right, sr.left);
-    }
+    if (el) ({ left, right, bottom } = besideSheet(r, el, { left, right, bottom }));
     bottom = Math.min(bottom, $('#strip').getBoundingClientRect().top || bottom);
     const vw = (right - left) * dpr();
     const vh = (bottom - top) * dpr();
@@ -2254,11 +2600,56 @@ export function startGame(opts: GameOptions): void {
     // Ronda 22: sin bajar de un zoom en el que se lean los ✓ y ✗ (~14 px CSS por casilla); si no cabe, se centra.
     const legible = Math.max(minZoom(), Math.ceil((14 * dpr()) / T));
     const fit = Math.max(legible, Math.min(cam.zoom, Math.floor(1 / need)));
+    const before = { x: cam.x, y: cam.y, zoom: cam.zoom };
     if (fit < cam.zoom) cam.zoom = fit;
     const ts = tileSize();
     cam.x = Math.round(((x0 + x1 + 1) / 2) * ts - ((left + right) / 2 - r.left) * dpr());
     cam.y = Math.round(((y0 + y1 + 1) / 2) * ts - ((top + bottom) / 2 - r.top) * dpr());
     clampCam();
+    noteReveal(before);
+  }
+
+  /** 2.7: lo que queda del mapa a la vista con la hoja abierta (abajo, a la derecha o a la izquierda). */
+  function besideSheet(r: DOMRect, el: HTMLElement, box: { left: number; right: number; bottom: number }) {
+    const sr = el.getBoundingClientRect();
+    if (sr.width >= r.width - 16) return { ...box, bottom: Math.min(box.bottom, sr.top) };
+    if (sr.left <= r.left + 8) return { ...box, left: Math.max(box.left, sr.right) };
+    return { ...box, right: Math.min(box.right, sr.left) };
+  }
+
+  /**
+   * 2.7: al cerrar la ficha, la cámara vuelve a donde estaba antes de que revealTile/revealArea
+   * la movieran (si el jugador no la ha movido después).
+   */
+  let camBack: { before: { x: number; y: number; zoom: number }; after: { x: number; y: number; zoom: number } } | null = null;
+  const sameCam = (a: { x: number; y: number; zoom: number }, b: { x: number; y: number; zoom: number }) => a.x === b.x && a.y === b.y && a.zoom === b.zoom;
+  function noteReveal(before: { x: number; y: number; zoom: number }) {
+    const after = { x: cam.x, y: cam.y, zoom: cam.zoom };
+    if (!currentSheet() || sameCam(before, after)) return;
+    // Si el jugador movió el mapa entre una ficha y otra, se vuelve a donde lo dejó él.
+    if (!camBack || !sameCam(before, camBack.after)) camBack = { before, after };
+    else camBack.after = after;
+  }
+  function restoreCam() {
+    const back = camBack;
+    camBack = null;
+    if (!back || !sameCam(back.after, { x: cam.x, y: cam.y, zoom: cam.zoom })) return;
+    cam.zoom = back.before.zoom;
+    cam.x = back.before.x;
+    cam.y = back.before.y;
+    clampCam();
+  }
+  /** 2.7: las fichas (edificio, casilla) abren asomadas: el mapa y el edificio quedan a la vista. */
+  function asFicha(el: HTMLElement): HTMLElement {
+    el.classList.add('half', 'ficha');
+    el.dataset.start = 'peek';
+    // Si en la asomada no se llega a ver el estado y el botón principal, se abre a media altura.
+    requestAnimationFrame(() => {
+      if (!el.isConnected || el.dataset.snap) return;
+      const main = el.querySelector('[data-test="fiche-main"]') ?? el.querySelector('[data-test="fiche-status"]');
+      if (main && main.getBoundingClientRect().bottom > el.getBoundingClientRect().bottom - 4) setSheetSnap(el, 'mid');
+    });
+    return el;
   }
 
   /** 2.6: la zona que toca dibujar: la del servicio que se coloca, la del servicio tocado o la del filtro de «Qué falta». */
@@ -2310,20 +2701,19 @@ export function startGame(opts: GameOptions): void {
     const el = currentSheet();
     if (!el) return;
     const r = canvas.getBoundingClientRect();
-    const sr = el.getBoundingClientRect();
-    const { left, top } = r;
-    let { right, bottom } = r;
-    if (sr.left <= r.left + 8) bottom = Math.min(bottom, sr.top);
-    else right = Math.min(right, sr.left);
+    const { top } = r;
+    const { left, right, bottom } = besideSheet(r, el, { left: r.left, right: r.right, bottom: r.bottom });
     if (bottom - top < 40 || right - left < 40) return;
     const [sx, sy] = screenOf(t.x, t.y);
     // Si queda cerca del borde (o debajo de la hoja), se centra en lo que queda a la vista.
     const mx = Math.max(2 * tileSize() / dpr(), (right - left) * 0.15);
     const my = Math.max(2 * tileSize() / dpr(), (bottom - top) * 0.15);
     if (sx > left + mx && sx < right - mx && sy > top + my && sy < bottom - my) return;
+    const before = { x: cam.x, y: cam.y, zoom: cam.zoom };
     cam.x = Math.round((t.x + 0.5) * tileSize() - ((left + right) / 2 - r.left) * dpr());
     cam.y = Math.round((t.y + 0.5) * tileSize() - ((top + bottom) / 2 - r.top) * dpr());
     clampCam();
+    noteReveal(before);
   }
 
   function renderInspect(tile: { x: number; y: number }, b: Building | undefined) {
@@ -2338,7 +2728,7 @@ export function startGame(opts: GameOptions): void {
           ? ter === Terrain.River ? 'Puente' : 'Carretera'
           : dike ? 'Dique' : ter === Terrain.River ? 'Río' : ter === Terrain.Sea ? 'Mar' : tt === Tile.Tree ? 'Árboles' : ter === Terrain.Hill ? 'Colina' : 'Solar';
       if (dike) {
-        sheet(name, h('p', {}, 'Muro de piedra en la orilla: aquí y en las casillas de alrededor no llega la riada.'), h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`)).classList.add('half');
+        asFicha(sheet(name, h('p', {}, 'Muro de piedra en la orilla: aquí y en las casillas de alrededor no llega la riada.'), h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`)));
         openInspect = null;
         inspectSheet = null;
         return;
@@ -2349,7 +2739,7 @@ export function startGame(opts: GameOptions): void {
         ? h('p', { class: 'pocket-warn', 'data-test': 'lot-no-road' }, '⚠ Falta carretera: aquí no se construirá nada hasta que pase una carretera al lado.')
         : '';
       // 2.6: y si toca carretera, por qué crece o no (agua, luz, demanda, casas libres).
-      sheet(name, h('p', {}, zone), noRoad || lotBox(state, tile.x, tile.y), h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`)).classList.add('half');
+      asFicha(sheet(name, h('p', {}, zone), noRoad || lotBox(state, tile.x, tile.y), h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`)));
       openInspect = null;
       inspectSheet = null;
       return;
@@ -2373,7 +2763,7 @@ export function startGame(opts: GameOptions): void {
     // 2.3: las grandes obras tienen su ficha (barra de fases, «Pagar fase N», parar y la cofinanciación).
     if (isLandmarkKind(b.kind)) {
       inspectSheet = sheet(b.name ?? BUILD_NAMES[b.kind] ?? b.kind, ...landmarkContent(state, b, command, () => inspect({ x: b.x, y: b.y })));
-      inspectSheet.classList.add('half', 'landmark-sheet');
+      asFicha(inspectSheet).classList.add('landmark-sheet');
       const body = document.querySelector('.sheet-body');
       if (body) body.scrollTop = prevScroll;
       return;
@@ -2425,20 +2815,16 @@ export function startGame(opts: GameOptions): void {
             : 'No funciona ni contrata hasta repararlo. Nunca se pierde: se arregla pagando la obra.'
           : 'No vende hasta repararla, pero sigue pagando sueldos e impuestos con sus ahorros: si dos meses seguidos no llega a las nóminas, cierra.';
         const box = h('div', { class: 'petition danger-box' }, h('p', {}, h('strong', {}, fire ? 'Destrozado por el fuego. ' : 'Destrozada en unos disturbios. '), why));
+        // 2.7: «Reparar» es el botón principal de la ficha (arriba).
         if (dmg.repairUntil >= 0) box.append(h('p', { class: 'muted small' }, `En reparación: reabre el ${formatDate(tickToDate(dmg.repairUntil))}.`));
-        else {
-          const fix = h('button', { class: 'btn primary wide' }, `Reparar · ${money(dmg.cost)}`);
-          fix.addEventListener('click', () => void command({ type: 'RepairBuilding', buildingId: b.id }));
-          box.append(fix);
-        }
         content.push(box);
       }
       // 2.6 «Lo básico»: la zona que cubre, a cuántas casas da servicio y su máximo.
       const rb = reachBox(b);
       if (rb) content.push(rb);
       const home = b.kind === 'house' || b.kind === 'res';
-      if (home) content.push(servicesTable(b));
-      else {
+      // 2.7: en la casa, primero quién vive y cómo está; los servicios van después (abajo).
+      if (!home) {
         const pills: HTMLElement[] = [];
         // 2.2: la finca no necesita agua ni luz: su ficha cuenta la cosecha.
         if (b.kind === 'farm') content.push(farmBox(b));
@@ -2490,9 +2876,6 @@ export function startGame(opts: GameOptions): void {
       // 2.3: el patrimonio (su forma sale del terreno) y la casa rural.
       if (b.kind === 'heritage') {
         content.push(h('p', {}, `${HERITAGE_NAMES[heritageVariant(state, b.x, b.y)].replace(/^el /, 'El ')}: atrae visitantes. El mes pasado vinieron ${state.tourism.visitors}.${state.tourism.protectedId === b.id ? ' Su entorno está protegido.' : ''}`));
-        const go = h('button', { class: 'btn wide', id: 'heritage-tourism' }, 'Turismo: tasa y entorno');
-        go.addEventListener('click', () => withBack('Ficha', () => focusBuilding(b.id), () => openTownHall(social, 'tourism')));
-        content.push(go);
       }
       if (b.rural && (b.kind === 'house' || b.kind === 'res')) content.push(h('p', { class: 'muted small' }, 'Casa rural: su dueño alquila plazas a los visitantes.'));
       // 2.4 «Vida»: estación (billete), guardería y residencia (cuota), depuradora (el río) y renovables (la luz).
@@ -2505,7 +2888,8 @@ export function startGame(opts: GameOptions): void {
       const viv = viviendaBox(state, b, citizenList);
       if (viv) content.push(viv);
       // v1.8 (petición del creador): los servicios suben de nivel.
-      if (UPGRADABLE.includes(b.kind)) content.push(levelBox(b));
+      // v1.8 (petición del creador): los servicios suben de nivel. 2.7: el detalle, plegado (el botón va arriba).
+      if (UPGRADABLE.includes(b.kind)) content.push(fold(`level:${b.kind}`, `Nivel ${levelOf(b)} de ${maxLevelOf(b)}: qué da y qué pide`, false, levelBox(b)));
       // 2.6: la carga de la bomba o la central (cuántos piden y quién se queda sin).
       const plant = plantLoadBox(state, b);
       if (plant) content.push(plant);
@@ -2523,7 +2907,9 @@ export function startGame(opts: GameOptions): void {
           citizenList(res),
         );
       } else if (res.length && b.kind !== 'vpo') content.push(h('h3', {}, 'Viven aquí'), citizenList(res));
-      if (workers.length) content.push(h('h3', {}, 'Trabajan aquí'), citizenList(workers));
+      // 2.7: los servicios de la casa, en una fila de iconos con ✓/✗ (al tocarla, el detalle).
+      if (home) content.push(servicesTable(b));
+      if (workers.length) content.push(fold(`workers:${b.id}`, `Trabajan aquí (${workers.length})`, workers.length <= 3, citizenList(workers)));
       if (b.kind === 'house') {
         const sale = !!b.forSale;
         const toggle = h('button', { class: 'btn wide' }, sale ? 'Pasar a alquiler' : 'Poner a la venta');
@@ -2534,16 +2920,12 @@ export function startGame(opts: GameOptions): void {
           toggle,
         );
       }
-      if (b.owner > 0) {
-        const o = state.citizens.find((c) => c.id === b.owner);
-        content.push(h('p', {}, `Negocio de ${o?.name ?? 'un antiguo vecino'}.`));
-      }
       if (b.kind === 'shop' || b.kind === 'factory') content.push(h('p', { class: 'muted' }, `Caja de la empresa: ${money(b.cash)}`));
     }
-    const owner = b.owner === 0 ? 'Municipal' : b.owner === -1 ? 'Privado (inversor de fuera)' : 'De un vecino';
-    content.push(h('p', { class: 'muted' }, owner));
+    // 2.7: cabecera → estado → acción, arriba del todo; de quién es, en la cabecera.
+    content.unshift(inspectHead(b, p));
     inspectSheet = sheet(b.name ?? (b.kind === 'farm' && b.crop ? `Finca · ${CROP_TEXT[b.crop]}` : (BUILD_NAMES[b.kind] ?? b.kind)), ...content);
-    inspectSheet.classList.add('half');
+    asFicha(inspectSheet);
     const body = document.querySelector('.sheet-body');
     if (body) body.scrollTop = prevScroll;
   }
@@ -2578,7 +2960,15 @@ export function startGame(opts: GameOptions): void {
     const needs = new Map(missingServices(state, b.x, b.y).map((n) => [n.key, n.status] as const));
     const row = (icon: string, label: string, ok: boolean | 'warn', text: string) =>
       // Ronda 14 (aplazado): lista de definición para los lectores de pantalla («Agua: Sí»), mismo aspecto.
-      h('div', { class: `svc ${ok === true ? 'ok' : ok === 'warn' ? 'warn' : 'bad'}` }, pixelIcon(icon), h('dt', { class: 'svc-label' }, label), h('dd', { class: 'svc-state' }, text));
+      // 2.7: plegada, una fila de iconos con ✓/✗ (el texto sigue ahí para el lector de pantalla).
+      h(
+        'div',
+        { class: `svc ${ok === true ? 'ok' : ok === 'warn' ? 'warn' : 'bad'}`, title: `${label}: ${text}` },
+        pixelIcon(icon),
+        h('span', { class: 'svc-mark', 'aria-hidden': 'true' }, ok === true ? '✓' : ok === 'warn' ? '!' : '✗'),
+        h('dt', { class: 'svc-label' }, label),
+        h('dd', { class: 'svc-state' }, text),
+      );
     const svc = (key: NeedKey, icon: string, label: string) => {
       const st = needs.get(key);
       return row(icon, label, st === undefined ? true : st === 'lleno' ? 'warn' : false, st === undefined ? 'Cubierto' : st === 'lleno' ? 'Lleno' : 'No llega');
@@ -2598,7 +2988,25 @@ export function startGame(opts: GameOptions): void {
       ...(trashActive(state) || state.buildings.some((s) => s.kind === 'cleanpoint') ? [trashRow(b, row)] : []),
       row('bar', 'Tienda', state.buildings.some((s) => s.kind === 'shop' && s.built && !s.damaged && Math.abs(s.x - b.x) + Math.abs(s.y - b.y) <= 6), state.buildings.some((s) => s.kind === 'shop' && s.built && !s.damaged && Math.abs(s.x - b.x) + Math.abs(s.y - b.y) <= 6) ? 'Cerca' : 'Lejos'),
     ];
-    return h('div', {}, h('dl', { class: 'svc-table', 'aria-label': 'Servicios de la vivienda' }, ...rows), h('p', { class: 'muted small' }, `Valor: ${money(unitValue(state, b))} por vivienda`));
+    const dl = h('dl', { class: `svc-table svc-icons${svcOpen ? ' open' : ''}`, id: 'svc-table', 'aria-label': 'Servicios de la vivienda' }, ...rows);
+    const bad = rows.filter((r) => !r.classList.contains('ok')).length;
+    const more = h('button', { class: 'btn small svc-more', 'aria-expanded': String(svcOpen), 'aria-controls': 'svc-table' }, svcOpen ? 'Ocultar el detalle' : 'Ver el detalle');
+    const toggle = () => {
+      svcOpen = !svcOpen;
+      dl.classList.toggle('open', svcOpen);
+      more.setAttribute('aria-expanded', String(svcOpen));
+      more.textContent = svcOpen ? 'Ocultar el detalle' : 'Ver el detalle';
+    };
+    more.addEventListener('click', toggle);
+    dl.addEventListener('click', toggle);
+    return h(
+      'div',
+      { class: 'svc-box' },
+      h('h3', {}, 'Servicios', h('span', { class: `svc-count ${bad ? 'bad' : 'ok'}` }, bad ? ` · ${bad} sin cubrir del todo` : ' · todos')),
+      dl,
+      more,
+      h('p', { class: 'muted small' }, `Valor: ${money(unitValue(state, b))} por vivienda`),
+    );
   }
 
   /** 2.1: bolsas de basura que tiene un edificio (cada 10 unidades, una bolsa). */
@@ -2690,10 +3098,6 @@ export function startGame(opts: GameOptions): void {
       else if (state.citizens.some((c) => c.id === ref)) withBack('El Eco de Bitópolis', openPressSheet, () => openCitizen(social, ref));
     });
 
-  /**
-   * v1.6: el panel «Pueblo» sustituye al menú plano. Cada sección resume cómo va
-   * y lleva a sus hojas, que tienen «‹» para volver aquí.
-   */
   /** «Gestión del pueblo», como al tocar el ayuntamiento en el mapa. */
   function openHall() {
     const hall = state.buildings.find((b) => b.kind === 'townhall' && b.built);
@@ -2704,130 +3108,254 @@ export function startGame(opts: GameOptions): void {
     openMailbox({ token, state: () => state, openCitizen: (id) => openCitizen(social, id) });
   }
 
+  /**
+   * 2.7 «Pueblo 2.0»: arriba, cuatro tarjetas de resumen (Dinero, Gente,
+   * Ayuntamiento y Política o Comarca); luego «Lo urgente» (hasta 3 cosas con
+   * su botón) y el resto en una lista por temas. Lo frecuente (impuestos,
+   * préstamos, pleno) queda a dos toques. Sigue creciendo con el pueblo (2.6).
+   */
   function openHub() {
     closeTray();
     const go = (fn: () => void) => () => withBack('Pueblo', openHub, fn);
     // 2.6: el panel crece con el pueblo; lo que sale por primera vez lleva «Nuevo» hasta que se abre.
+    // 2.7: como mucho dos marcas a la vez (las demás salen cuando se abran esas).
     const show = hubShown();
-    const item = (label: string, fn: () => void, attn = false, id?: HubEntry) => {
-      const fresh = !!id && reveal.isNew(`hub:${id}`);
-      const b = h('button', { class: `btn${attn ? ' attn' : ''}${fresh ? ' is-new' : ''}`, ...(fresh ? { 'aria-describedby': 'new-desc' } : {}), ...(id ? { 'data-hub': id } : {}) }, label, fresh ? newBadge() : '');
-      b.addEventListener('click', () => {
-        if (id) seenHub(id);
-        fn();
+    let badges = 0;
+    const row = (id: HubEntry | null, icon: string, title: string, fn: () => void, o: { datum?: string; name?: string; attn?: boolean } = {}) => {
+      const fresh = !!id && reveal.isNew(`hub:${id}`) && badges < 2;
+      if (fresh) badges++;
+      return listRow({
+        icon,
+        title,
+        ...o,
+        fresh: fresh ? newBadge() : '',
+        hub: id ?? undefined,
+        onClick: () => {
+          if (id) seenHub(id);
+          fn();
+        },
       });
-      return b;
     };
-    const opt = (id: HubEntry, label: string, fn: () => void, attn = false) => (show[id] ? [item(label, fn, attn, id)] : []);
-    const card = (icon: string, title: string, sum: (Node | string)[], ...buttons: Node[]) =>
-      h('section', { class: 'hub-card' }, h('h3', {}, pixelIcon(icon), title), h('p', { class: 'hub-sum' }, ...sum), buttons.length ? h('div', { class: 'hub-grid' }, ...buttons) : '');
+    const opt = (id: HubEntry, icon: string, title: string, fn: () => void, o: { datum?: string; name?: string; attn?: boolean } = {}) => (show[id] ? [row(id, icon, title, fn, o)] : []);
+
+    const pop = state.citizens.length;
     const last = state.stats.at(-1);
     const net = last ? last.income - last.expenses : null;
-    const happy = state.citizens.length ? Math.round(state.citizens.reduce((a, c) => a + c.happiness, 0) / state.citizens.length) : 0;
+    const happy = pop ? Math.round(state.citizens.reduce((a, c) => a + c.happiness, 0) / pop) : 0;
     const d = tickToDate(state.tick);
     const budgetOpen = state.budget.status === 'open' && state.budget.year === d.year;
     const offers = state.grants.filter((g) => g.status === 'offered').length;
-    const townSum: string[] = [budgetOpen ? `Presupuesto ${d.year} por aprobar` : `Presupuesto ${state.budget.plan}`];
-    if (offers) townSum.push(plural(offers, 'subvención por responder', 'subvenciones por responder'));
     const assocs = state.associations ?? [];
     const protest = assocs.some((a) => a.protestDay >= 0);
-    if (assocs.length) townSum.push(protest ? 'manifestación convocada' : plural(assocs.length, 'asociación vecinal', 'asociaciones vecinales'));
     // 2.4: la comisión de festejos espera presupuesto.
     const fiesta = state.seasons?.current;
     const fiestaAsks = !!fiesta && fiesta.status === 'comision' && !!fiesta.asked;
-    if (fiestaAsks) townSum.push('la comisión de festejos pide presupuesto');
+    // 2.7: lo que aguanta la caja con el gasto corriente (las obras del mes no cuentan, como en la barra de arriba).
+    const rw = state.treasury > 0 ? runwayMonths(state) : null;
+    const runway = rw === null ? -1 : Math.floor(rw);
+    const lv = townLevel(state);
+    const top = lv >= TOWNHALL_LEVELS.length;
+    const next = nextLevel(state);
+    const canUp = canUpgradeTownhall(state).ok;
+    const dilemma = state.dilemmas.find((x) => !x.resolved);
+
+    /* --- 4 tarjetas de resumen --- */
+    const moneySub = state.treasury < 0 ? 'en números rojos' : runway >= 0 && runway < 3 ? `aguanta ${runway === 0 ? 'menos de un mes' : plural(runway, 'mes', 'meses')}` : net === null ? 'aún sin cerrar un mes' : `${net >= 0 ? '+' : '−'}${money(Math.abs(net))} el último mes`;
+    const moneyCard = statCard({
+      icon: 'coin',
+      label: 'Dinero',
+      value: money(state.treasury),
+      sub: moneySub,
+      trend: net === null || net === 0 ? undefined : net > 0 ? 'up' : 'down',
+      tone: state.treasury < 0 || (runway >= 0 && runway < 3) ? 'bad' : net !== null && net < 0 ? 'warn' : 'ok',
+      name: `Dinero: ${money(state.treasury)} en caja, ${moneySub}. Ver cuentas`,
+      onClick: go(openAccounts),
+    });
+    const prevPop = last?.population ?? pop;
+    const popDiff = pop - prevPop;
+    const peopleSub = `${popDiff ? `${popDiff > 0 ? '+' : '−'}${Math.abs(popDiff)} este mes · ` : ''}felicidad ${happy} (${happy >= 65 ? 'contentos' : happy >= 45 ? 'regular' : 'descontentos'})`;
+    const peopleCard = statCard({
+      icon: 'people',
+      label: 'Gente',
+      value: plural(pop, 'vecino', 'vecinos'),
+      sub: peopleSub,
+      trend: pop > prevPop ? 'up' : pop < prevPop ? 'down' : undefined,
+      tone: pop && happy < 45 ? 'bad' : pop && happy < 60 ? 'warn' : 'ok',
+      name: `Gente: ${plural(pop, 'vecino', 'vecinos')}, ${peopleSub}. Ver la lista`,
+      onClick: go(openPeople),
+    });
+    const hallSub = top || !next ? 'el nivel más alto' : canUp ? `ya puedes ampliarlo (${money(next.cost)})` : next.pop > pop ? `nivel ${next.level}: faltan ${plural(next.pop - pop, 'vecino', 'vecinos')}` : `nivel ${next.level}: ${money(next.cost)}`;
+    const hallCard = statCard({
+      icon: 'townhall',
+      label: 'Ayuntamiento',
+      value: `Nivel ${lv}`,
+      sub: hallSub,
+      trend: canUp ? 'up' : undefined,
+      tone: canUp ? 'ok' : 'info',
+      // v1.9.1: desde aquí se llega a «Gestión del pueblo» (el ayuntamiento cuesta de encontrar en el mapa).
+      name: `Nivel ${lv} · ${top ? 'Gestión del pueblo' : 'Ampliar el ayuntamiento'}: ${hallSub}`,
+      onClick: go(openHall),
+    });
+    let fourth: HTMLElement;
+    if (show.politics && politicsActive(state)) {
+      const p = state.politics;
+      const months = Math.max(0, Math.round(daysToElection(state) / DAYS_PER_MONTH));
+      const polSub = p.mayor === 'player' ? `elecciones en ${plural(months, 'mes', 'meses')}` : 'estás en la oposición';
+      fourth = statCard({
+        icon: 'ballot',
+        label: 'Política',
+        value: `${p.approval} %`,
+        sub: polSub,
+        tone: p.approval < 45 ? 'bad' : p.approval < 55 ? 'warn' : 'ok',
+        name: `Política: ${p.approval} % de intención de voto, ${polSub}`,
+        onClick: go(() => openPolitics(social)),
+      });
+    } else if (show.region || show.neighbors) {
+      const pending = show.neighbors ? comarcaPending(state) : 0;
+      const phase = { bonanza: 'Bonanza', normal: 'Normal', crisis: 'Crisis' }[state.region.phase];
+      const comSub = pending ? plural(pending, 'oferta por responder', 'ofertas por responder') : regionAttention(state) ? 'hay algo que mirar' : show.neighbors ? plural(state.comarca.towns.length, 'pueblo vecino', 'pueblos vecinos') : 'grandes obras y empresas';
+      fourth = statCard({
+        icon: 'map',
+        label: 'Comarca',
+        value: phase,
+        sub: comSub,
+        tone: state.region.phase === 'crisis' ? 'bad' : pending || regionAttention(state) ? 'warn' : 'ok',
+        name: `Comarca: ${phase.toLowerCase()}, ${comSub}`,
+        onClick: go(show.neighbors ? openComarcaSheet : openRegionSheet),
+      });
+    } else {
+      const goals = activeObjectives(state);
+      // Sin el paréntesis («Pueblo › Pleno municipal»): la tarjeta no se llama como las filas de la lista.
+      const objSub = goals[0] ? lowerFirst(objectiveText(state, goals[0]).replace(/\s*\(.*\)$/, '')) : 'todos cumplidos';
+      fourth = statCard({
+        icon: 'medal',
+        label: 'Objetivos',
+        value: `${state.objectivesDone.length} de ${OBJECTIVES.length}`,
+        sub: objSub,
+        tone: 'info',
+        name: `Objetivos: ${state.objectivesDone.length} de ${OBJECTIVES.length} cumplidos. Siguiente: ${objSub}`,
+        onClick: () => document.querySelector('#hub-goals')?.scrollIntoView({ block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth' }),
+      });
+    }
+
+    /* --- lo urgente: lo que más pide atención ahora, con su botón --- */
+    const urgent: UrgentItem[] = [];
+    const burning = state.buildings.find((b) => b.fire);
+    if (burning) urgent.push({ icon: 'fire', tone: 'bad', text: `Arde ${(burning.name ?? BUILD_NAMES[burning.kind] ?? 'un edificio').toLowerCase()}`, action: 'Ir allí', onClick: () => focusBuilding(burning.id) });
+    if (state.treasury < 0 || (runway >= 0 && runway < 3)) {
+      urgent.push({ icon: 'coin', tone: 'bad', text: state.treasury < 0 ? `La caja está en números rojos (${money(state.treasury)})` : `Al ritmo del último mes, la caja aguanta ${runway === 0 ? 'menos de un mes' : plural(runway, 'mes', 'meses')}`, action: 'Ver cuentas', onClick: go(openAccounts) });
+    }
+    const homes = state.buildings.filter((b) => b.built && !b.damaged && (b.kind === 'house' || b.kind === 'res' || b.kind === 'vpo'));
+    const dry = homes.filter((b) => !b.hasWater).length;
+    const dark = homes.filter((b) => !b.hasPower).length;
+    if (dry) urgent.push({ icon: 'drop', tone: 'bad', text: `${plural(dry, 'vivienda', 'viviendas')} sin agua`, action: 'Ver dónde', onClick: () => showMissing('agua') });
+    if (dark) urgent.push({ icon: 'bolt', tone: 'bad', text: `${plural(dark, 'vivienda', 'viviendas')} sin luz`, action: 'Ver dónde', onClick: () => showMissing('luz') });
+    // El servicio más lleno (por encima de lo que atiende): a su ficha, donde está «Ampliar».
+    const counts = serviceCounts(state);
+    let full: { b: Building; pct: number } | null = null;
+    for (const b of state.buildings) {
+      const cap = b.built && !b.damaged ? serviceCapacityOf(b) : 0;
+      const used = counts.get(b.id);
+      if (!cap || used === undefined) continue;
+      const pct = Math.round((100 * used) / cap);
+      if (pct > 100 && (!full || pct > full.pct)) full = { b, pct };
+    }
+    if (full) {
+      const fb = full.b;
+      const canMore = UPGRADABLE.includes(fb.kind) && levelOf(fb) < maxLevelOf(fb) && fb.upgradeUntil === undefined;
+      urgent.push({ icon: 'upgrade', tone: 'warn', text: `${fb.name ?? BUILD_NAMES[fb.kind] ?? fb.kind}: lleno al ${full.pct} %`, action: canMore ? 'Ampliar' : 'Ver', onClick: () => focusBuilding(fb.id) });
+    }
+    // Lo que espera respuesta.
+    if (dilemma) urgent.push({ icon: 'megaphone', tone: 'warn', text: 'Un vecino espera tu decisión', action: 'Responder', onClick: go(() => openDilemmaSheet(dilemmaCtx, dilemma.id)) });
+    if (state.pleno) urgent.push({ icon: 'gavel', tone: 'warn', text: 'El pleno espera tus respuestas', action: 'Responder', onClick: go(() => openPleno(social)) });
+    if (budgetOpen) urgent.push({ icon: 'clipboard', tone: 'warn', text: `Toca presentar el presupuesto de ${d.year}`, action: 'Responder', onClick: go(() => openTownHall(social, 'budget')) });
+    if (offers) urgent.push({ icon: 'clipboard', tone: 'info', text: plural(offers, 'subvención espera respuesta', 'subvenciones esperan respuesta'), action: 'Responder', onClick: go(() => openTownHall(social, 'grants')) });
+    if (fiestaAsks) urgent.push({ icon: 'calendar', tone: 'info', text: 'La comisión de festejos pide presupuesto', action: 'Responder', onClick: go(() => openTownHall(social, 'seasons')) });
+    if (show.neighbors && comarcaPending(state)) urgent.push({ icon: 'map', tone: 'info', text: 'Un pueblo vecino espera respuesta', action: 'Responder', onClick: go(openComarcaSheet) });
+    if (show.errands && state.errands?.list.some((e) => e.status === 'ofrecido')) urgent.push({ icon: 'scroll', tone: 'info', text: 'Te han hecho un encargo', action: 'Responder', onClick: go(openErrandsSheet) });
+    const broken = state.buildings.filter((b) => b.damaged && b.damaged.repairUntil < 0);
+    if (broken.length) urgent.push({ icon: 'repair', tone: 'warn', text: `${plural(broken.length, 'edificio destrozado', 'edificios destrozados')} sin reparar`, action: 'Ver', onClick: () => focusBuilding(broken[0]!.id) });
+
+    /* --- la lista --- */
+    const visitors = state.tourism.visitors;
+    const medals = medalCount(state);
+    const errandsOffered = state.errands?.list.filter((e) => e.status === 'ofrecido').length ?? 0;
+    const lastEd = state.press?.editions.at(-1);
     sheet(
       'Pueblo',
-      // 2.1: el rango y el escudo del pueblo, arriba del todo (2.6: tras el primer mes).
-      ...(show.rank ? [hubRank()] : []),
-      card(
-        'coin',
-        'Dinero',
-        ['Caja: ', h('strong', {}, money(state.treasury)), net !== null ? ` · último mes: ${net >= 0 ? '+' : ''}${money(net)}` : ''],
-        item('Parte mensual', go(openAccounts)),
-        item('Impuestos', go(openTaxes)),
+      statGrid([moneyCard, peopleCard, hallCard, fourth]),
+      urgentBlock(urgent),
+      listGroup('Dinero', [
+        row(null, 'chart', 'Parte mensual', go(openAccounts)),
+        row(null, 'tax', 'Impuestos', go(openTaxes)),
         // 2.2: préstamos municipales (destaca con mucha carga o nota D). 2.6: cuando la caja va justa o ya hay uno.
-        ...opt('loans', `Préstamos · nota ${state.rating ?? 'B'}`, go(openLoansSheet), heavyLoad(state) || state.rating === 'D'),
-      ),
-      card(
-        'build',
-        'Ayuntamiento',
-        [townSum.join(' · ')],
-        // v1.9.1: el ayuntamiento cuesta de encontrar en el mapa; desde aquí se llega a «Gestión del pueblo».
-        item(`Nivel ${townLevel(state)} · ${townLevel(state) >= TOWNHALL_LEVELS.length ? 'Gestión' : 'Ampliar'}`, go(openHall), canUpgradeTownhall(state).ok),
-        ...opt('budget', 'Presupuesto y fiestas', go(() => openTownHall(social, fiestaAsks ? 'seasons' : undefined)), budgetOpen || offers > 0 || protest || fiestaAsks),
-        // 2.3: turismo (desde el nivel 3 o en cuanto hay visitantes).
-        ...(townLevel(state) >= 3 || state.tourism.visitors > 0 ? [item(`Turismo · ${plural(state.tourism.visitors, 'visitante', 'visitantes')}`, go(() => openTownHall(social, 'tourism')), touristified(state))] : []),
-        ...(state.dilemmas.some((d) => !d.resolved) ? [item('Un asunto difícil', go(() => openDilemmaSheet(dilemmaCtx, state.dilemmas.find((d) => !d.resolved)!.id)), true)] : []),
-        ...opt('pleno', 'Pleno municipal', go(() => openPleno(social))),
-        ...opt('politics', 'Política y elecciones', go(() => openPolitics(social))),
-        ...opt('advisor', 'Consejero', go(() => openAdvisor(social))),
-      ),
-      card(
-        'people',
-        'Gente',
-        [h('strong', {}, plural(state.citizens.length, 'vecino', 'vecinos')), ` · felicidad ${happy}`],
-        item('Vecinos', go(openPeople)),
-        ...(state.aiMode ? [item('✦ Qué está pasando', go(openHappening), !!state.ai?.log.length)] : []),
-        item('Felicidad', go(openHappiness)),
-        ...opt('diary', 'Diario del pueblo', go(() => openDiary(social))),
-        ...opt('album', 'Álbum del pueblo', go(() => openAlbum(social))),
+        ...opt('loans', 'bank', 'Préstamos', go(openLoansSheet), { datum: `nota ${state.rating ?? 'B'}`, name: `Préstamos · nota ${state.rating ?? 'B'}`, attn: heavyLoad(state) || state.rating === 'D' }),
+      ]),
+      listGroup('Ayuntamiento', [
+        ...opt('pleno', 'gavel', 'Pleno municipal', go(() => openPleno(social)), { datum: state.pleno ? 'en curso' : undefined, attn: !!state.pleno }),
+        ...opt('budget', 'clipboard', 'Presupuesto y fiestas', go(() => openTownHall(social, fiestaAsks ? 'seasons' : undefined)), { datum: budgetOpen ? 'por aprobar' : state.budget.plan, attn: budgetOpen || offers > 0 || protest || fiestaAsks }),
+        // 2.3: turismo (desde el nivel 3 o en cuanto hay visitantes). 2.7: en su propia hoja.
+        ...(lv >= 3 || visitors > 0 ? [row(null, 'camera', 'Turismo', go(() => openTourism(social)), { datum: plural(visitors, 'visitante', 'visitantes'), name: `Turismo · ${plural(visitors, 'visitante', 'visitantes')}`, attn: touristified(state) })] : []),
+        ...(dilemma ? [row(null, 'megaphone', 'Un asunto difícil', go(() => openDilemmaSheet(dilemmaCtx, dilemma.id)), { attn: true })] : []),
+        ...opt('politics', 'ballot', 'Política y elecciones', go(() => openPolitics(social)), { datum: politicsActive(state) ? `${state.politics.approval} %` : undefined }),
+        ...opt('advisor', 'speech', 'Consejero', go(() => openAdvisor(social))),
+      ]),
+      listGroup('Gente', [
+        row(null, 'people', 'Vecinos', go(openPeople), { datum: String(pop) }),
+        row(null, 'smile', 'Felicidad', go(openHappiness), { datum: `${happy} de 100` }),
+        ...(state.aiMode ? [row(null, 'spark', '✦ Qué está pasando', go(openHappening), { attn: !!state.ai?.log.length })] : []),
+        ...opt('diary', 'book', 'Diario del pueblo', go(() => openDiary(social))),
+        ...opt('album', 'album', 'Álbum del pueblo', go(() => openAlbum(social))),
         // 2.5: el buzón (cartas de los que se fueron), con correos o si ya llegó alguna.
-        ...(state.letters.length || state.buildings.some((x) => x.kind === 'post') ? [item(`Buzón · ${plural(state.letters.length, 'carta', 'cartas')}`, go(openMail), unreadLetters(state, token) > 0)] : []),
+        ...(state.letters.length || state.buildings.some((x) => x.kind === 'post') ? [row(null, 'letter', 'Buzón', go(openMail), { datum: plural(state.letters.length, 'carta', 'cartas'), name: `Buzón · ${plural(state.letters.length, 'carta', 'cartas')}`, attn: unreadLetters(state, token) > 0 })] : []),
         // 2.3: gráficas por años y récords.
-        ...opt('history', 'Historia', go(() => openHistory(state))),
-      ),
-      // 2.3: la comarca (bonanza o crisis), la gran empresa y las grandes obras.
-      // 2.5: los pueblos vecinos y sus alcaldes (ofertas con plazo).
-      // 2.6: desde el ayuntamiento 3 (sin pueblos vecinos en «Pueblo sencillo»).
-      ...(show.region || show.neighbors
-        ? [
-            card(
-              'town',
-              'Comarca',
-              show.neighbors ? [regionSummary(state), ' · ', comarcaSummary(state)] : [regionSummary(state)],
-              ...opt('region', 'Comarca y grandes obras', go(openRegionSheet), regionAttention(state)),
-              ...opt('neighbors', 'Pueblos vecinos', go(openComarcaSheet), comarcaPending(state) > 0),
-            ),
-          ]
-        : []),
+        ...opt('history', 'calendar', 'Historia', go(() => openHistory(state))),
+      ]),
+      // 2.3: la comarca (bonanza o crisis), la gran empresa y las grandes obras. 2.5: los pueblos vecinos.
+      listGroup('Comarca', [
+        ...opt('region', 'map', 'Comarca y grandes obras', go(openRegionSheet), { datum: { bonanza: 'bonanza', normal: 'normal', crisis: 'crisis' }[state.region.phase], attn: regionAttention(state) }),
+        ...opt('neighbors', 'town', 'Pueblos vecinos', go(openComarcaSheet), { datum: comarcaPending(state) ? `${comarcaPending(state)} por responder` : undefined, attn: comarcaPending(state) > 0 }),
+      ]),
       // 2.1: encargos del pueblo y El Eco de Bitópolis (2.6: cuando llega el primero).
-      ...(show.errands || show.press
-        ? [
-            card(
-              'inspect',
-              'Encargos y El Eco',
-              [errandsSummary(state)],
-              ...opt('errands', 'Encargos del pueblo', go(openErrandsSheet), !!state.errands?.list.some((e) => e.status === 'ofrecido')),
-              ...opt('press', 'El Eco de Bitópolis', go(openPressSheet), !!state.press?.editions.at(-1) && !state.press.editions.at(-1)!.answered),
-            ),
-          ]
-        : []),
+      listGroup('Encargos y El Eco', [
+        ...opt('errands', 'scroll', 'Encargos del pueblo', go(openErrandsSheet), { datum: errandsOffered ? `${errandsOffered} por responder` : undefined, attn: errandsOffered > 0 }),
+        ...opt('press', 'news', 'El Eco de Bitópolis', go(openPressSheet), { attn: !!lastEd && !lastEd.answered }),
+      ]),
       h(
         'section',
-        { class: 'hub-card' },
-        h('h3', {}, pixelIcon('smile'), 'Objetivos'),
+        { class: 'hub-sec', id: 'hub-goals' },
+        h('h3', { class: 'hub-sec-h' }, 'Objetivos'),
+        // 2.1: el rango y el escudo del pueblo (2.6: tras el primer mes).
+        ...(show.rank ? [hubRank(badges < 2 && reveal.isNew('hub:rank') ? (badges++, true) : false)] : []),
         objectivesNode(state),
         // 2.3: medallas (logros del pueblo, también los encargos).
-        show.medals ? h('div', { class: 'hub-grid' }, item(`Medallas · ${medalCount(state).have} de ${medalCount(state).total}`, go(() => openMedals(state)), false, 'medals')) : '',
+        show.medals ? h('div', { class: 'hub-grid hub-list' }, row('medals', 'medal', 'Medallas', go(() => openMedals(state)), { datum: `${medals.have} de ${medals.total}`, name: `Medallas · ${medals.have} de ${medals.total}` })) : '',
       ),
-      ...(state.aiMode
-        ? [card('inspect', 'IA', ['Los vecinos con nombre deciden con la IA.'], item('Gasto de la IA', () => void openUsage(token)), item('Qué se envía a la IA', () => void openPreview(token)))]
-        : []),
-      h(
-        'div',
-        { class: 'menu-foot' },
-        item('Ajustes', go(openSettingsGame)),
-        item('Repetir tutorial', () => {
+      state.aiMode
+        ? listGroup('IA', [row(null, 'coin', 'Gasto de la IA', () => void openUsage(token)), row(null, 'spark', 'Qué se envía a la IA', () => void openPreview(token))])
+        : '',
+      listGroup('Partida', [
+        row(null, 'gear', 'Ajustes', go(openSettingsGame)),
+        row(null, 'replay', 'Repetir tutorial', () => {
           closeSheet();
           tutorial.start(state, true);
         }),
-        item('Volver al inicio', () => {
+        row(null, 'door', 'Volver al inicio', () => {
           closeSheet();
           exit();
         }),
-      ),
+      ]),
     );
+  }
+  /** 2.7: «Ver dónde»: el mapa con «Qué falta» filtrado a ese servicio (casas sin él). */
+  function showMissing(k: NeedKey) {
+    closeSheet();
+    setLayer('missing');
+    missingKey = k;
+    selected = null;
+    missingLegend();
+    const lack = filterOverlay(state, k).marks.map((m) => m.y * state.map.w + m.x);
+    if (lack.length) revealArea(lack);
   }
   /** 2.6: qué entradas del panel se ven (lo que pide el pueblo ahora y lo que ya salió alguna vez). */
   function hubShown(): Record<HubEntry, boolean> {
@@ -2843,10 +3371,10 @@ export function startGame(opts: GameOptions): void {
     refreshNewDots();
   }
   /** El rango y el escudo (2.6: con «Nuevo» la primera vez). */
-  function hubRank() {
+  function hubRank(badge: boolean) {
     const card = rankCard(state, go(() => openRank(state)));
     const btn = card.querySelector<HTMLElement>('.rank-card')!;
-    if (reveal.isNew('hub:rank')) {
+    if (badge) {
       btn.classList.add('is-new');
       btn.setAttribute('aria-describedby', 'new-desc');
       btn.append(newBadge());
@@ -2858,7 +3386,11 @@ export function startGame(opts: GameOptions): void {
     }
   }
   // La pestaña «Pueblo» se marca mientras su panel (o una hoja abierta desde él) está a la vista.
-  onSheetChange((title) => $('#menu').setAttribute('aria-expanded', String(title === 'Pueblo')));
+  onSheetChange((title) => {
+    $('#menu').setAttribute('aria-expanded', String(title === 'Pueblo'));
+    // 2.7: al cerrar la ficha, el mapa vuelve a donde estaba.
+    if (title === null) restoreCam();
+  });
   $('#menu').setAttribute('aria-expanded', 'false');
   const openPeople = () => openNeighbours(state, (c) => withBack('Vecinos', () => withBack('Pueblo', openHub, openPeople), () => openCitizen(social, c.id)));
 
@@ -2888,31 +3420,210 @@ export function startGame(opts: GameOptions): void {
     );
   }
 
-  /** La campana: todos los avisos recientes; los que llevan a algo, se tocan (v1.6). */
-  function openLog() {
-    markLogRead();
-    const items = toastLog();
-    const icon = { info: 'ℹ', warn: '⚠', good: '✔' };
-    const ul = h('ul', { class: 'log' });
-    for (const e of items) {
-      const btn = h('button', { class: 'log-item', ...(e.onClick ? { 'data-go': '1' } : {}) }, h('span', { class: 'toast-icon', 'aria-hidden': 'true' }, icon[e.kind]), h('span', {}, e.text, ' ', h('span', { class: 'when' }, e.when)));
-      if (e.onClick) btn.addEventListener('click', () => withBack('Avisos', openLog, e.onClick!));
-      else btn.setAttribute('tabindex', '-1');
-      ul.append(h('li', { class: e.kind }, btn));
+  /**
+   * 2.7: de una referencia guardable (la de los avisos y de «Te piden») a lo que abre.
+   * Si lo que señalaba ya no existe, nada (la campana lo enseña sin botón).
+   */
+  function goTo(ref: string): (() => void) | undefined {
+    const at = ref.indexOf(':');
+    const k = at < 0 ? ref : ref.slice(0, at);
+    const arg = at < 0 ? '' : ref.slice(at + 1);
+    const id = Number(arg);
+    const hub = (fn: () => void) => () => withBack('Pueblo', openHub, fn);
+    switch (k) {
+      case 'b':
+        return state.buildings.some((b) => b.id === id) ? () => focusBuilding(id) : undefined;
+      case 'c':
+        return state.citizens.some((c) => c.id === id) ? () => openCitizen(social, id) : undefined;
+      case 'at': {
+        const [x, y] = arg.split(',').map(Number);
+        return Number.isFinite(x) && Number.isFinite(y) ? () => centerOn(x!, y!) : undefined;
+      }
+      case 'th':
+        return ['budget', 'festival', 'seasons', 'grants', 'associations', 'tourism'].includes(arg) ? () => openTownHall(social, arg as 'grants') : () => openTownHall(social);
+      case 'dilemma':
+        return state.dilemmas.some((d) => d.id === id && !d.resolved) ? () => openDilemmaSheet(dilemmaCtx, id) : undefined;
+      case 'debtors':
+        return () => openNeighbours(state, (c) => withBack('Vecinos', () => openNeighbours(state, () => {}, true), () => openCitizen(social, c.id)), true);
+      case 'accounts':
+        return openAccounts;
+      case 'rank':
+        return hub(() => openRank(state));
+      case 'politics':
+        return () => openPolitics(social);
+      case 'happening':
+        return openHappening;
+      case 'tray':
+        return () => openTray();
+      case 'mail':
+        return hub(openMail);
+      case 'comarca':
+        return hub(openComarcaSheet);
+      case 'region':
+        return hub(openRegionSheet);
+      case 'errands':
+        return hub(openErrandsSheet);
+      case 'press':
+        return hub(openPressSheet);
+      default:
+        return undefined;
     }
-    sheet('Avisos', items.length ? ul : h('p', { class: 'muted' }, 'Sin avisos todavía.'));
+  }
+
+  /** 2.7: lo que se repite en una semana va junto en «Ha pasado» («3 robos esta semana»). */
+  const LOG_GROUPS: [RegExp, string, string][] = [
+    [/^(Roban en|Intentan robar|Entran a robar)/, 'robo', 'robos'],
+    [/se muda al pueblo|^Llegan \d+ vecinos|vuelve al pueblo|^¡Llega un bebé/, 'llegada', 'llegadas'],
+    [/se va del pueblo|^Un vecino se va|vecinos se van/, 'despedida', 'despedidas'],
+    [/^Terminada la obra|obras terminadas/, 'obra terminada', 'obras terminadas'],
+    [/^(Nieva|Ola de calor|Tormenta sobre|El río crece)/, 'aviso del tiempo', 'avisos del tiempo'],
+    [/^Riesgo de incendio/, 'riesgo de incendio', 'riesgos de incendio'],
+    [/^(Desahucian|El banco se queda)/, 'desahucio o embargo', 'desahucios y embargos'],
+  ];
+  /** El número de la campana: lo que te piden más lo importante sin mirar. */
+  let asksNow: Ask[] = [];
+  let bellKey = '';
+  let unreadNow = 0;
+  function paintBell(unread = unreadNow) {
+    unreadNow = unread;
+    const asks = asksNow.length;
+    const n = asks + unread;
+    const key = `${asks}|${unread}`;
+    if (key === bellKey) return;
+    bellKey = key;
+    bellBadge.hidden = n === 0;
+    bellBadge.textContent = n > 9 ? '9+' : String(n);
+    bellBadge.classList.toggle('asks', asks > 0);
+    $('#bell').setAttribute('aria-label', n ? `Avisos: ${n} sin leer${asks ? ` (${asks === 1 ? '1 te pide respuesta' : `${asks} te piden respuesta`})` : ''}` : 'Avisos');
+  }
+  let asksDay = -1;
+  /** Una vez por hora de juego (o al responder): «Te piden» sale del estado. */
+  /** La primera vez solo se apunta lo que ya había (al abrir no se frena). */
+  let askSeeded = false;
+  function refreshAsks(force = false) {
+    if (!force && state.tick === asksDay) return;
+    asksDay = state.tick;
+    const before = new Set(asksNow.map((a) => a.key));
+    asksNow = pendingAsks(state);
+    // Ronda 23: a x3/x10 lo que pide respuesta con plazo caducaba en segundos: baja a x1 al llegar
+    // (también con «Solo emergencias»; con «Nada», no). Vuelve sola a la velocidad de antes a los 20 s.
+    const fresh = asksNow.find((a) => a.due !== undefined && !before.has(a.key));
+    if (fresh && before.size + asksNow.length > 0 && askSeeded && speed >= 3 && prefs().slowFor !== 'nada') {
+      const was = speed;
+      setSpeed(1);
+      slowNote(was, 'lo que te piden');
+    }
+    askSeeded = true;
+    paintBell();
+  }
+
+  /** Una fila de «Te piden»: qué, plazo y botón. */
+  function askRow(a: Ask, back: () => void): HTMLElement {
+    const fn = goTo(a.go);
+    const due = dueText(state.tick, a.due);
+    const btn = h('button', { class: 'btn primary ask-go' }, a.action);
+    if (fn) btn.addEventListener('click', () => withBack('Avisos', back, fn));
+    else btn.setAttribute('aria-disabled', 'true');
+    return h(
+      'li',
+      { class: 'ask-card', 'data-ask': a.key },
+      h('p', { class: 'ask-text' }, a.text),
+      due ? h('p', { class: `ask-due${dueSoon(state.tick, a.due) ? ' soon' : ''}` }, `⏳ ${due}`) : '',
+      btn,
+    );
+  }
+
+  /** La campana 2.0: «Te piden» (lo que espera respuesta) y «Ha pasado» (agrupado). */
+  function openLog(tab?: 'asks' | 'past') {
+    markLogRead();
+    refreshAsks(true);
+    const asks = asksNow;
+    const pick = tab ?? (asks.length ? 'asks' : 'past');
+    const icon = { info: 'ℹ', warn: '⚠', good: '✔' };
+    const back = () => openLog(pick);
+    // «Ha pasado»: lo más nuevo arriba; lo que se repite en la misma semana, junto.
+    const items = toastLog();
+    const week = (t?: number) => (t === undefined ? -1 : Math.floor(t / (7 * TICKS_PER_DAY)));
+    const nowWeek = week(state.tick);
+    const groups = new Map<string, { label: [string, string]; list: LogEntry[] }>();
+    const order: (LogEntry | string)[] = [];
+    for (const e of items) {
+      const g = LOG_GROUPS.find(([re]) => re.test(e.text));
+      if (!g || e.tick === undefined) {
+        order.push(e);
+        continue;
+      }
+      const key = `${g[1]}|${week(e.tick)}`;
+      const have = groups.get(key);
+      if (have) have.list.push(e);
+      else {
+        groups.set(key, { label: [g[1], g[2]], list: [e] });
+        order.push(key);
+      }
+    }
+    const row = (e: LogEntry) => {
+      const fn = entryAction(e);
+      const btn = h('button', { class: 'log-item', ...(fn ? { 'data-go': '1' } : {}) }, h('span', { class: 'toast-icon', 'aria-hidden': 'true' }, icon[e.kind]), h('span', {}, e.text, ' ', h('span', { class: 'when' }, e.when)));
+      if (fn) btn.addEventListener('click', () => withBack('Avisos', back, fn));
+      else btn.setAttribute('tabindex', '-1');
+      return h('li', { class: e.kind }, btn);
+    };
+    const ul = h('ul', { class: 'log' });
+    for (const o of order) {
+      if (typeof o !== 'string') {
+        ul.append(row(o));
+        continue;
+      }
+      const g = groups.get(o)!;
+      if (g.list.length === 1) {
+        ul.append(row(g.list[0]!));
+        continue;
+      }
+      const w = week(g.list[0]!.tick);
+      const when = w === nowWeek ? 'esta semana' : w === nowWeek - 1 ? 'la semana pasada' : `la semana del ${g.list.at(-1)!.when}`;
+      const kind = g.list.some((e) => e.kind === 'warn') ? 'warn' : g.list[0]!.kind;
+      ul.append(
+        h(
+          'li',
+          { class: `${kind} log-group` },
+          h('details', {}, h('summary', { class: 'log-sum' }, h('span', { class: 'toast-icon', 'aria-hidden': 'true' }, icon[kind]), `${g.list.length} ${g.label[1]} ${when}`), h('ul', { class: 'log' }, ...g.list.map(row))),
+        ),
+      );
+    }
+    const askList = h('ul', { class: 'asks' }, ...asks.map((a) => askRow(a, back)));
+    const panelAsks = h('div', { id: 'log-asks', role: 'tabpanel', 'aria-labelledby': 'log-tab-asks' }, asks.length ? askList : h('p', { class: 'muted' }, 'Nadie espera respuesta ahora mismo.'));
+    const panelPast = h('div', { id: 'log-past', role: 'tabpanel', 'aria-labelledby': 'log-tab-past' }, items.length ? ul : h('p', { class: 'muted' }, 'Sin avisos todavía.'));
+    const tabAsks = h('button', { id: 'log-tab-asks', class: 'log-tab', role: 'tab', 'aria-controls': 'log-asks' }, 'Te piden', asks.length ? h('span', { class: 'log-tab-n' }, String(asks.length)) : '');
+    const tabPast = h('button', { id: 'log-tab-past', class: 'log-tab', role: 'tab', 'aria-controls': 'log-past' }, 'Ha pasado');
+    const show = (t: 'asks' | 'past') => {
+      tabAsks.setAttribute('aria-selected', String(t === 'asks'));
+      tabPast.setAttribute('aria-selected', String(t === 'past'));
+      tabAsks.tabIndex = t === 'asks' ? 0 : -1;
+      tabPast.tabIndex = t === 'past' ? 0 : -1;
+      panelAsks.hidden = t !== 'asks';
+      panelPast.hidden = t !== 'past';
+    };
+    tabAsks.addEventListener('click', () => show('asks'));
+    tabPast.addEventListener('click', () => show('past'));
+    const tabs = h('div', { class: 'log-tabs', role: 'tablist', 'aria-label': 'Avisos' }, tabAsks, tabPast);
+    tabs.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const next = tabAsks.getAttribute('aria-selected') === 'true' ? 'past' : 'asks';
+      show(next);
+      (next === 'asks' ? tabAsks : tabPast).focus();
+    });
+    show(pick);
+    sheet('Avisos', tabs, panelAsks, panelPast);
   }
   const bellBadge = document.querySelector<HTMLElement>('#bell .bell-n')!;
   $('#bell').prepend(pixelIcon('bell'));
   onToastLog(
-    (n) => {
-      bellBadge.hidden = n === 0;
-      bellBadge.textContent = n > 9 ? '9+' : String(n);
-      $('#bell').setAttribute('aria-label', n ? `Avisos: ${n} sin mirar` : 'Avisos');
-    },
-    openLog,
+    (n) => paintBell(n),
+    () => openLog('past'),
     () => shortDate(tickToDate(state.tick)),
+    { token, tick: () => state.tick, resolve: goTo },
   );
+  refreshAsks(true);
 
   /** Capas: el chip dice cuál está puesta; al tocarlo se elige de una lista (antes, se cambiaba a ciegas). */
   function setLayer(id: LayerId) {
@@ -2921,12 +3632,11 @@ export function startGame(opts: GameOptions): void {
     const def = LAYERS.find((l) => l.id === layer)!;
     const legend = $('#legend');
     legend.hidden = layer === 'none';
-    if (layer === 'missing') {
-      // v1.9.1: con poca altura (móvil en horizontal) empieza plegada: si no, tapa medio mapa.
-      // Ronda 21: en el móvil en vertical también (plegada enseña lo que más falta, 2–3 filas).
-      if (matchMedia('(max-height: 500px), (max-width: 719px)').matches) legendFolded = true;
-      missingLegend();
-    } else legend.replaceChildren(h('strong', {}, def.label), ...def.legend.map((x) => h('span', { class: `legend-item ${x.cls}` }, x.text)));
+    // v1.9.1: con poca altura (móvil en horizontal) empieza plegada: si no, tapa medio mapa.
+    // 2.7: en el móvil, todas las capas: un chip de una línea abajo a la izquierda; se despliega al tocarlo.
+    if (matchMedia('(max-height: 500px), (max-width: 719px)').matches) legendFolded = true;
+    if (layer === 'missing') missingLegend();
+    else if (layer !== 'none') plainLegend(def);
     const chip = $('#layers');
     // Ronda 21: con leyenda, en el móvil el chip se queda en su icono (la leyenda ya dice qué capa es).
     document.body.classList.toggle('layer-on', layer !== 'none');
@@ -2940,6 +3650,24 @@ export function startGame(opts: GameOptions): void {
   /** 2.6: último día en que se miró la carga de las redes. */
   let lastNetDay = -1;
   let legendFolded = false;
+  /** 2.7: leyenda de una capa de colores: cabecera que se pliega (un chip de una línea) y sus colores. */
+  function plainLegend(def: (typeof LAYERS)[number]) {
+    const legend = $('#legend');
+    legend.classList.remove('filtered');
+    legend.classList.toggle('folded', legendFolded);
+    const head = h(
+      'button',
+      { class: 'legend-head', 'aria-expanded': String(!legendFolded), 'aria-label': `Leyenda: ${def.label}. ${legendFolded ? 'Desplegar' : 'Plegar'}` },
+      h('strong', {}, def.label),
+      h('span', { class: 'legend-chev', 'aria-hidden': 'true' }, legendFolded ? '▸' : '▾'),
+    );
+    head.addEventListener('click', () => {
+      legendFolded = !legendFolded;
+      plainLegend(def);
+      legend.querySelector<HTMLElement>('.legend-head')?.focus();
+    });
+    legend.replaceChildren(head, ...def.legend.map((x) => h('span', { class: `legend-item ${x.cls}` }, x.text)));
+  }
   function missingLegend() {
     legendDay = Math.floor(state.tick / 24);
     // Ronda 13: ordenada por lo que más falta, con «Construir» al lado; plegable para ver el mapa.
@@ -2996,16 +3724,25 @@ export function startGame(opts: GameOptions): void {
       });
       return h('span', { class: 'legend-need' }, pick, goBtn(r.key));
     });
-    const more = legendFolded && rows.length > 2 ? h('span', { class: 'legend-more' }, ` · ver las ${rows.length}`) : '';
-    const head = h('button', { class: 'legend-head', 'aria-expanded': String(!legendFolded) }, h('strong', {}, 'Qué falta'), h('span', { 'aria-hidden': 'true' }, legendFolded ? ' ▸' : ' ▾'), more);
+    // 2.7: plegada es un chip de una línea: «Qué falta · 5 ▸» (cuántos servicios faltan en alguna casa).
+    const lacking = sum.filter((r) => r.falta > 0).length;
+    const more = legendFolded && lacking ? h('span', { class: 'legend-more' }, ` · ${lacking}`) : '';
+    const head = h(
+      'button',
+      { class: 'legend-head', 'aria-expanded': String(!legendFolded), 'aria-label': `Qué falta${lacking ? `: ${plural(lacking, 'servicio', 'servicios')}` : ''}. ${legendFolded ? 'Desplegar' : 'Plegar'}` },
+      h('strong', {}, 'Qué falta'),
+      more,
+      h('span', { class: 'legend-chev', 'aria-hidden': 'true' }, legendFolded ? '▸' : '▾'),
+    );
     head.addEventListener('click', () => {
       legendFolded = !legendFolded;
       missingLegend();
+      $('#legend').querySelector<HTMLElement>('.legend-head')?.focus();
     });
     legend.classList.toggle('folded', legendFolded);
     legend.replaceChildren(
       head,
-      // Ronda 21: plegada sigue enseñando lo que más falta (el CSS deja 2–3 filas; en horizontal, ninguna).
+      // 2.7: plegada, el CSS solo enseña la cabecera (las filas siguen ahí para el lector de pantalla al desplegar).
       ...(rows.length ? rows : legendFolded ? [] : [h('span', {}, 'A ninguna vivienda le falta nada.')]),
       ...(legendFolded ? [] : [h('span', { class: 'legend-note' }, 'Toca un servicio para ver qué casas son y la zona que cubre. Marco rojo: falta. Amarillo a trazos: llega, pero está lleno.')]),
     );
@@ -3020,7 +3757,9 @@ export function startGame(opts: GameOptions): void {
       });
       list.append(b);
     }
-    sheet('Capas de datos', h('p', { class: 'muted small' }, 'Colorean el mapa según un dato. La leyenda sale abajo a la izquierda.'), list).classList.add('half');
+    // 2.7: hoja compacta (dos columnas, sin texto largo): el pueblo sigue a la vista mientras se elige.
+    const el = sheet('Capas de datos', h('p', { class: 'muted small' }, 'Colorean el mapa. La leyenda sale abajo a la izquierda.'), list);
+    el.classList.add('half', 'layers-sheet');
   }
   $('#layers').prepend(pixelIcon('layers'));
 
@@ -3078,6 +3817,8 @@ export function startGame(opts: GameOptions): void {
     }
   }
 
+  /** 2.7: el aviso de x10 sale una vez por sesión (antes, cada vez que se ponía). */
+  let x10Warned = false;
   function setSpeed(s: number) {
     if (lost && s > 0) return;
     // Modo tranquilo: como mucho x1.
@@ -3085,7 +3826,8 @@ export function startGame(opts: GameOptions): void {
       toast('Modo tranquilo: la velocidad máxima es x1 (Ajustes).', { kind: 'info' });
       s = 1;
     }
-    if (s === 10 && speed !== 10) {
+    if (s === 10 && speed !== 10 && !x10Warned) {
+      x10Warned = true;
       toast(
         state.aiMode
           ? 'x10 con la IA activa: gasta más por hora y muchas decisiones no llegarán a tiempo (las tomarán las reglas).'
@@ -3094,6 +3836,7 @@ export function startGame(opts: GameOptions): void {
       );
     }
     speed = s;
+    setFastToasts(s >= 10);
     // Otra velocidad (no la x1 del suceso): la nota «Bajo a x1…» ya no hace falta.
     if (s !== 1) hideSlowNote();
     syncTurnPace(s);
@@ -3120,13 +3863,38 @@ export function startGame(opts: GameOptions): void {
     sp.setAttribute('aria-label', `Velocidad x${lastSpeed}. Toca para cambiarla`);
   }
 
+  /**
+   * 2.7: «Hoy en Bitópolis»: el juego espera en pausa con la tarjeta abierta y
+   * «▶ Seguir» lo pone a la velocidad guardada (al volver se sabe si está en marcha).
+   */
+  function showHoy(since: AwaySince) {
+    if (speed > 0) setSpeed(0);
+    refreshAsks(true);
+    const go = savedSpeed() || lastSpeed || 1;
+    openHoy(state, since, asksNow, {
+      speed: go,
+      go: goTo,
+      openCitizen: (id) => openCitizen(social, id),
+      resume: () => userSpeed(go),
+      closed: () => rememberSeen(token, state),
+    });
+    $('#sr-live').textContent = 'Hoy en Bitópolis. El juego espera en pausa.';
+  }
   const onVisibility = () => {
     if (document.hidden) {
+      rememberSeen(token, state);
       setSpeed(0);
       send({ type: 'flush' });
-    } else if (speed === 0 && !lost && !isSheetOpen() && savedSpeed() > 0) {
-      // Al volver a la pestaña, sigue como lo dejó el jugador.
-      setSpeed(savedSpeed());
+    } else if (!lost && !isHoyOpen()) {
+      // 2.7: tras un buen rato fuera, «Hoy en Bitópolis» (en pausa) en vez de seguir sin más.
+      const away = speed === 0 && !tutorial.active ? resumeSummary(token, state) : null;
+      if (away && hoyHasNews(state, away, pendingAsks(state))) {
+        if (isSheetOpen()) closeSheet();
+        showHoy(away);
+      } else if (speed === 0 && !isSheetOpen() && savedSpeed() > 0) {
+        // Al volver a la pestaña, sigue como lo dejó el jugador.
+        setSpeed(savedSpeed());
+      }
     }
   };
   const onPageHide = () => {
@@ -3135,12 +3903,23 @@ export function startGame(opts: GameOptions): void {
   };
   document.addEventListener('visibilitychange', onVisibility);
   window.addEventListener('pagehide', onPageHide);
-  const heartbeat = setInterval(() => !document.hidden && !lost && send({ type: 'flush' }), 30_000);
+  const heartbeat = setInterval(() => {
+    if (document.hidden || lost) return;
+    send({ type: 'flush' });
+    // 2.7: la última visita se apunta mientras se juega (para que «Hoy» no salga a destiempo).
+    rememberSeen(token, state);
+  }, 30_000);
 
   // Atrás sin hojas abiertas: pausa y pregunta antes de salir de la partida (ronda 10).
   history.pushState({ ...(history.state ?? {}), game: true }, '');
   async function onBack(e: PopStateEvent) {
     if ((e.state as { game?: boolean } | null)?.game) return; // cerró una hoja: lo hace ui.ts
+    // 2.7: con «Hoy en Bitópolis» abierta, atrás la cierra (no pregunta si salir).
+    if (isHoyOpen()) {
+      closeHoy();
+      history.pushState({ game: true }, '');
+      return;
+    }
     const was = speed;
     setSpeed(0);
     if (await confirmDialog('¿Salir de la partida?', 'Se guarda sola. Puedes volver con tu enlace.', 'Salir')) exit();
@@ -3152,6 +3931,7 @@ export function startGame(opts: GameOptions): void {
   window.addEventListener('popstate', onBack);
 
   function exit() {
+    closeHoy();
     rememberSeen(token, state);
     stopMusic();
     offPrefs();
@@ -3189,9 +3969,18 @@ export function startGame(opts: GameOptions): void {
   $('#zoom-out').onclick = () => setZoom(cam.zoom - 1);
   $('#menu').onclick = () => (currentSheet()?.querySelector('#sheet-title')?.textContent === 'Pueblo' ? closeSheet() : openHub());
   $('#hud-money').onclick = () => withBack('Pueblo', openHub, openAccounts);
+  // 2.7: «⌂» vuelve al ayuntamiento (el centro del pueblo) desde donde sea.
+  $('#home').onclick = () => {
+    const hall = hallSpot();
+    if (!hall) return;
+    if (cam.zoom < touchZoom()) setZoom(touchZoom());
+    if (reducedMotion()) centerOn(hall.x, hall.y);
+    else glide({ x: cam.x, y: cam.y }, () => { centerOn(hall.x, hall.y); return { x: cam.x, y: cam.y }; }, () => undefined);
+    highlight = { x: hall.x, y: hall.y, since: performance.now() };
+  };
   $('#hud-pop').onclick = () => withBack('Pueblo', openHub, openPeople);
   $('#hud-happy').onclick = () => withBack('Pueblo', openHub, openHappiness);
-  $('#bell').onclick = openLog;
+  $('#bell').onclick = () => openLog();
   $('#strip-info').onclick = openDemand;
   // Ronda 21: la ayuda de la franja se corta a dos líneas; al tocarla se lee entera (y otro toque la recoge).
   const toolInfo = $('#tool-info');
@@ -3281,7 +4070,7 @@ export function startGame(opts: GameOptions): void {
     const [sx, sy] = shakeOffset(time);
     const view = sx || sy ? { ...cam, x: cam.x + sx * dpr(), y: cam.y + sy * dpr() } : cam;
     reachHint();
-    render(ctx, state, view, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer, highlight, labels: cam.zoom >= touchZoom(), fast: speed >= 10, reach: currentReach(), missingKey: layer === 'missing' ? missingKey : null });
+    render(ctx, state, view, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer, highlight, labels: cam.zoom >= touchZoom(), fast: speed >= 10, reach: currentReach(), missingKey: layer === 'missing' ? missingKey : null, bad: badFlash });
     placeBubbles();
     requestAnimationFrame(frame);
   }
@@ -3303,10 +4092,11 @@ export function startGame(opts: GameOptions): void {
   const away = resumeSummary(token, state);
   tutorial.start(state);
   tutorial.update(state, tool.id);
-  // 2.1: «Mientras no estabas», una tarjeta que se desliza (no durante el tutorial).
-  if (away && !tutorial.active) openAway(token, state, away, { openCitizen: (id) => openCitizen(social, id), openRank: () => openRank(state) });
+  // 2.7: «Hoy en Bitópolis» al volver tras una ausencia, si hay algo que contar (no durante el tutorial).
+  if (away && !tutorial.active && hoyHasNews(state, away, pendingAsks(state))) showHoy(away);
   introGeography();
-  if (!tutorial.active && resume === 0) toast(`En pausa. Pulsa ▶ (${matchMedia('(orientation: landscape) and (max-height: 500px)').matches ? 'arriba' : 'arriba a la izquierda'}) para que pase el tiempo.`);
+  // 2.7: en pausa, ⏯ late (antes, un aviso fijo tapaba la parte de arriba del mapa).
+  if (!tutorial.active && resume === 0) $('#sr-live').textContent = 'En pausa. Pulsa ▶ para que pase el tiempo.';
   // Sonido: se desbloquea con el primer gesto; el ambiente sigue la hora del juego.
   const unlock = () => unlockAudio();
   window.addEventListener('pointerdown', unlock, { once: true });

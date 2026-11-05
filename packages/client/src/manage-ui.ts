@@ -18,11 +18,13 @@ import {
   UPKEEP,
 } from '@bitopolis/sim';
 import { money, MONTHS } from './i18n.ts';
+import { monthFlow, splitText } from './cash.ts';
 import { economyLines } from './money-ui.ts';
 import { pixelIcon } from './icons.ts';
 import type { SocialCtx } from './social-ui.ts';
 import { townhallSprite } from './sprites.ts';
-import { h, sheet } from './ui.ts';
+import { confirmDialog, h, sheet } from './ui.ts';
+import { fold, statusBar } from './hub-ui.ts';
 
 /**
  * v1.8 (petición del creador): al tocar el ayuntamiento, un panel de gestión a
@@ -39,20 +41,23 @@ export interface ManageLinks {
 
 const card = (title: string, icon: string, ...body: (Node | string)[]) =>
   h('section', { class: 'mg-card' }, h('h3', {}, pixelIcon(icon), ` ${title}`), ...body);
+/** 2.7: una tarjeta que se pliega (lo que se mira de vez en cuando). */
+const foldCard = (key: string, title: string, icon: string, ...body: (Node | string)[]) =>
+  h('section', { class: 'mg-card mg-fold' }, fold(key, h('span', { class: 'mg-fold-h' }, pixelIcon(icon), ` ${title}`), false, ...body));
 const row = (label: string, value: string, cls = '') => h('div', { class: `mg-row ${cls}` }, h('span', {}, label), h('strong', {}, value));
 
 /**
- * Lo que se paga a fin de mes, aproximado: los gastos del mes pasado (o el
- * mantenimiento, si aún no hay mes cerrado) más lo que sube el mantenimiento
- * del ayuntamiento con `extraLevels` niveles más (se paga × nivel, tick.ts).
+ * Lo que se paga a fin de mes, aproximado: el gasto corriente (el del mes
+ * pasado sin las obras, o lo que hay construido si aún no hay mes cerrado; ver
+ * `monthFlow`) más lo que sube el mantenimiento del ayuntamiento con
+ * `extraLevels` niveles más (se paga × nivel, tick.ts).
+ * 2.7: antes contaba las obras del mes pasado («pagas ≈ 26.850 €» con un gasto fijo de 3.200 €).
  */
 export function monthlyCostEstimate(s: GameState, extraLevels = 0): number {
   const fx = budgetFx(s).maintenance;
   const hall = s.buildings.find((b) => b.kind === 'townhall' && b.built);
   const extra = hall ? maintenanceOf(hall) * extraLevels * fx : 0;
-  const last = s.stats.at(-1);
-  const base = last ? last.expenses : s.buildings.filter((b) => b.built).reduce((t, b) => t + maintenanceOf(b) * (b.kind === 'townhall' ? townLevel(s) : 1) * fx, 0);
-  return Math.round(base + extra + upkeepJump(s, extraLevels));
+  return Math.round(monthFlow(s).running + extra + upkeepJump(s, extraLevels));
 }
 
 /** Ronda 22: lo que sube el gasto corriente (€ por vecino, upkeep.ts) al ampliar, ya con la rampa entera. */
@@ -86,11 +91,23 @@ export function openManagement(ctx: SocialCtx, links: ManageLinks, fresh?: strin
   const pic = h('canvas', { class: 'mg-hall', width: String(src.width), height: String(src.height), 'aria-hidden': 'true' }) as HTMLCanvasElement;
   pic.getContext('2d')?.drawImage(src, 0, 0);
   const up: (Node | string)[] = [];
+  let status: HTMLElement;
   if (next) {
     const ok = canUpgradeTownhall(s);
-    const btn = h('button', { class: 'btn primary mg-upgrade' }, pixelIcon('upgrade'), ` Ampliar a nivel ${next.level} · ${money(next.cost)}`) as HTMLButtonElement;
+    // 2.7: el botón principal, arriba; desactivado, con candado (mobile2.css) y el motivo debajo.
+    const btn = h('button', { class: 'btn primary big mg-upgrade', 'data-test': 'fiche-main' }, pixelIcon('upgrade'), ` Ampliar a nivel ${next.level} · ${money(next.cost)}`) as HTMLButtonElement;
     btn.disabled = !ok.ok;
     btn.addEventListener('click', async () => {
+      // Ronda 23: una ampliación que se lleva más del 20 % de la caja se confirma (antes, 70.000 € de un toque).
+      if (next.cost > 0.2 * Math.max(0, s.treasury)) {
+        const sure = await confirmDialog(
+          `¿Ampliar el ayuntamiento a nivel ${next.level}?`,
+          `Cuesta ${money(next.cost)}: te quedarán ${money(s.treasury - next.cost)}. A fin de mes pagas ≈ ${money(due)} de gasto corriente.`,
+          'Ampliar',
+          { safe: true },
+        );
+        if (!sure) return;
+      }
       // El aviso va dentro de la hoja: un aviso normal quedaría tapado por la pantalla completa.
       if (await ctx.command({ type: 'UpgradeTownhall' })) {
         const after = ctx.state();
@@ -101,20 +118,39 @@ export function openManagement(ctx: SocialCtx, links: ManageLinks, fresh?: strin
     const left = s.treasury - next.cost;
     const due = monthlyCostEstimate(s, 1);
     const tight = ok.ok && left < due;
+    const pop = s.citizens.length;
+    status = ok.ok
+      ? statusBar(tight ? 'warn' : 'ok', 'Puedes ampliarlo', `nivel ${next.level}`, tight ? 'la caja quedará justa' : undefined)
+      : pop < next.pop
+        ? statusBar('warn', 'Faltan vecinos', `${pop} de ${next.pop}`, `para el nivel ${next.level}`)
+        : s.treasury < next.cost
+          ? statusBar('warn', 'Falta dinero', money(next.cost - s.treasury), `para el nivel ${next.level}`)
+          : statusBar('warn', 'Aún no se puede ampliar', `nivel ${next.level}`);
     up.push(
-      h('p', {}, `Siguiente: `, h('strong', {}, next.name), ` (nivel ${next.level}). Pide ${next.pop} vecinos y ${money(next.cost)}.`),
-      h('p', { class: 'muted small' }, `Desbloquea: ${next.unlocks.join(', ')}.`),
-      upkeepJump(s, 1) > 0 ? h('p', { class: 'muted small', 'data-test': 'upgrade-upkeep' }, `Con más nivel, el gasto corriente (alumbrado, limpieza, oficinas) sube unos ${money(upkeepJump(s, 1))} al mes.`) : '',
-      ok.ok ? h('p', { class: tight ? 'pocket-warn mg-after' : 'muted small mg-after', 'data-test': 'upgrade-after' }, `${tight ? '⚠ ' : ''}Te quedarán ${money(left)}; a fin de mes pagas ≈ ${money(due)}.${tight ? ' Quizá convenga esperar a cobrar.' : ''}`) : '',
       btn,
+      ok.ok ? '' : h('p', { class: 'muted small mg-why' }, ok.error),
+      ok.ok ? h('p', { class: tight ? 'pocket-warn mg-after' : 'muted small mg-after', 'data-test': 'upgrade-after' }, `${tight ? '⚠ ' : ''}Te quedarán ${money(left)}; a fin de mes pagas ≈ ${money(due)} de gasto corriente.${tight ? ' Quizá convenga esperar a cobrar.' : ''}`) : '',
+      fold(
+        'mg-next',
+        `Qué trae el nivel ${next.level}: ${next.name}`,
+        false,
+        h('p', {}, `Pide ${next.pop} vecinos y ${money(next.cost)}.`),
+        h('p', { class: 'muted small' }, `Desbloquea: ${next.unlocks.join(', ')}.`),
+        upkeepJump(s, 1) > 0 ? h('p', { class: 'muted small', 'data-test': 'upgrade-upkeep' }, `Con más nivel, el gasto corriente (alumbrado, limpieza, oficinas) sube unos ${money(upkeepJump(s, 1))} al mes.`) : '',
+      ),
     );
-    if (!ok.ok) up.push(h('p', { class: 'muted small mg-why' }, ok.error));
-  } else up.push(h('p', { class: 'muted small' }, 'Es el nivel más alto: el orgullo del pueblo.'));
+  } else {
+    status = statusBar('ok', 'Nivel más alto', `${lv} de ${TOWNHALL_LEVELS.length}`);
+    up.push(h('p', { class: 'muted small' }, 'Es el nivel más alto: el orgullo del pueblo.'));
+  }
+  // 2.7: cabecera (sprite pequeño y nombre) → estado → acción → detalle.
   const hall = h(
     'section',
-    { class: 'mg-card mg-hero' },
-    pic,
-    h('div', {}, note ? h('p', { class: 'mg-note', role: 'status', 'data-test': 'upgrade-done' }, note) : '', h('h3', {}, info.name), h('p', { class: 'mg-level' }, `Nivel ${lv} de ${TOWNHALL_LEVELS.length}`), ...up),
+    { class: 'mg-card mg-hero fc-head', 'data-test': 'fiche-head' },
+    h('div', { class: 'fc-top' }, pic, h('div', { class: 'fc-lines' }, h('h3', {}, info.name), h('p', { class: 'mg-level' }, `Nivel ${lv} de ${TOWNHALL_LEVELS.length}`))),
+    note ? h('p', { class: 'mg-note', role: 'status', 'data-test': 'upgrade-done' }, note) : '',
+    status,
+    h('div', { class: 'fc-main' }, ...up),
   );
 
   /* --- cómo va --- */
@@ -130,6 +166,8 @@ export function openManagement(ctx: SocialCtx, links: ManageLinks, fresh?: strin
     row('En caja', money(s.treasury), s.treasury < 0 ? 'neg' : ''),
     ...(last ? [row(`Último mes (${MONTHS[(tickToDate(s.tick).month + 10) % 12]})`, `${net >= 0 ? '+' : ''}${money(net)}`, net < 0 ? 'neg' : '')] : []),
   );
+  // 2.7: el gasto corriente y las obras, por separado (una estación de tren no es gasto de cada mes).
+  if (last) how.append(h('p', { class: 'muted small', 'data-test': 'month-split' }, `${splitText(last)}.`));
   const accounts = h('button', { class: 'btn' }, 'Ver las cuentas');
   accounts.addEventListener('click', links.accounts);
   how.append(accounts);
@@ -151,11 +189,10 @@ export function openManagement(ctx: SocialCtx, links: ManageLinks, fresh?: strin
   /* --- lo que tiene --- */
   const counts = new Map<string, number>();
   for (const b of s.buildings) if (b.built && b.kind !== 'townhall') counts.set(b.kind, (counts.get(b.kind) ?? 0) + 1);
-  const has = card('Lo que tiene', 'townhall');
-  if (!counts.size) has.append(h('p', { class: 'muted small' }, 'Aún nada más que el ayuntamiento.'));
   const grid = h('div', { class: 'mg-grid' });
   for (const [k, n] of [...counts].sort((a, b) => b[1] - a[1])) grid.append(h('span', { class: 'mg-chip' }, `${BUILD_NAMES[k] ?? KIND_TEXT[k] ?? k} `, h('strong', {}, String(n))));
-  has.append(grid);
+  // 2.7: el recuento, plegado; lo destrozado (con su botón), siempre a la vista.
+  const has = foldCard('mg-has', 'Lo que tiene', 'townhall', counts.size ? grid : h('p', { class: 'muted small' }, 'Aún nada más que el ayuntamiento.'));
   const broken = s.buildings.filter((b) => b.damaged);
   for (const b of broken) {
     const go = h('button', { class: 'btn small danger' }, `${b.name ?? BUILD_NAMES[b.kind] ?? 'Tienda'}: ${b.damaged?.cause === 'fuego' ? 'quemado' : 'destrozada'}`);
@@ -168,7 +205,8 @@ export function openManagement(ctx: SocialCtx, links: ManageLinks, fresh?: strin
   const stations = s.buildings.filter((b) => b.kind === 'police' && b.built).length;
   const cap = stations * CRIME.cellsPerStation;
   const jail = jailCapacity(s);
-  const safety = card(
+  const safety = foldCard(
+    'mg-safety',
     'Seguridad',
     'handcuffs',
     row('Robos', String(j.robberies)),

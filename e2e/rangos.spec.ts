@@ -33,6 +33,8 @@ test('2.1: el pueblo sube de rango con fanfarria, cartel en la entrada y escudo 
   expect(rankFor(state)).toBeGreaterThanOrEqual(1);
   state.rank = { ...state.rank!, level: 0, vote: null, crest: { ...state.rank!.crest, pieces: state.rank!.crest.pieces.slice(0, 1), motto: null } };
   const token = await importTown(request, state);
+  // 2.7: por defecto solo frenan las emergencias; aquí se elige «también lo importante» para ver la bajada a x1.
+  await page.addInitScript(() => localStorage.setItem('bitopolis.prefs', JSON.stringify({ slowFor: 'importante' })));
   await open(page, token);
   await setSpeed(page, 10);
   await expect.poll(() => page.evaluate(() => (window as any).__bitopolis.state.rank.level), { timeout: 30_000 }).toBeGreaterThanOrEqual(1);
@@ -66,58 +68,30 @@ test('2.1: el pueblo sube de rango con fanfarria, cartel en la entrada y escudo 
   expect(errors).toEqual([]);
 });
 
-for (const text of [100, 200] as const) {
-  test(`2.1: «Mientras no estabas» al volver (texto ${text} %), se desliza y se pasa con botones`, async ({ page, request }, info) => {
-    test.setTimeout(90_000);
-    const errors: string[] = [];
-    page.on('pageerror', (e) => errors.push(e.message));
-    const { state } = runSimulation({ seed: 42, days: 400, profile: 'constructor' });
-    const token = await importTown(request, state);
-    // La última visita fue hace 60 días de juego, con menos gente y menos caja.
-    const seen = { tick: state.tick - 60 * 24, pop: state.citizens.length - 4, treasury: state.treasury - 2_000, at: 0, rank: 0 };
-    await page.addInitScript(
-      ([t, s, size]) => {
-        localStorage.setItem(`bitopolis.seen.${t}`, s as string);
-        localStorage.setItem('bitopolis.prefs', JSON.stringify({ text: size }));
-      },
-      [token, JSON.stringify(seen), text] as const,
-    );
-    await open(page, token);
-    const away = page.locator('.away-sheet');
-    await expect(away).toBeVisible();
-    await expect(page.locator('#sheet-title')).toHaveText('Mientras no estabas');
-    const slides = away.locator('.away-slide');
-    const n = await slides.count();
-    expect(n).toBeGreaterThanOrEqual(3);
-    expect(n).toBeLessThanOrEqual(5);
-    await expect(slides.first()).toContainText('+4 vecinos');
-    await expect(away.locator('.away-status')).toHaveText(`1 de ${n}`);
-    // Nada se sale de lado (legible a 390 px y al 200 %).
-    const overflow = await page.evaluate(() => {
-      const s = document.querySelector('.away-slide') as HTMLElement;
-      return s.scrollWidth - s.clientWidth;
-    });
-    expect(overflow).toBeLessThanOrEqual(1);
-    await page.screenshot({ path: `test-results/capturas/${info.project.name}-rangos-4-mientras-${text}.png` });
-
-    // Con el botón «Siguiente».
-    await away.getByRole('button', { name: 'Siguiente ›' }).click();
-    await expect(away.locator('.away-status')).toHaveText(`2 de ${n}`);
-    // Deslizando (scroll con imán, como el dedo).
-    await away.locator('.away-track').evaluate((el) => el.scrollTo({ left: el.clientWidth * 2, behavior: 'auto' }));
-    await expect(away.locator('.away-status')).toHaveText(`3 de ${n}`);
-    await page.screenshot({ path: `test-results/capturas/${info.project.name}-rangos-5-mientras-${text}-3.png` });
-    // Hasta el final: «A jugar» cierra la tarjeta.
-    for (let i = 3; i < n; i++) await away.getByRole('button', { name: 'Siguiente ›' }).click();
-    await away.getByRole('button', { name: 'A jugar' }).click();
-    await expect(away).toBeHidden();
-    expect(errors).toEqual([]);
-  });
-}
+// 2.7: «Mientras no estabas» (cinco páginas) pasa a ser «Hoy en Bitópolis», una sola tarjeta (e2e/campana.spec.ts).
+test('2.7: al volver, «Hoy en Bitópolis» cuenta lo que ha cambiado (también el rango)', async ({ page, request }, info) => {
+  test.setTimeout(90_000);
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  const { state } = runSimulation({ seed: 42, days: 400, profile: 'constructor' });
+  const token = await importTown(request, state);
+  // La última visita fue hace 60 días de juego, con menos gente y menos caja, y aún de aldea.
+  const seen = { tick: state.tick - 60 * 24, pop: state.citizens.length - 4, treasury: state.treasury - 2_000, at: 0, rank: 0 };
+  await page.addInitScript(([t, s]) => localStorage.setItem(`bitopolis.seen.${t}`, s as string), [token, JSON.stringify(seen)] as const);
+  await open(page, token);
+  const hoy = page.locator('.hoy');
+  await expect(hoy).toBeVisible();
+  await expect(hoy.locator('.hoy-since')).toContainText('+4 vecinos');
+  if ((state.rank?.level ?? 0) > 0) await expect(hoy.locator('.hoy-since')).toContainText('ahora es');
+  await page.screenshot({ path: `test-results/capturas/${info.project.name}-rangos-4-hoy.png` });
+  await hoy.getByRole('button', { name: /▶ Seguir/ }).click();
+  await expect(hoy).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
 
 test('2.1: sin ausencia no sale la tarjeta', async ({ page, request }) => {
   const { state } = runSimulation({ seed: 5, days: 60, profile: 'casual' });
   const token = await importTown(request, state);
   await open(page, token);
-  await expect(page.locator('.away-sheet')).toHaveCount(0);
+  await expect(page.locator('.hoy')).toHaveCount(0);
 });

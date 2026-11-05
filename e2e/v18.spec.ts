@@ -1,7 +1,7 @@
 import { gzipSync } from 'node:zlib';
 import { expect, type Page, test } from '@playwright/test';
 import { type GameState, OUTSIDE, runSimulation, transfer, TREASURY } from '../packages/sim/src/index.ts';
-import { setSpeed, skipTutorial, tile } from './helpers.ts';
+import { setSpeed, skipTutorial, tile, confirmIfAsked } from './helpers.ts';
 
 /** v1.8: ficha de casa completa, cárcel, tiendas destrozadas y su reparación. */
 function pack(state: GameState) {
@@ -80,6 +80,7 @@ test('v1.8: el ayuntamiento abre el panel de gestión y se amplía; calendario a
   await expect(page.locator('.sheet')).toContainText('Seguridad');
   await shot('3-gestion');
   await page.getByRole('button', { name: /Ampliar a nivel 2/ }).click();
+  await confirmIfAsked(page);
   await expect(page.locator('.sheet')).toContainText('Nivel 2 de 5');
   await page.locator('.sheet-close').click();
   await page.locator('#tab-build').click();

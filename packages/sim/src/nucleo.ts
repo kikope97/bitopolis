@@ -368,13 +368,16 @@ export function monthlyCostOf(kind: BuildKind, state?: GameState): { maintenance
   return { maintenance, jobs, wages, total: maintenance + wages };
 }
 
-/** «+430 €/mes» o «+430 €/mes (mantenimiento y 3 sueldos)» (formato con `fmtMoney`, que pone el cliente). */
+/**
+ * «−430 €/mes» o «−430 €/mes (mantenimiento y 3 sueldos)» (formato con `fmtMoney`, que pone el cliente).
+ * 2.7: con «−»: es un gasto (con «+» se leía como ganancia).
+ */
 export function monthlyCostText(kind: BuildKind, fmtMoney: (n: number) => string, state?: GameState, long = false): string {
   const c = monthlyCostOf(kind, state);
   if (!c.total) return '';
-  if (!long) return `+${fmtMoney(c.total)}/mes`;
+  if (!long) return `−${fmtMoney(c.total)}/mes`;
   const parts = [c.maintenance ? 'mantenimiento' : '', c.jobs ? `${c.jobs} ${c.jobs === 1 ? 'sueldo' : 'sueldos'}` : ''].filter(Boolean);
-  return `+${fmtMoney(c.total)}/mes (${parts.join(' y ')})`;
+  return `−${fmtMoney(c.total)}/mes (${parts.join(' y ')})`;
 }
 
 /**

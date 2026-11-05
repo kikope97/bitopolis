@@ -218,9 +218,9 @@ export function trayCost(tool: Tool): string {
 }
 
 /** Categorías de la bandeja «Construir»; Mirar, Carretera y Derribar van en las pestañas. */
-export const TRAY: { title: string; tools: ToolId[] }[] = [
+export const TRAY: { title: string; tools: ToolId[]; chip?: string }[] = [
   { title: 'Lo básico', tools: ['house', 'water', 'power'] },
-  { title: 'Zonas (los vecinos construyen)', tools: ['zoneR', 'zoneC', 'zoneI', 'zoneA', 'dezone'] },
+  { title: 'Zonas (los vecinos construyen)', chip: 'Zonas', tools: ['zoneR', 'zoneC', 'zoneI', 'zoneA', 'dezone'] },
   { title: 'Servicios', tools: ['park', 'school', 'clinic', 'police', 'cleanpoint', 'jail'] },
   { title: 'Vida social', tools: ['bar', 'chapel', 'cemetery', 'library', 'sports'] },
   { title: 'Emergencias', tools: ['firestation', 'civilprotection', 'dike'] },
@@ -232,10 +232,15 @@ export const TRAY: { title: string; tools: ToolId[] }[] = [
   { title: 'Transporte', tools: ['busstation'] },
   { title: 'Campo', tools: ['coop'] },
   { title: 'Turismo', tools: ['heritage'] },
-  { title: 'Premios de los hitos', tools: ['plaza', 'market'] },
+  { title: 'Premios de los hitos', chip: 'Premios', tools: ['plaza', 'market'] },
   // 2.3: grandes obras por fases (cada fase se paga desde su ficha).
   { title: 'Grandes obras', tools: ['bridge', 'station', 'fair', 'stadium', 'cathedral'] },
 ];
+
+/** 2.7: el nombre corto de una categoría para su chip («Zonas», «Premios»). */
+export function trayChipName(title: string): string {
+  return TRAY.find((c) => c.title === title)?.chip ?? title;
+}
 
 export function costText(tool: Tool): string {
   if (tool.landmark) {

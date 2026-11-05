@@ -3,6 +3,9 @@ import { BUILD } from './balance.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { type GameState, pushEvent } from './state.ts';
 
+/** Miles con punto (como `fmt` de loans.ts; aquí sin importarlo para no crear un ciclo). */
+const miles = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
 /**
  * v1.8 (petición del creador): el ayuntamiento es el centro del pueblo y sube
  * de nivel. Cada nivel pide vecinos y dinero y desbloquea edificios y partes
@@ -85,7 +88,7 @@ export function canUpgradeTownhall(state: GameState): { ok: true } | { ok: false
   const next = nextLevel(state);
   if (!next) return { ok: false, error: 'El ayuntamiento ya está en su nivel más alto' };
   if (state.citizens.length < next.pop) return { ok: false, error: `Hacen falta ${next.pop} vecinos (hay ${state.citizens.length})` };
-  if (state.treasury < next.cost) return { ok: false, error: `Faltan ${next.cost - state.treasury} € en la caja (cuesta ${next.cost} €; hay ${state.treasury} €)` };
+  if (state.treasury < next.cost) return { ok: false, error: `Faltan ${miles(next.cost - state.treasury)} € en la caja (cuesta ${miles(next.cost)} €; hay ${miles(state.treasury)} €)` };
   return { ok: true };
 }
 

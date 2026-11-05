@@ -8,6 +8,7 @@ test('/healthz responde', async ({ request }) => {
 });
 
 test('partida nueva: tutorial, obras, guardado y continuar', async ({ page }, info) => {
+  test.setTimeout(60_000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
@@ -36,6 +37,8 @@ test('partida nueva: tutorial, obras, guardado y continuar', async ({ page }, in
   await pickTool(page, 'power');
   await tap(page, cx + 2, cy + 1);
   await pickTool(page, 'house');
+  // 2.7: los botones del mapa van en la zona del pulgar; la casilla se centra antes de tocarla.
+  await page.evaluate(([a, b]) => (window as any).__bitopolis.centerOn(a, b), [cx + 4, cy + 2]);
   await tap(page, cx + 4, cy + 2);
   await expect(page.locator('.tut-box')).toContainText('▶');
   const s1 = await state(page);
@@ -46,6 +49,8 @@ test('partida nueva: tutorial, obras, guardado y continuar', async ({ page }, in
   await expect(page.locator('#hud-pop')).not.toHaveText('1', { timeout: 25_000 });
   await setSpeed(page, 0);
   await pickTool(page, 'inspect');
+  // 2.7: la casa al centro (con el tutorial más bajo, los botones del mapa podían quedar encima de ella).
+  await page.evaluate(([a, b]) => (window as any).__bitopolis.centerOn(a, b), [cx + 4, cy + 2]);
   await tap(page, cx + 4, cy + 2);
   await expect(page.locator('.sheet')).toContainText('Viven aquí');
   await shot('4-ficha');

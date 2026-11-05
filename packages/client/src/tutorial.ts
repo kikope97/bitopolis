@@ -11,6 +11,8 @@ interface Step {
   done: (s: GameState, tool: ToolId, ctx: Ctx) => boolean;
   /** v1.9.1: algo del mapa que hay que encontrar (destella y la cámara va allí). */
   focus?: 'townhall';
+  /** 2.7: el paso solo informa (no pide tocar nada ahora): lleva «Siguiente», que lo guarda hasta el paso siguiente. */
+  info?: boolean;
 }
 
 interface Ctx {
@@ -62,6 +64,7 @@ const STEPS: Step[] = [
     text: '¡Ya tienes vecinos! Con 10 podrás ampliar el ayuntamiento (el edificio del centro) y desbloquear las zonas R, C e I: abajo ves cuántos faltan. Si dudas, pulsa «?».',
     target: () => null,
     done: (s) => s.citizens.length >= 10,
+    info: true,
   },
   {
     // v1.8: el ayuntamiento por niveles.
@@ -88,6 +91,9 @@ export class Tutorial {
   private box: HTMLElement;
   private arrow: HTMLElement;
   private skip: HTMLButtonElement;
+  private next: HTMLButtonElement;
+  /** Paso informativo que ya se leyó («Siguiente»): la caja no sale hasta el paso siguiente. */
+  private dismissed = -1;
   private started = false;
   /** Último paso cuyo `focus` ya se enseñó (para no mover la cámara en cada refresco). */
   private focused = -1;
@@ -97,11 +103,18 @@ export class Tutorial {
   constructor(private storageKey: string) {
     this.arrow = h('div', { class: 'tut-arrow', 'aria-hidden': 'true' }, '▼');
     this.skip = h('button', { class: 'tut-skip' }, 'Saltar');
+    this.next = h('button', { class: 'tut-next' }, 'Siguiente');
+    this.next.addEventListener('click', () => {
+      this.dismissed = this.step;
+      this.box.hidden = true;
+      document.documentElement.style.setProperty('--tut-h', '0px');
+    });
     // Ronda 12: un toque al mapa caía en «Saltar» y el tutorial se perdía; ahora se pregunta.
     this.skip.addEventListener('click', async () => {
       if (this.step >= STEPS.length - 1 || (await confirmDialog('¿Saltar el tutorial?', 'Puedes repetirlo desde Pueblo › Repetir tutorial.', 'Saltar'))) this.finish();
     });
-    this.box = h('div', { class: 'tut-box', role: 'status', 'aria-live': 'polite' }, h('p', {}), this.skip);
+    // 2.7: los botones van juntos a un lado, separados del texto (un toque al mapa caía en «Saltar»).
+    this.box = h('div', { class: 'tut-box', role: 'status', 'aria-live': 'polite' }, h('p', {}), h('div', { class: 'tut-actions' }, this.skip));
     try {
       const v = localStorage.getItem(storageKey);
       this.step = v === 'done' ? STEPS.length : Number(v ?? 0) || 0;
@@ -121,6 +134,7 @@ export class Tutorial {
 
   start(state: GameState, fromScratch = false) {
     this.focused = -1;
+    this.dismissed = -1;
     if (fromScratch) this.step = 0;
     // Un pueblo ya hecho (importado o de otra partida) no empieza el tutorial desde cero (ronda 11).
     else if (this.step === 0 && state.citizens.length >= 10) {
@@ -172,6 +186,17 @@ export class Tutorial {
     // Último paso: sin cierre automático; se cierra con «Entendido».
     this.skip.textContent = this.step === STEPS.length - 1 ? 'Entendido' : 'Saltar';
     const cur = STEPS[this.step]!;
+    // «Siguiente» solo en los pasos que informan (y fuera del DOM en los demás: un solo botón en la caja).
+    if (cur.info && !this.next.isConnected) this.skip.before(this.next);
+    else if (!cur.info && this.next.isConnected) this.next.remove();
+    const hide = this.dismissed === this.step;
+    if (this.box.hidden !== hide) this.box.hidden = hide;
+    if (hide) {
+      document.documentElement.style.setProperty('--tut-h', '0px');
+      this.mark(null);
+      this.arrow.hidden = true;
+      return;
+    }
     if (cur.focus && this.focused !== this.step) {
       this.focused = this.step;
       this.onFocus?.(cur.focus);

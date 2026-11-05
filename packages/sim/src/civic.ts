@@ -182,8 +182,8 @@ function offerGrant(state: GameState): void {
     ...(days !== GRANT_OFFER_DAYS ? { offerDays: days } : {}),
   });
   const until = tickToDate(state.tick + days * TICKS_PER_DAY);
-  const late = days < GRANT_OFFER_DAYS ? ' La postal llega tarde: sin oficina de correos hay menos días para responder.' : '';
-  pushEvent(state, 'info', `La Diputación ofrece pagar el ${Math.round(share * 100)} % de ${GRANT_NAME[kind]}. Responde antes del ${until.day}/${until.month} (Pueblo › Ayuntamiento)${late}`);
+  const late = days < GRANT_OFFER_DAYS ? '. La postal llega tarde: sin oficina de correos hay menos días para responder' : '';
+  pushEvent(state, 'info', `La Diputación ofrece pagar el ${Math.round(share * 100)} % de ${GRANT_NAME[kind]}. Responde antes del ${until.day}/${until.month}${late}`);
 }
 
 export const GRANT_NAME: Partial<Record<BuildingKind, string>> = {
@@ -263,7 +263,7 @@ export function offerFeder(state: GameState): Grant | null {
     federFor: stationReady ? 'station' : 'repair',
   };
   state.grants.push(g);
-  pushEvent(state, 'business', stationReady ? `Fondos europeos por la crisis: el FEDER pagaría el ${Math.round(share * 100)} % de la estación de tren (Pueblo › Ayuntamiento)` : `Fondos europeos por la crisis: el FEDER pagaría el ${Math.round(share * 100)} % de las reparaciones (Pueblo › Ayuntamiento)`);
+  pushEvent(state, 'business', stationReady ? `Fondos europeos por la crisis: el FEDER pagaría el ${Math.round(share * 100)} % de la estación de tren` : `Fondos europeos por la crisis: el FEDER pagaría el ${Math.round(share * 100)} % de las reparaciones`);
   return g;
 }
 
@@ -322,7 +322,7 @@ export function civicDay(state: GameState): void {
     b.status = 'open';
     b.votesFor = 0;
     b.votesAgainst = 0;
-    pushEvent(state, 'politics', `Toca presentar el presupuesto del año ${d.year} antes de febrero (Pueblo › Ayuntamiento). Si no, se prorroga el ${b.plan}`);
+    pushEvent(state, 'politics', `Toca presentar el presupuesto del año ${d.year} antes de febrero. Si no, se prorroga el ${b.plan}`);
   }
   if (b.status === 'open' && d.month > 1) {
     b.status = 'prorrogado';
@@ -335,7 +335,7 @@ export function civicDay(state: GameState): void {
       state.festival.name = PATRONS[hash32(state.seed, 7) % PATRONS.length]!;
       if (social) pushEvent(state, 'info', `${social.name.split(' ')[0]} propone llamarlas «Fiestas de ${state.festival.name}»`, { ref: social.id });
     }
-    pushEvent(state, 'info', `Se acercan las fiestas de ${state.festival.name}: puedes organizarlas en julio o agosto (Pueblo › Ayuntamiento)`);
+    pushEvent(state, 'info', `Se acercan las fiestas de ${state.festival.name}: puedes organizarlas en julio o agosto`);
   }
   // Septiembre sin fiestas: las montan los vecinos (pequeñas y gratis).
   if (d.month === FESTIVAL_MONTH + 1 && d.day === 1 && state.festival.year !== d.year && state.citizens.length >= 5) {

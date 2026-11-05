@@ -115,7 +115,7 @@ export function publishEdition(state: GameState, headlines: Headline[], source: 
   p.editions.push(ed);
   if (p.editions.length > PRESS.keep) p.editions.splice(0, p.editions.length - PRESS.keep);
   p.last = state.tick;
-  pushEvent(state, 'info', `Sale El Eco de Bitópolis: «${ed.headlines[0]!.text}» (Pueblo › El Eco)`);
+  pushEvent(state, 'info', `Sale El Eco de Bitópolis: «${ed.headlines[0]!.text}»`);
   return ed;
 }
 
