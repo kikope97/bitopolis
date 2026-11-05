@@ -41,8 +41,10 @@ test('v0.5: ajustes de accesibilidad, teclado y carretera con dos toques', async
   await expect(page.locator('html')).toHaveAttribute('data-contrast', 'alto');
   await page.getByLabel(/Modo tranquilo/).check();
   await expect(page.locator('html')).toHaveAttribute('data-motion', 'reducido');
-  // Trampa de foco: Tab no sale de la hoja.
-  for (let i = 0; i < 25; i++) await page.keyboard.press('Tab');
+  // Trampa de foco: Tab no sale de la hoja. Como panel lateral (escritorio) no es modal y Tab puede salir al
+  // final (ronda 12); 2.7: con «Accesibilidad» primero, ahí basta con unos pocos tabuladores dentro.
+  const side = (page.viewportSize()?.width ?? 0) >= 720;
+  for (let i = 0; i < (side ? 4 : 25); i++) await page.keyboard.press('Tab');
   expect(await page.evaluate(() => document.activeElement?.closest('.sheet') ? 'dentro' : document.activeElement?.outerHTML.slice(0, 120))).toBe('dentro');
   await shot('ajustes');
   await page.keyboard.press('Escape');

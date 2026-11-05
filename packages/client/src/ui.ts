@@ -392,20 +392,38 @@ export function confirmDialog(title: string, text: string, yes: string, opts: { 
     const dlg = h(
       'div',
       { class: 'modal-backdrop' },
-      h('div', { class: 'modal', role: 'alertdialog', 'aria-modal': 'true', 'aria-labelledby': 'dlg-t' },
+      h('div', { class: 'modal', role: 'alertdialog', 'aria-modal': 'true', 'aria-labelledby': 'dlg-t', 'aria-describedby': 'dlg-d' },
         h('h2', { id: 'dlg-t' }, title),
-        h('p', {}, text),
+        h('p', { id: 'dlg-d' }, text),
         h('div', { class: 'row' }, no, ok),
       ),
     );
+    // 2.7: el foco no sale del diálogo; lo de detrás queda inerte (el tabulador no llega al juego).
+    const behind = [...document.body.children].filter((el): el is HTMLElement => el instanceof HTMLElement && !el.inert);
     const done = (v: boolean) => {
       dlg.remove();
+      for (const el of behind) el.inert = false;
       prev?.focus();
       resolve(v);
     };
     no.addEventListener('click', () => done(false));
     ok.addEventListener('click', () => done(true));
-    dlg.addEventListener('keydown', (e) => e.key === 'Escape' && done(false));
+    dlg.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') done(false);
+      else if (e.key === 'Tab') {
+        // Por si el navegador no conoce `inert`: el tabulador da la vuelta entre los dos botones.
+        const first = no;
+        const last = ok;
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    });
+    for (const el of behind) el.inert = true;
     document.body.append(dlg);
     (opts.safe ? ok : no).focus();
   });

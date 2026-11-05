@@ -87,6 +87,7 @@ import {
   hasReach,
   serviceReach,
   SERVICE,
+  townNameOf,
 } from '@bitopolis/sim';
 import { contractBox, openTender } from './tender-ui.ts';
 import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
@@ -162,6 +163,8 @@ export function startGame(opts: GameOptions): void {
   $('#start').hidden = true;
   $('#game').hidden = false;
   document.body.classList.add('in-game');
+  // 2.7: un h1 (oculto) con el nombre del pueblo.
+  $('#town-h1').textContent = townNameOf(opts.state);
 
   const canvas = $('#map') as HTMLCanvasElement;
   const ctx = canvas.getContext('2d')!;
@@ -638,7 +641,7 @@ export function startGame(opts: GameOptions): void {
   function fitTopbar() {
     const bar = $('.topbar');
     const over = () => bar.scrollWidth > bar.clientWidth + 1;
-    bar.classList.remove('tb-tight', 'tb-rows', 'tb-more', 'tb-more2');
+    bar.classList.remove('tb-tight', 'tb-rows', 'tb-more', 'tb-more2', 'tb-nounit');
     if (!over()) return;
     bar.classList.add('tb-tight');
     if (!over()) return;
@@ -648,6 +651,8 @@ export function startGame(opts: GameOptions): void {
     if (over()) bar.classList.add('tb-tight');
     // Último escalón (320 px con letra grande): también la felicidad va a «Más».
     if (over()) bar.classList.add('tb-more2');
+    // 2.7: el «€» se queda mientras quepa; solo se quita si aún no cabe nada más.
+    if (over()) bar.classList.add('tb-nounit');
   }
   /** 2.7: «⋯» enseña lo que no cupo en la barra (cada fila abre lo mismo que su botón). */
   $('#hud-more').addEventListener('click', () => {
@@ -2000,6 +2005,18 @@ export function startGame(opts: GameOptions): void {
   tabBuild.onclick = () => (tray.hidden ? openTray() : closeTray());
   $('#menu').replaceChildren(pixelIcon('town'), tabLabel('Pueblo'));
   $('#menu').classList.add('tab');
+  // 2.7: el dock es una barra de herramientas: las flechas pasan de una pestaña a otra.
+  $('#dock').addEventListener('keydown', (e) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+    const tabs = [...$('#dock').querySelectorAll<HTMLElement>('.tab')].filter((b) => b.offsetParent !== null);
+    const i = tabs.indexOf(document.activeElement as HTMLElement);
+    if (i < 0) return;
+    e.preventDefault();
+    e.stopPropagation(); // el mapa no se mueve por detrás
+    const n = tabs.length;
+    const j = e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : (i + (e.key === 'ArrowRight' ? 1 : n - 1)) % n;
+    tabs[j]!.focus();
+  });
 
   // La bandeja: por categorías, con precio y lo que falta para lo bloqueado.
   const trayMsg = h('p', { class: 'tray-msg muted small', 'aria-live': 'polite' }, 'Elige qué construir. Los precios incluyen la obra.');
@@ -3012,12 +3029,11 @@ export function startGame(opts: GameOptions): void {
     const def = LAYERS.find((l) => l.id === layer)!;
     const legend = $('#legend');
     legend.hidden = layer === 'none';
-    if (layer === 'missing') {
-      // v1.9.1: con poca altura (móvil en horizontal) empieza plegada: si no, tapa medio mapa.
-      // Ronda 21: en el móvil en vertical también (plegada enseña lo que más falta, 2–3 filas).
-      if (matchMedia('(max-height: 500px), (max-width: 719px)').matches) legendFolded = true;
-      missingLegend();
-    } else legend.replaceChildren(h('strong', {}, def.label), ...def.legend.map((x) => h('span', { class: `legend-item ${x.cls}` }, x.text)));
+    // v1.9.1: con poca altura (móvil en horizontal) empieza plegada: si no, tapa medio mapa.
+    // 2.7: en el móvil, todas las capas: un chip de una línea abajo a la izquierda; se despliega al tocarlo.
+    if (matchMedia('(max-height: 500px), (max-width: 719px)').matches) legendFolded = true;
+    if (layer === 'missing') missingLegend();
+    else if (layer !== 'none') plainLegend(def);
     const chip = $('#layers');
     // Ronda 21: con leyenda, en el móvil el chip se queda en su icono (la leyenda ya dice qué capa es).
     document.body.classList.toggle('layer-on', layer !== 'none');
@@ -3031,6 +3047,24 @@ export function startGame(opts: GameOptions): void {
   /** 2.6: último día en que se miró la carga de las redes. */
   let lastNetDay = -1;
   let legendFolded = false;
+  /** 2.7: leyenda de una capa de colores: cabecera que se pliega (un chip de una línea) y sus colores. */
+  function plainLegend(def: (typeof LAYERS)[number]) {
+    const legend = $('#legend');
+    legend.classList.remove('filtered');
+    legend.classList.toggle('folded', legendFolded);
+    const head = h(
+      'button',
+      { class: 'legend-head', 'aria-expanded': String(!legendFolded), 'aria-label': `Leyenda: ${def.label}. ${legendFolded ? 'Desplegar' : 'Plegar'}` },
+      h('strong', {}, def.label),
+      h('span', { class: 'legend-chev', 'aria-hidden': 'true' }, legendFolded ? '▸' : '▾'),
+    );
+    head.addEventListener('click', () => {
+      legendFolded = !legendFolded;
+      plainLegend(def);
+      legend.querySelector<HTMLElement>('.legend-head')?.focus();
+    });
+    legend.replaceChildren(head, ...def.legend.map((x) => h('span', { class: `legend-item ${x.cls}` }, x.text)));
+  }
   function missingLegend() {
     legendDay = Math.floor(state.tick / 24);
     // Ronda 13: ordenada por lo que más falta, con «Construir» al lado; plegable para ver el mapa.
@@ -3087,16 +3121,25 @@ export function startGame(opts: GameOptions): void {
       });
       return h('span', { class: 'legend-need' }, pick, goBtn(r.key));
     });
-    const more = legendFolded && rows.length > 2 ? h('span', { class: 'legend-more' }, ` · ver las ${rows.length}`) : '';
-    const head = h('button', { class: 'legend-head', 'aria-expanded': String(!legendFolded) }, h('strong', {}, 'Qué falta'), h('span', { 'aria-hidden': 'true' }, legendFolded ? ' ▸' : ' ▾'), more);
+    // 2.7: plegada es un chip de una línea: «Qué falta · 5 ▸» (cuántos servicios faltan en alguna casa).
+    const lacking = sum.filter((r) => r.falta > 0).length;
+    const more = legendFolded && lacking ? h('span', { class: 'legend-more' }, ` · ${lacking}`) : '';
+    const head = h(
+      'button',
+      { class: 'legend-head', 'aria-expanded': String(!legendFolded), 'aria-label': `Qué falta${lacking ? `: ${plural(lacking, 'servicio', 'servicios')}` : ''}. ${legendFolded ? 'Desplegar' : 'Plegar'}` },
+      h('strong', {}, 'Qué falta'),
+      more,
+      h('span', { class: 'legend-chev', 'aria-hidden': 'true' }, legendFolded ? '▸' : '▾'),
+    );
     head.addEventListener('click', () => {
       legendFolded = !legendFolded;
       missingLegend();
+      $('#legend').querySelector<HTMLElement>('.legend-head')?.focus();
     });
     legend.classList.toggle('folded', legendFolded);
     legend.replaceChildren(
       head,
-      // Ronda 21: plegada sigue enseñando lo que más falta (el CSS deja 2–3 filas; en horizontal, ninguna).
+      // 2.7: plegada, el CSS solo enseña la cabecera (las filas siguen ahí para el lector de pantalla al desplegar).
       ...(rows.length ? rows : legendFolded ? [] : [h('span', {}, 'A ninguna vivienda le falta nada.')]),
       ...(legendFolded ? [] : [h('span', { class: 'legend-note' }, 'Toca un servicio para ver qué casas son y la zona que cubre. Marco rojo: falta. Amarillo a trazos: llega, pero está lleno.')]),
     );
@@ -3111,7 +3154,9 @@ export function startGame(opts: GameOptions): void {
       });
       list.append(b);
     }
-    sheet('Capas de datos', h('p', { class: 'muted small' }, 'Colorean el mapa según un dato. La leyenda sale abajo a la izquierda.'), list).classList.add('half');
+    // 2.7: hoja compacta (dos columnas, sin texto largo): el pueblo sigue a la vista mientras se elige.
+    const el = sheet('Capas de datos', h('p', { class: 'muted small' }, 'Colorean el mapa. La leyenda sale abajo a la izquierda.'), list);
+    el.classList.add('half', 'layers-sheet');
   }
   $('#layers').prepend(pixelIcon('layers'));
 
