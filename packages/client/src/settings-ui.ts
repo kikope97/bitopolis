@@ -141,9 +141,9 @@ export function openSettings(ai?: AiShareCtl, share?: Node): void {
     radioGroup<Prefs['slowFor']>(
       'A x3 y x10, bajar a x1 por',
       [
-        ['emergencias', 'Solo emergencias (incendio, riada, disturbios, manifestación)'],
+        ['emergencias', 'Emergencias y lo que te piden con plazo (incendio, riada, disturbios, subvenciones…)'],
         ['importante', 'También ofertas, dilemas y fiestas'],
-        ['nada', 'Nada (avisa sin frenar)'],
+        ['nada', 'Nada (avisa sin frenar; lo que te piden puede caducar)'],
       ],
       p.slowFor,
       (v) => setPrefs({ slowFor: v }),

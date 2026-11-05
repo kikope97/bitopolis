@@ -76,6 +76,12 @@ for (const size of SIZES) {
       // Nada se sale de la pantalla por los lados.
       const wide = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       expect(wide).toBeLessThanOrEqual(0);
+      // Ronda 23: con una herramienta elegida (texto largo en la franja), la columna no se ensancha.
+      await page.locator('#tab-road').click();
+      const game = await page.locator('#game').evaluate((el) => ({ w: el.getBoundingClientRect().width, cols: getComputedStyle(el).gridTemplateColumns }));
+      const yesFits = await page.evaluate(() => Math.max(...[...document.querySelectorAll('#tab-inspect, #menu')].map((e) => e.getBoundingClientRect().right)) - window.innerWidth);
+      expect(yesFits, `el dock cabe con una herramienta (${game.cols})`).toBeLessThanOrEqual(1);
+      await page.locator('#tab-inspect').click();
       // Todo lo que se toca en la barra, el dock y los botones del mapa: 44 px o más.
       expect(await smallTargets(page, '.topbar')).toEqual([]);
       expect(await smallTargets(page, '.dock')).toEqual([]);

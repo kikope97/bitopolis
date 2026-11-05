@@ -832,3 +832,11 @@ body.tool-active .map-btns #whatnow, body.tool-active .map-btns #home { display:
 .topbar.tb-nocal .calendar { display: none !important; }
 /* La franja de abajo (fecha y demanda) se toca: 44 px como todo lo demás. */
 .strip-info { min-height: 44px; }
+
+/* Ronda 23: un texto largo de la franja (con letra grande) ensanchaba la columna y «Construir» quedaba fuera. */
+.game { grid-template-columns: minmax(0, 1fr); }
+.strip, .tool-info, #confirm-text, .confirm-bar { min-width: 0; max-width: 100%; }
+.tool-info, #confirm-text { overflow-wrap: anywhere; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .game { grid-template-columns: minmax(0, 1fr) var(--dock-w); }
+}
