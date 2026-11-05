@@ -224,7 +224,7 @@ export function foundAssociation(state: GameState, cause: Cause, cs: Citizen[]):
   };
   state.associations.push(a);
   for (const c of cs) addMemory(state, c, 'asociacion', 3, 1);
-  pushEvent(state, 'politics', `Nace la ${a.name}: ${cs.length} socios, con ${leader.name} al frente. Piden ${CAUSE_ASK[cause]} (Pueblo › Ayuntamiento)`, { ref: leader.id });
+  pushEvent(state, 'politics', `Nace la ${a.name}: ${cs.length} socios, con ${leader.name} al frente. Piden ${CAUSE_ASK[cause]}`, { ref: leader.id });
   return a;
 }
 

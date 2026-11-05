@@ -29,48 +29,133 @@ export interface LogEntry {
   at: number;
   /** Fecha del juego cuando llegó. */
   when: string;
+  /** 2.7: tick del juego cuando llegó (para agrupar por semana). */
+  tick?: number;
+  /** Solo en esta sesión (las funciones no se guardan). */
   onClick?: () => void;
+  /** 2.7: qué abre, guardable (`b:12`, `th:grants`…; lo resuelve game.ts al tocarlo). */
+  go?: string;
   /** Importante (fijo o con algo que hacer): cuenta en la campana hasta que se mira. */
   important: boolean;
 }
-/** v1.6: todos los avisos quedan en la campana (los 40 últimos). */
+/** v1.6: todos los avisos quedan en la campana. 2.7: los 60 últimos, guardados por partida en el navegador. */
+const LOG_MAX = 60;
 const log: LogEntry[] = [];
 let unread = 0;
 let logListener: ((unread: number) => void) | null = null;
 let fallback: (() => void) | null = null;
 let stamp: () => string = () => '';
+export interface LogStore {
+  token: string;
+  tick: () => number;
+  /** De una referencia guardada a lo que abre (o nada si ya no existe). */
+  resolve: (go: string) => (() => void) | undefined;
+}
+let store: LogStore | null = null;
+let saveTimer = 0;
+const logKey = (token: string) => `bitopolis.log.${token}`;
+function writeLog(s: LogStore) {
+  try {
+    localStorage.setItem(logKey(s.token), JSON.stringify({ v: 1, unread, log: log.map(({ onClick: _f, ...e }) => e) }));
+  } catch {
+    /* sin almacenamiento: la campana vale para esta visita */
+  }
+}
+function saveLog() {
+  const s = store;
+  if (!s || saveTimer) return;
+  saveTimer = window.setTimeout(() => {
+    saveTimer = 0;
+    writeLog(s);
+  }, 250);
+}
+function loadLog(token: string) {
+  log.length = 0;
+  unread = 0;
+  try {
+    const raw = JSON.parse(localStorage.getItem(logKey(token)) ?? 'null') as { v?: number; unread?: number; log?: LogEntry[] } | null;
+    if (raw?.v !== 1 || !Array.isArray(raw.log)) return;
+    for (const e of raw.log.slice(0, LOG_MAX)) {
+      if (!e || typeof e.text !== 'string') continue;
+      log.push({ ...e, kind: e.kind === 'warn' || e.kind === 'good' ? e.kind : 'info', important: !!e.important });
+    }
+    unread = Math.max(0, Math.min(log.length, Number(raw.unread) || 0));
+  } catch {
+    /* guardado roto: se empieza de cero */
+  }
+}
 export function toastLog(): readonly LogEntry[] {
   return log;
 }
-export function onToastLog(fn: (unread: number) => void, open: () => void, when: () => string): void {
+/** Lo que hace tocar una entrada: en esta sesión, su función; tras recargar, su referencia. */
+export function entryAction(e: LogEntry): (() => void) | undefined {
+  return e.onClick ?? (e.go ? store?.resolve(e.go) : undefined);
+}
+export function onToastLog(fn: (unread: number) => void, open: () => void, when: () => string, persist?: LogStore): void {
   logListener = fn;
   fallback = open;
   stamp = when;
+  store = persist ?? null;
+  if (persist) loadLog(persist.token);
+  fn(unread);
 }
 export function markLogRead(): void {
   unread = 0;
   logListener?.(0);
+  saveLog();
 }
 export function clearToastLog(): void {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = 0;
+    if (store) writeLog(store);
+  }
   log.length = 0;
   unread = 0;
   logListener = null;
   fallback = null;
+  store = null;
 }
 
-export function toast(text: string, opts: { sticky?: boolean; kind?: ToastKind; onClick?: () => void } = {}) {
+/**
+ * 2.7: el aviso cabe en dos líneas. Si el texto es largo, la píldora enseña la
+ * primera frase entera (nunca cortada con «…»); la campana guarda el texto completo.
+ */
+export function toastHeadline(text: string): string {
+  if (text.length <= 84) return text;
+  const m = /^(.{20,96}?)(?:\. |: | — |; )/.exec(text);
+  return m ? m[1]!.replace(/[.,;:]$/, '') : text;
+}
+
+/** Qué dice el botón del aviso según lo que abre. */
+function goLabel(go: string | undefined): string {
+  if (!go) return 'Ver';
+  if (/^(b|at):/.test(go)) return 'Ir allí';
+  if (/^(th:|dilemma:|comarca|region|errands|debtors|c:)/.test(go)) return 'Responder';
+  return 'Ver';
+}
+
+/**
+ * Un aviso. `go` es una referencia que se guarda con la campana (`b:12`,
+ * `th:grants`, `dilemma:3`…): al tocarlo, también tras recargar, abre lo mismo.
+ * `onClick` manda si se da (solo vale en esta visita).
+ */
+export function toast(text: string, opts: { sticky?: boolean; kind?: ToastKind; onClick?: () => void; go?: string } = {}) {
   const box = $('#toasts');
-  const important = !!opts.sticky || !!opts.onClick;
+  const goFn = opts.go && store ? store.resolve(opts.go) : undefined;
+  const own = opts.onClick ?? goFn;
+  const important = !!opts.sticky || !!own;
   const prev = log[0];
   if (prev && prev.text === text) prev.at = Date.now();
   else {
-    log.unshift({ text, kind: opts.kind ?? 'info', at: Date.now(), when: stamp(), onClick: opts.onClick, important });
-    if (log.length > 40) log.pop();
+    log.unshift({ text, kind: opts.kind ?? 'info', at: Date.now(), when: stamp(), tick: store?.tick(), onClick: opts.onClick, go: opts.go, important });
+    if (log.length > LOG_MAX) log.pop();
     if (important) {
       unread++;
       logListener?.(unread);
     }
   }
+  saveLog();
   // Compactos (v1.3): el mismo aviso otra vez no se apila; sube su contador «×2».
   const same = [...box.querySelectorAll<HTMLElement>('.toast')].find((t) => t.dataset.text === text && !t.classList.contains('clickable'));
   if (same) {
@@ -92,9 +177,15 @@ export function toast(text: string, opts: { sticky?: boolean; kind?: ToastKind; 
   const icon = { info: 'ℹ', warn: '⚠', good: '✔' }[opts.kind ?? 'info'];
   // Sin role propio: el contenedor #toasts ya es aria-live (evita anuncios dobles).
   // En la partida, tocar un aviso sin acción abre la campana para leerlo entero (v1.6).
-  const action = opts.onClick ?? fallback ?? undefined;
-  const body = action ? h('button', { class: 'toast-text toast-action' }, text) : h('span', { class: 'toast-text' }, text);
+  const action = own ?? fallback ?? undefined;
+  // 2.7: la píldora, en dos líneas como mucho; con algo que hacer, el botón lo dice («Responder», «Ir allí»).
+  const shown = document.body.classList.contains('in-game') ? toastHeadline(text) : text;
+  const label = own ? goLabel(opts.go) : shown !== text ? 'Más' : '';
+  const body = action
+    ? h('button', { class: 'toast-text toast-action' }, shown, label ? h('span', { class: 'toast-go' }, ` ${label} ›`) : '')
+    : h('span', { class: 'toast-text' }, shown);
   const el = h('div', { class: `toast ${opts.kind ?? 'info'}` }, h('span', { class: 'toast-icon', 'aria-hidden': 'true' }, icon), body);
+  if (own) el.dataset.go = opts.go ?? 'fn';
   el.dataset.text = text;
   if (action) {
     el.classList.add('clickable');

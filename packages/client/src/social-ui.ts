@@ -39,7 +39,7 @@ import { formatDate, money } from './i18n.ts';
 import { portraitSprite } from './sprites.ts';
 import { $, confirmDialog, h, sheet, toast, withBack } from './ui.ts';
 import { openFamily } from './album-ui.ts';
-import type { AwaySince } from './away-ui.ts';
+import type { AwaySince } from './hoy-ui.ts';
 import { drawPixelIcons, pixelIcon } from './icons.ts';
 import { lettersTo, openMailbox } from './mail-ui.ts';
 
@@ -453,12 +453,16 @@ interface Seen {
 
 const seenOf = (state: GameState): Seen => ({ tick: state.tick, pop: state.citizens.length, treasury: state.treasury, at: Date.now(), rank: state.rank?.level ?? 0 });
 
-/** 2.1: tiempo real fuera para enseñar «Mientras no estabas» aunque el pueblo no avanzara (se para al salir). */
-export const AWAY_MS = 30 * 60_000;
+/**
+ * 2.1: tiempo real fuera para contar lo que ha pasado al volver (el pueblo se para al salir).
+ * 2.7: «Hoy en Bitópolis» sale tras 15 minutos fuera; la última visita se apunta cada 30 s
+ * mientras se juega (antes, solo al salir: si el móvil cerraba la pestaña, salía a destiempo).
+ */
+export const AWAY_MS = 15 * 60_000;
 
 /**
- * «Mientras no estabas» (2.1): desde cuándo contar al volver a la partida, o
- * null si no toca (primera visita, o se fue hace poco y no ha pasado nada).
+ * «Hoy en Bitópolis» (2.7; antes «Mientras no estabas»): desde cuándo contar al
+ * volver a la partida, o null si no toca (primera visita o se fue hace poco).
  * Si el pueblo no avanzó (el juego se para al salir), se repasa la última semana.
  */
 export function resumeSummary(token: string, state: GameState): AwaySince | null {
@@ -476,7 +480,8 @@ export function resumeSummary(token: string, state: GameState): AwaySince | null
   }
   if (!seen || seen.tick > state.tick) return null;
   const advanced = seen.tick < state.tick;
-  if (!advanced && Date.now() - (seen.at ?? 0) < AWAY_MS) return null;
+  // Una recarga o un rato corto fuera no es una ausencia, aunque el reloj del pueblo se moviera.
+  if (Date.now() - (seen.at ?? 0) < AWAY_MS) return null;
   return {
     tick: advanced ? seen.tick : Math.max(0, state.tick - 7 * 24),
     pop: seen.pop,

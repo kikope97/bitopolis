@@ -482,7 +482,7 @@ export function applyNeighborAct(state: GameState, t: NeighborTown, accion: stri
         state.comarca.offers = state.comarca.offers.filter((o) => extra <= 0 || !o.resolved || (o.resolved === 'accepted' && (o.dealUntil ?? -1) > state.tick) || (extra--, false));
       }
       const d = tickToDate(until);
-      pushEvent(state, 'info', `${who}, ofrece un acuerdo de ${OFFER_TEXT[arg]}. Responde antes del ${d.day}/${d.month} en Pueblo › Comarca. «${said}»`, { notify: true });
+      pushEvent(state, 'info', `${who}, ofrece un acuerdo de ${OFFER_TEXT[arg]}. Responde antes del ${d.day}/${d.month}. «${said}»`, { notify: true });
       break;
     }
     case 'criticar':
@@ -617,7 +617,7 @@ export function comarcaMonth(state: GameState, leave: (c: Citizen) => void): voi
   if (!cm.towns.length) {
     cm.towns = createNeighbors(state);
     // 2.6: la ficha de los pueblos vecinos sale en el panel con el ayuntamiento 3 (o con su primera oferta).
-    pushEvent(state, 'info', `La comarca: ${cm.towns.map((t) => t.name).join(', ')}. Sus alcaldes también miran lo que haces${(state.townhallLevel ?? 1) >= 3 ? ' (Pueblo › Comarca)' : ''}`);
+    pushEvent(state, 'info', `La comarca: ${cm.towns.map((t) => t.name).join(', ')}. Sus alcaldes también miran lo que haces`);
   }
   ensureFair(state);
   for (const t of cm.towns) simulateTown(state, t);
