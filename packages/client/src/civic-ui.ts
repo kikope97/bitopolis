@@ -125,6 +125,12 @@ export function openTownHall(ctx: SocialCtx, focus?: 'budget' | 'festival' | 'se
   if (focus) el.querySelector(`#th-${focus}`)?.scrollIntoView({ block: 'start' });
 }
 
+/** 2.7: el turismo en su propia hoja (antes, desde «Pueblo», abría la del ayuntamiento entera). */
+export function openTourism(ctx: SocialCtx): void {
+  const s = ctx.state();
+  sheet('Turismo', ...tourismSection(ctx, s, () => openTourism(ctx)));
+}
+
 /**
  * 2.3: turismo. Visitantes e ingresos del mes, tasa turística (0, 1 o 2 € por
  * noche, tres botones de 44 px), proteger el entorno del patrimonio y la parte

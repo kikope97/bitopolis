@@ -875,3 +875,79 @@ for (const [group, glyph] of Object.entries(MEDAL_GLYPH)) {
     ICONS[`medal-${group}-${tier}`] = { rows, colors: { r: c.r, b: c.b, o: c.edge, '#': c.disc, g: c.glyph } };
   }
 }
+
+/*
+ * 2.7: iconos del panel «Pueblo» (antes, Encargos llevaba la lupa, Comarca la de
+ * Gente y Objetivos la cara). 12×12, con la paleta.
+ */
+const HUB_ICONS: Record<string, { rows: string[]; colors: Record<string, number> }> = {
+  chart: {
+    rows: ['............', '.........gg.', '.........gg.', '......bb.gg.', '......bb.gg.', '...yy.bb.gg.', '...yy.bb.gg.', '...yy.bb.gg.', '.r.yy.bb.gg.', '.r.yy.bb.gg.', 'kkkkkkkkkkkk', '............'],
+    colors: { r: 2, y: 4, b: 10, g: 6, k: 13 },
+  },
+  tax: {
+    rows: ['.wwwwwwwwww.', '.wppppppppw.', '.wprrppprpw.', '.wprrpprppw.', '.wpppprpppw.', '.wppprpprrw.', '.wpprppprrw.', '.wppppppppw.', '.wpkkkkkkpw.', '.wppppppppw.', '.wpwpwpwpww.', '..w.w.w.w...'],
+    colors: { w: 13, p: 12, r: 2, k: 14 },
+  },
+  bank: {
+    rows: ['.....yy.....', '...yyyyyy...', '.yyyyyyyyyy.', 'yyyyyyyyyyyy', '............', '.ww..ww..ww.', '.ww..ww..ww.', '.ww..ww..ww.', '.ww..ww..ww.', '............', 'yyyyyyyyyyyy', 'dddddddddddd'],
+    colors: { y: 4, w: 13, d: 20 },
+  },
+  ballot: {
+    rows: ['...pppppp...', '...pkkkkp...', '...pkkkkp...', '...pppppp...', '.bbbbbbbbbb.', '.b##0000##b.', '.b########b.', '.b########b.', '.b###pp###b.', '.b###pp###b.', '.bbbbbbbbbb.', '............'],
+    colors: { p: 12, k: 14, b: 9, '#': 10, '0': 0 },
+  },
+  gavel: {
+    rows: ['............', '.oooooo.....', '.oyyyyo.....', '.oyyyyo.....', '.oooooo.....', '....hh......', '.....hh.....', '......hh....', '.......hh...', '..dddddddd..', '..dyyyyyyd..', '..dddddddd..'],
+    colors: { o: 17, y: 19, h: 46, d: 16 },
+  },
+  speech: {
+    rows: ['............', '.oooooooooo.', 'o##########o', 'o#kkk#kkkk#o', 'o##########o', 'o#kkkkk#kk#o', 'o##########o', '.ooo##ooooo.', '...o#o......', '...oo.......', '............', '............'],
+    colors: { o: 14, '#': 12, k: 15 },
+  },
+  book: {
+    rows: ['............', '.rrrrrrrrr..', '.rppppppppr.', '.rpkkkkkkpr.', '.rppppppppr.', '.rpkkkkkppr.', '.rppppppppr.', '.rpkkkkkkpr.', '.rppppppppr.', '.rrrrrrrrrr.', '.dddddddddd.', '............'],
+    colors: { r: 2, p: 21, k: 18, d: 1 },
+  },
+  news: {
+    rows: ['............', 'wwwwwwwwwww.', 'wkkkkkkkkkw.', 'wwwwwwwwwwwd', 'wbbbbwkkkkwd', 'wbbbbwwwwwwd', 'wbbbbwkkkkwd', 'wwwwwwwwwwwd', 'wkkkkwkkkkwd', 'wwwwwwwwwwwd', '.ddddddddddd', '............'],
+    colors: { w: 12, k: 14, b: 10, d: 13 },
+  },
+  gear: {
+    rows: ['.....gg.....', '..g.gggg.g..', '.gggggggggg.', '..ggg..ggg..', '.ggg....ggg.', 'gggg....gggg', 'gggg....gggg', '.ggg....ggg.', '..ggg..ggg..', '.gggggggggg.', '..g.gggg.g..', '.....gg.....'],
+    colors: { g: 13 },
+  },
+  map: {
+    rows: ['............', 'gg..bb..gg..', 'gggbbbbggg..', 'ggg.bbb.gggr', 'gg..bb..ggrr', 'gg..bb..ggr.', 'gg.bbb..gg..', 'ggbbb...gg..', 'ggbb...ggg..', 'gbb..gggg...', 'bb..gg......', '............'],
+    colors: { g: 23, b: 10, r: 2 },
+  },
+  door: {
+    rows: ['..oooooooo..', '..o######o..', '..o######o..', '..o######o..', '..o######o..', '..o####y#o..', '..o######o..', '..o######o..', '..o######o..', '..o######o..', '..o######o..', 'kkkkkkkkkkkk'],
+    colors: { o: 17, '#': 19, y: 4, k: 14 },
+  },
+  spark: {
+    rows: ['.....y......', '.....y......', '....yyy.....', '..yyyyyyy...', '....yyy.....', '.....y...w..', '.....y..www.', '.........w..', '..w.........', '.www........', '..w.........', '............'],
+    colors: { y: 4, w: 11 },
+  },
+  camera: {
+    rows: ['............', '....kkk.....', '.kkkkkkkkkk.', '.k########k.', '.k##ooo###k.', '.k#obbbo##k.', '.k#obwbo#yk.', '.k#obbbo##k.', '.k##ooo###k.', '.k########k.', '.kkkkkkkkkk.', '............'],
+    colors: { k: 0, '#': 14, o: 13, b: 9, w: 11, y: 4 },
+  },
+  clipboard: {
+    rows: ['....kkkk....', '.bbbkyykbbb.', '.bpppppppb..', '.bpkkkkkpb..', '.bpppppppb..', '.bpkkkpppb..', '.bpppppppb..', '.bpkkkkkpb..', '.bpppppppb..', '.bpkkppppb..', '.bpppppppb..', '.bbbbbbbbb..'],
+    colors: { k: 14, y: 4, b: 19, p: 12 },
+  },
+  scroll: {
+    rows: ['............', '.ddpppppppd.', 'dpdpppppppdd', '.ddpkkkkkpd.', '...pppppppd.', '...pkkkkppd.', '...pppppppd.', '...pkkkkkpd.', '...ppppppprr', '..ddddddddr.', '.dpppppppd..', '..ddddddd...'],
+    colors: { d: 20, p: 21, k: 18, r: 2 },
+  },
+  replay: {
+    rows: ['............', '....gggg....', '..gg....gg..', '.g........g.', '.g.....gggg.', 'g.......gg..', 'g........g..', 'g...........', '.g........g.', '.g.......g..', '..gg...gg...', '....ggg.....'],
+    colors: { g: 10 },
+  },
+  medal: {
+    rows: ['.rr......bb.', '..rr....bb..', '...rr..bb...', '....oooo....', '..oo####oo..', '.o###yy###o.', '.o##yyyy##o.', '.o##yyyy##o.', '.o###yy###o.', '.o########o.', '..oo####oo..', '....oooo....'],
+    colors: { r: 2, b: 9, o: 20, '#': 4, y: 59 },
+  },
+};
+for (const [k, v] of Object.entries(HUB_ICONS)) ICONS[k] = v;

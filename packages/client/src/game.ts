@@ -1,4 +1,4 @@
-import { tickToDate, type Command } from '@bitopolis/shared';
+import { DAYS_PER_MONTH, tickToDate, type Command } from '@bitopolis/shared';
 import {
   BUILD_NAMES,
   buildingAt,
@@ -87,6 +87,11 @@ import {
   hasReach,
   serviceReach,
   SERVICE,
+  activeObjectives,
+  daysToElection,
+  nextLevel,
+  OBJECTIVES,
+  politicsActive,
 } from '@bitopolis/sim';
 import { contractBox, openTender } from './tender-ui.ts';
 import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
@@ -97,26 +102,27 @@ import { vidaBox } from './vida-ui.ts';
 import { coopPostBox } from './coop-ui.ts';
 import { openMailbox, unreadLetters } from './mail-ui.ts';
 import { viviendaBox } from './vivienda-ui.ts';
-import { openTownHall } from './civic-ui.ts';
+import { openTourism, openTownHall } from './civic-ui.ts';
 import { openAlbum, snapMoments } from './album-ui.ts';
 import { openAway } from './away-ui.ts';
 import { openRank, rankCard } from './rank-ui.ts';
 import { dilemmaSpot, openDilemmaSheet, type DilemmaCtx } from './dilemma-ui.ts';
-import { objectivesNode, openAdvisor, openCitizen, openDiary, openPleno, portraitCanvas, rememberSeen, renderObjectives, resumeSummary, type SocialCtx } from './social-ui.ts';
+import { objectiveText, objectivesNode, openAdvisor, openCitizen, openDiary, openPleno, portraitCanvas, rememberSeen, renderObjectives, resumeSummary, type SocialCtx } from './social-ui.ts';
 import { api, ApiError } from './api.ts';
 import { nextHint } from './hints.ts';
 import { openManagement } from './manage-ui.ts';
-import { errandsSummary, openErrands, openPress } from './town-news-ui.ts';
+import { openErrands, openPress } from './town-news-ui.ts';
 import { openWhatsHappening, turnHeadline } from './ai-town-ui.ts';
 import { pocketMark } from './money-ui.ts';
 import { formatDate, money, MONTHS, plural, shortDate, t } from './i18n.ts';
-import { busTrips, type Camera, type Preview, render, restartAnimations, signSpot } from './render.ts';
+import { buildingPicture, busTrips, type Camera, type Preview, render, restartAnimations, signSpot } from './render.ts';
 import { filterOverlay, overlayFor, placeLines, previewOverlay, reachLine, type ReachOverlay, TOOL_FOR_NEED } from './reach-ui.ts';
 import type { FromWorker, SaveBatch, ToWorker, Unsaved } from './sim.worker.ts';
 import SimWorker from './sim.worker.ts?worker';
 import { buildingSprite, landmarkSprite, letterSprite, resSprite, T, ZONE_COLOR } from './sprites.ts';
-import { bigCompanyContent, landmarkContent, openRegion, regionAttention, regionSummary } from './landmarks-ui.ts';
-import { comarcaPending, comarcaSummary, openComarca } from './comarca-ui.ts';
+import { bigCompanyContent, landmarkContent, openRegion, regionAttention } from './landmarks-ui.ts';
+import { comarcaPending, openComarca } from './comarca-ui.ts';
+import { ficheHead, fold, listGroup, listRow, spriteCopy, statCard, statGrid, statusBar, type UrgentItem, urgentBlock } from './hub-ui.ts';
 import { type HubEntry, hubWants, Reveal, trayCatsWanted, ZONE_HELPERS } from './progress.ts';
 import { commandFor, costText, isLocked, lockLong, lockShort, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayCost } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
@@ -2191,6 +2197,8 @@ export function startGame(opts: GameOptions): void {
 
   /* ---------- inspección ---------- */
   let openInspect: (() => void) | null = null;
+  /** 2.7: la fila de servicios de la casa, abierta (detalle) o en iconos. */
+  let svcOpen = false;
   let inspectSheet: HTMLElement | null = null;
 
   function focusBuilding(id: number) {
@@ -2244,12 +2252,83 @@ export function startGame(opts: GameOptions): void {
       h('p', {}, `Para el nivel ${lv + 1} (más alcance y más capacidad; cuesta más mantenerlo):`),
       h('ul', { class: 'reqs' }, ...reqs.map((r) => h('li', { class: r.ok ? 'ok' : 'no' }, h('span', { 'aria-hidden': 'true' }, r.ok ? '✓ ' : '✗ '), r.label, h('span', { class: 'visually-hidden' }, r.ok ? ' (cumplido)' : ' (falta)')))),
     );
+    // 2.7: el botón va arriba, en la cabecera de la ficha (upgradeButton).
+    return box;
+  }
+
+  /** 2.7: «Ampliar a nivel N» (botón principal de la ficha); desactivado, con candado y lo que falta. */
+  function upgradeButton(b: Building): HTMLElement | null {
+    if (!UPGRADABLE.includes(b.kind) || b.upgradeUntil !== undefined || levelOf(b) >= maxLevelOf(b) || !b.built || b.damaged) return null;
+    const served = serviceCounts(state).get(b.id);
     const ok = canUpgradeBuilding(state, b, served).ok;
-    const btn = h('button', { class: 'btn primary wide' }, `Mejorar · ${money(upgradeCost(b))}`) as HTMLButtonElement;
+    const btn = h('button', { class: 'btn primary big wide', 'data-test': 'fiche-main' }, pixelIcon('upgrade'), ` Ampliar a nivel ${levelOf(b) + 1} · ${money(upgradeCost(b))}`) as HTMLButtonElement;
     btn.disabled = !ok;
     btn.addEventListener('click', () => void command({ type: 'UpgradeBuilding', buildingId: b.id }));
-    box.append(btn);
-    return box;
+    if (ok) return btn;
+    const miss = upgradeReqs(state, b, served).filter((r) => !r.ok).map((r) => lowerFirst(r.label));
+    return h('div', {}, btn, miss.length ? h('p', { class: 'muted small fc-why' }, `Falta: ${miss.join('; ')}.`) : '');
+  }
+
+  /** 2.7: la barra de estado de la ficha: una palabra y su número. */
+  function buildingStatus(b: Building, p: GameState['projects'][number] | undefined): HTMLElement {
+    if (p) {
+      const pct = Math.round((100 * p.workerDaysDone) / p.workerDaysNeeded);
+      return statusBar('info', 'En obra', `${pct} %`, `faltan ${plural(Math.ceil((p.workerDaysNeeded - p.workerDaysDone) / p.workersNeeded), 'día', 'días')}`);
+    }
+    if (b.fire) return statusBar('bad', 'Ardiendo', undefined, b.fire.covered ? 'los bomberos lo apagan' : 'sin bomberos cerca');
+    if (b.damaged) return b.damaged.repairUntil >= 0 ? statusBar('warn', 'En reparación', undefined, `hasta el ${formatDate(tickToDate(b.damaged.repairUntil))}`) : statusBar('bad', b.damaged.cause === 'fuego' ? 'Quemado' : 'Destrozado', undefined, 'no funciona');
+    if (b.upgradeUntil !== undefined) return statusBar('info', 'Ampliándose', `a nivel ${levelOf(b) + 1}`, 'sigue abierto');
+    const needsNet = b.kind !== 'water' && b.kind !== 'power' && b.kind !== 'farm';
+    if (needsNet && !b.hasWater) return statusBar('bad', 'Sin agua', b.dryDays ? plural(b.dryDays, 'día', 'días') : undefined);
+    if (needsNet && !b.hasPower) return statusBar('bad', 'Sin luz', b.darkDays ? plural(b.darkDays, 'día', 'días') : undefined);
+    if (b.risk) return statusBar('warn', 'Riesgo de incendio', undefined, b.risk.why);
+    if (trashStateOf(b) === 'ratas') return statusBar('warn', 'Ratas', undefined, bagsText(b));
+    if (b.kind === 'house' || b.kind === 'res' || b.kind === 'vpo') {
+      const res = occupants(state, b);
+      if (!res.length) return statusBar('info', 'Vacía', undefined, 'aún no vive nadie');
+      const avg = Math.round(res.reduce((t, c) => t + c.happiness, 0) / res.length);
+      const one = res.length === 1;
+      const word = avg >= 65 ? (one ? 'Contento' : 'Contentos') : avg >= 40 ? 'Regular' : one ? 'Descontento' : 'Descontentos';
+      const lack = missingServices(state, b.x, b.y).filter((n) => n.status === 'falta').length;
+      return statusBar(avg >= 65 ? 'ok' : avg >= 40 ? 'warn' : 'bad', word, `${avg} de 100`, `${plural(res.length, 'vecino', 'vecinos')}${lack ? ` · le ${lack === 1 ? 'falta un servicio' : `faltan ${lack} servicios`}` : ''}`);
+    }
+    if (hasReach(b.kind)) {
+      const cap = serviceReach(state, b).capacity;
+      if (cap && cap.of > 0) {
+        const pct = Math.round((100 * cap.used) / cap.of);
+        const tone = pct > 100 ? 'bad' : cap.full || pct >= 90 ? 'warn' : 'ok';
+        return statusBar(tone, pct > 100 ? 'Lleno' : tone === 'warn' ? 'Casi lleno' : 'Funciona', `${pct} %`, `${cap.used} de ${cap.of} ${cap.unit}`);
+      }
+    }
+    if ((b.kind === 'shop' || b.kind === 'factory') && b.books) {
+      const profit = b.books.sales - b.books.wages - b.books.taxes;
+      return profit < 0 ? statusBar('warn', 'Pierde dinero', `−${money(-profit)}`, 'el mes pasado') : statusBar('ok', 'Funciona', `+${money(profit)}`, 'el mes pasado');
+    }
+    return statusBar('ok', 'Funciona');
+  }
+
+  /** 2.7: cabecera de la ficha: sprite pequeño, de quién es, estado y botón principal. */
+  function inspectHead(b: Building, p: GameState['projects'][number] | undefined): HTMLElement {
+    const owner = b.owner === 0 ? 'Municipal' : b.owner === -1 ? 'Privado (inversor de fuera)' : `Negocio de ${state.citizens.find((c) => c.id === b.owner)?.name ?? 'un antiguo vecino'}`;
+    const lv = UPGRADABLE.includes(b.kind) ? `Nivel ${levelOf(b)} de ${maxLevelOf(b)}` : '';
+    let main: HTMLElement | null = null;
+    if (b.damaged && b.damaged.repairUntil < 0 && !p) {
+      const fix = h('button', { class: 'btn primary big wide', 'data-test': 'fiche-main' }, pixelIcon('repair'), ` Reparar · ${money(b.damaged.cost)}`);
+      fix.addEventListener('click', () => void command({ type: 'RepairBuilding', buildingId: b.id }));
+      main = fix;
+    } else if (!p) main = upgradeButton(b);
+    if (!main && b.kind === 'heritage' && b.built) {
+      const go = h('button', { class: 'btn primary big wide', id: 'heritage-tourism', 'data-test': 'fiche-main' }, pixelIcon('camera'), ' Turismo: tasa y entorno');
+      go.addEventListener('click', () => withBack('Ficha', () => focusBuilding(b.id), () => openTourism(social)));
+      main = go;
+    }
+    let pic: HTMLCanvasElement | null = null;
+    try {
+      pic = spriteCopy(buildingPicture(b, state));
+    } catch {
+      /* sin sprite: solo el texto */
+    }
+    return ficheHead(pic, [owner, lv], buildingStatus(b, p), main);
   }
 
   /** 2.6: «Da servicio a N viviendas · atiende a X de un máximo de Y» y «Ver zona». */
@@ -2481,20 +2560,16 @@ export function startGame(opts: GameOptions): void {
             : 'No funciona ni contrata hasta repararlo. Nunca se pierde: se arregla pagando la obra.'
           : 'No vende hasta repararla, pero sigue pagando sueldos e impuestos con sus ahorros: si dos meses seguidos no llega a las nóminas, cierra.';
         const box = h('div', { class: 'petition danger-box' }, h('p', {}, h('strong', {}, fire ? 'Destrozado por el fuego. ' : 'Destrozada en unos disturbios. '), why));
+        // 2.7: «Reparar» es el botón principal de la ficha (arriba).
         if (dmg.repairUntil >= 0) box.append(h('p', { class: 'muted small' }, `En reparación: reabre el ${formatDate(tickToDate(dmg.repairUntil))}.`));
-        else {
-          const fix = h('button', { class: 'btn primary wide' }, `Reparar · ${money(dmg.cost)}`);
-          fix.addEventListener('click', () => void command({ type: 'RepairBuilding', buildingId: b.id }));
-          box.append(fix);
-        }
         content.push(box);
       }
       // 2.6 «Lo básico»: la zona que cubre, a cuántas casas da servicio y su máximo.
       const rb = reachBox(b);
       if (rb) content.push(rb);
       const home = b.kind === 'house' || b.kind === 'res';
-      if (home) content.push(servicesTable(b));
-      else {
+      // 2.7: en la casa, primero quién vive y cómo está; los servicios van después (abajo).
+      if (!home) {
         const pills: HTMLElement[] = [];
         // 2.2: la finca no necesita agua ni luz: su ficha cuenta la cosecha.
         if (b.kind === 'farm') content.push(farmBox(b));
@@ -2546,9 +2621,6 @@ export function startGame(opts: GameOptions): void {
       // 2.3: el patrimonio (su forma sale del terreno) y la casa rural.
       if (b.kind === 'heritage') {
         content.push(h('p', {}, `${HERITAGE_NAMES[heritageVariant(state, b.x, b.y)].replace(/^el /, 'El ')}: atrae visitantes. El mes pasado vinieron ${state.tourism.visitors}.${state.tourism.protectedId === b.id ? ' Su entorno está protegido.' : ''}`));
-        const go = h('button', { class: 'btn wide', id: 'heritage-tourism' }, 'Turismo: tasa y entorno');
-        go.addEventListener('click', () => withBack('Ficha', () => focusBuilding(b.id), () => openTownHall(social, 'tourism')));
-        content.push(go);
       }
       if (b.rural && (b.kind === 'house' || b.kind === 'res')) content.push(h('p', { class: 'muted small' }, 'Casa rural: su dueño alquila plazas a los visitantes.'));
       // 2.4 «Vida»: estación (billete), guardería y residencia (cuota), depuradora (el río) y renovables (la luz).
@@ -2561,7 +2633,8 @@ export function startGame(opts: GameOptions): void {
       const viv = viviendaBox(state, b, citizenList);
       if (viv) content.push(viv);
       // v1.8 (petición del creador): los servicios suben de nivel.
-      if (UPGRADABLE.includes(b.kind)) content.push(levelBox(b));
+      // v1.8 (petición del creador): los servicios suben de nivel. 2.7: el detalle, plegado (el botón va arriba).
+      if (UPGRADABLE.includes(b.kind)) content.push(fold(`level:${b.kind}`, `Nivel ${levelOf(b)} de ${maxLevelOf(b)}: qué da y qué pide`, false, levelBox(b)));
       // 2.6: la carga de la bomba o la central (cuántos piden y quién se queda sin).
       const plant = plantLoadBox(state, b);
       if (plant) content.push(plant);
@@ -2579,7 +2652,9 @@ export function startGame(opts: GameOptions): void {
           citizenList(res),
         );
       } else if (res.length && b.kind !== 'vpo') content.push(h('h3', {}, 'Viven aquí'), citizenList(res));
-      if (workers.length) content.push(h('h3', {}, 'Trabajan aquí'), citizenList(workers));
+      // 2.7: los servicios de la casa, en una fila de iconos con ✓/✗ (al tocarla, el detalle).
+      if (home) content.push(servicesTable(b));
+      if (workers.length) content.push(fold(`workers:${b.kind}`, `Trabajan aquí (${workers.length})`, workers.length <= 3, citizenList(workers)));
       if (b.kind === 'house') {
         const sale = !!b.forSale;
         const toggle = h('button', { class: 'btn wide' }, sale ? 'Pasar a alquiler' : 'Poner a la venta');
@@ -2590,14 +2665,10 @@ export function startGame(opts: GameOptions): void {
           toggle,
         );
       }
-      if (b.owner > 0) {
-        const o = state.citizens.find((c) => c.id === b.owner);
-        content.push(h('p', {}, `Negocio de ${o?.name ?? 'un antiguo vecino'}.`));
-      }
       if (b.kind === 'shop' || b.kind === 'factory') content.push(h('p', { class: 'muted' }, `Caja de la empresa: ${money(b.cash)}`));
     }
-    const owner = b.owner === 0 ? 'Municipal' : b.owner === -1 ? 'Privado (inversor de fuera)' : 'De un vecino';
-    content.push(h('p', { class: 'muted' }, owner));
+    // 2.7: cabecera → estado → acción, arriba del todo; de quién es, en la cabecera.
+    content.unshift(inspectHead(b, p));
     inspectSheet = sheet(b.name ?? (b.kind === 'farm' && b.crop ? `Finca · ${CROP_TEXT[b.crop]}` : (BUILD_NAMES[b.kind] ?? b.kind)), ...content);
     inspectSheet.classList.add('half');
     const body = document.querySelector('.sheet-body');
@@ -2634,7 +2705,15 @@ export function startGame(opts: GameOptions): void {
     const needs = new Map(missingServices(state, b.x, b.y).map((n) => [n.key, n.status] as const));
     const row = (icon: string, label: string, ok: boolean | 'warn', text: string) =>
       // Ronda 14 (aplazado): lista de definición para los lectores de pantalla («Agua: Sí»), mismo aspecto.
-      h('div', { class: `svc ${ok === true ? 'ok' : ok === 'warn' ? 'warn' : 'bad'}` }, pixelIcon(icon), h('dt', { class: 'svc-label' }, label), h('dd', { class: 'svc-state' }, text));
+      // 2.7: plegada, una fila de iconos con ✓/✗ (el texto sigue ahí para el lector de pantalla).
+      h(
+        'div',
+        { class: `svc ${ok === true ? 'ok' : ok === 'warn' ? 'warn' : 'bad'}`, title: `${label}: ${text}` },
+        pixelIcon(icon),
+        h('span', { class: 'svc-mark', 'aria-hidden': 'true' }, ok === true ? '✓' : ok === 'warn' ? '!' : '✗'),
+        h('dt', { class: 'svc-label' }, label),
+        h('dd', { class: 'svc-state' }, text),
+      );
     const svc = (key: NeedKey, icon: string, label: string) => {
       const st = needs.get(key);
       return row(icon, label, st === undefined ? true : st === 'lleno' ? 'warn' : false, st === undefined ? 'Cubierto' : st === 'lleno' ? 'Lleno' : 'No llega');
@@ -2654,7 +2733,25 @@ export function startGame(opts: GameOptions): void {
       ...(trashActive(state) || state.buildings.some((s) => s.kind === 'cleanpoint') ? [trashRow(b, row)] : []),
       row('bar', 'Tienda', state.buildings.some((s) => s.kind === 'shop' && s.built && !s.damaged && Math.abs(s.x - b.x) + Math.abs(s.y - b.y) <= 6), state.buildings.some((s) => s.kind === 'shop' && s.built && !s.damaged && Math.abs(s.x - b.x) + Math.abs(s.y - b.y) <= 6) ? 'Cerca' : 'Lejos'),
     ];
-    return h('div', {}, h('dl', { class: 'svc-table', 'aria-label': 'Servicios de la vivienda' }, ...rows), h('p', { class: 'muted small' }, `Valor: ${money(unitValue(state, b))} por vivienda`));
+    const dl = h('dl', { class: `svc-table svc-icons${svcOpen ? ' open' : ''}`, id: 'svc-table', 'aria-label': 'Servicios de la vivienda' }, ...rows);
+    const bad = rows.filter((r) => !r.classList.contains('ok')).length;
+    const more = h('button', { class: 'btn small svc-more', 'aria-expanded': String(svcOpen), 'aria-controls': 'svc-table' }, svcOpen ? 'Ocultar el detalle' : 'Ver el detalle');
+    const toggle = () => {
+      svcOpen = !svcOpen;
+      dl.classList.toggle('open', svcOpen);
+      more.setAttribute('aria-expanded', String(svcOpen));
+      more.textContent = svcOpen ? 'Ocultar el detalle' : 'Ver el detalle';
+    };
+    more.addEventListener('click', toggle);
+    dl.addEventListener('click', toggle);
+    return h(
+      'div',
+      { class: 'svc-box' },
+      h('h3', {}, 'Servicios', h('span', { class: `svc-count ${bad ? 'bad' : 'ok'}` }, bad ? ` · ${bad} sin cubrir del todo` : ' · todos')),
+      dl,
+      more,
+      h('p', { class: 'muted small' }, `Valor: ${money(unitValue(state, b))} por vivienda`),
+    );
   }
 
   /** 2.1: bolsas de basura que tiene un edificio (cada 10 unidades, una bolsa). */
@@ -2746,10 +2843,6 @@ export function startGame(opts: GameOptions): void {
       else if (state.citizens.some((c) => c.id === ref)) withBack('El Eco de Bitópolis', openPressSheet, () => openCitizen(social, ref));
     });
 
-  /**
-   * v1.6: el panel «Pueblo» sustituye al menú plano. Cada sección resume cómo va
-   * y lleva a sus hojas, que tienen «‹» para volver aquí.
-   */
   /** «Gestión del pueblo», como al tocar el ayuntamiento en el mapa. */
   function openHall() {
     const hall = state.buildings.find((b) => b.kind === 'townhall' && b.built);
@@ -2760,130 +2853,251 @@ export function startGame(opts: GameOptions): void {
     openMailbox({ token, state: () => state, openCitizen: (id) => openCitizen(social, id) });
   }
 
+  /**
+   * 2.7 «Pueblo 2.0»: arriba, cuatro tarjetas de resumen (Dinero, Gente,
+   * Ayuntamiento y Política o Comarca); luego «Lo urgente» (hasta 3 cosas con
+   * su botón) y el resto en una lista por temas. Lo frecuente (impuestos,
+   * préstamos, pleno) queda a dos toques. Sigue creciendo con el pueblo (2.6).
+   */
   function openHub() {
     closeTray();
     const go = (fn: () => void) => () => withBack('Pueblo', openHub, fn);
     // 2.6: el panel crece con el pueblo; lo que sale por primera vez lleva «Nuevo» hasta que se abre.
+    // 2.7: como mucho dos marcas a la vez (las demás salen cuando se abran esas).
     const show = hubShown();
-    const item = (label: string, fn: () => void, attn = false, id?: HubEntry) => {
-      const fresh = !!id && reveal.isNew(`hub:${id}`);
-      const b = h('button', { class: `btn${attn ? ' attn' : ''}${fresh ? ' is-new' : ''}`, ...(fresh ? { 'aria-describedby': 'new-desc' } : {}), ...(id ? { 'data-hub': id } : {}) }, label, fresh ? newBadge() : '');
-      b.addEventListener('click', () => {
-        if (id) seenHub(id);
-        fn();
+    let badges = 0;
+    const row = (id: HubEntry | null, icon: string, title: string, fn: () => void, o: { datum?: string; name?: string; attn?: boolean } = {}) => {
+      const fresh = !!id && reveal.isNew(`hub:${id}`) && badges < 2;
+      if (fresh) badges++;
+      return listRow({
+        icon,
+        title,
+        ...o,
+        fresh: fresh ? newBadge() : '',
+        hub: id ?? undefined,
+        onClick: () => {
+          if (id) seenHub(id);
+          fn();
+        },
       });
-      return b;
     };
-    const opt = (id: HubEntry, label: string, fn: () => void, attn = false) => (show[id] ? [item(label, fn, attn, id)] : []);
-    const card = (icon: string, title: string, sum: (Node | string)[], ...buttons: Node[]) =>
-      h('section', { class: 'hub-card' }, h('h3', {}, pixelIcon(icon), title), h('p', { class: 'hub-sum' }, ...sum), buttons.length ? h('div', { class: 'hub-grid' }, ...buttons) : '');
+    const opt = (id: HubEntry, icon: string, title: string, fn: () => void, o: { datum?: string; name?: string; attn?: boolean } = {}) => (show[id] ? [row(id, icon, title, fn, o)] : []);
+
+    const pop = state.citizens.length;
     const last = state.stats.at(-1);
     const net = last ? last.income - last.expenses : null;
-    const happy = state.citizens.length ? Math.round(state.citizens.reduce((a, c) => a + c.happiness, 0) / state.citizens.length) : 0;
+    const happy = pop ? Math.round(state.citizens.reduce((a, c) => a + c.happiness, 0) / pop) : 0;
     const d = tickToDate(state.tick);
     const budgetOpen = state.budget.status === 'open' && state.budget.year === d.year;
     const offers = state.grants.filter((g) => g.status === 'offered').length;
-    const townSum: string[] = [budgetOpen ? `Presupuesto ${d.year} por aprobar` : `Presupuesto ${state.budget.plan}`];
-    if (offers) townSum.push(plural(offers, 'subvención por responder', 'subvenciones por responder'));
     const assocs = state.associations ?? [];
     const protest = assocs.some((a) => a.protestDay >= 0);
-    if (assocs.length) townSum.push(protest ? 'manifestación convocada' : plural(assocs.length, 'asociación vecinal', 'asociaciones vecinales'));
     // 2.4: la comisión de festejos espera presupuesto.
     const fiesta = state.seasons?.current;
     const fiestaAsks = !!fiesta && fiesta.status === 'comision' && !!fiesta.asked;
-    if (fiestaAsks) townSum.push('la comisión de festejos pide presupuesto');
+    const runway = net !== null && net < 0 && state.treasury > 0 ? Math.floor(state.treasury / -net) : -1;
+    const lv = townLevel(state);
+    const top = lv >= TOWNHALL_LEVELS.length;
+    const next = nextLevel(state);
+    const canUp = canUpgradeTownhall(state).ok;
+    const dilemma = state.dilemmas.find((x) => !x.resolved);
+
+    /* --- 4 tarjetas de resumen --- */
+    const moneySub = state.treasury < 0 ? 'en números rojos' : runway >= 0 && runway < 3 ? `aguanta ${runway === 0 ? 'menos de un mes' : plural(runway, 'mes', 'meses')}` : net === null ? 'aún sin cerrar un mes' : `${net >= 0 ? '+' : '−'}${money(Math.abs(net))} el último mes`;
+    const moneyCard = statCard({
+      icon: 'coin',
+      label: 'Dinero',
+      value: money(state.treasury),
+      sub: moneySub,
+      trend: net === null || net === 0 ? undefined : net > 0 ? 'up' : 'down',
+      tone: state.treasury < 0 || (runway >= 0 && runway < 3) ? 'bad' : net !== null && net < 0 ? 'warn' : 'ok',
+      name: `Dinero: ${money(state.treasury)} en caja, ${moneySub}. Ver cuentas`,
+      onClick: go(openAccounts),
+    });
+    const prevPop = last?.population ?? pop;
+    const popDiff = pop - prevPop;
+    const peopleSub = `${popDiff ? `${popDiff > 0 ? '+' : '−'}${Math.abs(popDiff)} este mes · ` : ''}felicidad ${happy} (${happy >= 65 ? 'contentos' : happy >= 45 ? 'regular' : 'descontentos'})`;
+    const peopleCard = statCard({
+      icon: 'people',
+      label: 'Gente',
+      value: plural(pop, 'vecino', 'vecinos'),
+      sub: peopleSub,
+      trend: pop > prevPop ? 'up' : pop < prevPop ? 'down' : undefined,
+      tone: pop && happy < 45 ? 'bad' : pop && happy < 60 ? 'warn' : 'ok',
+      name: `Gente: ${plural(pop, 'vecino', 'vecinos')}, ${peopleSub}. Ver la lista`,
+      onClick: go(openPeople),
+    });
+    const hallSub = top || !next ? 'el nivel más alto' : canUp ? `ya puedes ampliarlo (${money(next.cost)})` : next.pop > pop ? `nivel ${next.level}: faltan ${plural(next.pop - pop, 'vecino', 'vecinos')}` : `nivel ${next.level}: ${money(next.cost)}`;
+    const hallCard = statCard({
+      icon: 'townhall',
+      label: 'Ayuntamiento',
+      value: `Nivel ${lv}`,
+      sub: hallSub,
+      trend: canUp ? 'up' : undefined,
+      tone: canUp ? 'ok' : 'info',
+      // v1.9.1: desde aquí se llega a «Gestión del pueblo» (el ayuntamiento cuesta de encontrar en el mapa).
+      name: `Nivel ${lv} · ${top ? 'Gestión del pueblo' : 'Ampliar el ayuntamiento'}: ${hallSub}`,
+      onClick: go(openHall),
+    });
+    let fourth: HTMLElement;
+    if (show.politics && politicsActive(state)) {
+      const p = state.politics;
+      const months = Math.max(0, Math.round(daysToElection(state) / DAYS_PER_MONTH));
+      const polSub = p.mayor === 'player' ? `elecciones en ${plural(months, 'mes', 'meses')}` : 'estás en la oposición';
+      fourth = statCard({
+        icon: 'ballot',
+        label: 'Política',
+        value: `${p.approval} %`,
+        sub: polSub,
+        tone: p.approval < 45 ? 'bad' : p.approval < 55 ? 'warn' : 'ok',
+        name: `Política: ${p.approval} % de intención de voto, ${polSub}`,
+        onClick: go(() => openPolitics(social)),
+      });
+    } else if (show.region || show.neighbors) {
+      const pending = show.neighbors ? comarcaPending(state) : 0;
+      const phase = { bonanza: 'Bonanza', normal: 'Normal', crisis: 'Crisis' }[state.region.phase];
+      const comSub = pending ? plural(pending, 'oferta por responder', 'ofertas por responder') : regionAttention(state) ? 'hay algo que mirar' : show.neighbors ? plural(state.comarca.towns.length, 'pueblo vecino', 'pueblos vecinos') : 'grandes obras y empresas';
+      fourth = statCard({
+        icon: 'map',
+        label: 'Comarca',
+        value: phase,
+        sub: comSub,
+        tone: state.region.phase === 'crisis' ? 'bad' : pending || regionAttention(state) ? 'warn' : 'ok',
+        name: `Comarca: ${phase.toLowerCase()}, ${comSub}`,
+        onClick: go(show.neighbors ? openComarcaSheet : openRegionSheet),
+      });
+    } else {
+      const goals = activeObjectives(state);
+      const objSub = goals[0] ? lowerFirst(objectiveText(state, goals[0])) : 'todos cumplidos';
+      fourth = statCard({
+        icon: 'medal',
+        label: 'Objetivos',
+        value: `${state.objectivesDone.length} de ${OBJECTIVES.length}`,
+        sub: objSub,
+        tone: 'info',
+        name: `Objetivos: ${state.objectivesDone.length} de ${OBJECTIVES.length} cumplidos. Siguiente: ${objSub}`,
+        onClick: () => document.querySelector('#hub-goals')?.scrollIntoView({ block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth' }),
+      });
+    }
+
+    /* --- lo urgente: lo que más pide atención ahora, con su botón --- */
+    const urgent: UrgentItem[] = [];
+    const burning = state.buildings.find((b) => b.fire);
+    if (burning) urgent.push({ icon: 'fire', tone: 'bad', text: `Arde ${(burning.name ?? BUILD_NAMES[burning.kind] ?? 'un edificio').toLowerCase()}`, action: 'Ir allí', onClick: () => focusBuilding(burning.id) });
+    if (state.treasury < 0 || (runway >= 0 && runway < 3)) {
+      urgent.push({ icon: 'coin', tone: 'bad', text: state.treasury < 0 ? `La caja está en números rojos (${money(state.treasury)})` : `Al ritmo del último mes, la caja aguanta ${runway === 0 ? 'menos de un mes' : plural(runway, 'mes', 'meses')}`, action: 'Ver cuentas', onClick: go(openAccounts) });
+    }
+    const homes = state.buildings.filter((b) => b.built && !b.damaged && (b.kind === 'house' || b.kind === 'res' || b.kind === 'vpo'));
+    const dry = homes.filter((b) => !b.hasWater).length;
+    const dark = homes.filter((b) => !b.hasPower).length;
+    if (dry) urgent.push({ icon: 'drop', tone: 'bad', text: `${plural(dry, 'vivienda', 'viviendas')} sin agua`, action: 'Ver dónde', onClick: () => showMissing('agua') });
+    if (dark) urgent.push({ icon: 'bolt', tone: 'bad', text: `${plural(dark, 'vivienda', 'viviendas')} sin luz`, action: 'Ver dónde', onClick: () => showMissing('luz') });
+    // El servicio más lleno (por encima de lo que atiende): a su ficha, donde está «Ampliar».
+    const counts = serviceCounts(state);
+    let full: { b: Building; pct: number } | null = null;
+    for (const b of state.buildings) {
+      const cap = b.built && !b.damaged ? serviceCapacityOf(b) : 0;
+      const used = counts.get(b.id);
+      if (!cap || used === undefined) continue;
+      const pct = Math.round((100 * used) / cap);
+      if (pct > 100 && (!full || pct > full.pct)) full = { b, pct };
+    }
+    if (full) {
+      const fb = full.b;
+      const canMore = UPGRADABLE.includes(fb.kind) && levelOf(fb) < maxLevelOf(fb) && fb.upgradeUntil === undefined;
+      urgent.push({ icon: 'upgrade', tone: 'warn', text: `${fb.name ?? BUILD_NAMES[fb.kind] ?? fb.kind}: lleno al ${full.pct} %`, action: canMore ? 'Ampliar' : 'Ver', onClick: () => focusBuilding(fb.id) });
+    }
+    // Lo que espera respuesta.
+    if (dilemma) urgent.push({ icon: 'megaphone', tone: 'warn', text: 'Un vecino espera tu decisión', action: 'Responder', onClick: go(() => openDilemmaSheet(dilemmaCtx, dilemma.id)) });
+    if (state.pleno) urgent.push({ icon: 'gavel', tone: 'warn', text: 'El pleno espera tus respuestas', action: 'Responder', onClick: go(() => openPleno(social)) });
+    if (budgetOpen) urgent.push({ icon: 'clipboard', tone: 'warn', text: `Toca presentar el presupuesto de ${d.year}`, action: 'Responder', onClick: go(() => openTownHall(social, 'budget')) });
+    if (offers) urgent.push({ icon: 'clipboard', tone: 'info', text: plural(offers, 'subvención espera respuesta', 'subvenciones esperan respuesta'), action: 'Responder', onClick: go(() => openTownHall(social, 'grants')) });
+    if (fiestaAsks) urgent.push({ icon: 'calendar', tone: 'info', text: 'La comisión de festejos pide presupuesto', action: 'Responder', onClick: go(() => openTownHall(social, 'seasons')) });
+    if (show.neighbors && comarcaPending(state)) urgent.push({ icon: 'map', tone: 'info', text: 'Un pueblo vecino espera respuesta', action: 'Responder', onClick: go(openComarcaSheet) });
+    if (show.errands && state.errands?.list.some((e) => e.status === 'ofrecido')) urgent.push({ icon: 'scroll', tone: 'info', text: 'Te han hecho un encargo', action: 'Responder', onClick: go(openErrandsSheet) });
+    const broken = state.buildings.filter((b) => b.damaged && b.damaged.repairUntil < 0);
+    if (broken.length) urgent.push({ icon: 'repair', tone: 'warn', text: `${plural(broken.length, 'edificio destrozado', 'edificios destrozados')} sin reparar`, action: 'Ver', onClick: () => focusBuilding(broken[0]!.id) });
+
+    /* --- la lista --- */
+    const visitors = state.tourism.visitors;
+    const medals = medalCount(state);
+    const errandsOffered = state.errands?.list.filter((e) => e.status === 'ofrecido').length ?? 0;
+    const lastEd = state.press?.editions.at(-1);
     sheet(
       'Pueblo',
-      // 2.1: el rango y el escudo del pueblo, arriba del todo (2.6: tras el primer mes).
-      ...(show.rank ? [hubRank()] : []),
-      card(
-        'coin',
-        'Dinero',
-        ['Caja: ', h('strong', {}, money(state.treasury)), net !== null ? ` · último mes: ${net >= 0 ? '+' : ''}${money(net)}` : ''],
-        item('Parte mensual', go(openAccounts)),
-        item('Impuestos', go(openTaxes)),
+      statGrid([moneyCard, peopleCard, hallCard, fourth]),
+      urgentBlock(urgent),
+      listGroup('Dinero', [
+        row(null, 'chart', 'Parte mensual', go(openAccounts)),
+        row(null, 'tax', 'Impuestos', go(openTaxes)),
         // 2.2: préstamos municipales (destaca con mucha carga o nota D). 2.6: cuando la caja va justa o ya hay uno.
-        ...opt('loans', `Préstamos · nota ${state.rating ?? 'B'}`, go(openLoansSheet), heavyLoad(state) || state.rating === 'D'),
-      ),
-      card(
-        'build',
-        'Ayuntamiento',
-        [townSum.join(' · ')],
-        // v1.9.1: el ayuntamiento cuesta de encontrar en el mapa; desde aquí se llega a «Gestión del pueblo».
-        item(`Nivel ${townLevel(state)} · ${townLevel(state) >= TOWNHALL_LEVELS.length ? 'Gestión' : 'Ampliar'}`, go(openHall), canUpgradeTownhall(state).ok),
-        ...opt('budget', 'Presupuesto y fiestas', go(() => openTownHall(social, fiestaAsks ? 'seasons' : undefined)), budgetOpen || offers > 0 || protest || fiestaAsks),
-        // 2.3: turismo (desde el nivel 3 o en cuanto hay visitantes).
-        ...(townLevel(state) >= 3 || state.tourism.visitors > 0 ? [item(`Turismo · ${plural(state.tourism.visitors, 'visitante', 'visitantes')}`, go(() => openTownHall(social, 'tourism')), touristified(state))] : []),
-        ...(state.dilemmas.some((d) => !d.resolved) ? [item('Un asunto difícil', go(() => openDilemmaSheet(dilemmaCtx, state.dilemmas.find((d) => !d.resolved)!.id)), true)] : []),
-        ...opt('pleno', 'Pleno municipal', go(() => openPleno(social))),
-        ...opt('politics', 'Política y elecciones', go(() => openPolitics(social))),
-        ...opt('advisor', 'Consejero', go(() => openAdvisor(social))),
-      ),
-      card(
-        'people',
-        'Gente',
-        [h('strong', {}, plural(state.citizens.length, 'vecino', 'vecinos')), ` · felicidad ${happy}`],
-        item('Vecinos', go(openPeople)),
-        ...(state.aiMode ? [item('✦ Qué está pasando', go(openHappening), !!state.ai?.log.length)] : []),
-        item('Felicidad', go(openHappiness)),
-        ...opt('diary', 'Diario del pueblo', go(() => openDiary(social))),
-        ...opt('album', 'Álbum del pueblo', go(() => openAlbum(social))),
+        ...opt('loans', 'bank', 'Préstamos', go(openLoansSheet), { datum: `nota ${state.rating ?? 'B'}`, name: `Préstamos · nota ${state.rating ?? 'B'}`, attn: heavyLoad(state) || state.rating === 'D' }),
+      ]),
+      listGroup('Ayuntamiento', [
+        ...opt('pleno', 'gavel', 'Pleno municipal', go(() => openPleno(social)), { datum: state.pleno ? 'en curso' : undefined, attn: !!state.pleno }),
+        ...opt('budget', 'clipboard', 'Presupuesto y fiestas', go(() => openTownHall(social, fiestaAsks ? 'seasons' : undefined)), { datum: budgetOpen ? 'por aprobar' : state.budget.plan, attn: budgetOpen || offers > 0 || protest || fiestaAsks }),
+        // 2.3: turismo (desde el nivel 3 o en cuanto hay visitantes). 2.7: en su propia hoja.
+        ...(lv >= 3 || visitors > 0 ? [row(null, 'camera', 'Turismo', go(() => openTourism(social)), { datum: plural(visitors, 'visitante', 'visitantes'), name: `Turismo · ${plural(visitors, 'visitante', 'visitantes')}`, attn: touristified(state) })] : []),
+        ...(dilemma ? [row(null, 'megaphone', 'Un asunto difícil', go(() => openDilemmaSheet(dilemmaCtx, dilemma.id)), { attn: true })] : []),
+        ...opt('politics', 'ballot', 'Política y elecciones', go(() => openPolitics(social)), { datum: politicsActive(state) ? `${state.politics.approval} %` : undefined }),
+        ...opt('advisor', 'speech', 'Consejero', go(() => openAdvisor(social))),
+      ]),
+      listGroup('Gente', [
+        row(null, 'people', 'Vecinos', go(openPeople), { datum: String(pop) }),
+        row(null, 'smile', 'Felicidad', go(openHappiness), { datum: `${happy} de 100` }),
+        ...(state.aiMode ? [row(null, 'spark', '✦ Qué está pasando', go(openHappening), { attn: !!state.ai?.log.length })] : []),
+        ...opt('diary', 'book', 'Diario del pueblo', go(() => openDiary(social))),
+        ...opt('album', 'album', 'Álbum del pueblo', go(() => openAlbum(social))),
         // 2.5: el buzón (cartas de los que se fueron), con correos o si ya llegó alguna.
-        ...(state.letters.length || state.buildings.some((x) => x.kind === 'post') ? [item(`Buzón · ${plural(state.letters.length, 'carta', 'cartas')}`, go(openMail), unreadLetters(state, token) > 0)] : []),
+        ...(state.letters.length || state.buildings.some((x) => x.kind === 'post') ? [row(null, 'letter', 'Buzón', go(openMail), { datum: plural(state.letters.length, 'carta', 'cartas'), name: `Buzón · ${plural(state.letters.length, 'carta', 'cartas')}`, attn: unreadLetters(state, token) > 0 })] : []),
         // 2.3: gráficas por años y récords.
-        ...opt('history', 'Historia', go(() => openHistory(state))),
-      ),
-      // 2.3: la comarca (bonanza o crisis), la gran empresa y las grandes obras.
-      // 2.5: los pueblos vecinos y sus alcaldes (ofertas con plazo).
-      // 2.6: desde el ayuntamiento 3 (sin pueblos vecinos en «Pueblo sencillo»).
-      ...(show.region || show.neighbors
-        ? [
-            card(
-              'town',
-              'Comarca',
-              show.neighbors ? [regionSummary(state), ' · ', comarcaSummary(state)] : [regionSummary(state)],
-              ...opt('region', 'Comarca y grandes obras', go(openRegionSheet), regionAttention(state)),
-              ...opt('neighbors', 'Pueblos vecinos', go(openComarcaSheet), comarcaPending(state) > 0),
-            ),
-          ]
-        : []),
+        ...opt('history', 'calendar', 'Historia', go(() => openHistory(state))),
+      ]),
+      // 2.3: la comarca (bonanza o crisis), la gran empresa y las grandes obras. 2.5: los pueblos vecinos.
+      listGroup('Comarca', [
+        ...opt('region', 'map', 'Comarca y grandes obras', go(openRegionSheet), { datum: { bonanza: 'bonanza', normal: 'normal', crisis: 'crisis' }[state.region.phase], attn: regionAttention(state) }),
+        ...opt('neighbors', 'town', 'Pueblos vecinos', go(openComarcaSheet), { datum: comarcaPending(state) ? `${comarcaPending(state)} por responder` : undefined, attn: comarcaPending(state) > 0 }),
+      ]),
       // 2.1: encargos del pueblo y El Eco de Bitópolis (2.6: cuando llega el primero).
-      ...(show.errands || show.press
-        ? [
-            card(
-              'inspect',
-              'Encargos y El Eco',
-              [errandsSummary(state)],
-              ...opt('errands', 'Encargos del pueblo', go(openErrandsSheet), !!state.errands?.list.some((e) => e.status === 'ofrecido')),
-              ...opt('press', 'El Eco de Bitópolis', go(openPressSheet), !!state.press?.editions.at(-1) && !state.press.editions.at(-1)!.answered),
-            ),
-          ]
-        : []),
+      listGroup('Noticias', [
+        ...opt('errands', 'scroll', 'Encargos del pueblo', go(openErrandsSheet), { datum: errandsOffered ? `${errandsOffered} por responder` : undefined, attn: errandsOffered > 0 }),
+        ...opt('press', 'news', 'El Eco de Bitópolis', go(openPressSheet), { attn: !!lastEd && !lastEd.answered }),
+      ]),
       h(
         'section',
-        { class: 'hub-card' },
-        h('h3', {}, pixelIcon('smile'), 'Objetivos'),
+        { class: 'hub-sec', id: 'hub-goals' },
+        h('h3', { class: 'hub-sec-h' }, 'Objetivos'),
+        // 2.1: el rango y el escudo del pueblo (2.6: tras el primer mes).
+        ...(show.rank ? [hubRank(badges < 2 && reveal.isNew('hub:rank') ? (badges++, true) : false)] : []),
         objectivesNode(state),
         // 2.3: medallas (logros del pueblo, también los encargos).
-        show.medals ? h('div', { class: 'hub-grid' }, item(`Medallas · ${medalCount(state).have} de ${medalCount(state).total}`, go(() => openMedals(state)), false, 'medals')) : '',
+        show.medals ? h('div', { class: 'hub-grid hub-list' }, row('medals', 'medal', 'Medallas', go(() => openMedals(state)), { datum: `${medals.have} de ${medals.total}`, name: `Medallas · ${medals.have} de ${medals.total}` })) : '',
       ),
-      ...(state.aiMode
-        ? [card('inspect', 'IA', ['Los vecinos con nombre deciden con la IA.'], item('Gasto de la IA', () => void openUsage(token)), item('Qué se envía a la IA', () => void openPreview(token)))]
-        : []),
-      h(
-        'div',
-        { class: 'menu-foot' },
-        item('Ajustes', go(openSettingsGame)),
-        item('Repetir tutorial', () => {
+      state.aiMode
+        ? listGroup('IA', [row(null, 'coin', 'Gasto de la IA', () => void openUsage(token)), row(null, 'spark', 'Qué se envía a la IA', () => void openPreview(token))])
+        : '',
+      listGroup('Partida', [
+        row(null, 'gear', 'Ajustes', go(openSettingsGame)),
+        row(null, 'replay', 'Repetir tutorial', () => {
           closeSheet();
           tutorial.start(state, true);
         }),
-        item('Volver al inicio', () => {
+        row(null, 'door', 'Volver al inicio', () => {
           closeSheet();
           exit();
         }),
-      ),
+      ]),
     );
+  }
+  /** 2.7: «Ver dónde»: el mapa con «Qué falta» filtrado a ese servicio (casas sin él). */
+  function showMissing(k: NeedKey) {
+    closeSheet();
+    setLayer('missing');
+    missingKey = k;
+    selected = null;
+    missingLegend();
+    const lack = filterOverlay(state, k).marks.map((m) => m.y * state.map.w + m.x);
+    if (lack.length) revealArea(lack);
   }
   /** 2.6: qué entradas del panel se ven (lo que pide el pueblo ahora y lo que ya salió alguna vez). */
   function hubShown(): Record<HubEntry, boolean> {
@@ -2899,10 +3113,10 @@ export function startGame(opts: GameOptions): void {
     refreshNewDots();
   }
   /** El rango y el escudo (2.6: con «Nuevo» la primera vez). */
-  function hubRank() {
+  function hubRank(badge: boolean) {
     const card = rankCard(state, go(() => openRank(state)));
     const btn = card.querySelector<HTMLElement>('.rank-card')!;
-    if (reveal.isNew('hub:rank')) {
+    if (badge) {
       btn.classList.add('is-new');
       btn.setAttribute('aria-describedby', 'new-desc');
       btn.append(newBadge());
