@@ -134,7 +134,7 @@ import { ficheHead, fold, listGroup, listRow, spriteCopy, statCard, statGrid, st
 import { type HubEntry, hubWants, Reveal, trayCatsWanted, ZONE_HELPERS } from './progress.ts';
 import { commandFor, costText, isLocked, lockLong, lockShort, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayChipName, trayCost } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
-import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, entryAction, h, isSheetOpen, type LogEntry, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack } from './ui.ts';
+import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, entryAction, h, isSheetOpen, type LogEntry, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack, setSheetSnap } from './ui.ts';
 import { pixelIcon } from './icons.ts';
 import { openHistory } from './charts-ui.ts';
 import { medalCount, openMedals } from './medals-ui.ts';
@@ -2636,6 +2636,12 @@ export function startGame(opts: GameOptions): void {
   function asFicha(el: HTMLElement): HTMLElement {
     el.classList.add('half', 'ficha');
     el.dataset.start = 'peek';
+    // Si en la asomada no se llega a ver el estado y el botón principal, se abre a media altura.
+    requestAnimationFrame(() => {
+      if (!el.isConnected || el.dataset.snap) return;
+      const main = el.querySelector('[data-test="fiche-main"]') ?? el.querySelector('[data-test="fiche-status"]');
+      if (main && main.getBoundingClientRect().bottom > el.getBoundingClientRect().bottom - 4) setSheetSnap(el, 'mid');
+    });
     return el;
   }
 
