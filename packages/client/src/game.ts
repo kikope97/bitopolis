@@ -134,7 +134,7 @@ import { ficheHead, fold, listGroup, listRow, spriteCopy, statCard, statGrid, st
 import { type HubEntry, hubWants, Reveal, trayCatsWanted, ZONE_HELPERS } from './progress.ts';
 import { commandFor, costText, isLocked, lockLong, lockShort, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayChipName, trayCost } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
-import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, entryAction, h, isSheetOpen, type LogEntry, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack, setSheetSnap } from './ui.ts';
+import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, entryAction, h, isSheetOpen, type LogEntry, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack, setSheetSnap, setFastToasts } from './ui.ts';
 import { pixelIcon } from './icons.ts';
 import { openHistory } from './charts-ui.ts';
 import { medalCount, openMedals } from './medals-ui.ts';
@@ -3820,6 +3820,7 @@ export function startGame(opts: GameOptions): void {
       );
     }
     speed = s;
+    setFastToasts(s >= 10);
     // Otra velocidad (no la x1 del suceso): la nota «Bajo a x1…» ya no hace falta.
     if (s !== 1) hideSlowNote();
     syncTurnPace(s);

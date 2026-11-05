@@ -1,7 +1,7 @@
 import { gzipSync } from 'node:zlib';
 import { expect, type Page, test } from '@playwright/test';
 import { type GameState, OUTSIDE, runSimulation, transfer, TREASURY, validateCommand } from '../packages/sim/src/index.ts';
-import { chooseOffer, openTrayCat, pickTool, setSpeed, skipTutorial, state, tile } from './helpers.ts';
+import { chooseOffer, openTrayCat, pickTool, setSpeed, skipTutorial, state, tile, confirmIfAsked } from './helpers.ts';
 
 /** 2.6 «Lo básico»: el panel «Pueblo» y la bandeja crecen con el pueblo; licitaciones solo en obras grandes; «Pueblo sencillo». */
 
@@ -86,6 +86,7 @@ test('2.6: al ampliar el ayuntamiento, lo que aparece lleva «Nuevo» hasta que 
   await page.locator('#menu').click();
   await page.getByRole('button', { name: /^Nivel 2 · Ampliar/ }).click();
   await page.getByRole('button', { name: /Ampliar a nivel 3/ }).click();
+  await confirmIfAsked(page);
   await expect.poll(async () => (await state(page)).townhallLevel).toBe(3);
   await page.locator('.sheet-close').click();
   await expect(page.locator('#menu')).toHaveClass(/has-new/);

@@ -23,7 +23,7 @@ import { economyLines } from './money-ui.ts';
 import { pixelIcon } from './icons.ts';
 import type { SocialCtx } from './social-ui.ts';
 import { townhallSprite } from './sprites.ts';
-import { h, sheet } from './ui.ts';
+import { confirmDialog, h, sheet } from './ui.ts';
 import { fold, statusBar } from './hub-ui.ts';
 
 /**
@@ -98,6 +98,16 @@ export function openManagement(ctx: SocialCtx, links: ManageLinks, fresh?: strin
     const btn = h('button', { class: 'btn primary big mg-upgrade', 'data-test': 'fiche-main' }, pixelIcon('upgrade'), ` Ampliar a nivel ${next.level} · ${money(next.cost)}`) as HTMLButtonElement;
     btn.disabled = !ok.ok;
     btn.addEventListener('click', async () => {
+      // Ronda 23: una ampliación que se lleva más del 20 % de la caja se confirma (antes, 70.000 € de un toque).
+      if (next.cost > 0.2 * Math.max(0, s.treasury)) {
+        const sure = await confirmDialog(
+          `¿Ampliar el ayuntamiento a nivel ${next.level}?`,
+          `Cuesta ${money(next.cost)}: te quedarán ${money(s.treasury - next.cost)}. A fin de mes pagas ≈ ${money(due)} de gasto corriente.`,
+          'Ampliar',
+          { safe: true },
+        );
+        if (!sure) return;
+      }
       // El aviso va dentro de la hoja: un aviso normal quedaría tapado por la pantalla completa.
       if (await ctx.command({ type: 'UpgradeTownhall' })) {
         const after = ctx.state();

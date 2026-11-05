@@ -42,7 +42,17 @@ export function plural(n: number, one: string, many: string): string {
   return `${new Intl.NumberFormat('es-ES').format(n)} ${n === 1 ? one : many}`;
 }
 
-export const money = (n: number) => `${new Intl.NumberFormat('es-ES').format(n)} €`;
+/**
+ * Ronda 23: miles con punto a mano, con la norma del español (desde 5 cifras: «2000 €», «53.390 €»).
+ * Intl dependía de los datos de idioma del navegador (sin ellos salía «53390 €»).
+ */
+export function groupEs(n: number): string {
+  const neg = n < 0;
+  const [int, dec] = Math.abs(n).toString().split('.');
+  const body = int!.length >= 5 ? int!.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : int!;
+  return `${neg ? '-' : ''}${body}${dec ? `,${dec}` : ''}`;
+}
+export const money = (n: number) => `${groupEs(n)} €`;
 
 /** «1 ene A2»: para la cabecera en pantallas estrechas. */
 export function shortDate(d: { year: number; month: number; day: number }): string {

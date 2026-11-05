@@ -86,3 +86,14 @@ export async function topbarItem(page: Page, id: 'hud-pop' | 'hud-happy' | 'hud-
   await page.locator('#hud-more').click();
   await page.locator(`.more-row[data-for="${id}"]`).click();
 }
+
+/** Ronda 23: si un gasto grande pide confirmación, se acepta (botón principal del diálogo). */
+export async function confirmIfAsked(page: Page, yes = 'Ampliar') {
+  const dlg = page.locator('.modal-backdrop [role="alertdialog"], .modal-backdrop').first();
+  try {
+    await dlg.waitFor({ state: 'visible', timeout: 1500 });
+  } catch {
+    return;
+  }
+  await page.locator('.modal-backdrop').getByRole('button', { name: yes, exact: true }).click();
+}

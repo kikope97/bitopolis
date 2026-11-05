@@ -151,7 +151,7 @@ body.in-game .toast.sticky.warn, body.in-game .toast.urgent { border-left-color:
 body.in-game .toast-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; text-overflow: clip; }
 .toast-action { text-decoration: none; }
 /* Con una hoja abierta, los avisos no tapan su cabecera: salen abajo, sobre el dock. */
-body.sheet-open.in-game #toasts { top: auto; bottom: calc(var(--dock-h, 64px) + env(safe-area-inset-bottom) + 8px); }
+body.sheet-open.in-game #toasts { pointer-events: none; }
 
 /* ---------- capas (z): franja y dock por encima del mapa; hojas y diálogos encima ---------- */
 .strip, .dock { position: relative; z-index: var(--z-bars); }
@@ -822,3 +822,8 @@ html[data-text='200'] .hub-stat { min-height: 0; }
 
 /* Integración 2.7: con un servicio elegido en «Qué falta», la leyenda plegada enseña esa fila (con «Construir»). */
 .legend.folded > [data-test='legend-filter'] { display: grid !important; }
+
+/* Ronda 23: con una hoja abierta, el aviso se lee arriba pero no se toca (el toque va a la hoja). */
+body.in-game .toast.passive, body.in-game .toast.passive * { pointer-events: none !important; }
+/* Con una herramienta elegida, solo «Capas» queda en la pila del mapa (los demás robaban toques al construir). */
+body.tool-active .map-btns #whatnow, body.tool-active .map-btns #home { display: none; }

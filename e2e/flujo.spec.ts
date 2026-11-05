@@ -1,7 +1,7 @@
 import { gzipSync } from 'node:zlib';
 import { expect, type Page, test } from '@playwright/test';
 import { createInitialState, type GameState, OUTSIDE, runSimulation, transfer, TREASURY } from '../packages/sim/src/index.ts';
-import { drag, pickTool, setSpeed, skipTutorial, state, tap } from './helpers.ts';
+import { drag, pickTool, setSpeed, skipTutorial, state, tap, confirmIfAsked } from './helpers.ts';
 
 /** Pruebas 2.5: flujo, textos y erratas que encontró un jugador de pruebas. */
 function pack(s: GameState) {
@@ -104,6 +104,7 @@ test('bandeja plegada, ampliación con aviso, pleno sin rojo y títulos de la co
   await expect(page.locator('[data-test="upgrade-after"]')).toContainText('Te quedarán 100 €');
   await expect(page.locator('[data-test="upgrade-after"]')).toContainText('a fin de mes pagas ≈');
   await page.locator('.mg-upgrade').click();
+  await confirmIfAsked(page);
   await expect(page.locator('[data-test="upgrade-done"]')).toContainText('Ayuntamiento ampliado a nivel 2');
   await expect(page.locator('[data-test="upgrade-done"]')).toBeVisible();
   await shot('4-ampliado');

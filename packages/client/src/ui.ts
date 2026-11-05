@@ -141,6 +141,12 @@ function goLabel(go: string | undefined): string {
  * `th:grants`, `dilemma:3`…): al tocarlo, también tras recargar, abre lo mismo.
  * `onClick` manda si se da (solo vale en esta visita).
  */
+/** Ronda 23: a x10, los avisos fijos que no son urgentes se van solos a los 6 s. */
+let fastToasts = false;
+export function setFastToasts(on: boolean): void {
+  fastToasts = on;
+}
+
 export function toast(text: string, opts: { sticky?: boolean; kind?: ToastKind; onClick?: () => void; go?: string } = {}) {
   const box = $('#toasts');
   const goFn = opts.go && store ? store.resolve(opts.go) : undefined;
@@ -214,6 +220,17 @@ export function toast(text: string, opts: { sticky?: boolean; kind?: ToastKind; 
     el.classList.add('sticky');
     closeBtn();
   } else {
+    el.dataset.timer = String(setTimeout(() => el.remove(), 6000));
+  }
+  // Ronda 23: con una hoja abierta, lo que trae una acción va solo a la campana (antes tapaba las filas
+  // de la hoja y se quedaba con el toque); lo demás (errores, confirmaciones) se ve arriba y no se toca.
+  if (document.body.classList.contains('in-game') && document.body.classList.contains('sheet-open')) {
+    if (own) return;
+    el.classList.add('passive');
+  }
+  // A x10 los fijos de poca urgencia no se quedan: siguen en la campana y en «Te piden».
+  if (fastToasts && opts.sticky && opts.kind !== 'warn' && el.dataset.timer) {
+    clearTimeout(Number(el.dataset.timer));
     el.dataset.timer = String(setTimeout(() => el.remove(), 6000));
   }
   box.append(el);
