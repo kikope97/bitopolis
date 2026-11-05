@@ -175,7 +175,7 @@ pnpm e2e                            # Playwright, viewport móvil y escritorio; 
 ## Arreglos del jugador de pruebas (2.5.1)
 - Guardado: el worker emite un lote al aplicar cada orden (también en pausa) y al pausar; los lotes van en cadena; al ocultarse la página, el último lote sale por `navigator.sendBeacon` (POST `/save` con `release` y `parts`); «Guardado» solo con todo confirmado (`#saved[data-pending]`). e2e `guardado-pausa`.
 - Rendimiento: el suelo se repinta por trozos (`groundFor`, tope por fotograma); el estado del worker llega en JSON. `pnpm perf` (`e2e/tirones.spec.ts`).
-- Pantalla: `fitTopbar()` (la barra de arriba pasa a dos filas antes de quitar iconos), leyenda plegada en móvil, marca del tutorial dentro del objetivo (`tut-target`), `--ui` mayor en pantallas grandes. e2e `pantallas` (solo en «escritorio»; `PW_TOWN_CACHE`).
+- Pantalla: `fitTopbar()` (desde la 2.7, una sola fila con «⋯»), leyenda plegada en móvil, marca del tutorial dentro del objetivo (`tut-target`), `--ui` mayor en pantallas grandes. e2e `pantallas` (solo en «escritorio»; `PW_TOWN_CACHE`).
 - Flujos: zonas sin carretera (`zonesWithoutRoad`), «Bajo a x1 por…» con «Volver a xN», bandeja con categorías bloqueadas plegadas (`pickTool` las abre), `plenoPlan` (lo que se anuncia = lo que se pide). e2e `flujo`.
 
 ## Lo básico (2.6) — formato de partida 19, TURN_PROMPT_VERSION 16
@@ -189,3 +189,15 @@ pnpm e2e                            # Playwright, viewport móvil y escritorio; 
 - Cliente: `reach-ui.ts` (rombo, ✓/✗, «Ver zona», `revealArea` con zoom legible, filtro de «Qué falta» que manda sobre la selección), `nucleo-ui.ts` (carga de la planta, `data-test="plant-load"`), `progress.ts` (panel «Pueblo» y bandeja progresivos, «Nuevo», «Enseñar todo desde el principio»; `ZONE_HELPERS`).
 - IA: `en_su_casa` en cada vecino, `servicios_llenos` y `gasto_fijo` en `turnShared`.
 - e2e: `cobertura`, `nucleo`, `progresivo`.
+
+## Interfaz móvil 2.0 (2.7) — ronda 23, plan en `docs/propuestas/v2.7-interfaz-movil.md`
+- **Norma**: la interfaz se diseña para el móvil (pulgar, 360 px, texto al 200 %). `client/src/mobile2.css` va después de `style.css` y manda: variables `--fs-*` (×`--ui`; 150 % = 1,5 y 200 % = 2), `--sp-*`, `--z-*` y `--c-*` (colores por función de la paleta de 64). Cada parte tiene su sección («hojas», «accesibilidad y capas», «campana y Hoy», «construir», «Pueblo y fichas»); estilos nuevos, en su sección.
+- Barra de arriba en **una fila** (`fitTopbar`: `tb-tight` → `tb-more` (vecinos, votos, IA a `#hud-more` «⋯») → `tb-more2` (felicidad) → `tb-nocal` → `tb-nounit`). La caja enseña «N m» si aguanta menos de 3 meses (`runwayMonths` de `cash.ts`, gasto corriente sin obras). «Guardado» es un punto (`#saved`), el calendario va en la barra. En los e2e, `topbarItem(page, id)` abre un dato aunque esté en «⋯».
+- Mapa: `.map-btns` con Capas, «?» y ⌂ (`#home`); con herramienta (`body.tool-active`) solo «Capas» y las burbujas sin toques.
+- Ritmo: `prefs.slowFor` (`emergencias` por defecto: incendio, riada, disturbios, manifestación y lo que te piden con plazo; `importante`; `nada`). `slowNote` vuelve sola a la velocidad de antes a los 20 s. A x10 los avisos fijos poco urgentes se van solos (`setFastToasts`).
+- Hojas (`ui.ts`): tres alturas (`data-snap`: peek/mid/full) que se arrastran por el asa (`.sheet-grip`) o la cabecera; fichas con `asFicha` (asomada; media si no se ve `[data-test="fiche-main"]`); la cámara vuelve al cerrar. En horizontal (alto ≤ 500 px) el dock es un riel de 76 px y las hojas van a la izquierda.
+- Avisos: `toast({ go })` con referencia guardable (`goTo` en game.ts); la campana se guarda por partida (`bitopolis.log.<token>`) con «Te piden» (`asks.ts`, `pendingAsks`, del estado) y «Ha pasado». Con una hoja abierta, lo que trae acción va solo a la campana y lo demás es `.passive`. «Hoy en Bitópolis» (`hoy-ui.ts`) sustituye a «Mientras no estabas».
+- Panel «Pueblo» (`openHub` + `hub-ui.ts`): 4 tarjetas, «Lo urgente», lista con iconos. Fichas: `ficheHead`/`statusBar`/`fold` (cabecera → estado → botón principal → detalle). Gastos de más del 20 % de la caja se confirman (`confirmIfAsked` en los e2e).
+- Construir: bandeja con chips y cuadrícula (`TRAY[].chip`), coste al mes como gasto (`monthlyCostText`), aviso de caja (`cc-runway`), calle suelta (`cc-network`), casilla inválida en rojo (`opts.bad`). `money()` agrupa a mano desde 5 cifras (`groupEs`).
+- Accesibilidad: contraste ≥ 4,5:1, nada < 12 px, `confirmDialog` con fondo `inert`, `h1#town-h1`, dock `role="toolbar"`, Ajustes con la accesibilidad primero, `#boot` («Cargando el pueblo…»).
+- e2e: `movil2` (medidas en 320/360/390/740×360/768×1024 al 100 y 200 %, también a x10), `campana`.
