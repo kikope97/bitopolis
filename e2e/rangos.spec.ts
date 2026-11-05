@@ -33,6 +33,8 @@ test('2.1: el pueblo sube de rango con fanfarria, cartel en la entrada y escudo 
   expect(rankFor(state)).toBeGreaterThanOrEqual(1);
   state.rank = { ...state.rank!, level: 0, vote: null, crest: { ...state.rank!.crest, pieces: state.rank!.crest.pieces.slice(0, 1), motto: null } };
   const token = await importTown(request, state);
+  // 2.7: por defecto solo frenan las emergencias; aquí se elige «también lo importante» para ver la bajada a x1.
+  await page.addInitScript(() => localStorage.setItem('bitopolis.prefs', JSON.stringify({ slowFor: 'importante' })));
   await open(page, token);
   await setSpeed(page, 10);
   await expect.poll(() => page.evaluate(() => (window as any).__bitopolis.state.rank.level), { timeout: 30_000 }).toBeGreaterThanOrEqual(1);
