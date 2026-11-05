@@ -135,7 +135,7 @@ export function postMonth(state: GameState, freeHome: boolean): Citizen | null {
     const m = to.memories.at(-1);
     if (m?.kind === 'carta') m.names = [firstName(from.name)];
   }
-  pushEvent(state, 'info', `${to.name} recibe carta de ${firstName(from.name)}, que se fue del pueblo (Pueblo › Buzón)`, { ref: to.id });
+  pushEvent(state, 'info', `${to.name} recibe carta de ${firstName(from.name)}, que se fue del pueblo`, { ref: to.id });
   return back ? comeBack(state, from, to, tie) : null;
 }
 

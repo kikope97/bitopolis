@@ -156,7 +156,7 @@ export function offerErrand(state: GameState, key: string, story?: string): Erra
   const e: Errand = { id: state.nextId++, ...c, status: 'ofrecido', until: state.tick + ERRANDS.answerDays * TICKS_PER_DAY, ...(story ? { story } : {}) };
   es.list.push(e);
   const who = state.citizens.find((x) => x.id === c.by);
-  pushEvent(state, 'info', `Encargo del pueblo: ${c.text} (Pueblo › Objetivos)`, who ? { ref: who.id } : {});
+  pushEvent(state, 'info', `Encargo del pueblo: ${c.text}`, who ? { ref: who.id } : {});
   return e;
 }
 
