@@ -2292,15 +2292,10 @@ export function startGame(opts: GameOptions): void {
     }
     const r = canvas.getBoundingClientRect();
     const el = currentSheet();
-    let { right, bottom } = r;
-    const { left } = r;
+    let { left, right, bottom } = r;
     // Bajo la barra de arriba no se ve nada.
     const top = Math.max(r.top, document.querySelector('.topbar')?.getBoundingClientRect().bottom ?? r.top);
-    if (el) {
-      const sr = el.getBoundingClientRect();
-      if (sr.left <= r.left + 8) bottom = Math.min(bottom, sr.top);
-      else right = Math.min(right, sr.left);
-    }
+    if (el) ({ left, right, bottom } = besideSheet(r, el, { left, right, bottom }));
     bottom = Math.min(bottom, $('#strip').getBoundingClientRect().top || bottom);
     const vw = (right - left) * dpr();
     const vh = (bottom - top) * dpr();
@@ -2310,11 +2305,50 @@ export function startGame(opts: GameOptions): void {
     // Ronda 22: sin bajar de un zoom en el que se lean los ✓ y ✗ (~14 px CSS por casilla); si no cabe, se centra.
     const legible = Math.max(minZoom(), Math.ceil((14 * dpr()) / T));
     const fit = Math.max(legible, Math.min(cam.zoom, Math.floor(1 / need)));
+    const before = { x: cam.x, y: cam.y, zoom: cam.zoom };
     if (fit < cam.zoom) cam.zoom = fit;
     const ts = tileSize();
     cam.x = Math.round(((x0 + x1 + 1) / 2) * ts - ((left + right) / 2 - r.left) * dpr());
     cam.y = Math.round(((y0 + y1 + 1) / 2) * ts - ((top + bottom) / 2 - r.top) * dpr());
     clampCam();
+    noteReveal(before);
+  }
+
+  /** 2.7: lo que queda del mapa a la vista con la hoja abierta (abajo, a la derecha o a la izquierda). */
+  function besideSheet(r: DOMRect, el: HTMLElement, box: { left: number; right: number; bottom: number }) {
+    const sr = el.getBoundingClientRect();
+    if (sr.width >= r.width - 16) return { ...box, bottom: Math.min(box.bottom, sr.top) };
+    if (sr.left <= r.left + 8) return { ...box, left: Math.max(box.left, sr.right) };
+    return { ...box, right: Math.min(box.right, sr.left) };
+  }
+
+  /**
+   * 2.7: al cerrar la ficha, la cámara vuelve a donde estaba antes de que revealTile/revealArea
+   * la movieran (si el jugador no la ha movido después).
+   */
+  let camBack: { before: { x: number; y: number; zoom: number }; after: { x: number; y: number; zoom: number } } | null = null;
+  const sameCam = (a: { x: number; y: number; zoom: number }, b: { x: number; y: number; zoom: number }) => a.x === b.x && a.y === b.y && a.zoom === b.zoom;
+  function noteReveal(before: { x: number; y: number; zoom: number }) {
+    const after = { x: cam.x, y: cam.y, zoom: cam.zoom };
+    if (!currentSheet() || sameCam(before, after)) return;
+    // Si el jugador movió el mapa entre una ficha y otra, se vuelve a donde lo dejó él.
+    if (!camBack || !sameCam(before, camBack.after)) camBack = { before, after };
+    else camBack.after = after;
+  }
+  function restoreCam() {
+    const back = camBack;
+    camBack = null;
+    if (!back || !sameCam(back.after, { x: cam.x, y: cam.y, zoom: cam.zoom })) return;
+    cam.zoom = back.before.zoom;
+    cam.x = back.before.x;
+    cam.y = back.before.y;
+    clampCam();
+  }
+  /** 2.7: las fichas (edificio, casilla) abren asomadas: el mapa y el edificio quedan a la vista. */
+  function asFicha(el: HTMLElement): HTMLElement {
+    el.classList.add('half', 'ficha');
+    el.dataset.start = 'peek';
+    return el;
   }
 
   /** 2.6: la zona que toca dibujar: la del servicio que se coloca, la del servicio tocado o la del filtro de «Qué falta». */
@@ -2366,20 +2400,19 @@ export function startGame(opts: GameOptions): void {
     const el = currentSheet();
     if (!el) return;
     const r = canvas.getBoundingClientRect();
-    const sr = el.getBoundingClientRect();
-    const { left, top } = r;
-    let { right, bottom } = r;
-    if (sr.left <= r.left + 8) bottom = Math.min(bottom, sr.top);
-    else right = Math.min(right, sr.left);
+    const { top } = r;
+    const { left, right, bottom } = besideSheet(r, el, { left: r.left, right: r.right, bottom: r.bottom });
     if (bottom - top < 40 || right - left < 40) return;
     const [sx, sy] = screenOf(t.x, t.y);
     // Si queda cerca del borde (o debajo de la hoja), se centra en lo que queda a la vista.
     const mx = Math.max(2 * tileSize() / dpr(), (right - left) * 0.15);
     const my = Math.max(2 * tileSize() / dpr(), (bottom - top) * 0.15);
     if (sx > left + mx && sx < right - mx && sy > top + my && sy < bottom - my) return;
+    const before = { x: cam.x, y: cam.y, zoom: cam.zoom };
     cam.x = Math.round((t.x + 0.5) * tileSize() - ((left + right) / 2 - r.left) * dpr());
     cam.y = Math.round((t.y + 0.5) * tileSize() - ((top + bottom) / 2 - r.top) * dpr());
     clampCam();
+    noteReveal(before);
   }
 
   function renderInspect(tile: { x: number; y: number }, b: Building | undefined) {
@@ -2394,7 +2427,7 @@ export function startGame(opts: GameOptions): void {
           ? ter === Terrain.River ? 'Puente' : 'Carretera'
           : dike ? 'Dique' : ter === Terrain.River ? 'Río' : ter === Terrain.Sea ? 'Mar' : tt === Tile.Tree ? 'Árboles' : ter === Terrain.Hill ? 'Colina' : 'Solar';
       if (dike) {
-        sheet(name, h('p', {}, 'Muro de piedra en la orilla: aquí y en las casillas de alrededor no llega la riada.'), h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`)).classList.add('half');
+        asFicha(sheet(name, h('p', {}, 'Muro de piedra en la orilla: aquí y en las casillas de alrededor no llega la riada.'), h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`)));
         openInspect = null;
         inspectSheet = null;
         return;
@@ -2405,7 +2438,7 @@ export function startGame(opts: GameOptions): void {
         ? h('p', { class: 'pocket-warn', 'data-test': 'lot-no-road' }, '⚠ Falta carretera: aquí no se construirá nada hasta que pase una carretera al lado.')
         : '';
       // 2.6: y si toca carretera, por qué crece o no (agua, luz, demanda, casas libres).
-      sheet(name, h('p', {}, zone), noRoad || lotBox(state, tile.x, tile.y), h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`)).classList.add('half');
+      asFicha(sheet(name, h('p', {}, zone), noRoad || lotBox(state, tile.x, tile.y), h('p', { class: 'muted' }, `Casilla ${tile.x}, ${tile.y}`)));
       openInspect = null;
       inspectSheet = null;
       return;
@@ -2429,7 +2462,7 @@ export function startGame(opts: GameOptions): void {
     // 2.3: las grandes obras tienen su ficha (barra de fases, «Pagar fase N», parar y la cofinanciación).
     if (isLandmarkKind(b.kind)) {
       inspectSheet = sheet(b.name ?? BUILD_NAMES[b.kind] ?? b.kind, ...landmarkContent(state, b, command, () => inspect({ x: b.x, y: b.y })));
-      inspectSheet.classList.add('half', 'landmark-sheet');
+      asFicha(inspectSheet).classList.add('landmark-sheet');
       const body = document.querySelector('.sheet-body');
       if (body) body.scrollTop = prevScroll;
       return;
@@ -2599,7 +2632,7 @@ export function startGame(opts: GameOptions): void {
     const owner = b.owner === 0 ? 'Municipal' : b.owner === -1 ? 'Privado (inversor de fuera)' : 'De un vecino';
     content.push(h('p', { class: 'muted' }, owner));
     inspectSheet = sheet(b.name ?? (b.kind === 'farm' && b.crop ? `Finca · ${CROP_TEXT[b.crop]}` : (BUILD_NAMES[b.kind] ?? b.kind)), ...content);
-    inspectSheet.classList.add('half');
+    asFicha(inspectSheet);
     const body = document.querySelector('.sheet-body');
     if (body) body.scrollTop = prevScroll;
   }
@@ -2914,7 +2947,11 @@ export function startGame(opts: GameOptions): void {
     }
   }
   // La pestaña «Pueblo» se marca mientras su panel (o una hoja abierta desde él) está a la vista.
-  onSheetChange((title) => $('#menu').setAttribute('aria-expanded', String(title === 'Pueblo')));
+  onSheetChange((title) => {
+    $('#menu').setAttribute('aria-expanded', String(title === 'Pueblo'));
+    // 2.7: al cerrar la ficha, el mapa vuelve a donde estaba.
+    if (title === null) restoreCam();
+  });
   $('#menu').setAttribute('aria-expanded', 'false');
   const openPeople = () => openNeighbours(state, (c) => withBack('Vecinos', () => withBack('Pueblo', openHub, openPeople), () => openCitizen(social, c.id)));
 

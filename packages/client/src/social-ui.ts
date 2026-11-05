@@ -150,7 +150,7 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
     last.length ? h('h3', {}, 'Lo último que ha dicho') : '',
     ...last.map((d) => h('p', { class: 'quote' }, `«${d.motivo}» `, d.source === 'ai' ? h('span', { class: 'ai-badge' }, 'IA') : '')),
     h('details', { class: 'advanced' }, h('summary', {}, 'Personalidad'), traits, c.summary ? h('p', {}, c.summary) : ''),
-  );
+  ).classList.add('half', 'ficha'); // 2.7: la ficha del vecino abre a media altura
 }
 
 /** 2.5: las cartas que ha recibido (buzón filtrado), si tiene alguna. */

@@ -218,6 +218,7 @@ export function sheet(title: string | Node, ...content: (Node | string)[]): HTML
     h('header', { class: 'sheet-head' }, back, h('h2', { id: 'sheet-title' }, title), close),
     h('div', { class: 'sheet-body' }, ...content),
   );
+  draggable(el);
   // Trampa de foco: con el teclado, Tab no sale de la hoja hasta cerrarla (Esc o ✕).
   el.addEventListener('keydown', (e) => {
     // Como panel lateral (tableta, horizontal) no es modal: Tab puede salir al mapa (ronda 12).
@@ -241,6 +242,125 @@ export function sheet(title: string | Node, ...content: (Node | string)[]): HTML
   sheetWatch?.(titleText);
   close.focus();
   return el;
+}
+
+/*
+ * 2.7: hojas en tres alturas que se arrastran (solo en el móvil en vertical; en tableta y en
+ * horizontal son un panel lateral). Asomada (≈35 %, el mapa y el edificio a la vista), media
+ * (≈60 %) y completa (hasta la barra de arriba, sin taparla). El asa y la cabecera se arrastran;
+ * hacia abajo desde la asomada, se cierra. La altura elegida va en `data-snap`; sin ella manda la
+ * clase: `.half` (fichas) en media, `.half[data-start="peek"]` en asomada y el resto en completa.
+ */
+const SNAPS = ['peek', 'mid', 'full'] as const;
+export type SheetSnap = (typeof SNAPS)[number];
+const SNAP_NAME: Record<SheetSnap, string> = { peek: 'asomada', mid: 'media', full: 'completa' };
+
+/** La altura de la hoja ahora (la elegida al arrastrar o la que le toca por su clase). */
+export function sheetSnap(el: HTMLElement): SheetSnap {
+  const s = el.dataset.snap as SheetSnap | undefined;
+  if (s && SNAPS.includes(s)) return s;
+  if (el.classList.contains('half') && !el.classList.contains('full')) return el.dataset.start === 'peek' ? 'peek' : 'mid';
+  return 'full';
+}
+
+/** Alturas en px de las tres posiciones (entre la barra de arriba y el dock). */
+function snapHeights(): Record<SheetSnap, number> {
+  const css = getComputedStyle(document.documentElement);
+  const px = (v: string, d: number) => (Number.isFinite(parseFloat(v)) ? parseFloat(v) : d);
+  const inGame = document.body.classList.contains('in-game');
+  const top = inGame ? px(css.getPropertyValue('--top-h'), 44) : 8;
+  const dock = px(css.getPropertyValue('--dock-h'), 0);
+  const room = Math.max(120, window.innerHeight - top - dock);
+  return { peek: Math.min(room, Math.round(window.innerHeight * 0.35)), mid: Math.min(room, Math.round(window.innerHeight * 0.6)), full: room };
+}
+
+export function setSheetSnap(el: HTMLElement, snap: SheetSnap): void {
+  el.dataset.snap = snap;
+  el.querySelector('.sheet-grip')?.setAttribute('aria-label', `Alto de la hoja: ${SNAP_NAME[snap]}. Toca para cambiarlo`);
+}
+
+function draggable(el: HTMLElement): void {
+  const grip = h('button', { class: 'sheet-grip', type: 'button', 'aria-label': 'Cambiar el alto de la hoja' });
+  el.prepend(grip);
+  const head = el.querySelector<HTMLElement>('.sheet-head')!;
+  let drag: { id: number; y0: number; t0: number; h0: number; from: SheetSnap; moved: boolean; y: number; t: number; v: number } | null = null;
+  let justDragged = false;
+  // Toque sin arrastrar (o Intro): sube un escalón; desde la completa, vuelve a la asomada.
+  grip.addEventListener('click', () => {
+    if (justDragged) return;
+    const now = sheetSnap(el);
+    setSheetSnap(el, now === 'full' ? 'peek' : SNAPS[SNAPS.indexOf(now) + 1]!);
+  });
+  grip.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    e.preventDefault();
+    const i = SNAPS.indexOf(sheetSnap(el)) + (e.key === 'ArrowUp' ? 1 : -1);
+    if (i < 0) closeSheet();
+    else setSheetSnap(el, SNAPS[Math.min(i, SNAPS.length - 1)]!);
+  });
+  const start = (e: PointerEvent) => {
+    if (sidePanel() || drag || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    // Los botones de la cabecera (‹ y ✕) siguen siendo botones.
+    const t = e.target as HTMLElement;
+    if (t !== grip && t.closest('button, a, input, select')) return;
+    drag = { id: e.pointerId, y0: e.clientY, t0: e.timeStamp, h0: el.getBoundingClientRect().height, from: sheetSnap(el), moved: false, y: e.clientY, t: e.timeStamp, v: 0 };
+  };
+  const move = (e: PointerEvent) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dy = e.clientY - drag.y0;
+    if (!drag.moved) {
+      if (Math.abs(dy) < 6) return;
+      drag.moved = true;
+      el.classList.add('dragging');
+      try {
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      } catch {
+        /* sin captura: sigue funcionando mientras el dedo esté encima */
+      }
+    }
+    // Velocidad (px/ms, + hacia abajo), suavizada con el último tramo.
+    const dt = Math.max(1, e.timeStamp - drag.t);
+    drag.v = 0.6 * ((e.clientY - drag.y) / dt) + 0.4 * drag.v;
+    drag.y = e.clientY;
+    drag.t = e.timeStamp;
+    const max = snapHeights().full;
+    el.style.height = `${Math.round(Math.max(48, Math.min(max, drag.h0 - dy)))}px`;
+    e.preventDefault();
+  };
+  const end = (e: PointerEvent) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const d = drag;
+    drag = null;
+    if (!d.moved) return;
+    justDragged = true;
+    setTimeout(() => (justDragged = false), 0);
+    el.classList.remove('dragging');
+    const now = el.getBoundingClientRect().height;
+    el.style.height = '';
+    if (e.type === 'pointercancel') return;
+    const hs = snapHeights();
+    const dy = e.clientY - d.y0;
+    const fast = Math.abs(d.v) > 0.45 && Math.abs(dy) > 24;
+    // Hacia abajo: desde la asomada (o por debajo de ella) se cierra.
+    if (dy > 0 && (now < hs.peek * 0.7 || (d.from === 'peek' && (fast || dy > 48)))) {
+      closeSheet();
+      return;
+    }
+    let to: SheetSnap;
+    if (fast) {
+      const i = SNAPS.indexOf(d.from) + (d.v < 0 ? 1 : -1);
+      to = SNAPS[Math.max(0, Math.min(SNAPS.length - 1, i))]!;
+    } else {
+      to = SNAPS.reduce((best, s) => (Math.abs(hs[s] - now) < Math.abs(hs[best] - now) ? s : best), d.from);
+    }
+    setSheetSnap(el, to);
+  };
+  for (const target of [grip, head]) {
+    target.addEventListener('pointerdown', start);
+    target.addEventListener('pointermove', move);
+    target.addEventListener('pointerup', end);
+    target.addEventListener('pointercancel', end);
+  }
 }
 
 /** En tableta y en horizontal la hoja es un panel al lado del mapa (ver style.css). */

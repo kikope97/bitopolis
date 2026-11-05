@@ -173,3 +173,120 @@ html[data-text='150'] .tab-label, html[data-text='200'] .tab-label { display: bl
 html[data-text='150'] .tab-label .tl-long, html[data-text='200'] .tab-label .tl-long { display: none; }
 html[data-text='150'] .tab-label .tl-short, html[data-text='200'] .tab-label .tl-short { display: inline; }
 .tab-label { overflow-wrap: normal; word-break: normal; }
+
+/* ---------- hojas ---------- */
+/*
+ * Tres alturas que se arrastran (ui.ts: draggable, sheetSnap): asomada (35 %), media (60 %) y completa.
+ * La completa llega hasta la barra de arriba sin taparla (y así respeta el notch: la barra ya lo lleva).
+ * Sin `data-snap` manda la clase: `.half[data-start="peek"]` (fichas de edificio) asomada, `.half` media,
+ * el resto (Pueblo, Dinero, Pleno…) y `.full` (Gestión) completa.
+ */
+:root { --sheet-top: max(8px, env(safe-area-inset-top)); }
+body.in-game { --sheet-top: var(--top-h); }
+.sheet { z-index: var(--z-sheet); }
+.sheet-grip { display: none; }
+
+/* Móvil en vertical (lo que no es panel lateral: ver sidePanel() en ui.ts). */
+@media (max-width: 719px) and (orientation: portrait), (max-width: 719px) and (min-height: 501px), (min-width: 720px) and (min-height: 501px) and (max-height: 539px) {
+  .sheet, .sheet.half, .sheet.full {
+    --sheet-room: calc(100dvh - var(--sheet-top) - var(--dock-h));
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: var(--dock-h);
+    width: auto;
+    height: auto;
+    max-height: var(--sheet-room);
+    padding-top: 14px;
+    border: 0;
+    border-top: 4px solid var(--accent);
+    box-shadow: 0 -4px 0 var(--c-ink);
+  }
+  .sheet.half { max-height: min(60dvh, var(--sheet-room)); }
+  .sheet.half[data-start='peek'] { max-height: min(35dvh, var(--sheet-room)); }
+  .sheet.full { height: var(--sheet-room); }
+  .sheet.sheet[data-snap], .sheet.sheet.dragging { max-height: none; }
+  .sheet[data-snap='peek'] { height: min(35dvh, var(--sheet-room)); }
+  .sheet[data-snap='mid'] { height: min(60dvh, var(--sheet-room)); }
+  .sheet[data-snap='full'] { height: var(--sheet-room); }
+  /* El asa de siempre, ahora un botón de verdad (44 px de alto): se arrastra, o se toca para cambiar de altura. */
+  .sheet::before { display: none; }
+  .sheet-grip {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 50%;
+    z-index: 1;
+    width: 96px;
+    height: 44px;
+    margin-left: -48px;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: grab;
+    touch-action: none;
+  }
+  .sheet-grip::before { content: ''; display: block; width: 40px; height: 4px; margin: 5px auto 0; background: var(--line); }
+  .sheet-grip:focus-visible { outline-offset: -4px; }
+  .sheet-grip:focus-visible::before, .sheet.dragging .sheet-grip::before { background: var(--accent); }
+  .sheet-head { touch-action: none; }
+  .sheet.dragging, .sheet.dragging .sheet-head { cursor: grabbing; user-select: none; }
+  @media (prefers-reduced-motion: no-preference) {
+    html[data-motion='normal'] .sheet:not(.dragging) { transition: height 0.18s ease-out; }
+  }
+}
+
+/* La pestaña del dock sigue a la hoja: con una hoja que no es ficha (Dinero, Gente, Pleno…), «Pueblo». */
+body.in-game:has(> .sheet:not(.ficha)) .dock .tab[aria-pressed='true'] { border-top-color: transparent; border-left-color: transparent; background: none; }
+body.in-game:has(> .sheet:not(.ficha)) .dock .tab[aria-pressed='true'] .tab-label { color: var(--text); }
+body.in-game:has(> .sheet:not(.ficha)) .dock #menu { border-top-color: var(--accent); background: var(--panel-2); }
+body.in-game:has(> .sheet:not(.ficha)) .dock #menu .tab-label { color: var(--accent); }
+
+/* Tableta: el panel lateral y el de Gestión no tapan la barra de arriba ni el dock. */
+@media (min-width: 720px) and (min-height: 540px) {
+  .sheet[data-snap] { height: auto; }
+  .sheet.full { top: calc(var(--sheet-top) + 8px); bottom: calc(var(--dock-h) + 8px); left: 16px; right: 16px; height: auto; max-height: none; }
+}
+
+/*
+ * Horizontal (alto ≤ 500 px): el dock es un riel a la derecha (icono y nombre corto) y las hojas
+ * un panel a la izquierda, bajo la barra de arriba. Nada a pantalla completa: Gestión es un panel más ancho.
+ */
+@media (orientation: landscape) and (max-height: 500px) {
+  :root { --dock-w: 76px; --sheet-w: min(400px, calc(100vw - var(--dock-w) - 160px)); --sheet-wide: min(560px, calc(100vw - var(--dock-w) - 120px)); }
+  .dock { width: var(--dock-w); padding-left: 0; }
+  .dock .tools { flex: 4 1 0; }
+  .dock #menu { flex: 1 1 0; }
+  .tab { min-width: 56px; min-height: 44px; padding: 2px; gap: 2px; justify-content: center; }
+  .tab .px-icon, .tab .tab-sprite { width: 22px; height: 22px; flex: none; }
+  .tab-label { font-size: calc(12px * min(var(--ui), 1.25)); -webkit-line-clamp: 1; line-clamp: 1; max-width: 100%; }
+  .tab-label .tl-long { display: none; }
+  .tab-label .tl-short { display: inline; }
+  .tab[aria-pressed='true'], .tab[aria-expanded='true'] { border-left-color: var(--accent); }
+  body.in-game:has(> .sheet:not(.ficha)) .dock #menu { border-left-color: var(--accent); border-top-color: transparent; }
+  .game { grid-template-columns: minmax(0, 1fr) var(--dock-w); }
+  .sheet, .sheet.half, .sheet.full, .sheet[data-snap] {
+    top: var(--sheet-top);
+    bottom: var(--strip-h);
+    left: 0;
+    right: auto;
+    width: var(--sheet-w);
+    height: auto;
+    max-height: none;
+    padding-top: 0;
+    border: 0;
+    border-right: 4px solid var(--accent);
+    box-shadow: 4px 0 0 var(--c-ink);
+  }
+  .sheet.full { width: var(--sheet-wide); }
+  .sheet::before, .sheet-grip { display: none; }
+  /* Cabecera baja: con 360 px de alto, cada renglón cuenta. */
+  .sheet .sheet-head { padding-top: 0; padding-bottom: 0; }
+  .sheet .sheet-close { min-height: 44px; }
+  /* Gestión en el panel: una columna y el dibujo del ayuntamiento más pequeño. */
+  .sheet .mg { grid-template-columns: 1fr; }
+  .sheet .mg-hall { width: 64px; height: 96px; }
+  /* La franja (fecha, «Construir / ✕») sigue entera debajo del panel; los avisos se apartan de él. */
+  body.sheet-open.in-game #toasts { left: calc(var(--sheet-w) + 8px); right: calc(var(--dock-w) + 8px); }
+  .tray { top: var(--sheet-top); }
+}
