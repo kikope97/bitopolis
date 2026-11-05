@@ -65,6 +65,14 @@ for (const size of SIZES) {
       const bar = await page.locator('.topbar').evaluate((el) => ({ h: el.getBoundingClientRect().height, over: el.scrollWidth - el.clientWidth }));
       expect(bar.over, 'la barra de arriba no se sale').toBeLessThanOrEqual(1);
       expect(bar.h, 'la barra de arriba va en una fila').toBeLessThan(text === 200 ? 80 : 64);
+      // Ronda 23: a x10 sale el calendario en la barra; la campana sigue dentro de la pantalla.
+      await setSpeed(page, 10);
+      // Se ve el calendario, o se quitó a propósito para que quepa la campana (tb-nocal).
+      await expect.poll(async () => (await page.locator('#calendar').isVisible()) || (await page.locator('.topbar.tb-nocal').count()) > 0).toBe(true);
+      const bell = (await page.locator('#bell').boundingBox())!;
+      expect(bell.x + bell.width, 'la campana cabe con el calendario').toBeLessThanOrEqual(size.w + 1);
+      expect(await page.locator('.topbar').evaluate((el) => el.scrollWidth - el.clientWidth), 'la barra no se sale a x10').toBeLessThanOrEqual(1);
+      await setSpeed(page, 0);
       // Nada se sale de la pantalla por los lados.
       const wide = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       expect(wide).toBeLessThanOrEqual(0);

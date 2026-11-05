@@ -827,3 +827,8 @@ html[data-text='200'] .hub-stat { min-height: 0; }
 body.in-game .toast.passive, body.in-game .toast.passive * { pointer-events: none !important; }
 /* Con una herramienta elegida, solo «Capas» queda en la pila del mapa (los demás robaban toques al construir). */
 body.tool-active .map-btns #whatnow, body.tool-active .map-btns #home { display: none; }
+
+/* Ronda 23: si la barra no cabe ni con «Más», el calendario se quita antes que la campana. */
+.topbar.tb-nocal .calendar { display: none !important; }
+/* La franja de abajo (fecha y demanda) se toca: 44 px como todo lo demás. */
+.strip-info { min-height: 44px; }

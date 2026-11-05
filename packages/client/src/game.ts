@@ -474,6 +474,8 @@ export function startGame(opts: GameOptions): void {
     if (cal.hidden === on) {
       cal.hidden = !on;
       document.body.classList.toggle('cal-on', on);
+      // Ronda 23: el calendario va en la barra: hay que volver a encajarla (si no, la campana se salía).
+      fitTopbar();
     }
     if (!on || d.day === calDay) return;
     calDay = d.day;
@@ -656,7 +658,7 @@ export function startGame(opts: GameOptions): void {
   function fitTopbar() {
     const bar = $('.topbar');
     const over = () => bar.scrollWidth > bar.clientWidth + 1;
-    bar.classList.remove('tb-tight', 'tb-rows', 'tb-more', 'tb-more2', 'tb-nounit');
+    bar.classList.remove('tb-tight', 'tb-rows', 'tb-more', 'tb-more2', 'tb-nounit', 'tb-nocal');
     if (!over()) return;
     bar.classList.add('tb-tight');
     if (!over()) return;
@@ -666,6 +668,8 @@ export function startGame(opts: GameOptions): void {
     if (over()) bar.classList.add('tb-tight');
     // Último escalón (320 px con letra grande): también la felicidad va a «Más».
     if (over()) bar.classList.add('tb-more2');
+    // Y si ni así cabe, el calendario (es un adorno; la fecha está en la franja).
+    if (over()) bar.classList.add('tb-nocal');
     // 2.7: el «€» se queda mientras quepa; solo se quita si aún no cabe nada más.
     if (over()) bar.classList.add('tb-nounit');
   }
@@ -3494,10 +3498,22 @@ export function startGame(opts: GameOptions): void {
   }
   let asksDay = -1;
   /** Una vez por hora de juego (o al responder): «Te piden» sale del estado. */
+  /** La primera vez solo se apunta lo que ya había (al abrir no se frena). */
+  let askSeeded = false;
   function refreshAsks(force = false) {
     if (!force && state.tick === asksDay) return;
     asksDay = state.tick;
+    const before = new Set(asksNow.map((a) => a.key));
     asksNow = pendingAsks(state);
+    // Ronda 23: a x3/x10 lo que pide respuesta con plazo caducaba en segundos: baja a x1 al llegar
+    // (también con «Solo emergencias»; con «Nada», no). Vuelve sola a la velocidad de antes a los 20 s.
+    const fresh = asksNow.find((a) => a.due !== undefined && !before.has(a.key));
+    if (fresh && before.size + asksNow.length > 0 && askSeeded && speed >= 3 && prefs().slowFor !== 'nada') {
+      const was = speed;
+      setSpeed(1);
+      slowNote(was, 'lo que te piden');
+    }
+    askSeeded = true;
     paintBell();
   }
 
