@@ -42,7 +42,7 @@ export async function setSpeed(page: Page, n: 0 | 1 | 3 | 10) {
 
 /** Salta el tutorial si aparece (los pueblos importados ya no lo empiezan, ronda 11). */
 export async function skipTutorial(page: Page) {
-  const b = page.locator('.tut-box button');
+  const b = page.locator('.tut-box .tut-skip');
   try {
     await b.waitFor({ state: 'visible', timeout: 1500 });
     await b.click();

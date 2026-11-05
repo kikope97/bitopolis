@@ -46,6 +46,8 @@ test('partida nueva: tutorial, obras, guardado y continuar', async ({ page }, in
   await expect(page.locator('#hud-pop')).not.toHaveText('1', { timeout: 25_000 });
   await setSpeed(page, 0);
   await pickTool(page, 'inspect');
+  // 2.7: la casa al centro (con el tutorial más bajo, los botones del mapa podían quedar encima de ella).
+  await page.evaluate(([a, b]) => (window as any).__bitopolis.centerOn(a, b), [cx + 4, cy + 2]);
   await tap(page, cx + 4, cy + 2);
   await expect(page.locator('.sheet')).toContainText('Viven aquí');
   await shot('4-ficha');

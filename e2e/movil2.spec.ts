@@ -78,3 +78,216 @@ for (const size of SIZES) {
     });
   }
 }
+
+/* ---------- 2.7: accesibilidad, leyendas y capas, inicio y tutorial ---------- */
+
+/**
+ * Contraste (WCAG) de cada texto visible dentro de `scopes`, con su color calculado y el fondo del primer
+ * antepasado que lo tenga opaco; y el tamaño: ningún texto por debajo de `minPx`.
+ */
+async function textAudit(page: Page, scopes: string[], minPx: number) {
+  return page.evaluate(
+    ([sel, min]) => {
+      const rgb = (c: string) => {
+        const m = c.match(/rgba?\(([^)]+)\)/);
+        if (!m) return null;
+        const [r, g, b, a = '1'] = m[1]!.split(/[ ,/]+/).filter(Boolean);
+        return { r: Number(r), g: Number(g), b: Number(b), a: Number(a) };
+      };
+      const lum = (c: { r: number; g: number; b: number }) => {
+        const f = (v: number) => {
+          const s = v / 255;
+          return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+        };
+        return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b);
+      };
+      const bgOf = (el: Element | null) => {
+        for (let e = el; e; e = e.parentElement) {
+          const c = rgb(getComputedStyle(e).backgroundColor);
+          if (c && c.a > 0.5) return c;
+        }
+        return { r: 26, g: 28, b: 44, a: 1 };
+      };
+      const low: string[] = [];
+      const small: string[] = [];
+      for (const el of document.querySelectorAll<HTMLElement>(sel as string)) {
+        const own = [...el.childNodes].some((n) => n.nodeType === 3 && (n.textContent ?? '').trim().length > 0);
+        if (!own || !el.offsetWidth || !el.offsetHeight) continue;
+        const cs = getComputedStyle(el);
+        if (cs.visibility === 'hidden' || el.closest('[aria-disabled="true"], :disabled, .visually-hidden, [hidden]')) continue;
+        const fg = rgb(cs.color)!;
+        const [hi, lo] = [lum(fg), lum(bgOf(el))].sort((a, b) => b - a);
+        const ratio = (hi! + 0.05) / (lo! + 0.05);
+        const label = `${el.id || el.className || el.tagName} «${(el.textContent ?? '').trim().slice(0, 12)}»`;
+        const size = parseFloat(cs.fontSize);
+        const large = size >= 24 || (size >= 18.66 && Number(cs.fontWeight) >= 700);
+        if (ratio < (large ? 3 : 4.5)) low.push(`${label} ${ratio.toFixed(2)}:1`);
+        if (size < (min as number) - 0.05) small.push(`${label} ${size.toFixed(1)} px`);
+      }
+      return { low, small };
+    },
+    [scopes.map((s) => `${s}, ${s} *`).join(', '), minPx] as const,
+  );
+}
+
+for (const text of [100, 200] as const) {
+  test(`2.7: contraste de 4,5:1 y texto de 12 px o más en la barra, la franja y el dock (${text} %)`, async ({ page, request }, info) => {
+    test.skip(info.project.name !== 'escritorio', 'el tamaño lo pone la propia prueba');
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 360, height: 740 });
+    await open(page, request, text);
+    // Al 200 %, nada por debajo de 18 px (el doble de 12 sería 24, pero la barra de arriba crece como mucho ×1,6).
+    const a = await textAudit(page, ['.topbar', '.strip', '.dock', '.map-btns'], text === 100 ? 12 : 18);
+    expect(a.low, 'texto con contraste de 4,5:1 o más').toEqual([]);
+    expect(a.small, 'ningún texto demasiado pequeño').toEqual([]);
+    // Al 200 % la franja y las cifras de la demanda crecen de verdad (antes ×1,3) y el dinero no pierde el «€».
+    if (text === 200) {
+      const sizes = await page.evaluate(() => ['#hud-date', '.d-row b', '.bar-num'].map((s) => parseFloat(getComputedStyle(document.querySelector(s)!).fontSize)));
+      for (const s of sizes) expect(s).toBeGreaterThanOrEqual(22);
+      await expect(page.locator('#hud-money')).toContainText('€');
+    }
+  });
+}
+
+test('2.7: el diálogo de confirmar atrapa el foco; h1 del pueblo y dock como barra de herramientas', async ({ page }, info) => {
+  test.skip(info.project.name !== 'escritorio', 'basta con una vez');
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Jugar' }).click();
+  await expect(page.locator('.tut-box')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(/\S/);
+  await expect(page.locator('#dock')).toHaveAttribute('role', 'toolbar');
+  // Las flechas pasan de una pestaña a otra.
+  await page.locator('#tab-inspect').focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('#tab-road')).toBeFocused();
+  await page.locator('.tut-skip').click();
+  const dlg = page.getByRole('alertdialog');
+  await expect(dlg).toBeVisible();
+  await expect(dlg).toHaveAttribute('aria-describedby', 'dlg-d');
+  expect(await page.locator('#game').evaluate((el) => (el as HTMLElement).inert)).toBe(true);
+  for (let i = 0; i < 5; i++) {
+    await page.keyboard.press('Tab');
+    expect(await page.evaluate(() => !!document.activeElement?.closest('.modal')), 'el tabulador no sale del diálogo').toBe(true);
+  }
+  await page.keyboard.press('Escape');
+  await expect(dlg).toHaveCount(0);
+  expect(await page.locator('#game').evaluate((el) => (el as HTMLElement).inert)).toBe(false);
+  await expect(page.locator('.tut-box')).toBeVisible();
+});
+
+for (const size of [SIZES[0]!, SIZES[2]!, SIZES[3]!]) {
+  for (const text of [100, 200] as const) {
+    test(`2.7: la leyenda de capas sale plegada en una línea y la cámara no se mueve (${size.name}, ${text} %)`, async ({ page, request }, info) => {
+      test.skip(info.project.name !== 'escritorio', 'el tamaño lo pone la propia prueba');
+      test.setTimeout(120_000);
+      await page.setViewportSize({ width: size.w, height: size.h });
+      await open(page, request, text);
+      const townhall = async () =>
+        page.evaluate(() => {
+          const w = window as unknown as { __bitopolis: { state: { buildings: { kind: string; x: number; y: number }[] }; tileCenter(x: number, y: number): { x: number; y: number } } };
+          const th = w.__bitopolis.state.buildings.find((b) => b.kind === 'townhall')!;
+          return w.__bitopolis.tileCenter(th.x, th.y);
+        });
+      for (const layer of ['Qué falta', 'Felicidad']) {
+        const before = await townhall();
+        await page.locator('#layers').click();
+        await page.waitForTimeout(300);
+        expect(await townhall(), 'al abrir «Capas» la cámara no se mueve').toEqual(before);
+        await page.getByRole('radio', { name: layer }).click();
+        await expect(page.locator('#legend')).toBeVisible();
+        await page.waitForTimeout(300);
+        expect(await townhall(), 'al elegir la capa la cámara no se mueve').toEqual(before);
+        await page.evaluate(() => document.querySelectorAll('#toasts > *').forEach((t) => t.remove()));
+        const map = (await page.locator('.map-wrap').boundingBox())!;
+        const leg = (await page.locator('#legend').boundingBox())!;
+        const name = `movil2-${size.name}-${text}-capa-${layer === 'Qué falta' ? 'falta' : 'felicidad'}`;
+        await page.screenshot({ path: `test-results/capturas/${name}.png` });
+        await expect(page.locator('#legend .legend-head')).toHaveAttribute('aria-expanded', 'false');
+        expect(leg.height, 'plegada: una línea').toBeLessThanOrEqual(text === 100 ? 48 : 64);
+        if (size.name === '360' && text === 100) expect((leg.width * leg.height) / (map.width * map.height), 'plegada tapa poco mapa').toBeLessThanOrEqual(0.15);
+        expect(leg.x, 'abajo a la izquierda').toBeLessThan(map.x + 24);
+        expect(leg.y + leg.height).toBeLessThanOrEqual(map.y + map.height + 1);
+        // Desplegada: se ajusta al contenido y no pasa de la mitad del mapa.
+        await page.locator('#legend .legend-head').click();
+        await expect(page.locator('#legend .legend-head')).toHaveAttribute('aria-expanded', 'true');
+        const opened = (await page.locator('#legend').boundingBox())!;
+        expect(opened.height).toBeLessThanOrEqual(map.height * 0.5 + 1);
+        const gap = await page.locator('#legend').evaluate((el) => el.clientHeight - [...el.children].reduce((a, c) => Math.max(a, (c as HTMLElement).offsetTop + (c as HTMLElement).offsetHeight), 0));
+        expect(gap, 'sin hueco vacío').toBeLessThanOrEqual(16);
+        await page.screenshot({ path: `test-results/capturas/${name}-abierta.png` });
+        await page.locator('#legend .legend-head').click();
+      }
+    });
+  }
+}
+
+for (const size of [SIZES[0]!, SIZES[2]!, SIZES[3]!]) {
+  for (const text of [100, 200] as const) {
+    test(`2.7: inicio con «Jugar» a la vista y el tamaño del texto (${size.name}, ${text} %)`, async ({ page }, info) => {
+      test.skip(info.project.name !== 'escritorio', 'el tamaño lo pone la propia prueba');
+      await page.setViewportSize({ width: size.w, height: size.h });
+      await page.addInitScript((t) => localStorage.setItem('bitopolis.prefs', JSON.stringify({ text: t })), text);
+      await page.goto('/');
+      const play = page.getByRole('button', { name: 'Jugar' });
+      await expect(play).toBeVisible();
+      await expect(page.locator('#boot')).toBeHidden();
+      await page.screenshot({ path: `test-results/capturas/movil2-${size.name}-${text}-inicio.png` });
+      const r = (await play.boundingBox())!;
+      expect(r.y + r.height, '«Jugar» se ve sin desplazar').toBeLessThanOrEqual(size.h + 1);
+      expect(await page.evaluate(() => scrollY)).toBe(0);
+      // El tamaño del texto también se elige aquí.
+      const group = page.getByRole('radiogroup', { name: 'Tamaño del texto' });
+      await group.getByRole('radio', { name: text === 100 ? '200 %' : '100 %' }).click();
+      await expect(page.locator('html')).toHaveAttribute('data-text', text === 100 ? '200' : '100');
+    });
+  }
+}
+
+test('2.7: con la red lenta se ve «Cargando» desde el primer momento', async ({ page }, info) => {
+  test.skip(info.project.name !== 'escritorio', 'basta con una vez');
+  await page.route('**/assets/*.js', async (route) => {
+    await new Promise((r) => setTimeout(r, 1500));
+    await route.continue();
+  });
+  await page.goto('/', { waitUntil: 'commit' });
+  await expect(page.locator('#boot')).toBeVisible({ timeout: 1000 });
+  await expect(page.locator('#boot')).toContainText('Cargando');
+  await expect(page.getByRole('button', { name: 'Jugar' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#boot')).toBeHidden();
+});
+
+test('2.7: el tutorial va pegado a la franja, sin el amarillo de «?», y los pasos que informan llevan «Siguiente»', async ({ page }, info) => {
+  test.skip(info.project.name !== 'escritorio', 'el tamaño lo pone la propia prueba');
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Jugar' }).click();
+  const box = page.locator('.tut-box');
+  await expect(box).toContainText('Carretera');
+  await page.waitForTimeout(300);
+  const r = (await box.boundingBox())!;
+  const strip = (await page.locator('#strip').boundingBox())!;
+  expect(r.height, 'la caja es compacta').toBeLessThanOrEqual(80);
+  expect(Math.abs(strip.y - (r.y + r.height)), 'pegada a la franja').toBeLessThanOrEqual(1);
+  const bg = await box.evaluate((el) => getComputedStyle(el).backgroundColor);
+  const help = await page.locator('#whatnow').evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(bg, 'otro estilo que «?»').not.toBe(help);
+  await expect(box.locator('.tut-next')).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/capturas/movil2-360-100-tutorial.png' });
+});
+
+test('2.7: el paso del tutorial que solo informa se cierra con «Siguiente»', async ({ page, request }, info) => {
+  test.skip(info.project.name !== 'escritorio', 'el tamaño lo pone la propia prueba');
+  await page.setViewportSize({ width: 360, height: 740 });
+  // Un pueblo con agua, luz, casa y dos vecinos: el tutorial está en «¡Ya tienes vecinos!».
+  const { state: s } = runSimulation({ seed: 7, days: 12, profile: 'constructor', checkEveryDay: false });
+  const data = gzipSync(JSON.stringify({ bitopolis: 1, formatVersion: (s as GameState).formatVersion, exportedAt: '', mode: 'normal', state: s }));
+  const { token } = await (await request.post('/api/import', { data, headers: { 'content-type': 'application/octet-stream' } })).json();
+  await page.goto(`/p/${token}`);
+  await page.getByRole('button', { name: 'Continuar' }).click();
+  const box = page.locator('.tut-box');
+  await expect(box).toContainText('Ya tienes vecinos');
+  await page.screenshot({ path: 'test-results/capturas/movil2-360-100-tutorial-siguiente.png' });
+  await box.getByRole('button', { name: 'Siguiente' }).click();
+  await expect(box).toBeHidden();
+});
