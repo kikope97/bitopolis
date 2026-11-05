@@ -460,11 +460,14 @@ function drawLamp(ctx: CanvasRenderingContext2D, px: number, py: number, z: numb
   ctx.fillRect(lx - z, ly - z, 3 * z, 2 * z);
 }
 
+/** 2.7: cuánto dura el parpadeo rojo de una casilla que no vale (ms). */
+export const BAD_MS = 900;
+
 export function render(
   ctx: CanvasRenderingContext2D,
   state: GameState,
   cam: Camera,
-  opts: { preview?: Preview | null; selected?: { x: number; y: number } | null; cursor?: { x: number; y: number } | null; time: number; reducedMotion: boolean; layer?: LayerId; highlight?: { x: number; y: number; since: number } | null; labels?: boolean; fast?: boolean; reach?: ReachOverlay | null; missingKey?: NeedKey | null },
+  opts: { preview?: Preview | null; selected?: { x: number; y: number } | null; cursor?: { x: number; y: number } | null; time: number; reducedMotion: boolean; layer?: LayerId; highlight?: { x: number; y: number; since: number } | null; labels?: boolean; fast?: boolean; reach?: ReachOverlay | null; missingKey?: NeedKey | null; bad?: { tiles: { x: number; y: number }[]; since: number } | null },
 ): void {
   const z = cam.zoom;
   const ts = T * z;
@@ -832,6 +835,17 @@ export function render(
   };
   if (opts.preview) {
     for (const t of opts.preview.tiles) corner(t.x, t.y, opts.preview.ok ? 12 : 2, 2);
+  }
+  // 2.7: la casilla donde no se puede construir parpadea en rojo un momento (fija con movimiento reducido).
+  if (opts.bad) {
+    const age = opts.time - opts.bad.since;
+    if (age < BAD_MS && (opts.reducedMotion || Math.floor(age / 150) % 2 === 0)) {
+      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = P(2);
+      for (const t of opts.bad.tiles) ctx.fillRect(t.x * ts - cam.x, t.y * ts - cam.y, ts, ts);
+      ctx.globalAlpha = 1;
+      for (const t of opts.bad.tiles) corner(t.x, t.y, 2, 3);
+    }
   }
   if (opts.selected) corner(opts.selected.x, opts.selected.y, 4, 2);
   // Cursor de teclado: esquinas blancas gruesas (se distingue de la selección por forma y color).

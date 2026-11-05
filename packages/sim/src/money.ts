@@ -11,6 +11,22 @@ export function ownIncome(m: { income: number; breakdown: Record<string, number>
   return m.income - Math.max(0, m.breakdown['préstamo'] ?? 0);
 }
 
+/**
+ * 2.7: lo que se fue en obras (inversión) en un mes: materiales y cuadrillas,
+ * ampliaciones, diques, sobrecostes y reparaciones. Lo devuelto al cancelar
+ * una obra resta (va con el mismo concepto).
+ */
+export function worksSpent(m: { breakdown: Record<string, number> }): number {
+  let out = 0;
+  for (const [k, v] of Object.entries(m.breakdown)) if (k.startsWith('obras') || k.startsWith('reparaciones')) out -= v;
+  return Math.max(0, out);
+}
+
+/** 2.7: el gasto corriente de un mes (lo que sale sin contar las obras). */
+export function runningExpenses(m: { expenses: number; breakdown: Record<string, number> }): number {
+  return Math.max(0, m.expenses - worksSpent(m));
+}
+
 export const TREASURY = 0;
 export const OUTSIDE = -1;
 

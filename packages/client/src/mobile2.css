@@ -173,3 +173,92 @@ html[data-text='150'] .tab-label, html[data-text='200'] .tab-label { display: bl
 html[data-text='150'] .tab-label .tl-long, html[data-text='200'] .tab-label .tl-long { display: none; }
 html[data-text='150'] .tab-label .tl-short, html[data-text='200'] .tab-label .tl-short { display: inline; }
 .tab-label { overflow-wrap: normal; word-break: normal; }
+
+/* ---------- construir ---------- */
+/* 2.7 «Construir 2.0»: chips de categoría arriba (fila que se desplaza de lado) y tarjetas en 3 columnas.
+   En vertical, como mucho el 55 % del alto: el mapa se ve encima. */
+.tray {
+  max-height: min(55dvh, calc(100dvh - var(--top-h) - var(--dock-h) - 16px));
+  padding-top: 0;
+  overscroll-behavior: contain;
+}
+.tray-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0 calc(-1 * max(10px, env(safe-area-inset-left)));
+  padding: var(--sp-1) max(10px, env(safe-area-inset-left)) 0;
+  background: var(--c-surface);
+  box-shadow: 0 2px 0 var(--c-ink);
+}
+.tray-chips {
+  display: flex;
+  gap: var(--sp-2);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  padding: 6px 0;
+}
+.tray-chips::-webkit-scrollbar { display: none; }
+.tray-chip {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 var(--sp-3);
+  border: 2px solid var(--c-chip-line);
+  border-radius: 2px;
+  background: var(--c-chip);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-s);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+/* Área táctil de 48 px aunque el chip mida 36. */
+.tray-chip::before { content: ''; position: absolute; left: 0; right: 0; top: -6px; bottom: -6px; }
+.tray-chip[hidden] { display: none; }
+.tray-chip[aria-current='true'] { background: var(--c-gold); color: var(--c-ink); border-color: var(--c-gold-line); }
+.tray-chip.locked { color: var(--muted); }
+.tray-chip.locked[aria-current='true'] { color: var(--c-ink); }
+.tray-chip.locked .tc-name::before { content: '🔒 '; font-size: 0.85em; }
+.tray-chip.has-new::after { content: ''; position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; background: var(--c-urgent); }
+.tray .tray-msg { margin: 0 0 6px; font-size: var(--fs-xs); }
+.tray-cat > summary { min-height: 40px; }
+.tray h3 { margin: 4px 0; font-size: var(--fs-s); }
+/* Tres columnas de tarjetas: dibujo, nombre, precio y lo que cuesta al mes. */
+.tray-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-2); padding-bottom: var(--sp-2); }
+@media (min-width: 600px) and (min-height: 501px) { .tray-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+html[data-text='200'] .tray-grid, html[data-text='150'] .tray-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 600px) { html[data-text='200'] .tray-grid, html[data-text='150'] .tray-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.tray .tool {
+  min-height: 100px;
+  justify-content: flex-start;
+  gap: 2px;
+  padding: var(--sp-1) var(--sp-1) 6px;
+  background: var(--c-card);
+  border: 2px solid var(--c-card-line);
+  border-radius: 2px;
+  touch-action: manipulation;
+}
+.tray .tool .tool-icon { flex: 0 0 auto; margin-bottom: 2px; }
+.tray .tool-label { font-size: var(--fs-s); }
+.tray .tool-cost { font-size: var(--fs-xs); color: var(--text); font-weight: 600; }
+/* El coste al mes es un gasto: «−1050 €/mes», en ámbar. */
+.tray .tool-month { font-size: var(--fs-xs); color: var(--c-warn); }
+.tray .tool[aria-pressed='true'] { border-color: var(--c-gold); box-shadow: inset 0 -4px 0 var(--c-gold); }
+/* Lo bloqueado: fondo apagado y candado con el motivo (nada de trazos). */
+.tray .tool.locked { border-style: solid; background: var(--c-disabled); border-color: var(--c-chip-line); }
+.tray .tool.locked .tool-label { color: var(--muted); }
+.tray .tool.locked .tool-cost { color: var(--c-gold); font-weight: 400; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .tray { max-height: none; }
+  .tray-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* La barra «Construir / ✕»: la obra explicada, el gasto al mes y el aviso de la caja. */
+.cc-month { color: var(--c-warn); white-space: nowrap; }
+.cc-runway { color: var(--c-warn); font-weight: 600; }
+.confirm-bar.runway { box-shadow: inset 0 3px 0 var(--c-warn); }
+/* Casilla que no vale: la franja dice por qué (el mapa la marca en rojo un momento). */
+.tool-info .bad-why { color: var(--bad); font-weight: 600; }

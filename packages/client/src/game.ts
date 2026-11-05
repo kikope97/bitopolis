@@ -63,6 +63,11 @@ import {
   roadCost,
   commandOutlay,
   pendingWorksCost,
+  monthlyCostOf,
+  networkRoads,
+  BUILD,
+  WAGE_OUTSIDE,
+  maintenanceOf,
   zoneChanges,
   Terrain,
   terrainAt,
@@ -105,6 +110,7 @@ import { dilemmaSpot, openDilemmaSheet, type DilemmaCtx } from './dilemma-ui.ts'
 import { objectivesNode, openAdvisor, openCitizen, openDiary, openPleno, portraitCanvas, rememberSeen, renderObjectives, resumeSummary, type SocialCtx } from './social-ui.ts';
 import { api, ApiError } from './api.ts';
 import { nextHint } from './hints.ts';
+import { buildCostParts, monthsText, runwayMonths, runwayWarn } from './cash.ts';
 import { openManagement } from './manage-ui.ts';
 import { errandsSummary, openErrands, openPress } from './town-news-ui.ts';
 import { openWhatsHappening, turnHeadline } from './ai-town-ui.ts';
@@ -118,7 +124,7 @@ import { buildingSprite, landmarkSprite, letterSprite, resSprite, T, ZONE_COLOR 
 import { bigCompanyContent, landmarkContent, openRegion, regionAttention, regionSummary } from './landmarks-ui.ts';
 import { comarcaPending, comarcaSummary, openComarca } from './comarca-ui.ts';
 import { type HubEntry, hubWants, Reveal, trayCatsWanted, ZONE_HELPERS } from './progress.ts';
-import { commandFor, costText, isLocked, lockLong, lockShort, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayCost } from './tools.ts';
+import { commandFor, costText, isLocked, lockLong, lockShort, shortCost, type Tool, type ToolId, TOOLS, tilesOf, TRAY, trayChipName, trayCost } from './tools.ts';
 import { Tutorial } from './tutorial.ts';
 import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, h, isSheetOpen, markLogRead, onToastLog, reducedMotion, sheet, toast, toastLog, vibrate, withBack } from './ui.ts';
 import { pixelIcon } from './icons.ts';
@@ -774,10 +780,10 @@ export function startGame(opts: GameOptions): void {
       moneyText.dataset.v = moneyNum;
       moneyText.replaceChildren(moneyNum, h('span', { class: 'tb-unit' }, ' €'));
     }
-    // 2.7: si el último mes fue en negativo, cuántos meses aguanta la caja (en rojo si son menos de 3).
-    const lastM = state.stats.at(-1);
-    const net = lastM ? lastM.income - lastM.expenses : 0;
-    const months = net < 0 && state.treasury > 0 ? Math.floor(state.treasury / -net) : -1;
+    // 2.7: si el mes va en negativo, cuántos meses aguanta la caja (en rojo si son menos de 3).
+    // Con el gasto corriente: las obras se pagan una vez (antes, el mes de una obra grande decía «<1 m»).
+    const rm = state.treasury > 0 ? runwayMonths(state) : null;
+    const months = rm === null ? -1 : Math.floor(rm);
     const runKey = months >= 0 && months < 3 ? (months === 0 ? '<1 m' : `${months} m`) : '';
     if (runway.dataset.v !== runKey) {
       runway.dataset.v = runKey;
@@ -857,14 +863,16 @@ export function startGame(opts: GameOptions): void {
       const locked = isLocked(tl, state);
       // Ronda 14: también cambia el motivo («ayto. nivel 2» → «25 vecinos»), no solo el candado.
       const sig = locked ? lockText(tl) : '';
+      // 2.7: el gasto al mes cambia con el presupuesto: se pone al día aunque no cambie el candado.
+      const month = btn.querySelector<HTMLElement>('.tool-month');
+      const monthNow = locked ? '' : monthlyText(tl.build, state);
+      if (month && month.textContent !== monthNow) month.textContent = monthNow;
       if (btn.dataset.ready && btn.dataset.lock === sig) continue;
       btn.dataset.ready = '1';
       btn.dataset.lock = sig;
       btn.classList.toggle('locked', locked);
       btn.setAttribute('aria-disabled', String(locked));
       btn.querySelector('.tool-cost')!.textContent = locked ? `🔒 ${lockText(tl)}` : trayCost(tl);
-      const month = btn.querySelector<HTMLElement>('.tool-month');
-      if (month) month.textContent = locked ? '' : monthlyText(tl.build, state);
     }
   }
   /** Qué falta para desbloquear una herramienta, en pocas palabras. */
@@ -1475,7 +1483,9 @@ export function startGame(opts: GameOptions): void {
       if (touchInput) proposePlace(g.startTile, t1);
       else {
         const cmd = commandFor(tool, g.startTile, t1);
-        if (cmd) void command(cmd).then((ok) => ok && warnZoneWithoutRoad(cmd));
+        const net = cmd?.type === 'BuildRoad' && validateCommand(state, cmd).ok ? roadNetworkWarn(cmd) : '';
+        if (cmd && !validateCommand(state, cmd).ok) flashBad(previewFor(g.startTile, t1)?.tiles ?? [t1]);
+        if (cmd) void command(cmd).then((ok) => ok && (warnZoneWithoutRoad(cmd), net && warnRoadNetwork(net)));
       }
     }
     // Con un inicio marcado (dos toques) o una obra por confirmar se mantiene la vista previa.
@@ -1543,8 +1553,10 @@ export function startGame(opts: GameOptions): void {
         pendingEnd = tile;
         preview = previewFor(anchor, tile);
         const v = validateCommand(state, line);
+        if (!v.ok) flashBad(preview?.tiles ?? [tile]);
+        const net = v.ok && line.type === 'BuildRoad' ? roadNetworkWarn(line) : '';
         const msg = v.ok
-          ? `${tool.label}: ${lineText(anchor, tile)}. Haz clic otra vez en el final para confirmar.`
+          ? `${tool.label}: ${lineText(anchor, tile)}.${net ? ` ${net}` : ''} Haz clic otra vez en el final para confirmar.`
           : `${tool.label}: no se puede (${v.error}). Elige otro final o pulsa Esc.`;
         $('#tool-info').textContent = msg;
         refreshStrip();
@@ -1556,7 +1568,11 @@ export function startGame(opts: GameOptions): void {
       preview = null;
       document.body.classList.remove('placing');
       selectTool(tool.id);
-      if (await command(line)) warnZoneWithoutRoad(line);
+      const net = line.type === 'BuildRoad' && validateCommand(state, line).ok ? roadNetworkWarn(line) : '';
+      if (await command(line)) {
+        warnZoneWithoutRoad(line);
+        if (net) warnRoadNetwork(net);
+      }
       return;
     }
     if (touchInput && (tool.build || tool.id === 'dike' || tool.landmark)) {
@@ -1564,6 +1580,9 @@ export function startGame(opts: GameOptions): void {
       return proposePlace(tile, tile);
     }
     const cmd = commandFor(tool, tile, tile);
+    // 2.7: un clic donde no se puede ya no se queda en un aviso suelto: la casilla parpadea y la franja dice por qué.
+    const v = cmd ? validateCommand(state, cmd) : null;
+    if (cmd && v && !v.ok) return flashBad([tile], v.error);
     if (cmd && (await placeBuild(cmd)) && cmd.type === 'Build') offerUndo(cmd.x, cmd.y);
   }
 
@@ -1680,6 +1699,12 @@ export function startGame(opts: GameOptions): void {
     }).length;
     return n ? `⚠ ${plural(n, 'casilla', 'casillas')} sin carretera: ${n === 1 ? 'ahí' : 'aquí'} no se construirá` : '';
   }
+  /** 2.7: tras trazar con el ratón una calle sin agua o luz, la franja lo dice. */
+  function warnRoadNetwork(text: string) {
+    $('#tool-info').replaceChildren(h('b', {}, tool.label), `: ${text}`);
+    refreshStrip();
+    $('#sr-live').textContent = text;
+  }
   /** Tras marcar una zona, si parte no toca carretera, la franja lo dice. */
   function warnZoneWithoutRoad(cmd: Command | null | undefined) {
     if (cmd?.type !== 'Zone') return;
@@ -1718,6 +1743,56 @@ export function startGame(opts: GameOptions): void {
     return cmd ? tilesOf(cmd).filter((t) => terrainAt(state, t.x, t.y) === Terrain.River && state.map.tiles[t.y * state.map.w + t.x] !== Tile.Road).length : 0;
   }
 
+  /**
+   * 2.7: las calles nuevas que no tocan la red del agua o de la luz (`networkRoads`, lo mismo
+   * que `siteNetworkWarn` para los edificios). Solo si ya hay planta de esa red.
+   */
+  let netCache: { s: GameState; water: Set<number>; power: Set<number> } | null = null;
+  function roadNetworkWarn(cmd: Extract<Command, { type: 'BuildRoad' }>): string {
+    if (netCache?.s !== state) netCache = { s: state, water: networkRoads(state, 'water'), power: networkRoads(state, 'power') };
+    const { w, h: hh } = state.map;
+    const tiles = tilesOf(cmd);
+    const plantOf = (kind: string, net: 'water' | 'power') => kind === net || (net === 'power' && (kind === 'solar' || kind === 'wind'));
+    const missing: string[] = [];
+    for (const net of ['water', 'power'] as const) {
+      if (!state.buildings.some((b) => b.built && plantOf(b.kind, net))) continue;
+      const set = netCache[net];
+      const touches = tiles.some((t) => {
+        if (set.has(t.y * w + t.x)) return true;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+          const x = t.x + dx;
+          const y = t.y + dy;
+          if (x < 0 || y < 0 || x >= w || y >= hh) continue;
+          if (set.has(y * w + x)) return true;
+          const b = buildingAt(state, x, y);
+          if (b?.built && plantOf(b.kind, net)) return true;
+        }
+        return false;
+      });
+      if (!touches) missing.push(net === 'water' ? 'agua' : 'luz');
+    }
+    if (!missing.length) return '';
+    const to = missing.length === 2 ? 'al agua ni a la luz' : missing[0] === 'agua' ? 'al agua' : 'a la luz';
+    return `⚠ Esta calle no está unida ${to}: únela a la red o junto a ella no habrá ${missing.join(' ni ')}.`;
+  }
+
+  /** 2.7: qué hacer si la caja va a quedar justa (en la barra «Construir»). */
+  function runwayAdvice(): string {
+    return 'Quizá convenga esperar a cobrar o subir los impuestos.';
+  }
+
+  /** 2.7: la casilla que no vale parpadea en rojo; si se dice por qué, va en la franja. */
+  let badFlash: { tiles: { x: number; y: number }[]; since: number } | null = null;
+  function flashBad(tiles: { x: number; y: number }[], why?: string) {
+    badFlash = { tiles, since: performance.now() };
+    if (!why) return;
+    $('#tool-info').replaceChildren(h('b', {}, tool.label), ': ', h('span', { class: 'bad-why' }, `aquí no: ${why}`), '. Elige otra casilla.');
+    refreshStrip();
+    $('#sr-live').textContent = `${tool.label}: aquí no se puede, ${why}.`;
+    sfx.error();
+    vibrate(30);
+  }
+
   /** Enseña la obra (fantasma) y la barra «Construir / ✕». Nada se gasta hasta confirmar. */
   function proposePlace(a: { x: number; y: number }, b: { x: number; y: number }, demolishText?: string) {
     const cmd = commandFor(tool, a, b);
@@ -1729,21 +1804,51 @@ export function startGame(opts: GameOptions): void {
     preview = previewFor(a, b);
     const v = validateCommand(state, cmd);
     const hill = (tool.build || tool.landmark) && tool.shape === 'tap' && terrainAt(state, a.x, a.y) === Terrain.Hill;
-    // 2.6: con lo que costará al mes («+1.050 €/mes (mantenimiento y 1 sueldo)»).
+    // 2.6: con lo que costará al mes. 2.7: como gasto («−1050 €/mes»).
     const pl0 = v.ok && !demolishText && tool.build && tool.shape === 'tap' && touchInput;
-    // Ronda 22: en la barra, corto («· +2450 €/mes»); el detalle de sueldos está en la bandeja.
+    // Ronda 22: en la barra, corto («· −2450 €/mes»); el detalle de sueldos está en la bandeja.
     const month = tool.build && tool.shape === 'tap' ? monthlyText(tool.build, state, true).replace(/\s*\(.*\)$/, '') : '';
-    const cost = tool.id === 'dike' ? shortCost(tool) : tool.landmark ? `${shortCost(tool)}${hill ? ' (colina: +50 %)' : ''} · ahora solo el solar` : tool.build && tool.shape === 'tap' ? `${shortCost(tool)}${hill ? ' (colina: materiales +50 %)' : ''}${month ? ` ${month}` : ''}` : lineText(a, b);
+    // 2.7: la obra explicada: lo que se paga al poner la obra y lo que irá en obreros («Agua 4200 €» cobraba 3000 y luego devolvía 3000).
+    const parts = tool.build && tool.build !== 'road' && tool.shape === 'tap' ? buildCostParts(state, tool.build, a.x, a.y) : null;
+    const monthSpan = month ? h('span', { class: 'cc-month' }, ` · ${month}`) : '';
+    const cost: (Node | string)[] | string =
+      tool.id === 'dike'
+        ? shortCost(tool)
+        : tool.landmark
+          ? `${shortCost(tool)}${hill ? ' (colina: +50 %)' : ''} · ahora solo el solar`
+          : parts
+            ? [`${parts.text}${hill ? ' (colina: materiales +50 %)' : ''}`, monthSpan]
+            : lineText(a, b);
     // Ronda 13: el precio va en su propia línea y siempre se ve (también si no se puede: «no hay dinero»).
     const what = demolishText && v.ok ? demolishText : v.ok ? (pl0 ? '' : `${tool.label} aquí`) : `${tool.label}: no se puede (${v.error})`;
     // v1.9.1: si con lo que falta por pagar de las obras en marcha la caja quedaría en negativo, se avisa (no se bloquea).
-    const after = v.ok && !demolishText ? state.treasury - commandOutlay(state, cmd) - pendingWorksCost(state) : 0;
-    const warn = after < 0 ? h('span', { class: 'cc-warn' }, `⚠ Quedarías en −${money(-after)} con las obras en marcha`) : '';
+    const outlay = v.ok && !demolishText ? commandOutlay(state, cmd) : 0;
+    const after = v.ok && !demolishText ? state.treasury - outlay - pendingWorksCost(state) : 0;
+    // 2.7: y si la caja queda para menos de 2 meses con el gasto corriente (y lo que costará esta obra al mes).
+    const runway = v.ok && !demolishText && after >= 0 && outlay > 0 ? runwayWarn(state, outlay, tool.build && tool.build !== 'road' ? monthlyCostOf(tool.build, state).total : 0) : '';
+    // 2.7: una calle que no toca la red de agua o de luz no lleva ni agua ni luz a lo que se construya junto a ella.
+    const netWarn = v.ok && !demolishText && cmd.type === 'BuildRoad' ? roadNetworkWarn(cmd) : '';
+    const warn = after < 0
+      ? h('span', { class: 'cc-warn' }, `⚠ Quedarías en −${money(-after)} con las obras en marcha`)
+      : runway
+        ? h('span', { class: 'cc-warn cc-runway', 'data-test': 'cc-runway' }, `${runway}. ${runwayAdvice()}`)
+        : '';
+    const netSpan = netWarn ? h('span', { class: 'cc-warn cc-runway', 'data-test': 'cc-network' }, netWarn) : '';
     // 2.6: lo que gana el pueblo con este servicio aquí («+14 casas con colegio · atenderá a ~38 de 60»).
     const pl = v.ok && !demolishText && tool.build && tool.shape === 'tap' ? placeLines(state, tool.build, a.x, a.y) : null;
     const reachText = pl ? h('span', { class: 'cc-reach', 'data-test': 'cc-reach' }, h('b', { class: pl.none ? 'none' : '' }, pl.gain), ...pl.warn.map((w) => h('span', { class: 'cc-reach-warn' }, w))) : '';
-    $('#confirm-text').replaceChildren(h('span', { class: 'cc-what' }, what), demolishText || !cost ? '' : h('span', { class: 'cc-cost' }, v.ok ? cost : `Cuesta ${cost}`), reachText, warn);
+    const costNodes = typeof cost === 'string' ? [cost] : cost;
+    $('#confirm-text').replaceChildren(
+      h('span', { class: 'cc-what' }, what),
+      demolishText || !cost.length ? '' : h('span', { class: 'cc-cost' }, ...(v.ok ? costNodes : ['Cuesta ', ...costNodes])),
+      reachText,
+      netSpan,
+      warn,
+    );
     $('#confirm-bar').classList.toggle('warn', after < 0);
+    $('#confirm-bar').classList.toggle('runway', !!runway || !!netWarn);
+    // 2.7: lo que no se puede, también en el mapa (la casilla parpadea en rojo).
+    if (!v.ok && !demolishText) flashBad(preview?.tiles ?? [a]);
     const yes = $('#confirm-yes') as HTMLButtonElement;
     yes.textContent = demolishText ? 'Derribar' : tool.zone ? (tool.zone === 'none' ? 'Quitar zona' : 'Marcar zona') : tool.density !== undefined ? 'Marcar densidad' : tool.landmark ? 'Marcar el solar' : 'Construir';
     yes.className = demolishText ? 'btn danger' : 'btn primary';
@@ -1771,10 +1876,12 @@ export function startGame(opts: GameOptions): void {
     if (!p) return;
     const cmd0 = commandFor(tool, p.a, p.b);
     const cmd = cmd0 && cancelOnly && cmd0.type === 'Demolish' ? { ...cmd0, cancelOnly: true as const } : cmd0;
+    const net = cmd?.type === 'BuildRoad' && validateCommand(state, cmd).ok ? roadNetworkWarn(cmd) : '';
     const ok = cmd ? await placeBuild(cmd) : false;
     // Tras una carretera o zona, la franja vuelve a la ayuda de la herramienta (no a «toca dónde termina»).
     if (tool.shape !== 'tap') selectTool(tool.id);
     if (ok) warnZoneWithoutRoad(cmd);
+    if (ok && net) warnRoadNetwork(net);
     if (ok && cmd?.type === 'Build') offerUndo(cmd.x, cmd.y);
   }
 
@@ -1796,7 +1903,8 @@ export function startGame(opts: GameOptions): void {
     if (!b || refund <= 0) return;
     hideUndo();
     undo = { x, y, id: b.id, until: performance.now() + UNDO_MS, timer: window.setTimeout(hideUndo, UNDO_MS) };
-    $('#undo-text').textContent = `${BUILD_NAMES[b.kind] ?? b.kind}: obra puesta. Si te has equivocado, se devuelven ${money(refund)}.`;
+    // 2.7: lo que se recupera es justo lo pagado hasta ahora (los materiales; los obreros aún no han cobrado).
+    $('#undo-text').textContent = `${BUILD_NAMES[b.kind] ?? b.kind}: obra puesta (pagados ${money(refund)} de materiales). Deshacer: recuperas ${money(refund)}.`;
     $('#undo-bar').hidden = false;
     refreshStrip();
   }
@@ -2004,8 +2112,49 @@ export function startGame(opts: GameOptions): void {
   $('#menu').classList.add('tab');
 
   // La bandeja: por categorías, con precio y lo que falta para lo bloqueado.
+  // 2.7 «Construir 2.0»: chips de categoría en una fila (se desplaza de lado) y tarjetas en 3 columnas.
+  // Se construye una sola vez: al abrirla solo se ponen al día precios, bloqueos y categorías.
+  const trayChips = h('div', { class: 'tray-chips', role: 'toolbar', 'aria-label': 'Categorías' });
   const trayMsg = h('p', { class: 'tray-msg muted small', 'aria-live': 'polite' }, 'Elige qué construir. Los precios incluyen la obra.');
-  tray.replaceChildren(trayMsg);
+  tray.replaceChildren(h('div', { class: 'tray-head' }, trayChips, trayMsg));
+  /** Lleva a una categoría: la abre y la deja arriba (bajo los chips). */
+  function goTrayCat(title: string) {
+    const fold = tray.querySelector<HTMLDetailsElement>(`details[data-cat="${title}"]`);
+    if (!fold) return;
+    if (!fold.open) {
+      fold.dataset.user = '1';
+      fold.open = true;
+    }
+    seenTrayCat(title);
+    const head = tray.querySelector<HTMLElement>('.tray-head')!;
+    tray.scrollTo({ top: fold.offsetTop - head.offsetHeight - 2, behavior: reducedMotion() ? 'auto' : 'smooth' });
+    markTrayChip(title);
+  }
+  function markTrayChip(title: string) {
+    for (const c of trayChips.querySelectorAll<HTMLElement>('.tray-chip')) {
+      const on = c.dataset.cat === title;
+      if (on !== (c.getAttribute('aria-current') === 'true')) c.setAttribute('aria-current', String(on));
+      if (on) {
+        const r = c.offsetLeft - (trayChips.clientWidth - c.offsetWidth) / 2;
+        if (c.offsetLeft < trayChips.scrollLeft || c.offsetLeft + c.offsetWidth > trayChips.scrollLeft + trayChips.clientWidth) trayChips.scrollTo({ left: r });
+      }
+    }
+  }
+  /** Al desplazar la bandeja, el chip de la categoría que está arriba se marca. */
+  let trayScrollRaf = 0;
+  tray.addEventListener('scroll', () => {
+    if (trayScrollRaf) return;
+    trayScrollRaf = requestAnimationFrame(() => {
+      trayScrollRaf = 0;
+      const top = tray.scrollTop + tray.querySelector<HTMLElement>('.tray-head')!.offsetHeight + 8;
+      let cur = '';
+      for (const fold of tray.querySelectorAll<HTMLDetailsElement>('details.tray-cat')) {
+        if (fold.hidden) continue;
+        if (!cur || fold.offsetTop <= top) cur = fold.dataset.cat!;
+      }
+      if (cur) markTrayChip(cur);
+    });
+  }, { passive: true });
   for (const cat of TRAY) {
     const grid = h('div', { class: 'tray-grid' });
     for (const id of cat.tools) {
@@ -2016,7 +2165,7 @@ export function startGame(opts: GameOptions): void {
         toolIcon(tl),
         h('span', { class: 'tool-label' }, tl.label),
         h('span', { class: 'tool-cost' }, trayCost(tl)),
-        // 2.6: lo que cuesta al mes, debajo del precio.
+        // 2.6: lo que cuesta al mes, debajo del precio (2.7: como gasto, «−1050 €/mes»).
         h('span', { class: 'tool-month' }, monthlyText(tl.build, state)),
       );
       btn.addEventListener('click', () => {
@@ -2046,6 +2195,9 @@ export function startGame(opts: GameOptions): void {
       }
     });
     tray.append(fold);
+    const chip = h('button', { class: 'tray-chip', 'data-cat': cat.title, 'aria-current': 'false' }, h('span', { class: 'tc-name' }, trayChipName(cat.title)));
+    chip.addEventListener('click', () => goTrayCat(cat.title));
+    trayChips.append(chip);
   }
   refreshReveal();
   /**
@@ -2073,6 +2225,7 @@ export function startGame(opts: GameOptions): void {
     reveal.seen(`tray:${title}`);
     reveal.seen(`trayfree:${title}`);
     document.querySelector(`#tray details[data-cat="${title}"] .new-badge`)?.remove();
+    document.querySelector(`#tray .tray-chip[data-cat="${title}"]`)?.classList.remove('has-new');
     refreshNewDots();
   }
   /**
@@ -2096,6 +2249,14 @@ export function startGame(opts: GameOptions): void {
       const why = free ? '' : (tools.map((tl) => lockText(tl)).find((t) => /nivel/.test(t)) ?? lockText(tools[0]!));
       fold.querySelector('h3')!.textContent = free ? cat.title : `${cat.title} (${tools.length}${why ? ` · ${why.replace(/^ayto\. nivel/, 'desde nivel')}` : ''})`;
       if (trayCatNew(cat.title)) fold.querySelector('h3')!.append(newBadge());
+      // 2.7: su chip, igual (oculto, con candado si no hay nada disponible y con el punto de «Nuevo»).
+      const chip = trayChips.querySelector<HTMLButtonElement>(`.tray-chip[data-cat="${cat.title}"]`);
+      if (chip) {
+        chip.hidden = fold.hidden;
+        chip.classList.toggle('locked', !free);
+        chip.classList.toggle('has-new', trayCatNew(cat.title));
+        chip.setAttribute('aria-label', `${cat.title}${free ? '' : ': aún bloqueada'}${trayCatNew(cat.title) ? ' (nuevo)' : ''}`);
+      }
       if (fold.dataset.user) continue;
       fold.dataset.auto = String(free);
       fold.open = free;
@@ -2112,7 +2273,13 @@ export function startGame(opts: GameOptions): void {
     tabBuild.setAttribute('aria-expanded', 'true');
     document.body.classList.add('tray-open');
     tutorial.update(state, tool.id);
-    (tray.querySelector<HTMLElement>('[aria-pressed="true"]') ?? tray.querySelector<HTMLElement>('.tool:not(.locked)'))?.focus();
+    const target = tray.querySelector<HTMLElement>('[aria-pressed="true"]') ?? tray.querySelector<HTMLElement>('details:not([hidden]) .tool:not(.locked)');
+    // 2.7: el chip de la categoría de lo elegido (o de lo primero que se puede construir) queda marcado.
+    const cat = target?.closest<HTMLElement>('details.tray-cat')?.dataset.cat ?? TRAY[0]!.title;
+    markTrayChip(cat);
+    target?.focus({ preventScroll: true });
+    if (target && target.getAttribute('aria-pressed') === 'true') goTrayCat(cat);
+    else tray.scrollTop = 0;
   }
   function closeTray() {
     if (tray.hidden) return;
@@ -2170,9 +2337,11 @@ export function startGame(opts: GameOptions): void {
     else if (tl.id === 'inspect') info.textContent = '';
     else {
       const cost = trayCost(tl) || costText(tl);
-      // 2.6: y lo que costará cada mes (mantenimiento y sueldos).
+      // 2.6: y lo que costará cada mes (mantenimiento y sueldos). 2.7: como gasto y con la obra explicada.
       const month = monthlyText(tl.build, state, true);
-      info.replaceChildren(h('b', {}, tl.label), cost ? ` · ${cost}${month ? ` ${month}` : ''} · ` : ': ', toolHelp(tl));
+      const spec = tl.build && tl.build !== 'road' && tl.shape === 'tap' ? BUILD[tl.build] : null;
+      const why = spec && spec.workers ? ` (${money(spec.materials)} al empezar + hasta ${money(spec.workers * spec.days * WAGE_OUTSIDE)} de obreros)` : '';
+      info.replaceChildren(h('b', {}, tl.label), cost ? ` · ${cost}${why}` : ': ', month ? h('span', { class: 'cc-month' }, ` · ${month}`) : '', cost ? ' · ' : '', toolHelp(tl));
     }
     selected = null;
     anchor = null;
@@ -2247,7 +2416,24 @@ export function startGame(opts: GameOptions): void {
     const ok = canUpgradeBuilding(state, b, served).ok;
     const btn = h('button', { class: 'btn primary wide' }, `Mejorar · ${money(upgradeCost(b))}`) as HTMLButtonElement;
     btn.disabled = !ok;
-    btn.addEventListener('click', () => void command({ type: 'UpgradeBuilding', buildingId: b.id }));
+    btn.addEventListener('click', async () => {
+      // 2.7: una mejora que se lleva más del 20 % de la caja se confirma (antes, 10.000 € de un toque).
+      const cost = upgradeCost(b);
+      if (cost > 0.2 * Math.max(0, state.treasury)) {
+        const left = state.treasury - cost;
+        const extra = Math.max(0, Math.round(maintenanceOf({ ...b, level: lv + 1 }) - maintenanceOf(b)));
+        const m = runwayMonths(state, left - pendingWorksCost(state), extra);
+        const run = m !== null && m < 2 ? ` ⚠ Con el gasto de cada mes, la caja aguantaría ${monthsText(m)}.` : '';
+        const ok2 = await confirmDialog(
+          `¿Mejorar a nivel ${lv + 1}?`,
+          `Cuesta ${money(cost)} (el ${Math.round((100 * cost) / Math.max(1, state.treasury))} % de la caja): te quedarán ${money(left)}.${extra ? ` El mantenimiento sube ${money(extra)} al mes.` : ''}${run}`,
+          'Mejorar',
+          { safe: !run },
+        );
+        if (!ok2) return;
+      }
+      void command({ type: 'UpgradeBuilding', buildingId: b.id });
+    });
     box.append(btn);
     return box;
   }
@@ -3349,7 +3535,7 @@ export function startGame(opts: GameOptions): void {
     const [sx, sy] = shakeOffset(time);
     const view = sx || sy ? { ...cam, x: cam.x + sx * dpr(), y: cam.y + sy * dpr() } : cam;
     reachHint();
-    render(ctx, state, view, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer, highlight, labels: cam.zoom >= touchZoom(), fast: speed >= 10, reach: currentReach(), missingKey: layer === 'missing' ? missingKey : null });
+    render(ctx, state, view, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer, highlight, labels: cam.zoom >= touchZoom(), fast: speed >= 10, reach: currentReach(), missingKey: layer === 'missing' ? missingKey : null, bad: badFlash });
     placeBubbles();
     requestAnimationFrame(frame);
   }

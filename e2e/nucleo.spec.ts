@@ -64,7 +64,7 @@ test('lo básico: motivo del solar, carga de la bomba, demanda, coste al mes y d
 
   // 4. Bandeja: lo que cuesta al mes (bomba: 150 € de mantenimiento y un sueldo de 900 €).
   await page.locator('#tab-build').click();
-  await expect(page.locator('#tray [data-tool="water"] .tool-month')).toHaveText('+1050 €/mes');
+  await expect(page.locator('#tray [data-tool="water"] .tool-month')).toHaveText('−1050 €/mes');
   await shot('4-bandeja');
 
   // 5. Poner una casa y deshacerla: se devuelven los materiales.
@@ -79,7 +79,7 @@ test('lo básico: motivo del solar, carga de la bomba, demanda, coste al mes y d
   }
   await chooseOffer(page, 'local');
   await expect(page.locator('#undo-bar')).toBeVisible();
-  await expect(page.locator('#undo-text')).toContainText('se devuelven 2000 €');
+  await expect(page.locator('#undo-text')).toContainText('Deshacer: recuperas 2000 €');
   await expect.poll(async () => (await state(page)).treasury).toBe(before - 2000);
   await shot('5-deshacer');
   await page.locator('#undo-btn').click();
