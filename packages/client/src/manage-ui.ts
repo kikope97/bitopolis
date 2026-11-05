@@ -18,6 +18,7 @@ import {
   UPKEEP,
 } from '@bitopolis/sim';
 import { money, MONTHS } from './i18n.ts';
+import { monthFlow, splitText } from './cash.ts';
 import { economyLines } from './money-ui.ts';
 import { pixelIcon } from './icons.ts';
 import type { SocialCtx } from './social-ui.ts';
@@ -42,17 +43,17 @@ const card = (title: string, icon: string, ...body: (Node | string)[]) =>
 const row = (label: string, value: string, cls = '') => h('div', { class: `mg-row ${cls}` }, h('span', {}, label), h('strong', {}, value));
 
 /**
- * Lo que se paga a fin de mes, aproximado: los gastos del mes pasado (o el
- * mantenimiento, si aún no hay mes cerrado) más lo que sube el mantenimiento
- * del ayuntamiento con `extraLevels` niveles más (se paga × nivel, tick.ts).
+ * Lo que se paga a fin de mes, aproximado: el gasto corriente (el del mes
+ * pasado sin las obras, o lo que hay construido si aún no hay mes cerrado; ver
+ * `monthFlow`) más lo que sube el mantenimiento del ayuntamiento con
+ * `extraLevels` niveles más (se paga × nivel, tick.ts).
+ * 2.7: antes contaba las obras del mes pasado («pagas ≈ 26.850 €» con un gasto fijo de 3.200 €).
  */
 export function monthlyCostEstimate(s: GameState, extraLevels = 0): number {
   const fx = budgetFx(s).maintenance;
   const hall = s.buildings.find((b) => b.kind === 'townhall' && b.built);
   const extra = hall ? maintenanceOf(hall) * extraLevels * fx : 0;
-  const last = s.stats.at(-1);
-  const base = last ? last.expenses : s.buildings.filter((b) => b.built).reduce((t, b) => t + maintenanceOf(b) * (b.kind === 'townhall' ? townLevel(s) : 1) * fx, 0);
-  return Math.round(base + extra + upkeepJump(s, extraLevels));
+  return Math.round(monthFlow(s).running + extra + upkeepJump(s, extraLevels));
 }
 
 /** Ronda 22: lo que sube el gasto corriente (€ por vecino, upkeep.ts) al ampliar, ya con la rampa entera. */
@@ -105,7 +106,7 @@ export function openManagement(ctx: SocialCtx, links: ManageLinks, fresh?: strin
       h('p', {}, `Siguiente: `, h('strong', {}, next.name), ` (nivel ${next.level}). Pide ${next.pop} vecinos y ${money(next.cost)}.`),
       h('p', { class: 'muted small' }, `Desbloquea: ${next.unlocks.join(', ')}.`),
       upkeepJump(s, 1) > 0 ? h('p', { class: 'muted small', 'data-test': 'upgrade-upkeep' }, `Con más nivel, el gasto corriente (alumbrado, limpieza, oficinas) sube unos ${money(upkeepJump(s, 1))} al mes.`) : '',
-      ok.ok ? h('p', { class: tight ? 'pocket-warn mg-after' : 'muted small mg-after', 'data-test': 'upgrade-after' }, `${tight ? '⚠ ' : ''}Te quedarán ${money(left)}; a fin de mes pagas ≈ ${money(due)}.${tight ? ' Quizá convenga esperar a cobrar.' : ''}`) : '',
+      ok.ok ? h('p', { class: tight ? 'pocket-warn mg-after' : 'muted small mg-after', 'data-test': 'upgrade-after' }, `${tight ? '⚠ ' : ''}Te quedarán ${money(left)}; a fin de mes pagas ≈ ${money(due)} de gasto corriente.${tight ? ' Quizá convenga esperar a cobrar.' : ''}`) : '',
       btn,
     );
     if (!ok.ok) up.push(h('p', { class: 'muted small mg-why' }, ok.error));
@@ -130,6 +131,8 @@ export function openManagement(ctx: SocialCtx, links: ManageLinks, fresh?: strin
     row('En caja', money(s.treasury), s.treasury < 0 ? 'neg' : ''),
     ...(last ? [row(`Último mes (${MONTHS[(tickToDate(s.tick).month + 10) % 12]})`, `${net >= 0 ? '+' : ''}${money(net)}`, net < 0 ? 'neg' : '')] : []),
   );
+  // 2.7: el gasto corriente y las obras, por separado (una estación de tren no es gasto de cada mes).
+  if (last) how.append(h('p', { class: 'muted small', 'data-test': 'month-split' }, `${splitText(last)}.`));
   const accounts = h('button', { class: 'btn' }, 'Ver las cuentas');
   accounts.addEventListener('click', links.accounts);
   how.append(accounts);
