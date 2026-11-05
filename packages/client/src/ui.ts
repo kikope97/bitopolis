@@ -77,6 +77,7 @@ function loadLog(token: string) {
     if (raw?.v !== 1 || !Array.isArray(raw.log)) return;
     for (const e of raw.log.slice(0, LOG_MAX)) {
       if (!e || typeof e.text !== 'string') continue;
+      if (e.go !== undefined && typeof e.go !== 'string') delete (e as { go?: unknown }).go;
       log.push({ ...e, kind: e.kind === 'warn' || e.kind === 'good' ? e.kind : 'info', important: !!e.important });
     }
     unread = Math.max(0, Math.min(log.length, Number(raw.unread) || 0));

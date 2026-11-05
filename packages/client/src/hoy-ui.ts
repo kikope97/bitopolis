@@ -1,3 +1,4 @@
+import { monthFlow } from './cash.ts';
 import { TICKS_PER_DAY, tickToDate } from '@bitopolis/shared';
 import { type GameState, hash32, rankName } from '@bitopolis/sim';
 import { type Ask, dueSoon, dueText } from './asks.ts';
@@ -38,7 +39,9 @@ export function townLine(state: GameState): string {
   const happy = avgHappy(state);
   const last = state.stats.at(-1);
   const net = last ? last.income - last.expenses : 0;
-  const how = state.treasury < 0 || happy < 40 ? 'pasa un mal momento' : happy >= 65 && net >= 0 ? 'va bien' : 'va tirando';
+  // 2.7: «va bien» mira el gasto corriente (un mes con una obra grande no es un mal mes).
+  const f = monthFlow(state);
+  const how = state.treasury < 0 || happy < 40 ? 'pasa un mal momento' : happy >= 65 && f.income - f.running >= 0 ? 'va bien' : 'va tirando';
   const month = last ? ` (el último mes, ${signed(net)})` : '';
   return `${rankName(state)} de Bitópolis ${how}: ${plural(state.citizens.length, 'vecino', 'vecinos')}, felicidad ${happy} de 100 y ${money(state.treasury)} en caja${month}.`;
 }

@@ -119,8 +119,12 @@ const folds = new Map<string, boolean>();
 /** Bloque plegable que se acuerda de si estaba abierto. `open` es lo que hace la primera vez. */
 export function fold(key: string, summary: string | Node, open: boolean, ...content: (Node | string)[]): HTMLDetailsElement {
   const d = h('details', { class: 'fold', 'data-fold': key }, h('summary', {}, summary), ...content) as HTMLDetailsElement;
-  d.open = folds.get(key) ?? open;
-  d.addEventListener('toggle', () => folds.set(key, d.open));
+  const init = folds.get(key) ?? open;
+  d.open = init;
+  // Solo se recuerda lo que cambia el jugador (abrirlo por defecto lanza un «toggle» que no es suyo).
+  d.addEventListener('toggle', () => {
+    if (d.open !== init || folds.has(key)) folds.set(key, d.open);
+  });
   return d;
 }
 

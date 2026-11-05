@@ -110,7 +110,7 @@ import { openMailbox, unreadLetters } from './mail-ui.ts';
 import { viviendaBox } from './vivienda-ui.ts';
 import { openTourism, openTownHall } from './civic-ui.ts';
 import { openAlbum, snapMoments } from './album-ui.ts';
-import { type AwaySince, hoyHasNews, isHoyOpen, openHoy } from './hoy-ui.ts';
+import { type AwaySince, closeHoy, hoyHasNews, isHoyOpen, openHoy } from './hoy-ui.ts';
 import { type Ask, dueSoon, dueText, pendingAsks } from './asks.ts';
 import { openRank, rankCard } from './rank-ui.ts';
 import { dilemmaSpot, openDilemmaSheet, type DilemmaCtx } from './dilemma-ui.ts';
@@ -375,6 +375,8 @@ export function startGame(opts: GameOptions): void {
           sfx.error();
         }
         if (ok) feedback(cmd);
+        // 2.7: en pausa el tick no cambia: «Te piden» se recalcula al responder.
+        if (ok) queueMicrotask(() => refreshAsks(true));
         resolve(ok);
       });
       send({ type: 'command', cmd, id });
@@ -590,7 +592,7 @@ export function startGame(opts: GameOptions): void {
     slowTimer = window.setTimeout(() => {
       const to = slowFrom;
       hideSlowNote();
-      if (to > 1 && speed === 1 && !isSheetOpen()) setSpeed(to);
+      if (to > 1 && speed === 1 && !isSheetOpen() && !document.querySelector('.modal-backdrop, .hoy-backdrop')) setSpeed(to);
     }, 20_000);
   }
   function hideSlowNote() {
@@ -672,7 +674,8 @@ export function startGame(opts: GameOptions): void {
     const rows: HTMLElement[] = [];
     const add = (sel: string, label: string) => {
       const src = document.querySelector<HTMLElement>(sel);
-      if (!src || src.hidden) return;
+      // Solo lo que de verdad no se ve en la barra (oculto o mandado a «Más» por el CSS).
+      if (!src || src.hidden || src.offsetParent !== null) return;
       const b = h('button', { class: 'btn wide more-row', 'data-for': sel.slice(1) }, label);
       // Abre su hoja encima (sin cerrar esta antes: el «atrás» del historial cerraría la nueva).
       b.addEventListener('click', () => src.click());
@@ -816,7 +819,7 @@ export function startGame(opts: GameOptions): void {
     $('#hud-happy').setAttribute('aria-label', `Felicidad media ${happy} de 100: ver por qué`);
     renderPollChip(state, () => openPolitics(social));
     // Ronda 21: si cambia lo largo de las cifras, se vuelve a encajar la barra de arriba.
-    const barKey = `${moneyNum}|${popText.textContent}|${happyText.textContent}|${$('#hud-poll').textContent}|${$('#hud-poll').hidden}|${$('#ai-chip').hidden}`;
+    const barKey = `${moneyNum.length}|${runKey}|${popText.textContent}|${happyText.textContent}|${$('#hud-poll').textContent}|${$('#hud-poll').hidden}|${$('#ai-chip').hidden}`;
     if (barKey !== topbarKey) {
       topbarKey = barKey;
       fitTopbar();
@@ -1994,7 +1997,7 @@ export function startGame(opts: GameOptions): void {
   }
 
   window.addEventListener('keydown', (e) => {
-    if (document.querySelector('.modal-backdrop')) return;
+    if (document.querySelector('.modal-backdrop, .hoy-backdrop')) return;
     const target = e.target as HTMLElement;
     if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
     const step = Math.round(64 * dpr());
@@ -2902,7 +2905,7 @@ export function startGame(opts: GameOptions): void {
       } else if (res.length && b.kind !== 'vpo') content.push(h('h3', {}, 'Viven aquí'), citizenList(res));
       // 2.7: los servicios de la casa, en una fila de iconos con ✓/✗ (al tocarla, el detalle).
       if (home) content.push(servicesTable(b));
-      if (workers.length) content.push(fold(`workers:${b.kind}`, `Trabajan aquí (${workers.length})`, workers.length <= 3, citizenList(workers)));
+      if (workers.length) content.push(fold(`workers:${b.id}`, `Trabajan aquí (${workers.length})`, workers.length <= 3, citizenList(workers)));
       if (b.kind === 'house') {
         const sale = !!b.forSale;
         const toggle = h('button', { class: 'btn wide' }, sale ? 'Pasar a alquiler' : 'Poner a la venta');
@@ -3143,7 +3146,9 @@ export function startGame(opts: GameOptions): void {
     // 2.4: la comisión de festejos espera presupuesto.
     const fiesta = state.seasons?.current;
     const fiestaAsks = !!fiesta && fiesta.status === 'comision' && !!fiesta.asked;
-    const runway = net !== null && net < 0 && state.treasury > 0 ? Math.floor(state.treasury / -net) : -1;
+    // 2.7: lo que aguanta la caja con el gasto corriente (las obras del mes no cuentan, como en la barra de arriba).
+    const rw = state.treasury > 0 ? runwayMonths(state) : null;
+    const runway = rw === null ? -1 : Math.floor(rw);
     const lv = townLevel(state);
     const top = lv >= TOWNHALL_LEVELS.length;
     const next = nextLevel(state);
@@ -3892,6 +3897,12 @@ export function startGame(opts: GameOptions): void {
   history.pushState({ ...(history.state ?? {}), game: true }, '');
   async function onBack(e: PopStateEvent) {
     if ((e.state as { game?: boolean } | null)?.game) return; // cerró una hoja: lo hace ui.ts
+    // 2.7: con «Hoy en Bitópolis» abierta, atrás la cierra (no pregunta si salir).
+    if (isHoyOpen()) {
+      closeHoy();
+      history.pushState({ game: true }, '');
+      return;
+    }
     const was = speed;
     setSpeed(0);
     if (await confirmDialog('¿Salir de la partida?', 'Se guarda sola. Puedes volver con tu enlace.', 'Salir')) exit();
@@ -3903,6 +3914,7 @@ export function startGame(opts: GameOptions): void {
   window.addEventListener('popstate', onBack);
 
   function exit() {
+    closeHoy();
     rememberSeen(token, state);
     stopMusic();
     offPrefs();

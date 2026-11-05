@@ -134,6 +134,7 @@ export class Tutorial {
 
   start(state: GameState, fromScratch = false) {
     this.focused = -1;
+    this.dismissed = -1;
     if (fromScratch) this.step = 0;
     // Un pueblo ya hecho (importado o de otra partida) no empieza el tutorial desde cero (ronda 11).
     else if (this.step === 0 && state.citizens.length >= 10) {

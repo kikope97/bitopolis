@@ -148,7 +148,7 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
     // 2.0: lo que piensa y planea (si piensa con IA).
     mindBox(state, c) ?? '',
     // v1.9: su balance y sus deudas (2.7: abierto si debe o no llega).
-    fold('cz-pocket', `Su bolsillo · ${debt > 0 ? `debe ${money(debt)}` : POCKET_TEXT[pocket]}`, debt > 0 || pocket === 'no_llega', pocketBox(ctx, c, () => openCitizen(ctx, citizenId))),
+    fold(`cz-pocket:${c.id}`, `Su bolsillo · ${debt > 0 ? `debe ${money(debt)}` : POCKET_TEXT[pocket]}`, debt > 0 || pocket === 'no_llega', pocketBox(ctx, c, () => openCitizen(ctx, citizenId))),
     h('p', {}, `Quiere ${DESIRE_TEXT[c.desire]}; teme ${FEAR_TEXT[c.fear]}. Meta: ${GOAL_TEXT[c.goal]} ${goalDone(state, c) ? '✓' : ''}`),
     politicsActive(state)
       ? h(
