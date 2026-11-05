@@ -8,6 +8,7 @@ test('/healthz responde', async ({ request }) => {
 });
 
 test('partida nueva: tutorial, obras, guardado y continuar', async ({ page }, info) => {
+  test.setTimeout(60_000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));

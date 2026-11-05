@@ -656,10 +656,8 @@ export function startGame(opts: GameOptions): void {
       const src = document.querySelector<HTMLElement>(sel);
       if (!src || src.hidden) return;
       const b = h('button', { class: 'btn wide more-row', 'data-for': sel.slice(1) }, label);
-      b.addEventListener('click', () => {
-        closeSheet();
-        src.click();
-      });
+      // Abre su hoja encima (sin cerrar esta antes: el «atrás» del historial cerraría la nueva).
+      b.addEventListener('click', () => src.click());
       rows.push(b);
     };
     add('#hud-pop', `Vecinos: ${state.citizens.length}`);
