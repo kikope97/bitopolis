@@ -840,3 +840,5 @@ body.tool-active .map-btns #whatnow, body.tool-active .map-btns #home { display:
 @media (orientation: landscape) and (max-height: 500px) {
   .game { grid-template-columns: minmax(0, 1fr) var(--dock-w); }
 }
+/* La letra pixel solo admite tamaños de píxel exacto: el «€» de la caja, al mismo tamaño que la cifra. */
+html[data-font='pixel'] .topbar .tb-unit, html[data-font='pixel'] .topbar.tb-tight .tb-unit { font-size: 1em; }
