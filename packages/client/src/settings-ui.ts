@@ -145,6 +145,17 @@ export function openSettings(ai?: AiShareCtl, share?: Node): void {
     ),
     h('h3', {}, 'Ritmo y movimiento'),
     toggle('Modo tranquilo', 'calm', '(velocidad x1, pausa en los eventos importantes y avisos sin tiempo límite)'),
+    // 2.7: a x3/x10 el tiempo se frenaba solo cada poco por cosas menores.
+    radioGroup<Prefs['slowFor']>(
+      'A x3 y x10, bajar a x1 por',
+      [
+        ['emergencias', 'Solo emergencias (incendio, riada, disturbios, manifestación)'],
+        ['importante', 'También ofertas, dilemas y fiestas'],
+        ['nada', 'Nada (avisa sin frenar)'],
+      ],
+      p.slowFor,
+      (v) => setPrefs({ slowFor: v }),
+    ),
     radioGroup<Prefs['motion']>(
       'Animaciones',
       [

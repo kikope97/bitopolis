@@ -678,7 +678,6 @@ html[data-text='200'] { --ui: 1.3; }
 .tab[aria-pressed='true'] .tab-label { color: var(--accent); }
 .tab.danger[aria-pressed='true'] { border-top-color: #b13e53; }
 .tab.danger[aria-pressed='true'] .tab-label { color: var(--bad); }
-html[data-text='200'] .tab-label { display: none; }
 html[data-text='200'] .tab .px-icon, html[data-text='200'] .tab .tab-sprite { width: 32px; height: 32px; }
 
 /* --- bandeja «Construir» por categorías --- */

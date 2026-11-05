@@ -1,0 +1,175 @@
+/*
+ * v2.7 «Interfaz móvil 2.0» — sistema de diseño (docs/propuestas/v2.7-interfaz-movil.md).
+ * Va después de style.css: lo que aquí se define manda. Solo colores de la paleta (palette.ts).
+ */
+
+/* ---------- variables ---------- */
+:root {
+  /* Escala de texto (× --ui). Al 150 % y al 200 %, de verdad. */
+  --fs-xs: calc(12px * var(--ui));
+  --fs-s: calc(14px * var(--ui));
+  --fs-m: calc(16px * var(--ui));
+  --fs-l: calc(20px * var(--ui));
+  --fs-xl: calc(24px * var(--ui));
+  --fs-xxl: calc(32px * var(--ui));
+  /* Espaciado en base 4. */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  /* Capas: una sola escala para todo lo que flota. */
+  --z-map: 0;
+  --z-float: 10;
+  --z-bars: 20;
+  --z-sheet: 30;
+  --z-toast: 40;
+  --z-dialog: 50;
+  /* Colores por función (índices de la paleta). */
+  --c-ink: #1a1c2c; /* 0 */
+  --c-deep: #141428; /* 56 */
+  --c-card: #1a1c2c; /* 0 */
+  --c-card-line: #3d4552; /* 55 */
+  --c-surface: #333c57; /* 15 */
+  --c-surface-line: #566c86; /* 14 */
+  --c-disabled: #20203c; /* 57 */
+  --c-chip: #20203c; /* 57 */
+  --c-chip-line: #2e2f55; /* 58 */
+  --c-urgent: #b13e53; /* 2 */
+  --c-warn: #eea160; /* 20 */
+  --c-info: #41a6f6; /* 10 */
+  --c-ok: #a7f070; /* 5: verde claro (contraste 4,5:1 sobre el azul marino) */
+  --c-gold: #ffcd75; /* 4 */
+  --c-gold-line: #eea160; /* 20 */
+  --tap-min: 44px;
+}
+/* Tamaños de texto reales (antes ×1,15 y ×1,3). */
+html[data-text='150'] { --ui: 1.5; }
+html[data-text='200'] { --ui: 2; }
+@media (min-width: 1100px) and (min-height: 700px) {
+  :root { --ui: 1.15; }
+  html[data-text='150'] { --ui: 1.6; }
+  html[data-text='200'] { --ui: 2.1; }
+}
+
+/* El pellizco sobre la interfaz no amplía la página (solo el mapa tiene gestos). */
+.topbar, .strip, .dock, .tray, .sheet, #toasts, .map-btns, .legend, .modal-backdrop, .start { touch-action: manipulation; }
+
+/* ---------- botones ---------- */
+.btn {
+  border-radius: 2px;
+  border-color: var(--c-surface-line);
+  background: var(--c-surface);
+  box-shadow: 0 2px 0 var(--c-ink);
+  font-size: var(--fs-m);
+}
+.btn.primary { background: var(--c-gold); color: var(--c-ink); border-color: var(--c-gold-line); }
+.btn.danger { background: var(--c-urgent); color: #f4f4f4; border-color: #ef7d57; }
+.btn.big { min-height: 56px; font-size: var(--fs-l); }
+.btn.small { font-size: var(--fs-s); }
+.btn:disabled, .btn[aria-disabled='true'] {
+  background: var(--c-disabled);
+  color: var(--muted);
+  border-style: solid;
+  border-color: var(--c-chip-line);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.btn.choice[aria-disabled='true'] { border-style: solid; }
+.btn:disabled::before, .btn[aria-disabled='true']:not(.choice)::before { content: '🔒'; font-size: 0.85em; }
+
+/* Tarjetas. */
+.card { background: var(--c-card); border: 2px solid var(--c-card-line); border-radius: 2px; padding: var(--sp-3); }
+
+/* Sin monoespaciada: solo el texto legible y la pixel (para cifras y títulos, si se elige). */
+.tray h3, .mono { font-family: inherit; letter-spacing: 0; }
+.mono { word-break: break-all; }
+
+/* ---------- barra de arriba: una sola fila, siempre ---------- */
+.topbar {
+  position: relative;
+  z-index: var(--z-bars);
+  flex-wrap: nowrap;
+  gap: var(--sp-1);
+  min-height: calc(44px * min(var(--ui), 1.3));
+  font-size: calc(15px * min(var(--ui), 1.6));
+  background: var(--c-surface);
+}
+.topbar.tb-rows { flex-wrap: nowrap; }
+.topbar .tb-btn { min-height: var(--tap-min); }
+/* ⏯ y la velocidad juntos, como un solo control. */
+.tb-time { border-radius: 2px 0 0 2px; }
+.tb-speed { border: 2px solid var(--line); border-left: 0; border-radius: 0 2px 2px 0; background: var(--c-ink); min-width: var(--tap-min); }
+/* En pausa, ⏯ late (en vez del aviso «En pausa, pulsa ▶…»). */
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-motion='reducido']) .tb-time[data-paused='true'] { animation: tb-pulse 1.6s steps(2) infinite; }
+}
+@keyframes tb-pulse { 50% { background: var(--c-gold); color: var(--c-ink); } }
+/* Cuánto aguanta la caja si el mes va en negativo. */
+.tb-runway { margin-left: 2px; padding: 0 4px; border-radius: 2px; background: var(--c-urgent); color: #f4f4f4; font-size: 0.75em; }
+.tb-runway[hidden] { display: none; }
+/* Lo que no cabe va en «Más» (vecinos, votos, IA): nunca dos filas. */
+#hud-more { display: none; }
+.topbar.tb-more #hud-more { display: inline-flex; }
+.topbar.tb-more #hud-pop, .topbar.tb-more #hud-poll, .topbar.tb-more .ai-chip, .topbar.tb-more2 #hud-happy { display: none !important; }
+/* «Guardado» y el calendario viven en la barra: «Guardado» es un punto (verde, ámbar guardando, rojo si falla). */
+.topbar .saved { position: static; flex: 0 0 auto; width: 18px; height: 44px; padding: 0; background: none; font-size: 0; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; }
+.topbar .saved::before { content: ''; width: 8px; height: 8px; background: var(--good); }
+.topbar .saved[data-pending='true']::before { background: var(--c-warn); }
+.topbar .saved.err::before { background: var(--c-urgent); width: 10px; height: 10px; }
+.topbar .saved:empty { display: none; }
+.topbar .calendar { position: static; flex: 0 0 auto; width: 44px; margin: 0 2px; transform: scale(0.82); transform-origin: center; }
+
+/* ---------- mapa limpio: una pila de botones en la zona del pulgar ---------- */
+.map-btns { z-index: var(--z-float); gap: var(--sp-2); }
+.map-btns .chip, .map-btns .fab { min-width: 48px; min-height: 48px; }
+.map-btns .fab-home { display: inline-flex; align-items: center; justify-content: center; font-size: calc(20px * min(var(--ui), 1.5)); }
+.legend { z-index: var(--z-float); }
+.slow-note { z-index: var(--z-float); }
+/* Con una herramienta elegida, las burbujas de los vecinos no roban toques. */
+body.tool-active .bubble { pointer-events: none; opacity: 0.55; }
+
+/* ---------- avisos: una píldora bajo la barra, en tres niveles ---------- */
+#toasts { z-index: var(--z-toast); }
+body.in-game .toast {
+  border-left-width: 6px;
+  border-left-color: var(--c-info);
+  border-radius: 2px;
+  font-size: var(--fs-s);
+}
+body.in-game .toast.good { border-left-color: var(--good); }
+body.in-game .toast.warn { border-left-color: var(--c-warn); }
+body.in-game .toast.sticky.warn, body.in-game .toast.urgent { border-left-color: var(--c-urgent); }
+/* Hasta dos líneas, sin «…» ni subrayado. */
+body.in-game .toast-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; text-overflow: clip; }
+.toast-action { text-decoration: none; }
+/* Con una hoja abierta, los avisos no tapan su cabecera: salen abajo, sobre el dock. */
+body.sheet-open.in-game #toasts { top: auto; bottom: calc(var(--dock-h, 64px) + env(safe-area-inset-bottom) + 8px); }
+
+/* ---------- capas (z): franja y dock por encima del mapa; hojas y diálogos encima ---------- */
+.strip, .dock { position: relative; z-index: var(--z-bars); }
+.modal-backdrop { z-index: var(--z-dialog); }
+
+/* El calendario ya no empuja los avisos (está en la barra). */
+body.cal-on.in-game #toasts { left: max(8px, env(safe-area-inset-left)); }
+body.cal-on .legend { top: auto; }
+
+/* ---------- dock: el nombre de cada pestaña se queda siempre (en dos líneas si hace falta) ---------- */
+html[data-text='150'] .tab-label, html[data-text='200'] .tab-label { display: block !important; }
+.tab-label {
+  font-size: calc(13px * min(var(--ui), 1.45));
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  line-height: 1.05;
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+/* Al 150 % y al 200 %, el nombre corto (Calle, Obras, Quitar): cabe en una línea y no se parte. */
+.tab-label .tl-short { display: none; }
+html[data-text='150'] .tab-label .tl-long, html[data-text='200'] .tab-label .tl-long { display: none; }
+html[data-text='150'] .tab-label .tl-short, html[data-text='200'] .tab-label .tl-short { display: inline; }
+.tab-label { overflow-wrap: normal; word-break: normal; }

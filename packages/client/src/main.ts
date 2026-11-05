@@ -5,6 +5,7 @@ import { drawSkyline } from './skyline.ts';
 import { showStart } from './start.ts';
 import { showViewer } from './viewer.ts';
 import './style.css';
+import './mobile2.css';
 
 applyPrefs();
 drawSkyline();

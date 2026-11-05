@@ -221,7 +221,10 @@ export function startGame(opts: GameOptions): void {
   function paintSaved() {
     const el = $('#saved');
     const text = saveError ? t('saveFailed') : savePending() ? t('saving') : el.textContent ? t('saved') : '';
-    if (el.textContent !== text) el.textContent = text;
+    if (el.textContent !== text) {
+      el.textContent = text;
+      el.title = text;
+    }
     el.classList.toggle('err', saveError);
     el.dataset.pending = String(savePending());
   }
@@ -495,9 +498,12 @@ export function startGame(opts: GameOptions): void {
    */
   let highlight: { x: number; y: number; since: number } | null = null;
   let lastAttention = -Infinity;
-  function attention(at: { x: number; y: number } | undefined, force = false, why?: string) {
+  function attention(at: { x: number; y: number } | undefined, force = false, why?: string, level: 'emergencia' | 'importante' = 'emergencia') {
     const now = performance.now();
     if (at) highlight = { x: at.x, y: at.y, since: now };
+    // 2.7: el jugador elige qué frena el tiempo (por defecto, solo las emergencias).
+    const slowFor = prefs().slowFor;
+    if (slowFor === 'nada' || (level === 'importante' && slowFor !== 'importante')) return;
     if (force && speed >= 3) lastAttention = -Infinity;
     // Ronda 14: si en este mismo lote ya se bajó a x1 (una oferta con plazo), el motivo
     // que llega detrás sí se enseña; si no, como mucho una parada cada 45 s.
@@ -544,7 +550,7 @@ export function startGame(opts: GameOptions): void {
   }
   /** Una oferta con plazo baja a x1 (sin temblor) y cuenta como parada (ronda 14). */
   function slowDown(why?: string) {
-    if (speed < 3) return;
+    if (speed < 3 || prefs().slowFor !== 'importante') return;
     const before = speed;
     setSpeed(1);
     slowNote(before, why);
@@ -560,11 +566,16 @@ export function startGame(opts: GameOptions): void {
   function slowNote(before: number, why?: string) {
     const note = $('#slow-note');
     slowFrom = before;
-    note.querySelector('.slow-text')!.textContent = `Bajo a x1${why ? ` por ${why}` : ' para que lo veas'}.`;
+    note.querySelector('.slow-text')!.textContent = `Bajo a x1${why ? ` por ${why}` : ' para que lo veas'}. Vuelvo a x${before} en 20 s.`;
     $('#slow-back').textContent = `Volver a x${before}`;
     note.hidden = false;
     clearTimeout(slowTimer);
-    slowTimer = window.setTimeout(hideSlowNote, 20_000);
+    // 2.7: pasado el susto, vuelve sola a la velocidad de antes (si nadie la ha tocado).
+    slowTimer = window.setTimeout(() => {
+      const to = slowFrom;
+      hideSlowNote();
+      if (to > 1 && speed === 1 && !isSheetOpen()) setSpeed(to);
+    }, 20_000);
   }
   function hideSlowNote() {
     clearTimeout(slowTimer);
@@ -607,7 +618,9 @@ export function startGame(opts: GameOptions): void {
   /* ---------- HUD (v1.6: iconos de píxeles y cifras; cada dato se toca) ---------- */
   const moneyText = h('span', { class: 'tb-text' });
   const moneyTrend = h('span', { class: 'trend', 'aria-hidden': 'true' });
-  $('#hud-money').replaceChildren(pixelIcon('coin'), moneyText, moneyTrend);
+  const runway = h('span', { class: 'tb-runway', 'aria-hidden': 'true' });
+  runway.hidden = true;
+  $('#hud-money').replaceChildren(pixelIcon('coin'), moneyText, moneyTrend, runway);
   const popText = h('span', { class: 'tb-text' });
   $('#hud-pop').replaceChildren(pixelIcon('people'), popText);
   const happyText = h('span', { class: 'tb-text' });
@@ -618,17 +631,44 @@ export function startGame(opts: GameOptions): void {
    * Los iconos nunca se quitan (sin ellos, «77 61» no se entendía).
    */
   let topbarKey = '';
+  /**
+   * 2.7: la barra de arriba va siempre en una fila. Si no cabe, primero sin la flecha, el «€» ni el «%»;
+   * si aún no cabe, vecinos, votos e IA pasan a «⋯» (Más). Los iconos nunca se quitan.
+   */
   function fitTopbar() {
     const bar = $('.topbar');
     const over = () => bar.scrollWidth > bar.clientWidth + 1;
-    bar.classList.remove('tb-tight', 'tb-rows');
+    bar.classList.remove('tb-tight', 'tb-rows', 'tb-more', 'tb-more2');
     if (!over()) return;
     bar.classList.add('tb-tight');
     if (!over()) return;
-    // En dos filas hay sitio de sobra: vuelven el «€», el «%» y la flecha (si caben).
-    bar.classList.replace('tb-tight', 'tb-rows');
+    bar.classList.add('tb-more');
+    // Con lo demás en «Más», a lo mejor ya caben la flecha y el «€».
+    bar.classList.remove('tb-tight');
     if (over()) bar.classList.add('tb-tight');
+    // Último escalón (320 px con letra grande): también la felicidad va a «Más».
+    if (over()) bar.classList.add('tb-more2');
   }
+  /** 2.7: «⋯» enseña lo que no cupo en la barra (cada fila abre lo mismo que su botón). */
+  $('#hud-more').addEventListener('click', () => {
+    const rows: HTMLElement[] = [];
+    const add = (sel: string, label: string) => {
+      const src = document.querySelector<HTMLElement>(sel);
+      if (!src || src.hidden) return;
+      const b = h('button', { class: 'btn wide more-row' }, label);
+      b.addEventListener('click', () => {
+        closeSheet();
+        src.click();
+      });
+      rows.push(b);
+    };
+    add('#hud-pop', `Vecinos: ${state.citizens.length}`);
+    add('#hud-happy', `Felicidad: ${happyText.textContent}`);
+    add('#hud-poll', $('#hud-poll').getAttribute('aria-label') ?? 'Intención de voto');
+    add('#ai-chip', 'Lo que piensa el pueblo (IA)');
+    const el = sheet('Más datos', ...rows);
+    el.classList.add('half');
+  });
   let lastStats = state.stats.length;
   let lastLevel = townLevel(state);
   let upgradeWarned = townLevel(state) - 1;
@@ -734,13 +774,23 @@ export function startGame(opts: GameOptions): void {
       moneyText.dataset.v = moneyNum;
       moneyText.replaceChildren(moneyNum, h('span', { class: 'tb-unit' }, ' €'));
     }
+    // 2.7: si el último mes fue en negativo, cuántos meses aguanta la caja (en rojo si son menos de 3).
+    const lastM = state.stats.at(-1);
+    const net = lastM ? lastM.income - lastM.expenses : 0;
+    const months = net < 0 && state.treasury > 0 ? Math.floor(state.treasury / -net) : -1;
+    const runKey = months >= 0 && months < 3 ? (months === 0 ? '<1 m' : `${months} m`) : '';
+    if (runway.dataset.v !== runKey) {
+      runway.dataset.v = runKey;
+      runway.textContent = runKey;
+      runway.hidden = !runKey;
+    }
     moneyTrend.textContent = diff > 0 ? '▲' : diff < 0 ? '▼' : '';
     moneyTrend.className = `trend ${diff > 0 ? 'up' : diff < 0 ? 'down' : ''}`;
     $('#hud-money').classList.toggle('neg', state.treasury < 0);
     // 2.2: en ámbar si los préstamos se llevan más del 25 % de lo que entra.
     const heavy = state.treasury >= 0 && heavyLoad(state);
     $('#hud-money').classList.toggle('load', heavy);
-    $('#hud-money').setAttribute('aria-label', `Caja del ayuntamiento: ${money(state.treasury)}${diff > 0 ? ', subiendo' : diff < 0 ? ', bajando' : ''}${heavy ? `; los préstamos se llevan el ${loadPct(state)} % de lo que entra` : ''}. Ver cuentas`);
+    $('#hud-money').setAttribute('aria-label', `Caja del ayuntamiento: ${money(state.treasury)}${diff > 0 ? ', subiendo' : diff < 0 ? ', bajando' : ''}${heavy ? `; los préstamos se llevan el ${loadPct(state)} % de lo que entra` : ''}${runKey ? `; a este ritmo la caja aguanta ${months === 0 ? 'menos de un mes' : months === 1 ? '1 mes' : `${months} meses`}` : ''}. Ver cuentas`);
     popText.textContent = String(state.citizens.length);
     $('#hud-pop').setAttribute('aria-label', `Habitantes: ${state.citizens.length}. Ver la lista`);
     const happy = state.citizens.length ? Math.round(state.citizens.reduce((s, c) => s + c.happiness, 0) / state.citizens.length) : 0;
@@ -873,7 +923,7 @@ export function startGame(opts: GameOptions): void {
         const d = [...state.dilemmas].reverse().find((x) => !x.resolved && (e.ref === undefined || x.citizenIds[0] === e.ref));
         sfx.warn();
         calmPause();
-        attention(d ? dilemmaSpot(state, d.id) : undefined, true, 'un asunto difícil');
+        attention(d ? dilemmaSpot(state, d.id) : undefined, true, 'un asunto difícil', 'importante');
         toast(e.text, { kind: 'warn', sticky: true, onClick: d ? () => openDilemmaSheet(dilemmaCtx, d.id) : undefined });
       } else if (e.kind === 'warning' && e.text.startsWith('No decidiste a tiempo')) {
         toast(e.text, { kind: 'warn', sticky: true });
@@ -951,7 +1001,7 @@ export function startGame(opts: GameOptions): void {
         if (bad) {
           sfx.warn();
           calmPause();
-          if (/Disturbios|llenos|^Escándalo/.test(e.text)) attention(refSpot(e.ref) ?? state.buildings.find((b) => b.kind === 'police' && b.built), false, /Disturbios/.test(e.text) ? 'los disturbios' : /llenos/.test(e.text) ? 'los calabozos llenos' : 'el escándalo');
+          if (/Disturbios|llenos|^Escándalo/.test(e.text)) attention(refSpot(e.ref) ?? state.buildings.find((b) => b.kind === 'police' && b.built), false, /Disturbios/.test(e.text) ? 'los disturbios' : /llenos/.test(e.text) ? 'los calabozos llenos' : 'el escándalo', /Disturbios/.test(e.text) ? 'emergencia' : 'importante');
         }
         toast(e.text, { kind: bad ? 'warn' : 'good', sticky: /Disturbios|llenos|^Escándalo/.test(e.text), onClick: e.ref ? () => focusBuilding(e.ref!) : undefined });
       } else if (e.kind === 'fire') {
@@ -1928,8 +1978,12 @@ export function startGame(opts: GameOptions): void {
   const bar = $('#tools');
   const tray = $('#tray');
   const coarse = matchMedia('(pointer: coarse)').matches;
+  /** 2.7: el nombre de la pestaña, con uno corto para el texto grande (nunca solo el icono). */
+  const SHORT: Record<string, string> = { Carretera: 'Calle', Construir: 'Obras', Derribar: 'Quitar' };
+  const tabLabel = (label: string, short = SHORT[label] ?? label) =>
+    h('span', { class: 'tab-label', 'aria-hidden': 'true' }, h('span', { class: 'tl-long' }, label), h('span', { class: 'tl-short' }, short));
   const tab = (id: string, icon: string, label: string, cls = '') => {
-    const b = h('button', { class: `tab ${cls}`, id: `tab-${id}`, 'aria-label': label }, pixelIcon(icon), h('span', { class: 'tab-label', 'aria-hidden': 'true' }, label));
+    const b = h('button', { class: `tab ${cls}`, id: `tab-${id}`, 'aria-label': label }, pixelIcon(icon), tabLabel(label));
     return b;
   };
   const tabInspect = tab('inspect', 'inspect', 'Mirar');
@@ -1946,7 +2000,7 @@ export function startGame(opts: GameOptions): void {
   tabRoad.onclick = () => selectTool('road');
   tabDemolish.onclick = () => selectTool('demolish');
   tabBuild.onclick = () => (tray.hidden ? openTray() : closeTray());
-  $('#menu').replaceChildren(pixelIcon('town'), h('span', { class: 'tab-label', 'aria-hidden': 'true' }, 'Pueblo'));
+  $('#menu').replaceChildren(pixelIcon('town'), tabLabel('Pueblo'));
   $('#menu').classList.add('tab');
 
   // La bandeja: por categorías, con precio y lo que falta para lo bloqueado.
@@ -2096,13 +2150,15 @@ export function startGame(opts: GameOptions): void {
     // Ronda 22: con otra herramienta, la franja enseña su ayuda (no el «Deshacer» de la obra anterior).
     if (undo && id !== tool.id) hideUndo();
     tool = tl;
+    // 2.7: con una herramienta elegida, lo que flota sobre el mapa (burbujas) no roba toques.
+    document.body.classList.toggle('tool-active', id !== 'inspect');
     const inTray = TRAY.some((c) => c.tools.includes(id));
     for (const b of [tabInspect, tabRoad, tabDemolish]) b.setAttribute('aria-pressed', String(b.dataset.tool === id));
     tabBuild.setAttribute('aria-pressed', String(inTray));
     for (const b of tray.querySelectorAll('.tool')) b.setAttribute('aria-pressed', String(b.getAttribute('data-tool') === id));
     // La pestaña «Construir» enseña lo elegido: se ve qué hay en la mano.
-    if (inTray) tabBuild.replaceChildren(h('span', { class: 'tab-sprite' }, toolIcon(tl)), h('span', { class: 'tab-label', 'aria-hidden': 'true' }, tl.label));
-    else tabBuild.replaceChildren(pixelIcon('build'), h('span', { class: 'tab-label', 'aria-hidden': 'true' }, 'Construir'));
+    if (inTray) tabBuild.replaceChildren(h('span', { class: 'tab-sprite' }, toolIcon(tl)), tabLabel(tl.label, 'Obras'));
+    else tabBuild.replaceChildren(pixelIcon('build'), tabLabel('Construir'));
     tabBuild.setAttribute('aria-label', inTray ? `Construir: ${tl.label} elegido. Cambiar` : 'Construir');
     // Ronda 21: al trazar (carretera, zonas, densidad), «Capas» y «?» se apartan: un toque en esa esquina
     // abría las capas en vez de marcar la casilla. Vuelven con «Mirar» o con otra herramienta.
@@ -3078,6 +3134,8 @@ export function startGame(opts: GameOptions): void {
     }
   }
 
+  /** 2.7: el aviso de x10 sale una vez por sesión (antes, cada vez que se ponía). */
+  let x10Warned = false;
   function setSpeed(s: number) {
     if (lost && s > 0) return;
     // Modo tranquilo: como mucho x1.
@@ -3085,7 +3143,8 @@ export function startGame(opts: GameOptions): void {
       toast('Modo tranquilo: la velocidad máxima es x1 (Ajustes).', { kind: 'info' });
       s = 1;
     }
-    if (s === 10 && speed !== 10) {
+    if (s === 10 && speed !== 10 && !x10Warned) {
+      x10Warned = true;
       toast(
         state.aiMode
           ? 'x10 con la IA activa: gasta más por hora y muchas decisiones no llegarán a tiempo (las tomarán las reglas).'
@@ -3189,6 +3248,15 @@ export function startGame(opts: GameOptions): void {
   $('#zoom-out').onclick = () => setZoom(cam.zoom - 1);
   $('#menu').onclick = () => (currentSheet()?.querySelector('#sheet-title')?.textContent === 'Pueblo' ? closeSheet() : openHub());
   $('#hud-money').onclick = () => withBack('Pueblo', openHub, openAccounts);
+  // 2.7: «⌂» vuelve al ayuntamiento (el centro del pueblo) desde donde sea.
+  $('#home').onclick = () => {
+    const hall = hallSpot();
+    if (!hall) return;
+    if (cam.zoom < touchZoom()) setZoom(touchZoom());
+    if (reducedMotion()) centerOn(hall.x, hall.y);
+    else glide({ x: cam.x, y: cam.y }, () => { centerOn(hall.x, hall.y); return { x: cam.x, y: cam.y }; }, () => undefined);
+    highlight = { x: hall.x, y: hall.y, since: performance.now() };
+  };
   $('#hud-pop').onclick = () => withBack('Pueblo', openHub, openPeople);
   $('#hud-happy').onclick = () => withBack('Pueblo', openHub, openHappiness);
   $('#bell').onclick = openLog;
@@ -3306,7 +3374,8 @@ export function startGame(opts: GameOptions): void {
   // 2.1: «Mientras no estabas», una tarjeta que se desliza (no durante el tutorial).
   if (away && !tutorial.active) openAway(token, state, away, { openCitizen: (id) => openCitizen(social, id), openRank: () => openRank(state) });
   introGeography();
-  if (!tutorial.active && resume === 0) toast(`En pausa. Pulsa ▶ (${matchMedia('(orientation: landscape) and (max-height: 500px)').matches ? 'arriba' : 'arriba a la izquierda'}) para que pase el tiempo.`);
+  // 2.7: en pausa, ⏯ late (antes, un aviso fijo tapaba la parte de arriba del mapa).
+  if (!tutorial.active && resume === 0) $('#sr-live').textContent = 'En pausa. Pulsa ▶ para que pase el tiempo.';
   // Sonido: se desbloquea con el primer gesto; el ambiente sigue la hora del juego.
   const unlock = () => unlockAudio();
   window.addEventListener('pointerdown', unlock, { once: true });
