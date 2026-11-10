@@ -9,9 +9,13 @@ import {
   OBJECTIVES,
   replay,
   runSimulation,
+  removeBuilding,
   SCENARIOS,
   scenarioFx,
+  scenarioProgress,
+  scenarioResult,
   scenarioStatus,
+  validateCommand,
   seedRng,
   step,
   Terrain,
@@ -151,5 +155,46 @@ describe('escenarios', () => {
     const s = createInitialState({ seed: 4, aiMode: true, aiShare: 50, scenario: 'quiebra' });
     for (let id = 1; id < 400; id++) expect(byShare(s, id)).toBe(aiByShare(s, id));
     expect(checkInvariants(s)).toEqual([]);
+  });
+});
+
+describe('2.8: «Tras la riada» solo se gana reconstruyendo', () => {
+  it('guarda las casillas destrozadas; derribar no vale y lo cerrado queda pendiente hasta que haya algo encima', () => {
+    const s = createInitialState({ seed: 2, scenario: 'riada' });
+    const sites = s.scenario.goal?.sites ?? [];
+    expect(sites).toHaveLength(SCENARIOS.riada.damaged);
+    const wreck = s.buildings.find((b) => b.id === sites[0]!.id)!;
+    expect(validateCommand(s, { type: 'Demolish', x: wreck.x, y: wreck.y }).ok).toBe(false);
+    // Repararlo cuesta ≈ materiales × 1,5, y como poco `repairMin`.
+    expect(wreck.damaged!.cost).toBeGreaterThanOrEqual(SCENARIOS.riada.repairMin);
+    expect(wreck.damaged!.cost).toBeLessThan(10_000);
+    // Una tienda que cierra (se quita el edificio): su casilla sigue pendiente.
+    const shop = s.buildings.find((b) => b.kind === 'shop' && b.damaged)!;
+    removeBuilding(s, shop.id);
+    expect(scenarioProgress(s).text).toMatch(/^6 por reparar/);
+    // Reparado (la obra terminada) sí cuenta.
+    delete wreck.damaged;
+    expect(scenarioProgress(s).text).toMatch(/^5 por reparar/);
+    expect(scenarioStatus(s)?.short).toMatch(/^1\/6 reparado · \d+\/62 vecinos$/);
+  });
+
+  it('casual y constructor lo ganan reparando; el pasivo no gana ni cobra la ayuda', () => {
+    // Medido con 3 semillas (casual: meses 9, 17 y 9; constructor: 13, 14 y 16); aquí, las rápidas.
+    for (const [profile, seed] of [['casual', 1], ['casual', 3], ['constructor', 1]] as const) {
+      const { state: s, report } = runSimulation({ seed, days: 30 * 15, profile, scenario: 'riada', checkEveryDay: false });
+      expect(s.scenario.won, `${profile} ${seed}`).toBe(true);
+      expect(report.commands.some((c) => c.cmd.type === 'RepairBuilding')).toBe(true);
+      expect(report.commands.some((c) => c.cmd.type === 'Demolish' && s.scenario.goal?.sites?.some((x) => x.x === c.cmd.x && x.y === c.cmd.y))).toBe(false);
+      expect(scenarioResult(s)).toMatchObject({ id: 'riada', won: true });
+      expect(scenarioResult(s)!.months).toBeLessThanOrEqual(15);
+    }
+    const idle = runSimulation({ seed: 2, days: 30 * 25, profile: 'pasivo', scenario: 'riada', checkEveryDay: false });
+    expect(idle.state.scenario.won ?? false).toBe(false);
+    expect(idle.state.grants.find((g) => g.emergency)?.status).toBe('expired');
+  }, 120_000);
+
+  it('el jugador que intenta derribarlo todo el primer día no se libra: tiene que reparar', () => {
+    const s = createInitialState({ seed: 3, scenario: 'riada' });
+    for (const b of s.buildings.filter((x) => x.damaged)) expect(validateCommand(s, { type: 'Demolish', x: b.x, y: b.y }).ok).toBe(false);
   });
 });

@@ -627,12 +627,24 @@ export interface Tourism {
 export interface Scenario {
   id: ScenarioId;
   /** Meta medible: superávit (meses seguidos), vecinos o reparar lo destrozado (y llegar a `target` vecinos). */
-  goal?: { kind: 'superavit' | 'vecinos' | 'reparar'; target: number; progress?: number };
+  goal?: {
+    kind: 'superavit' | 'vecinos' | 'reparar';
+    target: number;
+    progress?: number;
+    /**
+     * 2.8: en «Tras la riada», las casillas que destrozó (y el edificio que había). Solo
+     * cuentan como hechas si se repara ese edificio o se construye otro encima.
+     * Opcional: en las partidas de antes se cuentan los destrozos que queden.
+     */
+    sites?: { x: number; y: number; id: number }[];
+  };
   /** Tick límite para cumplirla. */
   deadline?: number;
   done: boolean;
   /** Se cumplió (si no, venció sin cumplirse). */
   won?: boolean;
+  /** 2.8: tick en que terminó (cumplida o vencida), para «Cumplida en 13 meses». */
+  endedTick?: number;
 }
 
 /** 2.3: ciclo comarcal (region.ts): bonanza, normal o crisis hasta `until`; `warned`: ya se avisó del cambio. */
