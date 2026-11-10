@@ -272,7 +272,10 @@ function shortProgress(state: GameState): { short: string; ratio: number } {
     case 'quiebra': {
       const m = sc.goal?.progress ?? 0;
       const T = SCENARIOS.quiebra.surplusMonths;
-      return { short: `${m}/${T} meses`, ratio: Math.min(1, m / T) };
+      // Ronda 25: la meta también pide que la caja pague lo que se debe; la barra lo dice al llegar a los meses.
+      const net = state.treasury - owed(state);
+      const debt = m >= T && net <= 0 ? ` · faltan ${fmtEur(-net + 1)}` : '';
+      return { short: `${m}/${T} meses${debt}`, ratio: Math.min(m >= T && net <= 0 ? 0.95 : 1, m / T) };
     }
     case 'vaciado':
       return { short: `${pop}/${SCENARIOS.vaciado.goalPop} vecinos`, ratio: Math.min(1, pop / SCENARIOS.vaciado.goalPop) };

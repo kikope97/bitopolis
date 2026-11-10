@@ -68,7 +68,7 @@ export function openLoans(getState: () => GameState, command: Cmd): void {
       {},
       'Cada mes se comparan las cuotas con lo que ingresa el ayuntamiento (media de 12 meses). A: menos del 10 % y seis meses en que lo que entra cubre el gasto de cada mes (las obras y lo que amortizas no cuentan). B: menos del 20 %. C: menos del 35 % o un préstamo de tesorería en el último año. D: más, dos de tesorería o quiebra. ',
       'Si la caja cubre todo lo que debes, la nota no baja de B. El banco no te presta tanto que la nota caiga a C. ',
-      'Si la caja cierra un mes en negativo, el banco cubre el hueco con un préstamo de tesorería a 12 meses, más caro, y la nota baja.',
+      'Si la caja cierra un mes en negativo, el banco cubre el hueco con un préstamo de tesorería a 12 meses, más caro, y la nota baja (salvo si el hueco es pequeño: menos de la cuarta parte de lo que entra en un mes).',
     ),
   );
   const parts: (Node | string)[] = [head, how];

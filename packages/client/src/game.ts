@@ -481,7 +481,7 @@ export function startGame(opts: GameOptions): void {
       }, () => {
         toast(text, { kind: 'info', sticky: true, go: `at:${wx},${wy}` });
         setTimeout(() => glide({ x: cam.x, y: cam.y }, () => from, () => {}), 3500);
-      });
+      }, () => toast(text, { kind: 'info', sticky: true, go: `at:${wx},${wy}` }));
     }, 1500);
   }
   /** v1.8: a x3/x10, un calendario arriba a la izquierda que pasa la hoja cada día. */
@@ -506,12 +506,17 @@ export function startGame(opts: GameOptions): void {
     }
   }
   /** Desliza la cámara de `from` al destino que calcula `to` (en 1 s). */
-  function glide(from: { x: number; y: number }, to: () => { x: number; y: number }, done: () => void) {
+  /** Ronda 25: cualquier gesto del jugador (rueda, toque, arrastre, teclas) corta el deslizamiento. */
+  let glideGen = 0;
+  const stopGlide = () => { glideGen++; };
+  function glide(from: { x: number; y: number }, to: () => { x: number; y: number }, done: () => void, onStop: () => void = () => undefined) {
     const target = to();
     cam.x = from.x;
     cam.y = from.y;
     const t0 = performance.now();
+    const gen = ++glideGen;
     const stepFn = (now: number) => {
+      if (gen !== glideGen) return onStop();
       const k = Math.min(1, (now - t0) / 1000);
       const e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
       cam.x = Math.round(from.x + (target.x - from.x) * e);
@@ -577,7 +582,7 @@ export function startGame(opts: GameOptions): void {
     glide({ x: cam.x, y: cam.y }, () => {
       centerOn(at.x, at.y);
       return { x: cam.x, y: cam.y };
-    }, () => restartAnimations());
+    }, () => restartAnimations(), () => restartAnimations());
   }
   /**
    * 2.1: al subir de rango, «attention» suave: fanfarria, destello en el cartel
@@ -809,7 +814,6 @@ export function startGame(opts: GameOptions): void {
       setTimeout(() => tabBuild.classList.remove('pulse'), 8000);
     }
     lastLevel = lv;
-    celebrate.update(state);
     // 2.0: una tarjeta por turno del pueblo (en vez de muchos avisos sueltos).
     const lastTurn = state.ai?.log.at(-1);
     if (lastTurn && lastTurn.n > turnLogSeen) {
@@ -922,6 +926,8 @@ export function startGame(opts: GameOptions): void {
     if (!$('#tray').hidden) updateToolLocks();
     renderObjectives(state);
     announceEvents();
+    // Ronda 25: después de los avisos, para que la tarjeta quite el aviso repetido del mismo suceso.
+    celebrate.update(state);
     tutorial.update(state, tool.id);
     canvas.setAttribute(
       'aria-label',
@@ -1533,6 +1539,7 @@ export function startGame(opts: GameOptions): void {
   canvas.addEventListener('touchend', (e) => e.cancelable && e.preventDefault(), { passive: false });
   canvas.addEventListener('pointerdown', (e) => {
     cancelAnimationFrame(flingRaf);
+    stopGlide();
     closeTray();
     fling = { vx: 0, vy: 0, t: performance.now() };
     touchInput = e.pointerType !== 'mouse';
@@ -1661,6 +1668,7 @@ export function startGame(opts: GameOptions): void {
     'wheel',
     (e) => {
       e.preventDefault();
+      stopGlide();
       // 2.8: un paso por cada golpe de rueda (~100) hacia el puntero; los pasos pequeños del panel táctil se suman.
       const dy = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaMode === 2 ? e.deltaY * 800 : e.deltaY;
       if (Math.sign(dy) !== Math.sign(wheelAcc)) wheelAcc = 0;
@@ -2234,6 +2242,12 @@ export function startGame(opts: GameOptions): void {
     return `Casilla ${t.x}, ${t.y}: ${what}${zone}${can}`;
   }
 
+  // Ronda 25: tras un clic de ratón el botón no se queda con el foco (si no, Espacio lo vuelve a pulsar en vez de pausar).
+  document.addEventListener('click', (e) => {
+    if (e.detail === 0) return;
+    const b = (e.target as HTMLElement | null)?.closest?.('button');
+    if (b && b === document.activeElement && !b.closest('.modal-backdrop, .hoy-backdrop')) b.blur();
+  });
   window.addEventListener('keydown', (e) => {
     if (document.querySelector('.modal-backdrop, .hoy-backdrop')) return;
     const target = e.target as HTMLElement;
@@ -2272,14 +2286,17 @@ export function startGame(opts: GameOptions): void {
     }
     // Atajos de una tecla (letras y signos): se pueden quitar en Ajustes (WCAG 2.1.4) y nunca con Ctrl/Alt/Cmd.
     if (k.length === 1 && k !== ' ' && (!prefs().shortcuts || e.ctrlKey || e.metaKey || e.altKey)) return;
-    if (k === 'ArrowLeft' || k === 'a') cam.x -= step;
-    else if (k === 'ArrowRight' || k === 'd') cam.x += step;
-    else if (k === 'ArrowUp' || k === 'w') cam.y -= step;
-    else if (k === 'ArrowDown' || k === 's') cam.y += step;
+    // Ronda 25: con Bloq Mayús las letras llegan en mayúscula; los atajos valen igual.
+    const kl = k.length === 1 ? k.toLowerCase() : k;
+    if (k.startsWith('Arrow') || 'wasd'.includes(kl) && kl.length === 1) stopGlide();
+    if (k === 'ArrowLeft' || kl === 'a') cam.x -= step;
+    else if (k === 'ArrowRight' || kl === 'd') cam.x += step;
+    else if (k === 'ArrowUp' || kl === 'w') cam.y -= step;
+    else if (k === 'ArrowDown' || kl === 's') cam.y += step;
     else if (k === '+' || k === '=') setZoom(cam.zoom + 1);
     else if (k === '-') setZoom(cam.zoom - 1);
     else if (k === 'Home') $('#home').click();
-    else if (k === 'l') setLayer(LAYERS[(LAYERS.findIndex((l) => l.id === layer) + 1) % LAYERS.length]!.id);
+    else if (kl === 'l') setLayer(LAYERS[(LAYERS.findIndex((l) => l.id === layer) + 1) % LAYERS.length]!.id);
     // Atajo de Ajustes: solo la tecla sola (Ctrl+O abre archivos en el navegador), con o sin mayúsculas.
     else if (k.toLowerCase() === 'o') openSettingsGame();
     else if (k === ' ' && target.tagName !== 'BUTTON') {
@@ -2290,7 +2307,7 @@ export function startGame(opts: GameOptions): void {
       else if (isSheetOpen()) closeSheet();
       else if (!cancelStep()) selectTool('inspect');
     } else {
-      const tl = TOOLS.find((x) => x.key === k);
+      const tl = TOOLS.find((x) => x.key === kl);
       if (tl) selectTool(tl.id);
       else return;
     }
@@ -3811,9 +3828,11 @@ export function startGame(opts: GameOptions): void {
     if (!askSeeded) {
       // Al abrir no se frena por lo que ya estaba a punto de vencer.
       for (const a of asksNow) if (left(a) <= ASK_LAST_DAYS * TICKS_PER_DAY) askSlowed.add(a.key);
-    } else if (speed >= 3 && prefs().slowFor !== 'nada' && slowGapOk()) {
-      const hit = asksNow.find((a) => a.due !== undefined && !askSlowed.has(a.key) && (left(a) <= ASK_LAST_DAYS * TICKS_PER_DAY || (!before.has(a.key) && left(a) <= ASK_SLOW_DAYS * TICKS_PER_DAY)));
-      if (hit) {
+    } else if (speed >= 3 && prefs().slowFor !== 'nada') {
+      const last = (a: Ask) => left(a) <= ASK_LAST_DAYS * TICKS_PER_DAY;
+      const hit = asksNow.find((a) => a.due !== undefined && !askSlowed.has(a.key) && (last(a) || (!before.has(a.key) && left(a) <= ASK_SLOW_DAYS * TICKS_PER_DAY)));
+      // Ronda 25: los últimos 2 días no esperan los 60 s (a x10 son ~4 s y caducaría sin frenar).
+      if (hit && (slowGapOk() || last(hit))) {
         askSlowed.add(hit.key);
         const was = speed;
         setSpeed(1);

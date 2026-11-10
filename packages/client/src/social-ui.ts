@@ -144,7 +144,7 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
       statusBar(happy >= 65 ? 'ok' : happy >= 40 ? 'warn' : 'bad', mood[0]!.toUpperCase() + mood.slice(1), `${happy} de 100`, moneyWords),
       h('div', { class: 'fc-main cz-talk' }, h('p', { class: 'cz-talk-h' }, 'Hablar'), ask, answer),
     ),
-    h('p', {}, `${c.owns ? (c.mortgage > 0 ? `${owner} (le quedan ${money(c.mortgage)} de hipoteca)` : owner) : c.homeId === null ? 'Sin casa' : 'De alquiler'} · ${job ? `trabaja en ${workplaceText(job)}` : c.unemployedSince !== undefined ? 'en paro' : 'trabaja fuera'}`),
+    h('p', {}, `${c.owns ? (c.mortgage > 0 ? `${owner} (le quedan ${money(c.mortgage)} de hipoteca)` : owner) : c.homeId === null ? 'Sin casa' : 'De alquiler'} · ${job ? `${/^jubilad/.test(c.profession) ? 'sigue trabajando' : 'trabaja'} en ${workplaceText(job)}` : c.unemployedSince !== undefined ? 'en paro' : 'trabaja fuera'}`),
     c.kids?.length ? h('p', { class: 'muted small' }, c.kids.length === 1 ? 'Tiene un hijo en casa.' : `Tiene ${c.kids.length} hijos en casa.`) : '',
     hook ? h('p', { class: 'hook' }, h('strong', {}, 'Ahora mismo: '), `${HOOK_TEXT[hook.kind]}.`) : '',
     // 2.0: lo que piensa y planea (si piensa con IA).

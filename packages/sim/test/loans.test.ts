@@ -112,8 +112,8 @@ describe('préstamos municipales (2.2)', () => {
     expect(t.rate).toBeCloseTo(LOANS.rate.B * LOANS.treasuryPenalty, 6);
     expect(s.rating).toBe('C');
     expect(s.events.some((e) => e.text.includes('préstamo de tesorería'))).toBe(true);
-    // Otra vez en negativo: se refinancia en el mismo préstamo y la nota cae a D.
-    transfer(s, TREASURY, OUTSIDE, s.treasury + 500, 'obras');
+    // Otra vez en negativo (y no es poco: ronda 25): se refinancia en el mismo préstamo y la nota cae a D.
+    transfer(s, TREASURY, OUTSIDE, s.treasury + 2_500, 'obras');
     closeMonth(s, 8_000, 8_000);
     expect(s.loans.filter((l) => l.kind === 'tesoreria')).toHaveLength(1);
     expect(s.rating).toBe('D');

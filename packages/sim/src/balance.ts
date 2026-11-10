@@ -368,6 +368,8 @@ export const LOANS = {
    * por si bajan los ingresos): pedir el máximo deja la nota en B, no en D.
    */
   capLoad: 0.18,
+  /** Ronda 25: una tesorería menor que esta parte de los ingresos medios del mes no cuenta para la nota. */
+  smallGap: 0.25,
   /** Con la carga por encima, el 💰 de la barra se pone en ámbar (2.8: 0,25 → 0,15, que el tope ya no llega a 0,25). */
   warnLoad: 0.15,
 } as const;

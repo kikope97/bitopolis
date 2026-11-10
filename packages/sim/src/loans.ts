@@ -251,9 +251,12 @@ export function loansMonth(state: GameState): void {
       state.loans.push({ id: state.nextId++, principal: gap, left: gap, quota: quota(gap, rate, LOANS.treasuryMonths), rate, monthsLeft: LOANS.treasuryMonths, kind: 'tesoreria', tick: state.tick });
     }
     state.loanLedger.lent += gap;
-    state.loanLedger.treasuryTicks.push(state.tick);
+    // Ronda 25: un descubierto pequeño (menos del 25 % de lo que entra al mes) no baja la nota;
+    // si no, dos sustos de 1.000 € dejaban la D y sin banco (y de ahí a la quiebra).
+    const counts = gap >= LOANS.smallGap * averageIncome(state);
+    if (counts) state.loanLedger.treasuryTicks.push(state.tick);
     transfer(state, OUTSIDE, TREASURY, gap, 'préstamo');
-    pushEvent(state, 'warning', `La caja cerró el mes en negativo: el banco cubre ${fmt(gap)} € con un préstamo de tesorería a ${LOANS.treasuryMonths} meses (más caro, y la nota baja)`, { notify: true });
+    pushEvent(state, 'warning', `La caja cerró el mes en negativo: el banco cubre ${fmt(gap)} € con un préstamo de tesorería a ${LOANS.treasuryMonths} meses (más caro${counts ? ', y la nota baja' : '; al ser poco, la nota no baja'})`, { notify: true });
   }
   // Ronda 18: con nota D, nadie cubre la caja en negativo, pero sí se pagan intereses de demora.
   if (state.treasury < 0 && prev === 'D') {
