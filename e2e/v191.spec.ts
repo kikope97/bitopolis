@@ -52,12 +52,12 @@ test('v1.9.1: la barra de confirmar avisa si la caja quedaría en negativo; en e
   await page.getByRole('button', { name: 'Continuar' }).click();
   await expect(page.locator('.tut-box')).toBeVisible();
 
-  // Con la bandeja abierta, el cuadro del tutorial va abajo y no tapa el motivo de la bandeja.
+  // Con la bandeja abierta, el cuadro del tutorial no tapa el motivo de la bandeja (2.8: va arriba, bajo la barra).
   await page.locator('#tab-build').click();
   await expect(page.locator('#tray')).toBeVisible();
   const msg = (await page.locator('#tray .tray-msg').boundingBox())!;
   const box = (await page.locator('.tut-box').boundingBox())!;
-  expect(box.y).toBeGreaterThanOrEqual(msg.y + msg.height);
+  expect(box.y + box.height <= msg.y || box.y >= msg.y + msg.height, 'el tutorial no tapa el motivo').toBe(true);
   await page.screenshot({ path: `test-results/capturas/${info.project.name}-v191-1-bandeja-tutorial.png` });
   await page.locator('#tray [data-tool="house"]').click();
 

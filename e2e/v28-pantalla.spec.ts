@@ -191,8 +191,10 @@ test('2.8: con una hoja abierta, el aviso no tapa su cabecera (móvil y escritor
     expect(r.t, 'encima del borde de la hoja').toBeLessThanOrEqual(r.s + 1);
   }
   await setSpeed(page, 0);
-  // Escritorio: el panel lateral; el aviso, fuera de él (otra visita: el aviso de x10 vuelve a salir).
+  // Escritorio: el panel lateral; el aviso, fuera de él (otra visita).
   await page.setViewportSize({ width: 1280, height: 800 });
+  // 2.8 (A): el aviso de x10 sale una vez por partida; se olvida para que vuelva a salir.
+  await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('bitopolis.once.')) localStorage.removeItem(k); });
   await page.reload();
   await page.getByRole('button', { name: 'Continuar' }).click();
   await setSpeed(page, 0);
