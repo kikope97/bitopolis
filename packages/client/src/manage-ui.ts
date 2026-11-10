@@ -16,6 +16,7 @@ import {
   TOWNHALL_LEVELS,
   townLevel,
   UPKEEP,
+  monthNet,
 } from '@bitopolis/sim';
 import { money, MONTHS } from './i18n.ts';
 import { monthFlow, splitText } from './cash.ts';
@@ -157,14 +158,15 @@ export function openManagement(ctx: SocialCtx, links: ManageLinks, fresh?: strin
   const pop = s.citizens.length;
   const happy = pop ? Math.round(s.citizens.reduce((a, c) => a + c.happiness, 0) / pop) : 0;
   const last = s.stats.at(-1);
-  const net = last ? last.income - last.expenses : 0;
+  // 2.8: el neto del mes (`monthNet`: sin obras ni préstamos), como el parte y «Hoy».
+  const net = last ? monthNet(last).net : 0;
   const how = card(
     'Cómo va el pueblo',
     'people',
     row('Vecinos', String(pop)),
     row('Felicidad media', `${happy} %`, happy < 50 ? 'neg' : ''),
     row('En caja', money(s.treasury), s.treasury < 0 ? 'neg' : ''),
-    ...(last ? [row(`Último mes (${MONTHS[(tickToDate(s.tick).month + 10) % 12]})`, `${net >= 0 ? '+' : ''}${money(net)}`, net < 0 ? 'neg' : '')] : []),
+    ...(last ? [row(`Último mes (${MONTHS[(tickToDate(s.tick).month + 10) % 12]}, sin obras)`, `${net >= 0 ? '+' : ''}${money(net)}`, net < 0 ? 'neg' : '')] : []),
   );
   // 2.7: el gasto corriente y las obras, por separado (una estación de tren no es gasto de cada mes).
   if (last) how.append(h('p', { class: 'muted small', 'data-test': 'month-split' }, `${splitText(last)}.`));

@@ -84,7 +84,8 @@ test('2.2: con mucha carga, el 💰 se pone en ámbar y Préstamos lo avisa', as
   page.on('pageerror', (e) => errors.push(e.message));
   if (info.project.name === 'movil') await page.setViewportSize({ width: 360, height: 740 });
   const { state } = runSimulation({ seed: 42, days: 300, profile: 'casual', checkEveryDay: false });
-  // Ronda 18: lo máximo a 12 meses (el banco ya no deja pasar del 35 % de lo que entra), por encima del 25 %.
+  // Ronda 18: lo máximo a 12 meses. 2.8: el banco ya no deja pasar del 18 % de lo que entra (la nota no cae a C)
+  // y el 💰 se pone en ámbar desde el 15 % (`LOANS.warnLoad`).
   expect(applyCommand(state, { type: 'RequestLoan', amount: loanCapacity(state, 12), months: 12 }).ok).toBe(true);
   await openTown(page, request, state);
   await expect(page.locator('#hud-money')).toHaveClass(/\bload\b/);
@@ -92,7 +93,7 @@ test('2.2: con mucha carga, el 💰 se pone en ámbar y Préstamos lo avisa', as
   await page.locator('#menu').click();
   await expect(page.getByRole('button', { name: /^Préstamos · nota/ })).toHaveClass(/attn/);
   await page.getByRole('button', { name: /^Préstamos · nota/ }).click();
-  await expect(page.locator('.loan-head')).toContainText(/carga (muy )?alta/);
+  await expect(page.locator('.loan-head')).toContainText(/carga (media|alta|muy alta)/);
   await page.screenshot({ path: `test-results/capturas/${info.project.name}-prestamos-3-carga.png` });
   expect(errors).toEqual([]);
 });

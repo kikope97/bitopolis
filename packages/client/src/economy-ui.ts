@@ -1,7 +1,7 @@
 import type { Command, TaxLevel } from '@bitopolis/shared';
-import { BUILD_NAMES, ownIncome, worksSpent, totalDebt, type Citizen, type GameState, IBI_RATE, MIN_WAGE, type MinWageLevel, PLUSVALIA_RATE, TASA_BASURAS, TASA_TERRAZAS, TAX_SPLIT_POP, trashActive, trashFee, trashServed, unitValue } from '@bitopolis/sim';
+import { BUILD_NAMES, IBI_RATE, ibiForecast, monthNet, totalDebt, type Citizen, type GameState, MIN_WAGE, type MinWageLevel, PLUSVALIA_RATE, TASA_BASURAS, TASA_TERRAZAS, TAX_SPLIT_POP, trashActive, trashFee, trashServed } from '@bitopolis/sim';
 import { money, MONTHS } from './i18n.ts';
-import { splitText } from './cash.ts';
+import { netText, splitText } from './cash.ts';
 import { economyLines } from './money-ui.ts';
 import { maintenanceSection } from './nucleo-ui.ts';
 import { h, sheet } from './ui.ts';
@@ -59,13 +59,8 @@ function estimate(state: GameState, key: 'ibi' | 'tasas' | 'plusvalia', lv: TaxL
     const fees = state.citizens.reduce((a, c) => a + (c.homeId === null ? 0 : trashFee(state, TASA_BASURAS[lv], served.get(c.homeId))), 0);
     return `≈ ${money(fees + shops * TASA_TERRAZAS[lv])}/mes`;
   }
-  let total = 0;
-  for (const b of state.buildings) {
-    if (!b.built) continue;
-    const units = b.kind === 'res' ? 4 : b.kind === 'house' ? (b.privateUnits ?? 0) : b.kind === 'shop' || b.kind === 'factory' ? 1 : 0;
-    total += (units * unitValue(state, b) * IBI_RATE[lv]) / 12;
-  }
-  return `≈ ${money(Math.round(total))}/mes`;
+  // 2.8: la misma cuenta que el cobro (densidad, fincas, gran empresa, casas vacías y quemadas).
+  return `≈ ${money(ibiForecast(state, lv))}/mes`;
 }
 
 export function openTaxes(getState: () => GameState, command: Cmd): void {
@@ -178,8 +173,11 @@ const CONCEPT: Record<string, string> = {
   'viviendas municipales': 'Comunidad de las casas municipales',
   obras: 'Obras',
   intereses: 'Intereses de la deuda',
-  préstamo: 'Préstamos recibidos',
+  préstamo: 'Préstamo recibido',
   préstamos: 'Cuotas de los préstamos',
+  // 2.8: lo devuelto antes de tiempo (loans.ts).
+  amortización: 'Amortización anticipada',
+  subvenciones: 'Subvenciones',
   alquileres: 'Alquileres municipales',
   IBI: 'IBI',
   tasas: 'Tasas',
@@ -194,46 +192,80 @@ const CONCEPT: Record<string, string> = {
   'multa del río': 'Multa de la Confederación (río sucio)',
 };
 
-/** Parte mensual: ingresos y gastos con flechas y «por qué baja tu saldo» con nombres. */
+/**
+ * 2.8: claves del parte que son lo mismo con otro nombre. La comarca apunta
+ * «subvencion» (comarca.ts) y el resto del juego «subvenciones»; se juntan aquí
+ * para no cambiar el concepto en el motor (cambiaría el hash de las partidas).
+ */
+const CONCEPT_ALIAS: Record<string, string> = { subvencion: 'subvenciones' };
+
+/** El desglose de un mes con los alias juntos. */
+export function mergedBreakdown(bd: Record<string, number>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(bd)) {
+    const key = CONCEPT_ALIAS[k] ?? k;
+    out[key] = (out[key] ?? 0) + v;
+  }
+  return out;
+}
+
+const isWorks = (k: string) => k.startsWith('obras') || k.startsWith('reparaciones');
+
+/**
+ * Parte mensual: ingresos y gastos con flechas y «por qué baja tu saldo» con nombres.
+ * 2.8 (ronda 24): la cabecera es el neto del mes (`monthNet`): «Entra» (sin el
+ * préstamo) menos «Sale cada mes» (sin las obras). El préstamo recibido, las obras
+ * y lo amortizado van en sus líneas aparte, así que la cabecera cuadra con las líneas.
+ */
 export function openReport(state: GameState): void {
   const last = state.stats.at(-1);
   const prev = state.stats.at(-2);
   if (!last) {
-    sheet('Parte mensual', h('p', {}, 'Aún no ha terminado ningún mes.'), h('h3', {}, 'Este mes (en curso)'), rows(state.month.breakdown, undefined), maintenanceSection(state));
+    sheet('Parte mensual', h('p', {}, 'Aún no ha terminado ningún mes.'), h('h3', {}, 'Este mes (en curso)'), rows(mergedBreakdown(state.month.breakdown), undefined), maintenanceSection(state));
     return;
   }
   const monthName = MONTHS[(last.month - 1 + 12) % 12] ?? '';
-  // Ronda 18: lo prestado no cuenta como superávit.
-  const net = ownIncome(last) - last.expenses;
-  const reasons = Object.entries(last.breakdown)
-    .filter(([, v]) => v < 0)
+  const n = monthNet(last);
+  const net = n.net;
+  const bd = mergedBreakdown(last.breakdown);
+  const prevBd = prev ? mergedBreakdown(prev.breakdown) : undefined;
+  const pick = (f: (k: string, v: number) => boolean) => Object.fromEntries(Object.entries(bd).filter(([k, v]) => f(k, v)));
+  const income = pick((k, v) => v > 0 && k !== 'préstamo');
+  const spend = pick((k, v) => v < 0 && !isWorks(k) && k !== 'amortización');
+  const once = pick((k, v) => v < 0 && (isWorks(k) || k === 'amortización'));
+  const reasons = Object.entries(spend)
     .sort((a, b) => a[1] - b[1])
     .slice(0, 2)
     .map(([k, v]) => `${CONCEPT[k] ?? k} (${money(v)})${k === 'sueldos' ? `: ${publicWorkers(state)}` : ''}`);
-  const income = Object.fromEntries(Object.entries(last.breakdown).filter(([, v]) => v > 0));
-  const spend = Object.fromEntries(Object.entries(last.breakdown).filter(([, v]) => v < 0));
   const biggest = Object.entries(spend).sort((a, b) => a[1] - b[1])[0];
   const sentence =
     net >= 0
       ? `Sobran ${money(net)}.${biggest ? ` Tu mayor gasto: ${(CONCEPT[biggest[0]] ?? biggest[0]).toLowerCase()} (${money(-biggest[1])}).` : ''}`
-      : `Por qué baja tu saldo: ${reasons.join('; ')}.${net + worksSpent(last) >= 0 ? ` Sin las obras, el mes habría salido en +${money(net + worksSpent(last))}: el gasto de cada mes se cubre.` : ''}`;
+      : `Por qué baja tu saldo: ${reasons.join('; ')}.`;
+  const aside = [
+    n.works ? `Aparte, ${money(n.works)} en obras, que se pagan una vez.` : '',
+    n.repaid ? `Devolviste ${money(n.repaid)} de préstamos antes de tiempo.` : '',
+    n.loansIn ? `El banco prestó ${money(n.loansIn)}: entra en la caja, pero no cuenta como ingreso.` : '',
+  ].filter(Boolean);
   const live = Object.keys(state.month.breakdown).length;
   sheet(
     `Parte de ${monthName}`,
-    h('p', { class: 'big-number' }, `${net >= 0 ? '▲ sube' : '▼ baja'} ${money(Math.abs(net))} este mes`),
-    h('p', {}, sentence),
-    h('h3', {}, `Entra: ${money(last.income)}`),
-    rows(income, prev?.breakdown),
-    h('h3', {}, `Sale: ${money(last.expenses)}`),
-    // 2.7: el gasto de cada mes y las obras (que se pagan una vez), por separado.
-    worksSpent(last) ? h('p', { class: 'muted small', 'data-test': 'report-split' }, `${splitText(last)}. Las obras se pagan una vez; el gasto corriente, cada mes.`) : '',
-    rows(spend, prev?.breakdown),
+    h('p', { class: 'big-number', 'data-test': 'report-net' }, `${net >= 0 ? '▲' : '▼'} ${netText(net)} este mes`),
+    h('p', {}, `Entra ${money(n.own)} y el gasto de cada mes es de ${money(n.running)}. ${sentence}`),
+    aside.length ? h('p', { class: 'muted small', 'data-test': 'report-split' }, `${aside.join(' ')}${n.works || n.repaid ? ` ${splitText(last)}.` : ''}`) : '',
+    h('h3', {}, `Entra: ${money(n.own)}`),
+    rows(income, prevBd),
+    n.loansIn ? h('ul', { class: 'accounts', 'data-test': 'report-loan' }, h('li', { class: 'muted' }, h('span', {}, 'Préstamo recibido', h('span', { class: 'p-sub' }, 'no cuenta en «Entra»: se devuelve')), h('span', {}, `+${money(n.loansIn)}`))) : '',
+    h('h3', {}, `Sale cada mes: ${money(n.running)}`),
+    rows(spend, prevBd),
+    Object.keys(once).length ? h('h3', {}, `Una vez: ${money(n.works + n.repaid)}`) : '',
+    Object.keys(once).length ? rows(once, prevBd) : '',
     // 2.6: el mantenimiento, por tipo de edificio.
     maintenanceSection(state),
     // v1.9: los vecinos que no llegan y la salud de las empresas.
     h('h3', {}, 'Vecinos y empresas'),
     h('ul', { class: 'accounts' }, ...economyLines(state).map((l) => h('li', { class: l.bad ? 'neg' : '' }, h('span', {}, l.label), h('span', { class: 'num' }, l.bad ? `⚠ ${l.value}` : l.value)))),
-    live ? h('details', { class: 'advanced' }, h('summary', {}, 'Este mes (en curso)'), rows(state.month.breakdown, undefined)) : '',
+    live ? h('details', { class: 'advanced' }, h('summary', {}, 'Este mes (en curso)'), rows(mergedBreakdown(state.month.breakdown), undefined)) : '',
   );
 }
 
