@@ -363,8 +363,13 @@ export const LOANS = {
   /** Umbrales de la carga para cada nota y meses de superávit para la A. */
   load: { A: 0.1, B: 0.2, C: 0.35 },
   surplusMonths: 6,
-  /** Con la carga por encima, el 💰 de la barra se pone en ámbar. */
-  warnLoad: 0.25,
+  /**
+   * 2.8 (ronda 24): tope de la carga al pedir (por debajo de `load.B`, con margen
+   * por si bajan los ingresos): pedir el máximo deja la nota en B, no en D.
+   */
+  capLoad: 0.18,
+  /** Con la carga por encima, el 💰 de la barra se pone en ámbar (2.8: 0,25 → 0,15, que el tope ya no llega a 0,25). */
+  warnLoad: 0.15,
 } as const;
 
 /* ---------------- v0.3: tributos y vivienda ---------------- */

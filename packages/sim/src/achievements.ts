@@ -56,7 +56,8 @@ export function debtFreeMonths(state: GameState): number {
   for (let i = state.stats.length - 1; i >= 0; i--) {
     const m = state.stats[i]!;
     const bd = m.breakdown ?? {};
-    if (m.treasury < 0 || bd['préstamo'] || bd['préstamos'] || bd['intereses'] || ownIncome(m) < m.income) break;
+    // 2.8: lo amortizado antes de tiempo va con su propio concepto («amortización», loans.ts).
+    if (m.treasury < 0 || bd['préstamo'] || bd['préstamos'] || bd['amortización'] || bd['intereses'] || ownIncome(m) < m.income) break;
     n++;
   }
   return n;

@@ -318,7 +318,10 @@ function planner(name: string, o: PlannerOpts): Profile {
       }
       // 2.2: el perfil endeudado pide todo lo que le dejen, a 48 meses.
       if (o.borrow === 'maximo') {
-        const cap = loanCapacity(state);
+        // 2.8: el tope a 48 meses (con el tope de carga nuevo, el general casi siempre lo pasaba y no pedía
+        // nada); como antes, espera a que el préstamo sea grande (la mitad de lo que le dejaría deber).
+        const cap48 = loanCapacity(state, 48);
+        const cap = cap48 >= loanCapacity(state) / 2 ? cap48 : 0;
         if (cap >= LOANS.min && canRequestLoan(state, cap, 48).ok) out.push({ type: 'RequestLoan', amount: cap, months: 48 });
       }
       const pop = state.citizens.length;
