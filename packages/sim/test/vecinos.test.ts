@@ -48,7 +48,7 @@ describe('oficio según la edad', () => {
     c.name = 'Rosa Gil';
     c.age = CARE.pensionAge - 1;
     c.profession = 'enfermero';
-    const old = { ...c, id: c.id + 1000, name: 'Celia Ortega', age: 30, profession: 'jubilado', memories: [], relations: [] };
+    const old = { ...c, id: c.id + 1000, name: 'Celia Ortega', age: 30, profession: 'jubilado', memories: [] as typeof c.memories, relations: [] as typeof c.relations };
     s.citizens.push(old);
     lifeYear(s);
     expect(c.profession).toBe('jubilado');
