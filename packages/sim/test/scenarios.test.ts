@@ -184,7 +184,7 @@ describe('2.8: «Tras la riada» solo se gana reconstruyendo', () => {
       const { state: s, report } = runSimulation({ seed, days: 30 * 15, profile, scenario: 'riada', checkEveryDay: false });
       expect(s.scenario.won, `${profile} ${seed}`).toBe(true);
       expect(report.commands.some((c) => c.cmd.type === 'RepairBuilding')).toBe(true);
-      expect(report.commands.some((c) => c.cmd.type === 'Demolish' && s.scenario.goal?.sites?.some((x) => x.x === c.cmd.x && x.y === c.cmd.y))).toBe(false);
+      expect(report.commands.some(({ cmd }) => cmd.type === 'Demolish' && s.scenario.goal?.sites?.some((x) => x.x === cmd.x && x.y === cmd.y))).toBe(false);
       expect(scenarioResult(s)).toMatchObject({ id: 'riada', won: true });
       expect(scenarioResult(s)!.months).toBeLessThanOrEqual(15);
     }
