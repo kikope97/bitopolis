@@ -623,10 +623,14 @@ export function startGame(opts: GameOptions): void {
   const slowGo = h('button', { class: 'btn small', id: 'slow-go', 'data-test': 'slow-go' }, 'Ver ›');
   let slowGoRef: string | undefined;
   $('#slow-note').append(slowGo);
+  /** Ronda 25: velocidad que vuelve al cerrar la hoja (tras «Ver ›» o si la nota caducó con una hoja abierta). */
+  let resumeAfterSheet = 0;
   slowGo.addEventListener('click', () => {
     const fn = slowGoRef ? goTo(slowGoRef) : undefined;
+    const to = calmNote ? 0 : slowFrom;
     hideSlowNote();
     fn?.();
+    if (to > 1 && isSheetOpen()) resumeAfterSheet = to;
   });
   function showNote(text: string, back: string, to: number, go: string | undefined, auto: boolean) {
     const note = $('#slow-note');
@@ -642,7 +646,8 @@ export function startGame(opts: GameOptions): void {
     slowTimer = window.setTimeout(() => {
       const to = slowFrom;
       hideSlowNote();
-      if (to > 1 && speed === 1 && !isSheetOpen() && !document.querySelector('.modal-backdrop, .hoy-backdrop')) setSpeed(to);
+      if (to > 1 && speed === 1 && isSheetOpen()) resumeAfterSheet = to;
+      else if (to > 1 && speed === 1 && !document.querySelector('.modal-backdrop, .hoy-backdrop')) setSpeed(to);
     }, 20_000);
   }
   function slowNote(before: number, o: { why?: string; text?: string; go?: string } = {}) {
@@ -3701,6 +3706,9 @@ export function startGame(opts: GameOptions): void {
     $('#menu').setAttribute('aria-expanded', String(title === 'Pueblo'));
     // 2.7: al cerrar la ficha, el mapa vuelve a donde estaba.
     if (title === null) restoreCam();
+    // Ronda 25: la velocidad que se prometió («Vuelvo a xN») vuelve al cerrar la hoja.
+    if (title === null && resumeAfterSheet > 1 && speed === 1 && !document.querySelector('.modal-backdrop, .hoy-backdrop')) setSpeed(resumeAfterSheet);
+    if (title === null) resumeAfterSheet = 0;
   });
   $('#menu').setAttribute('aria-expanded', 'false');
   const openPeople = () => openNeighbours(state, (c) => withBack('Vecinos', () => withBack('Pueblo', openHub, openPeople), () => openCitizen(social, c.id)));
@@ -3830,7 +3838,8 @@ export function startGame(opts: GameOptions): void {
       for (const a of asksNow) if (left(a) <= ASK_LAST_DAYS * TICKS_PER_DAY) askSlowed.add(a.key);
     } else if (speed >= 3 && prefs().slowFor !== 'nada') {
       const last = (a: Ask) => left(a) <= ASK_LAST_DAYS * TICKS_PER_DAY;
-      const hit = asksNow.find((a) => a.due !== undefined && !askSlowed.has(a.key) && (last(a) || (!before.has(a.key) && left(a) <= ASK_SLOW_DAYS * TICKS_PER_DAY)));
+      // Ronda 25: los encargos no frenan (no pasa nada si caducan, y volvían una y otra vez); siguen en la campana.
+      const hit = asksNow.find((a) => a.due !== undefined && !a.key.startsWith('errand:') && !askSlowed.has(a.key) && (last(a) || (!before.has(a.key) && left(a) <= ASK_SLOW_DAYS * TICKS_PER_DAY)));
       // Ronda 25: los últimos 2 días no esperan los 60 s (a x10 son ~4 s y caducaría sin frenar).
       if (hit && (slowGapOk() || last(hit))) {
         askSlowed.add(hit.key);
@@ -4136,6 +4145,7 @@ export function startGame(opts: GameOptions): void {
     }
   }
   function userSpeed(s: number) {
+    resumeAfterSheet = 0;
     setSpeed(s);
     try {
       localStorage.setItem(speedKey, String(speed));
