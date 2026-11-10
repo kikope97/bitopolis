@@ -183,7 +183,7 @@ function offerGrant(state: GameState): void {
   });
   const until = tickToDate(state.tick + days * TICKS_PER_DAY);
   const late = days < GRANT_OFFER_DAYS ? '. La postal llega tarde: sin oficina de correos hay menos días para responder' : '';
-  pushEvent(state, 'info', `La Diputación ofrece pagar el ${Math.round(share * 100)} % de ${GRANT_NAME[kind]}. Responde antes del ${until.day}/${until.month}${late}`);
+  pushEvent(state, 'info', `La Diputación ofrece pagar el ${Math.round(share * 100)} % ${ofGrant(kind)}. Responde antes del ${until.day}/${until.month}${late}`);
 }
 
 export const GRANT_NAME: Partial<Record<BuildingKind, string>> = {
@@ -201,6 +201,12 @@ export const GRANT_NAME: Partial<Record<BuildingKind, string>> = {
   cathedral: 'la catedral',
 };
 
+/** 2.8 (ronda 24): «de» + el nombre, con la contracción («del estadio», no «de el estadio»). */
+export function ofGrant(kind: BuildingKind): string {
+  const n = GRANT_NAME[kind] ?? kind;
+  return n.startsWith('el ') ? `del ${n.slice(3)}` : `de ${n}`;
+}
+
 /** 2.3: ¿es una subvención de las de antes (una obra con anticipo y plazo)? Las de las grandes obras y el FEDER van aparte. */
 const classic = (g: Grant) => g.landmark === undefined && !g.feder;
 
@@ -216,20 +222,20 @@ export function grantTerms(g: Grant): { offer: string; terms: string; accepted: 
   }
   if (g.feder) {
     return {
-      offer: `Fondos europeos (FEDER) por la crisis: pagan el ${pct} de cada fase de ${GRANT_NAME[g.kind] ?? g.kind} que empiece en ${REGION.feder.months} meses.`,
+      offer: `Fondos europeos (FEDER) por la crisis: pagan el ${pct} de cada fase ${ofGrant(g.kind)} que empiece en ${REGION.feder.months} meses.`,
       terms: 'Sin anticipo ni recargo: se cobra al pagar cada fase.',
-      accepted: `Aceptado el FEDER: ${pct} de cada fase de ${GRANT_NAME[g.kind] ?? g.kind} hasta el ${dateText(g.deadline)}.`,
+      accepted: `Aceptado el FEDER: ${pct} de cada fase ${ofGrant(g.kind)} hasta el ${dateText(g.deadline)}.`,
     };
   }
   if (g.landmark !== undefined) {
     return {
       offer: `La Diputación cofinancia ${GRANT_NAME[g.kind] ?? g.kind}: paga el ${pct} de cada fase.`,
       terms: 'Sin anticipo ni plazo: se cobra al pagar cada fase, aunque la obra se pare entre fases.',
-      accepted: `Cofinanciación aceptada: la Diputación paga el ${pct} de cada fase de ${GRANT_NAME[g.kind] ?? g.kind}.`,
+      accepted: `Cofinanciación aceptada: la Diputación paga el ${pct} de cada fase ${ofGrant(g.kind)}.`,
     };
   }
   return {
-    offer: `Pagan el ${pct} de ${GRANT_NAME[g.kind] ?? g.kind} si se termina en 6 meses.`,
+    offer: `Pagan el ${pct} ${ofGrant(g.kind)} si se termina en 6 meses.`,
     terms: 'Al aceptar cobras un anticipo del 30 %. Si no lo terminas a tiempo, lo devuelves con un 10 % de recargo.',
     accepted: `Aceptada: ${GRANT_NAME[g.kind] ?? g.kind}, ${pct}. Anticipo cobrado: ${fmt(g.advance)} €. Plazo hasta el ${dateText(g.deadline)}.`,
   };
@@ -308,7 +314,7 @@ export function onBuildingDone(state: GameState, b: Building): void {
   const rest = Math.max(0, Math.round(estimatedCost(state, g.kind) * g.share) - g.advance);
   transfer(state, OUTSIDE, TREASURY, rest, 'subvenciones');
   g.status = 'paid';
-  pushEvent(state, 'milestone', `La Diputación paga la subvención de ${GRANT_NAME[g.kind]}: ${rest} € más`);
+  pushEvent(state, 'milestone', `La Diputación paga la subvención ${ofGrant(g.kind)}: ${rest} € más`);
 }
 
 /* ---------------- calendario ---------------- */

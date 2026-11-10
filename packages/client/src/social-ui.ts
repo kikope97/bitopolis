@@ -197,8 +197,9 @@ function memoryLines(state: GameState, c: GameState['citizens'][number]): string
   for (const m of [...c.memories].reverse()) {
     const text = memoryText(state, m);
     const same = out.find((o) => o.text === text);
-    if (same) same.n++;
-    else out.push({ text, n: 1 });
+    // 2.8: el motor ya junta los repetidos y los cuenta en `times`.
+    if (same) same.n += m.times ?? 1;
+    else out.push({ text, n: m.times ?? 1 });
   }
   return out.map((o) => (o.n > 1 ? `${o.text} (×${o.n})` : o.text));
 }

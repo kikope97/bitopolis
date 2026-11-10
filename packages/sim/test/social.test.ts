@@ -172,8 +172,10 @@ describe('memoria en 3 capas', () => {
   it('máximo 5 recuerdos (se olvida el menos importante) y resumen de plantilla', () => {
     const s = createInitialState({ seed: 2 });
     const c = s.citizens[0]!;
-    for (let i = 0; i < 8; i++) addMemory(s, c, i === 3 ? 'promesa_rota' : 'hablo_con_alcalde', i === 3 ? 5 : 1, 0);
-    expect(c.memories.length).toBe(MEMORY_MAX);
+    // 2.8: los repetidos se juntan y las anclas (la llegada) no cuentan: 8 recuerdos distintos que rotan.
+    const kinds = ['hablo_con_alcalde', 'voto', 'rumor', 'promesa_rota', 'mitin', 'susto', 'excursion', 'subida_impuestos'] as const;
+    for (let i = 0; i < 8; i++) addMemory(s, c, kinds[i]!, i === 3 ? 5 : 1, 0);
+    expect(c.memories.filter((m) => m.kind !== 'llego').length).toBe(MEMORY_MAX);
     expect(c.memories.some((m) => m.kind === 'promesa_rota')).toBe(true);
     expect(narrativeSummary(s, c)).toContain('Lucía');
   });

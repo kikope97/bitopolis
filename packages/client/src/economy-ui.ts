@@ -1,5 +1,5 @@
 import type { Command, TaxLevel } from '@bitopolis/shared';
-import { BUILD_NAMES, IBI_RATE, ibiForecast, monthNet, totalDebt, type Citizen, type GameState, MIN_WAGE, type MinWageLevel, PLUSVALIA_RATE, TASA_BASURAS, TASA_TERRAZAS, TAX_SPLIT_POP, trashActive, trashFee, trashServed } from '@bitopolis/sim';
+import { BUILD_NAMES, IBI_RATE, ibiForecast, isFemaleName, monthNet, totalDebt, type Citizen, type GameState, MIN_WAGE, type MinWageLevel, PLUSVALIA_RATE, TASA_BASURAS, TASA_TERRAZAS, TAX_SPLIT_POP, trashActive, trashFee, trashServed } from '@bitopolis/sim';
 import { money, MONTHS } from './i18n.ts';
 import { netText, splitText } from './cash.ts';
 import { economyLines } from './money-ui.ts';
@@ -322,7 +322,7 @@ export function openNeighbours(state: GameState, onPick: (c: Citizen) => void, o
         // 2.0: en Modo IA, los vecinos con nombre piensan con IA.
         state.aiMode && state.ai ? h('span', { class: 'ai-mark', title: 'Piensa con IA' }, ' ✦') : '',
         h('span', {}, ` (${mood[1]})`),
-        h('span', { class: 'p-sub muted' }, `${c.age} años · ${job ? (job.name ?? BUILD_NAMES[job.kind]) : c.unemployedSince !== undefined ? 'en paro' : 'trabaja fuera'}${c.owns ? ' · propietario' : ''}`, totalDebt(c) > 0 ? h('span', { class: 'pocket-warn' }, ` · debe ${money(totalDebt(c))}`) : ''),
+        h('span', { class: 'p-sub muted' }, `${c.age} años · ${job ? (job.name ?? BUILD_NAMES[job.kind]) : c.unemployedSince !== undefined ? 'en paro' : 'trabaja fuera'}${c.owns ? (isFemaleName(c.name) ? ' · propietaria' : ' · propietario') : ''}`, totalDebt(c) > 0 ? h('span', { class: 'pocket-warn' }, ` · debe ${money(totalDebt(c))}`) : ''),
       ),
     );
     btn.addEventListener('click', () => onPick(c));

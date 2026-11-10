@@ -20,7 +20,7 @@ import { earlyReady, systemOn } from './gates.ts';
 import { rankCandidates } from './rank.ts';
 import { rivalAiWanted, rivalPromptData } from './rival-ai.ts';
 import { inventedName, inventedNumber, toneOf } from './prompt.ts';
-import { GOAL_TEXT, HOOK_TEXT, hookFor, memoryText, narrativeSummary, NEED_TEXT, NEEDS, needsOf } from './social.ts';
+import { GOAL_TEXT, HOOK_TEXT, hookFor, memoryText, narrativeSummary, NEED_TEXT, NEEDS, needsOf, professionOf } from './social.ts';
 import type { Citizen, GameState } from './state.ts';
 import { LANDMARK_EFFECT, LANDMARK_NAMES } from './landmarks.ts';
 import { ruralHomes, touristified } from './tourism.ts';
@@ -253,7 +253,8 @@ function citizenBrief(state: GameState, c: Citizen) {
     vecino: c.id,
     nombre: c.name,
     edad: c.age,
-    profesion: c.profession,
+    // 2.8: con su género («enfermera»).
+    profesion: professionOf(c),
     rasgos: { terquedad: c.traits.terco, ahorrador: c.traits.ahorro, sociable: c.traits.social, ambicioso: c.traits.ambicion },
     tono: toneOf(c),
     deseo: c.desire.replace('_', ' '),

@@ -1,6 +1,6 @@
 import { monthFlow } from './cash.ts';
 import { TICKS_PER_DAY, tickToDate } from '@bitopolis/shared';
-import { type GameState, hash32, monthNet, rankName } from '@bitopolis/sim';
+import { type GameState, hash32, monthNet, professionOf, rankName } from '@bitopolis/sim';
 import { type Ask, dueSoon, dueText } from './asks.ts';
 import { formatDate, money, plural } from './i18n.ts';
 import { portraitCanvas } from './social-ui.ts';
@@ -138,7 +138,7 @@ export function openHoy(state: GameState, since: AwaySince, asks: readonly Ask[]
     // Su frase: lo que piensa (IA o reglas); si no, cómo anda. El resumen largo va en su ficha.
     const mood = c.happiness >= 70 ? 'Aquí se vive bien.' : c.happiness >= 45 ? 'Vamos tirando.' : 'Esto tiene que mejorar.';
     const said = c.thought?.trim() || mood;
-    const who = h('button', { class: 'hoy-face', 'aria-label': `La cara del día: ${c.name}. Ver su ficha` }, portraitCanvas(c.id, 3, 'portrait hoy-portrait'), h('span', { class: 'hoy-who' }, h('strong', {}, c.name), h('span', { class: 'hoy-sub' }, `${c.age} años${c.profession ? ` · ${c.profession}` : ''}`), h('span', { class: 'hoy-quote' }, `«${said}»`)));
+    const who = h('button', { class: 'hoy-face', 'aria-label': `La cara del día: ${c.name}. Ver su ficha` }, portraitCanvas(c.id, 3, 'portrait hoy-portrait'), h('span', { class: 'hoy-who' }, h('strong', {}, c.name), h('span', { class: 'hoy-sub' }, `${c.age} años${c.profession ? ` · ${professionOf(c)}` : ''}`), h('span', { class: 'hoy-quote' }, `«${said}»`)));
     who.addEventListener('click', () => close(() => act.openCitizen(c.id)));
     face = h('section', { class: 'hoy-day', 'aria-label': 'La cara del día' }, h('h3', {}, 'La cara del día'), who);
   }
