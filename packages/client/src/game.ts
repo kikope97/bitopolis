@@ -98,6 +98,7 @@ import {
   nextLevel,
   OBJECTIVES,
   politicsActive,
+  monthNet,
 } from '@bitopolis/sim';
 import { contractBox, openTender } from './tender-ui.ts';
 import { makeBubble, openPreview, openUsage } from './ai-ui.ts';
@@ -118,7 +119,7 @@ import { dilemmaSpot, openDilemmaSheet, type DilemmaCtx } from './dilemma-ui.ts'
 import { objectiveText, objectivesNode, openAdvisor, openCitizen, openDiary, openPleno, portraitCanvas, rememberSeen, renderObjectives, resumeSummary, type SocialCtx } from './social-ui.ts';
 import { api, ApiError } from './api.ts';
 import { nextHint } from './hints.ts';
-import { buildCostParts, monthsText, runwayMonths, runwayWarn } from './cash.ts';
+import { buildCostParts, lastNet, monthsText, netText, runwayMonths, runwayWarn, streakText } from './cash.ts';
 import { openManagement } from './manage-ui.ts';
 import { openErrands, openPress } from './town-news-ui.ts';
 import { openWhatsHappening, turnHeadline } from './ai-town-ui.ts';
@@ -789,8 +790,11 @@ export function startGame(opts: GameOptions): void {
       lastStats = state.stats.length;
       const m = state.stats.at(-1);
       if (m) {
-        const net = m.income - m.expenses;
-        toast(`Parte del mes: ${net >= 0 ? '▲ +' : '▼ '}${money(net)}. ${verbo({ cap: true, en: false })} para verlo.`, { kind: net >= 0 ? 'good' : 'warn', go: 'accounts' });
+        // 2.8: el neto del mes (`monthNet`: sin obras ni préstamos), como el parte, «Hoy» y el panel «Pueblo».
+        const mn = monthNet(m);
+        const net = mn.net;
+        const streak = streakText(state);
+        toast(`Parte del mes: ${net >= 0 ? '▲ ' : '▼ '}${netText(net)}${mn.works ? ` (aparte, ${money(mn.works)} en obras)` : ''}.${streak ? ` ${streak}.` : ''} ${verbo({ cap: true, en: false })} para verlo.`, { kind: net >= 0 ? 'good' : 'warn', go: 'accounts' });
         if (net > 0) {
           sfx.coin();
           const th = state.buildings.find((b) => b.kind === 'townhall');
@@ -3384,7 +3388,8 @@ export function startGame(opts: GameOptions): void {
 
     const pop = state.citizens.length;
     const last = state.stats.at(-1);
-    const net = last ? last.income - last.expenses : null;
+    // 2.8: el neto del mes, el mismo en todas partes (sin obras ni préstamos).
+    const net = lastNet(state);
     const happy = pop ? Math.round(state.citizens.reduce((a, c) => a + c.happiness, 0) / pop) : 0;
     const d = tickToDate(state.tick);
     const budgetOpen = state.budget.status === 'open' && state.budget.year === d.year;

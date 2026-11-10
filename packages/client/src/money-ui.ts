@@ -1,5 +1,5 @@
 import { TICKS_PER_DAY, tickToDate } from '@bitopolis/shared';
-import { type Citizen, canMicrocredit, DEBT, canSettleDebt, type GameState, MICROCREDIT, type Pocket, pocketOf, totalDebt } from '@bitopolis/sim';
+import { type Citizen, canMicrocredit, DEBT, canSettleDebt, type GameState, MICROCREDIT, ownIncome, type Pocket, pocketOf, totalDebt } from '@bitopolis/sim';
 import { formatDate, money } from './i18n.ts';
 import type { SocialCtx } from './social-ui.ts';
 import { confirmDialog, h, toast } from './ui.ts';
@@ -127,7 +127,7 @@ export function economyLines(state: GameState): { label: string; value: string; 
     { label: 'En paro', value: String(jobless), bad: jobless / pop > 0.1 },
   ];
   if (last) {
-    out.push({ label: 'Impagos el mes pasado', value: money(last.unpaid ?? 0), bad: (last.unpaid ?? 0) > 0.03 * last.income });
+    out.push({ label: 'Impagos el mes pasado', value: money(last.unpaid ?? 0), bad: (last.unpaid ?? 0) > 0.03 * ownIncome(last) }); // 2.8: sin contar lo prestado
     out.push({ label: 'Sueldo mínimo en las empresas', value: `${money(last.wage ?? 0)}/mes` });
     out.push({ label: 'Margen medio de las empresas', value: money(last.margin ?? 0), bad: (last.margin ?? 0) < 0 });
     out.push({ label: 'Empresas que pierden dinero', value: `${last.losing ?? 0} de ${last.businesses ?? 0}`, bad: (last.losing ?? 0) > 0 });

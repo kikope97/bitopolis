@@ -1,5 +1,5 @@
 import type { Command } from '@bitopolis/shared';
-import { earlyFee, type GameState, LOANS, type Loan, loadBand, loanCapacity, loanLoad, loanOffer, monthlyQuotas, type Rating, validateCommand } from '@bitopolis/sim';
+import { earlyFee, type GameState, LOANS, type Loan, loadBand, loanCapacity, loanLoad, loanOffer, monthlyQuotas, type Rating, ratingAfter, validateCommand } from '@bitopolis/sim';
 import { money } from './i18n.ts';
 import { confirmDialog, h, sheet } from './ui.ts';
 
@@ -17,6 +17,8 @@ const RATING_TEXT: Record<Rating, string> = {
   C: 'Cuentas flojas: los préstamos salen caros y te prestan poco.',
   D: 'Sin crédito: nadie presta al ayuntamiento hasta que mejore.',
 };
+
+const RATING_ORDER: readonly Rating[] = ['A', 'B', 'C', 'D'];
 
 /** Lo elegido en el formulario (se conserva al refrescar la hoja). */
 let amount = 5_000;
@@ -43,6 +45,7 @@ export function openLoans(getState: () => GameState, command: Cmd): void {
   const rating = state.rating ?? 'B';
   const loans = state.loans ?? [];
   const q = monthlyQuotas(state);
+  const projected = state.stats.length ? ratingAfter(state, 0, 12) : rating;
   const head = h(
     'section',
     { class: 'loan-head' },
@@ -52,6 +55,8 @@ export function openLoans(getState: () => GameState, command: Cmd): void {
       {},
       h('p', {}, h('strong', {}, `Nota ${rating}`), q > 0 ? ` · carga ${loadBand(loanLoad(state))} (${loadPct(state)} % de lo que entra)` : ' · sin préstamos'),
       h('p', { class: 'muted small' }, RATING_TEXT[rating]),
+      // 2.8: la nota cambia al cerrar el mes; si va a cambiar, se dice (antes: «Nota A · carga alta» y «Cuentas sanas» a la vez).
+      projected !== rating ? h('p', { class: 'small', 'data-test': 'loan-projected' }, `Al cerrar el mes, la nota pasará a ${projected}.`) : '',
     ),
   );
   const how = h(
@@ -61,7 +66,8 @@ export function openLoans(getState: () => GameState, command: Cmd): void {
     h(
       'p',
       {},
-      'Cada mes se comparan las cuotas con lo que ingresa el ayuntamiento (media de 12 meses). A: menos del 10 % y seis meses ganando dinero. B: menos del 20 %. C: menos del 35 % o un préstamo de tesorería en el último año. D: más, dos de tesorería o quiebra. ',
+      'Cada mes se comparan las cuotas con lo que ingresa el ayuntamiento (media de 12 meses). A: menos del 10 % y seis meses en que lo que entra cubre el gasto de cada mes (las obras y lo que amortizas no cuentan). B: menos del 20 %. C: menos del 35 % o un préstamo de tesorería en el último año. D: más, dos de tesorería o quiebra. ',
+      'Si la caja cubre todo lo que debes, la nota no baja de B. El banco no te presta tanto que la nota caiga a C. ',
       'Si la caja cierra un mes en negativo, el banco cubre el hueco con un préstamo de tesorería a 12 meses, más caro, y la nota baja.',
     ),
   );
@@ -109,8 +115,16 @@ function requestForm(state: GameState, command: Cmd, reopen: () => void): Node[]
   }
   const ask = h('button', { class: 'btn primary wide', id: 'loan-ask' }, `Pedir ${money(amount)}`);
   if (!v.ok) ask.setAttribute('disabled', '');
+  // 2.8 (ronda 24): la nota que quedará, antes de pedirlo (con el dinero gastado y mientras siga en la caja).
+  const now = state.rating ?? 'B';
+  const spent = ratingAfter(state, amount, months, true);
+  const kept = ratingAfter(state, amount, months, false);
+  const afterText =
+    spent !== now
+      ? `Tu nota pasará de ${now} a ${spent} cuando gastes el dinero${kept !== spent ? ` (${kept} mientras lo tengas en la caja)` : ''}.`
+      : `Tu nota seguirá en ${now}.`;
   ask.addEventListener('click', async () => {
-    const ok = await confirmDialog('Pedir préstamo', `El banco ingresa ${money(amount)} en la caja. Devuelves ${money(offer.quota)} al mes durante ${months} meses (TAE ${offer.tae.toLocaleString('es-ES')} %).`, 'Pedirlo');
+    const ok = await confirmDialog('Pedir préstamo', `El banco ingresa ${money(amount)} en la caja. Devuelves ${money(offer.quota)} al mes durante ${months} meses (TAE ${offer.tae.toLocaleString('es-ES')} %). ${afterText}`, 'Pedirlo');
     if (!ok) return;
     await command(cmd);
     reopen();
@@ -127,6 +141,7 @@ function requestForm(state: GameState, command: Cmd, reopen: () => void): Node[]
       h('strong', {}, `${money(offer.quota)} al mes`),
       ` · TAE ${offer.tae.toLocaleString('es-ES')} % · devuelves ${money(offer.total)} en total`,
     ),
+    ...(v.ok ? [h('p', { class: `small${RATING_ORDER.indexOf(spent) > RATING_ORDER.indexOf(now) ? ' neg' : ''}`, 'data-test': 'loan-after' }, afterText)] : []),
     ...(v.ok || cap <= 0 ? [] : [h('p', { class: 'neg small' }, (v as { error: string }).error)]),
     ask,
   ];

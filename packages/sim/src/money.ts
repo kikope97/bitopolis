@@ -22,9 +22,45 @@ export function worksSpent(m: { breakdown: Record<string, number> }): number {
   return Math.max(0, out);
 }
 
-/** 2.7: el gasto corriente de un mes (lo que sale sin contar las obras). */
+/** 2.8: lo devuelto antes de tiempo a un préstamo (no es gasto de cada mes; concepto «amortización»). */
+export function earlyRepaid(m: { breakdown: Record<string, number> }): number {
+  return Math.max(0, -(m.breakdown['amortización'] ?? 0));
+}
+
+/** 2.7: el gasto corriente de un mes (lo que sale sin contar las obras ni lo amortizado). */
 export function runningExpenses(m: { expenses: number; breakdown: Record<string, number> }): number {
-  return Math.max(0, m.expenses - worksSpent(m));
+  return Math.max(0, m.expenses - worksSpent(m) - earlyRepaid(m));
+}
+
+/** 2.8: el dinero de un mes, partido de la misma forma en todas partes. */
+export interface MonthNet {
+  /** Lo que entró sin contar lo prestado. */
+  own: number;
+  /** El gasto corriente: lo que sale cada mes (sin obras ni amortizaciones). */
+  running: number;
+  /** Obras y reparaciones (se pagan una vez). */
+  works: number;
+  /** Préstamos devueltos antes de tiempo. */
+  repaid: number;
+  /** Préstamos recibidos (de tesorería incluidos). */
+  loansIn: number;
+  /** **El neto del mes**: lo propio menos el gasto corriente. */
+  net: number;
+  /** Lo que cambió la caja sin el préstamo: lo propio menos todo lo que salió. */
+  total: number;
+}
+
+/**
+ * 2.8 (ronda 24): un solo «neto del mes». Lo usan el aviso de la caja del motor,
+ * la barra, el parte, «Hoy», el panel «Pueblo», Gestión y la nota del banco, para
+ * que todos digan lo mismo. Puro.
+ */
+export function monthNet(m: { income: number; expenses: number; breakdown: Record<string, number> }): MonthNet {
+  const own = ownIncome(m);
+  const works = worksSpent(m);
+  const repaid = earlyRepaid(m);
+  const running = Math.max(0, m.expenses - works - repaid);
+  return { own, running, works, repaid, loansIn: Math.max(0, m.breakdown['préstamo'] ?? 0), net: own - running, total: own - m.expenses };
 }
 
 export const TREASURY = 0;

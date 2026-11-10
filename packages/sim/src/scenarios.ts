@@ -1,6 +1,6 @@
 import { type ScenarioId, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { BUILD, BUSINESS_SEED_CASH, GRANT_PENALTY, SCENARIOS } from './balance.ts';
-import { ownIncome, OUTSIDE, totalInternalMoney, TREASURY, transfer } from './money.ts';
+import { monthNet, OUTSIDE, totalInternalMoney, TREASURY, transfer } from './money.ts';
 import { nextInt } from './prng.ts';
 import { type Building, type BuildingKind, type GameState, newBuilding, pushEvent, Tile, Zone } from './state.ts';
 import { isWater } from './terrain.ts';
@@ -278,7 +278,8 @@ export function scenariosMonth(state: GameState): void {
   if (sc.done) return;
   if (sc.goal) {
     // Ronda 19: el superávit corriente no cuenta las obras (si no, ganar era no construir nada en 13 meses).
-    if (sc.goal.kind === 'superavit') sc.goal.progress = ownIncome(state.month) > state.month.expenses + (state.month.breakdown['obras'] ?? 0) ? (sc.goal.progress ?? 0) + 1 : 0;
+    // 2.8: con el mismo neto que el resto del juego (`monthNet`: sin obras, reparaciones ni amortizaciones).
+    if (sc.goal.kind === 'superavit') sc.goal.progress = monthNet(state.month).net > 0 ? (sc.goal.progress ?? 0) + 1 : 0;
     else if (sc.goal.kind === 'vecinos') sc.goal.progress = state.citizens.length;
     else sc.goal.progress = floodWrecks(state).length;
   }
