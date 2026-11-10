@@ -658,20 +658,22 @@ export function startGame(opts: GameOptions): void {
   function fitTopbar() {
     const bar = $('.topbar');
     const over = () => bar.scrollWidth > bar.clientWidth + 1;
-    bar.classList.remove('tb-tight', 'tb-rows', 'tb-more', 'tb-more2', 'tb-nounit', 'tb-nocal');
+    bar.classList.remove('tb-tight', 'tb-rows', 'tb-more', 'tb-more2', 'tb-more3', 'tb-nounit', 'tb-nocal');
     if (!over()) return;
     bar.classList.add('tb-tight');
     if (!over()) return;
+    // 2.8 (ronda 24): a «⋯», de lo menos a lo más mirado: votos e IA, la felicidad, el calendario (se quita)
+    // y, lo último, 👥 los vecinos (es lo que más se mira, después de la caja).
     bar.classList.add('tb-more');
     // Con lo demás en «Más», a lo mejor ya caben la flecha y el «€».
     bar.classList.remove('tb-tight');
     if (over()) bar.classList.add('tb-tight');
-    // Último escalón (320 px con letra grande): también la felicidad va a «Más».
     if (over()) bar.classList.add('tb-more2');
-    // Y si ni así cabe, el calendario (es un adorno; la fecha está en la franja).
+    // El calendario es un adorno (la fecha está en la franja).
     if (over()) bar.classList.add('tb-nocal');
-    // 2.7: el «€» se queda mientras quepa; solo se quita si aún no cabe nada más.
+    // 2.7: el «€» se quita antes que los vecinos.
     if (over()) bar.classList.add('tb-nounit');
+    if (over()) bar.classList.add('tb-more3');
   }
   /** 2.7: «⋯» enseña lo que no cupo en la barra (cada fila abre lo mismo que su botón). */
   $('#hud-more').addEventListener('click', () => {
@@ -1367,7 +1369,8 @@ export function startGame(opts: GameOptions): void {
   function previewFor(a: { x: number; y: number }, b: { x: number; y: number }) {
     const cmd = commandFor(tool, a, b);
     if (!cmd) return null;
-    return { tiles: tilesOf(cmd), ok: validateCommand(state, cmd).ok };
+    // 2.8 (ronda 24, parte C): en las zonas, las casillas que quedan sin carretera llevan una ✗ pequeña (render.ts).
+    return { tiles: tilesOf(cmd), ok: validateCommand(state, cmd).ok, noRoad: cmd.type === 'Zone' ? noRoadTiles(cmd) : undefined };
   }
 
   /** Inercia al soltar un deslizamiento (v1.4); un toque la detiene. */
@@ -1712,15 +1715,18 @@ export function startGame(opts: GameOptions): void {
    * Casillas de una zona que no tocan carretera: el motor nunca construye en
    * ellas (`zoneLotWithoutRoad`). Antes de marcar se cuenta a mano; después, con el motor.
    */
-  function noRoadText(cmd: Extract<Command, { type: 'Zone' }>, placed = false): string {
-    if (cmd.zone === 'none') return '';
+  function noRoadTiles(cmd: Extract<Command, { type: 'Zone' }>, placed = false): { x: number; y: number }[] {
+    if (cmd.zone === 'none') return [];
     const { w, h: hh } = state.map;
-    const n = tilesOf(cmd).filter((t) => {
+    return tilesOf(cmd).filter((t) => {
       if (t.x < 0 || t.y < 0 || t.x >= w || t.y >= hh) return false;
       if (placed) return zoneLotWithoutRoad(state, t.x, t.y);
       const i = t.y * w + t.x;
       return state.map.tiles[i] !== Tile.Road && !buildingAt(state, t.x, t.y) && !isWater(state.map.terrain?.[i]) && !hasAdjacentRoad(state, t.x, t.y);
-    }).length;
+    });
+  }
+  function noRoadText(cmd: Extract<Command, { type: 'Zone' }>, placed = false): string {
+    const n = noRoadTiles(cmd, placed).length;
     return n ? `⚠ ${plural(n, 'casilla', 'casillas')} sin carretera: ${n === 1 ? 'ahí' : 'aquí'} no se construirá` : '';
   }
   /** 2.7: tras trazar con el ratón una calle sin agua o luz, la franja lo dice. */

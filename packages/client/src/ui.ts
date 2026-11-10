@@ -237,7 +237,35 @@ export function toast(text: string, opts: { sticky?: boolean; kind?: ToastKind; 
   // v1.6: en la partida, un solo aviso a la vista (el más nuevo); fuera, como mucho 2.
   const max = document.body.classList.contains('in-game') ? 1 : 2;
   while (box.children.length > max) box.firstElementChild?.remove();
+  placeToasts();
 }
+
+/**
+ * 2.8 (ronda 24): con una hoja abierta, el aviso nunca tapa su cabecera (título, «‹» y «✕»). Si cabe
+ * entre la barra de arriba y la hoja, va justo encima de su borde; si no (hoja completa), debajo de la
+ * cabecera. En el panel lateral el CSS ya lo deja fuera; aquí no se toca.
+ */
+export function placeToasts(): void {
+  const box = document.querySelector<HTMLElement>('#toasts');
+  if (!box) return;
+  box.style.removeProperty('top');
+  box.style.removeProperty('bottom');
+  const sh = openSheetEl;
+  if (!sh?.isConnected || !document.body.classList.contains('in-game') || !box.children.length) return;
+  const s = sh.getBoundingClientRect();
+  const b = box.getBoundingClientRect();
+  if (b.right <= s.left || b.left >= s.right || b.bottom <= s.top + 1) return;
+  const barBottom = document.querySelector('.topbar')?.getBoundingClientRect().bottom ?? 0;
+  if (s.top - barBottom >= b.height + 10) {
+    box.style.top = 'auto';
+    box.style.bottom = `${Math.round(window.innerHeight - s.top + 4)}px`;
+  } else {
+    const head = (sh.querySelector('.sheet-head') ?? sh).getBoundingClientRect();
+    box.style.top = `${Math.round(head.bottom + 4)}px`;
+    box.style.bottom = 'auto';
+  }
+}
+let sheetSize: ResizeObserver | null = null;
 
 /** Lo que hará la próxima hoja con su botón «‹» (volver al panel del que se abrió). */
 let pendingBack: { label: string; fn: () => void } | null = null;
@@ -276,6 +304,8 @@ export function closeSheet(fromBack = false) {
   openSheetEl.remove();
   openSheetEl = null;
   document.body.classList.remove('sheet-open');
+  sheetSize?.disconnect();
+  placeToasts();
   sheetWatch?.(null);
   // Si lo que tenía el foco ya no existe (p. ej. el aviso que abrió la hoja), al mapa.
   (lastFocus?.isConnected ? lastFocus : document.querySelector<HTMLElement>('#map'))?.focus();
@@ -348,6 +378,10 @@ export function sheet(title: string | Node, ...content: (Node | string)[]): HTML
   document.body.append(el);
   document.body.classList.add('sheet-open');
   openSheetEl = el;
+  // La hoja cambia de alto (asa, arrastre, contenido): el aviso se recoloca.
+  sheetSize?.disconnect();
+  if (typeof ResizeObserver !== 'undefined') (sheetSize = new ResizeObserver(() => placeToasts())).observe(el);
+  placeToasts();
   sheetWatch?.(titleText);
   close.focus();
   return el;
