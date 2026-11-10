@@ -5,6 +5,7 @@ import {
   applyNeighborAct,
   checkInvariants,
   COMARCA,
+  EARLY,
   comarcaDay,
   comarcaMonth,
   createInitialState,
@@ -32,8 +33,8 @@ const days = (s: GameState, n: number) => {
 /** Pueblo pequeño con la comarca ya creada (sin pasar un mes entero). */
 function town(seed = 3, opts: { aiMode?: boolean; pop?: number } = {}): GameState {
   const s = createInitialState({ seed, aiMode: opts.aiMode ?? false });
-  // 2.6: las ofertas de los pueblos vecinos llegan con el ayuntamiento 3 (o 30 vecinos).
-  s.townhallLevel = 3;
+  // 2.6: las ofertas de los pueblos vecinos llegan con un nivel del ayuntamiento (2.8: el 4) o con sus vecinos (`EARLY`).
+  s.townhallLevel = EARLY.neighborOffers.level;
   const base = s.citizens[0]!;
   while (s.citizens.length < (opts.pop ?? 0)) s.citizens.push({ ...structuredClone(base), id: s.nextId++, money: 0, homeId: null, jobId: null, named: false, flow: [0, 0] });
   transfer(s, OUTSIDE, TREASURY, 50_000, 'subvencion');
