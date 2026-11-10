@@ -2,8 +2,10 @@ import type { Command } from '@bitopolis/shared';
 import { POCKET_TEXT, pocketBox } from './money-ui.ts';
 import { fold, statusBar } from './hub-ui.ts';
 import { mindBox } from './ai-town-ui.ts';
+import { resultLine, retryScenario } from './celebrate-ui.ts';
 import {
   activeObjectives,
+  scenarioResult,
   scenarioStatus,
   type Citizen,
   diary,
@@ -437,9 +439,21 @@ export function objectivesNode(state: GameState): HTMLElement {
   const list = activeObjectives(state);
   // 2.3: la meta del escenario (mientras dura), antes que los objetivos de siempre.
   const sc = scenarioStatus(state);
+  // 2.8: al terminar, el resultado se queda («Cumplida en 13 meses») con «Reintentar».
+  const res = scenarioResult(state);
+  const token = location.pathname.match(/^\/p\/([0-9A-Za-z]{22})/)?.[1];
+  const retry = res && token ? h('button', { class: 'btn', type: 'button', 'data-test': 'scenario-retry' }, 'Reintentar este escenario') : '';
+  if (retry && token) retry.addEventListener('click', () => void retryScenario(state, token));
   const goal = sc
     ? h('p', { class: 'scenario-goal', 'data-scenario': sc.id }, h('strong', {}, `${sc.name}: `), sc.goal, h('br', {}), h('small', {}, `${sc.progress}. ${sc.monthsLeft === 1 ? 'Queda 1 mes' : `Quedan ${sc.monthsLeft} meses`}.`))
-    : '';
+    : res
+      ? h(
+          'div',
+          { class: `scenario-goal scenario-result ${res.won ? 'won' : 'lost'}`, 'data-scenario': res.id, 'data-test': 'scenario-result' },
+          h('p', {}, h('strong', {}, `${res.name}: `), `${res.won ? '✔ ' : ''}${resultLine(res)}.`),
+          retry,
+        )
+      : '';
   if (!list.length) return h('div', {}, goal, h('p', { class: 'muted' }, 'Todos los objetivos cumplidos.'));
   return h('div', {}, goal, h('ul', { class: 'obj-list' }, ...list.map((o) => h('li', {}, `○ ${objectiveText(state, o)}`, h('small', {}, ` +${money(o.reward)}${o.unlock ? ' y un edificio' : ''}`)))));
 }

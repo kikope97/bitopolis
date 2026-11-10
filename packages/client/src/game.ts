@@ -146,6 +146,7 @@ import { shareBlock } from './share-ui.ts';
 import { openElectionNight, openPolitics, renderPollChip } from './politics-ui.ts';
 import { timeOfDay } from './render.ts';
 import { demandExtra, lotBox, monthlyText, networkRoom, networkWarnings, plantLoadBox } from './nucleo-ui.ts';
+import { createCelebrate } from './celebrate-ui.ts';
 
 /** Margen entre toque y arrastre: con el dedo, más (un temblor no es un arrastre). */
 const DRAG_PX = 10;
@@ -696,6 +697,33 @@ export function startGame(opts: GameOptions): void {
   let lastLevel = townLevel(state);
   let upgradeWarned = townLevel(state) - 1;
   const albumSeen = { n: state.album?.length ?? 0 };
+  // 2.8 (parte D): tarjeta al subir de nivel, barra de meta del escenario y resultado al terminarlo.
+  const celebrate = createCelebrate(
+    {
+      openTray: () => openTray(),
+      openGoals: () => {
+        openHub();
+        requestAnimationFrame(() => document.querySelector('#hub-goals')?.scrollIntoView({ block: 'start' }));
+      },
+      showHall: () => {
+        const hall = hallSpot();
+        if (!hall) return;
+        const want = Math.max(touchZoom(), Math.round(dpr() * 2));
+        if (cam.zoom < want) setZoom(want);
+        if (reducedMotion()) return centerOn(hall.x, hall.y);
+        highlight = { x: hall.x, y: hall.y, since: performance.now() };
+        glide({ x: cam.x, y: cam.y }, () => {
+          centerOn(hall.x, hall.y);
+          return { x: cam.x, y: cam.y };
+        }, () => coins(...screenOf(hall.x, hall.y), 12));
+      },
+      cheer: () => {
+        sfx.fanfare();
+        vibrate(150);
+      },
+    },
+    token,
+  );
   function onState() {
     // 2.6: «Deshacer» solo mientras la obra no haya empezado; avisos de las redes, una vez al día.
     checkUndo();
@@ -725,6 +753,7 @@ export function startGame(opts: GameOptions): void {
       setTimeout(() => tabBuild.classList.remove('pulse'), 8000);
     }
     lastLevel = lv;
+    celebrate.update(state);
     // 2.0: una tarjeta por turno del pueblo (en vez de muchos avisos sueltos).
     const lastTurn = state.ai?.log.at(-1);
     if (lastTurn && lastTurn.n > turnLogSeen) {
