@@ -8,6 +8,7 @@ import { sessionId } from './session.ts';
 import { $, closeSheet, confirmDialog, h, sheet, toast } from './ui.ts';
 import { SCENARIO_INFO } from '@bitopolis/sim';
 import type { ScenarioId, TerrainShape } from '@bitopolis/shared';
+import { retryPicks, startPicksKey } from './celebrate-ui.ts';
 
 /**
  * 2.3: escenario y terreno de la partida nueva. Fuera de `showStart` para que no
@@ -109,6 +110,15 @@ function scenarioPicker(): HTMLElement {
 /** Pantalla de inicio de /p/<token>. */
 export async function showStart(token: string): Promise<void> {
   const sid = sessionId();
+  // 2.8: «Reintentar este escenario» llega con el escenario y el terreno en la URL (se quitan al leerlos).
+  const q = new URLSearchParams(location.search);
+  if (q.has('escenario')) {
+    const picks = retryPicks(q, SCENARIOS_SHOWN, TERRAINS.map(([id]) => id));
+    if (picks.scenario) pickedScenario = picks.scenario;
+    if (picks.terrain) pickedTerrain = picks.terrain;
+    if (picks.simple) pickedSimple = true;
+    history.replaceState(history.state, '', location.pathname);
+  }
   const root = $('#start');
   root.hidden = false;
   // 2.7: el tamaño del texto también se elige aquí (antes solo en Ajustes, al final de la hoja).
@@ -152,6 +162,12 @@ export async function showStart(token: string): Promise<void> {
     closeSheet();
     try {
       if (!info.exists) {
+        // 2.8: lo elegido se recuerda en este navegador (para «Reintentar» con el mismo terreno).
+        try {
+          localStorage.setItem(startPicksKey(token), JSON.stringify(startPicks()));
+        } catch {
+          /* sin almacenamiento: «Reintentar» usará un terreno al azar */
+        }
         if (mode === 'ai' && !meta.serverKey) {
           await openAiConfig(token, sid, () => void showStart(token), startPicks);
           return;

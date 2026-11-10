@@ -2,7 +2,7 @@ import { type ScenarioId, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { BUILD, BUSINESS_SEED_CASH, GRANT_PENALTY, SCENARIOS } from './balance.ts';
 import { monthNet, OUTSIDE, totalInternalMoney, TREASURY, transfer } from './money.ts';
 import { nextInt } from './prng.ts';
-import { type Building, type BuildingKind, type GameState, newBuilding, pushEvent, Tile, Zone } from './state.ts';
+import { type Building, type BuildingKind, buildingAt, type GameState, newBuilding, pushEvent, Tile, Zone } from './state.ts';
 import { isWater } from './terrain.ts';
 import { newResident } from './resident.ts';
 
@@ -156,9 +156,11 @@ export function applyScenario(state: GameState): void {
       const materials = BUILD[b.kind as keyof typeof BUILD]?.materials ?? 0;
       b.damaged = { cost: Math.max(r.repairMin, Math.round(materials * r.repair)), repairUntil: -1, cause: 'riada' };
     }
+    // 2.8: se guardan las casillas: derribar no cuenta como reparar (solo reparar o construir encima).
+    const sites = wrecked.map((b) => ({ x: b.x, y: b.y, id: b.id }));
     settle(state, r.citizens - 1, r.age, r.money);
     state.treasury = r.treasury;
-    state.scenario.goal = { kind: 'reparar', target: r.goalPop, progress: wrecked.length };
+    state.scenario.goal = { kind: 'reparar', target: r.goalPop, progress: wrecked.length, sites };
   }
   // Lo que el pueblo ya tenía no se premia como objetivo (lo comprueba un test con OBJECTIVES).
   state.objectivesDone.push(...STARTER_OBJECTIVES);
@@ -210,6 +212,29 @@ export function floodWrecks(state: GameState): Building[] {
   return state.buildings.filter((b) => b.damaged?.cause === 'riada');
 }
 
+/**
+ * 2.8: ¿está hecha esta casilla de la riada? Si sigue el edificio de antes, cuando
+ * termine su reparación; si ya no está (una tienda o un taller que cerró), cuando
+ * haya otro edificio terminado encima. Un solar vacío sigue pendiente.
+ */
+function siteDone(state: GameState, site: { x: number; y: number; id: number }): boolean {
+  const b = buildingAt(state, site.x, site.y);
+  return !!b && b.built && !b.damaged;
+}
+
+/** 2.8: lo que queda por reparar o reconstruir de la riada (casillas; sin `sites`, los destrozos que queden). */
+export function floodLeft(state: GameState): number {
+  const sites = state.scenario?.goal?.sites;
+  if (!sites) return floodWrecks(state).length;
+  return sites.filter((s) => !siteDone(state, s)).length;
+}
+
+/** 2.8: ¿es una casilla de la riada aún sin reparar? (no se derriba mientras dura el escenario). */
+export function floodSitePending(state: GameState, b: Building): boolean {
+  const sc = state.scenario;
+  return sc?.id === 'riada' && !sc.done && b.damaged?.cause === 'riada';
+}
+
 /** Lo que se debe al banco (préstamos vivos). */
 function owed(state: GameState): number {
   return (state.loans ?? []).reduce((s, l) => s + l.left, 0);
@@ -228,7 +253,7 @@ export function scenarioProgress(state: GameState): { met: boolean; text: string
     case 'vaciado':
       return { met: pop >= SCENARIOS.vaciado.goalPop, text: `${pop} de ${SCENARIOS.vaciado.goalPop} vecinos` };
     case 'riada': {
-      const left = floodWrecks(state).length;
+      const left = floodLeft(state);
       return { met: left === 0 && pop >= SCENARIOS.riada.goalPop, text: `${left ? `${left} por reparar` : 'todo reparado'}; ${pop} de ${SCENARIOS.riada.goalPop} vecinos` };
     }
     default:
@@ -236,19 +261,67 @@ export function scenarioProgress(state: GameState): { met: boolean; text: string
   }
 }
 
+/** 2.8: nombre corto para la barra de meta de la franja. */
+const SHORT_NAME: Record<ScenarioId, string> = { libre: 'Libre', quiebra: 'Quiebra', vaciado: 'Se vacía', riada: 'Riada' };
+
+/** 2.8: el progreso en una línea corta («3/13 meses», «4/6 reparado · 40/62 vecinos») y su fracción (0–1). */
+function shortProgress(state: GameState): { short: string; ratio: number } {
+  const sc = state.scenario;
+  const pop = state.citizens.length;
+  switch (sc.id) {
+    case 'quiebra': {
+      const m = sc.goal?.progress ?? 0;
+      const T = SCENARIOS.quiebra.surplusMonths;
+      return { short: `${m}/${T} meses`, ratio: Math.min(1, m / T) };
+    }
+    case 'vaciado':
+      return { short: `${pop}/${SCENARIOS.vaciado.goalPop} vecinos`, ratio: Math.min(1, pop / SCENARIOS.vaciado.goalPop) };
+    case 'riada': {
+      const n = state.scenario.goal?.sites?.length ?? SCENARIOS.riada.damaged;
+      const fixed = Math.max(0, n - floodLeft(state));
+      const P = SCENARIOS.riada.goalPop;
+      return { short: `${fixed}/${n} reparado · ${pop}/${P} vecinos`, ratio: (Math.min(1, fixed / n) + Math.min(1, pop / P)) / 2 };
+    }
+    default:
+      return { short: '', ratio: 0 };
+  }
+}
+
 /**
  * Resumen del escenario para la interfaz (y para la IA, si algún día lo necesita):
  * nombre, meta, progreso y meses que quedan. `null` en Libre o si ya terminó.
+ * 2.8: `short`, `shortName` y `ratio` para la barra de meta de la franja (`#strip`).
  */
-export function scenarioStatus(state: GameState): { id: ScenarioId; name: string; goal: string; progress: string; monthsLeft: number } | null {
+export function scenarioStatus(
+  state: GameState,
+): { id: ScenarioId; name: string; shortName: string; goal: string; progress: string; short: string; ratio: number; monthsLeft: number } | null {
   const sc = state.scenario;
   if (!sc || sc.id === 'libre' || sc.done) return null;
   return {
     id: sc.id,
     name: SCENARIO_INFO[sc.id].name,
+    shortName: SHORT_NAME[sc.id],
     goal: SCENARIO_INFO[sc.id].goal,
     progress: scenarioProgress(state).text,
+    ...shortProgress(state),
     monthsLeft: Math.max(0, Math.ceil(((sc.deadline ?? 0) - state.tick) / TICKS_PER_MONTH)),
+  };
+}
+
+/**
+ * 2.8: cómo acabó el escenario (para la tarjeta de resultado y Objetivos): ganado o
+ * no y los meses que se usaron (sin `endedTick`, en partidas de antes, `null`).
+ * `null` en Libre o si sigue en marcha.
+ */
+export function scenarioResult(state: GameState): { id: ScenarioId; name: string; won: boolean; months: number | null; deadlineMonths: number } | null {
+  const sc = state.scenario;
+  if (!sc || sc.id === 'libre' || !sc.done) return null;
+  return {
+    id: sc.id,
+    name: SCENARIO_INFO[sc.id].name,
+    won: sc.won === true,
+    months: sc.endedTick === undefined ? null : Math.max(1, Math.round(sc.endedTick / TICKS_PER_MONTH)),
+    deadlineMonths: SCENARIOS[sc.id].deadlineMonths,
   };
 }
 
@@ -256,7 +329,7 @@ export function scenarioStatus(state: GameState): { id: ScenarioId; name: string
 function emergencyGrant(state: GameState): void {
   for (const g of state.grants) {
     if (!g.emergency || g.status !== 'accepted') continue;
-    if (floodWrecks(state).length === 0 && state.tick <= g.deadline) {
+    if (floodLeft(state) === 0 && state.tick <= g.deadline) {
       const rest = Math.max(0, g.emergency - g.advance);
       transfer(state, OUTSIDE, TREASURY, rest, 'subvenciones');
       g.status = 'paid';
@@ -281,12 +354,13 @@ export function scenariosMonth(state: GameState): void {
     // 2.8: con el mismo neto que el resto del juego (`monthNet`: sin obras, reparaciones ni amortizaciones).
     if (sc.goal.kind === 'superavit') sc.goal.progress = monthNet(state.month).net > 0 ? (sc.goal.progress ?? 0) + 1 : 0;
     else if (sc.goal.kind === 'vecinos') sc.goal.progress = state.citizens.length;
-    else sc.goal.progress = floodWrecks(state).length;
+    else sc.goal.progress = floodLeft(state);
   }
   const info = SCENARIO_INFO[sc.id];
   if (scenarioProgress(state).met) {
     sc.done = true;
     sc.won = true;
+    sc.endedTick = state.tick;
     // La medalla y su foto las pone achievementsMonth (escenario_<id>), justo después.
     pushEvent(state, 'milestone', `¡Meta cumplida en «${info.name}»! Medalla nueva. El pueblo sigue, ya sin plazo`, { notify: true });
     return;
@@ -294,6 +368,7 @@ export function scenariosMonth(state: GameState): void {
   if (state.tick >= (sc.deadline ?? 0)) {
     sc.done = true;
     sc.won = false;
+    sc.endedTick = state.tick;
     pushEvent(state, 'warning', `Se acabó el plazo de «${info.name}» sin cumplir la meta. No pasa nada: el pueblo sigue como partida libre`, { notify: true });
   }
 }

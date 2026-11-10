@@ -975,13 +975,18 @@ export const TENDER = {
  * sistema (los dilemas ya piden `DILEMMA.minPop`; la gran empresa, sus vecinos).
  */
 export const EARLY = {
-  dilemmas: { pop: 30, level: 3 },
-  letters: { pop: 30, level: 3 },
-  neighborOffers: { pop: 30, level: 3 },
-  bigCompany: { pop: 30, level: 3 },
+  /**
+   * 2.8 (ronda 24): escalonados. Antes los seis llegaban a la vez a los 30 vecinos
+   * y el jugador se ahogaba en avisos. Ahora, uno nuevo cada pocos vecinos; con el
+   * ayuntamiento 3 (que ya pide 30 vecinos) llegan los dos primeros y con el 4
+   * (60 vecinos) el resto.
+   */
   errands: { pop: 30, level: 3 },
-  /** El Eco sale a la vez que llegan los encargos (van juntos en el panel «Pueblo»). */
-  press: { pop: 30, level: 3 },
+  press: { pop: 40, level: 3 },
+  neighborOffers: { pop: 45, level: 4 },
+  letters: { pop: 50, level: 4 },
+  dilemmas: { pop: 60, level: 4 },
+  bigCompany: { pop: 70, level: 4 },
 } as const;
 
 /** 2.2: calles y plazas con nombre de vecinos (streets.ts). */
@@ -1267,9 +1272,13 @@ export const SCENARIOS = {
     deadlineMonths: 36,
     citizens: 22,
     treasury: 12_000,
-    /** Reparar lo de la riada: parte de los materiales del edificio (mínimo `repairMin`). */
-    repair: 2,
-    repairMin: 22_000,
+    /**
+     * Reparar lo de la riada: parte de los materiales del edificio (mínimo `repairMin`).
+     * 2.8 (ronda 24): con 22.000 € por edificio (132.000 € en total) lo único razonable era
+     * derribar; ahora ≈ materiales × 1,5 y 6.000 € como poco (36.000 € los seis).
+     */
+    repair: 1.5,
+    repairMin: 8_000,
     village: { house: 2, res: 7, shop: 2, factory: 2, park: 1 },
     money: [400, 2_000],
     age: [20, 72],
