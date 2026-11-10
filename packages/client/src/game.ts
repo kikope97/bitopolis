@@ -137,6 +137,8 @@ import { commandFor, costText, isLocked, lockLong, lockShort, shortCost, type To
 import { Tutorial } from './tutorial.ts';
 import { $, clearToastLog, closeSheet, onSheetChange, confirmDialog, currentSheet, entryAction, h, isSheetOpen, type LogEntry, markLogRead, onToastLog, reducedMotion, sheet, toast, toastHeadline, toastLog, vibrate, withBack, setSheetSnap, setFastToasts } from './ui.ts';
 import { pixelIcon } from './icons.ts';
+import { PALETTE } from './palette.ts';
+import { openShortcuts, SHORTCUTS_TITLE } from './keys-ui.ts';
 import { openHistory } from './charts-ui.ts';
 import { medalCount, openMedals } from './medals-ui.ts';
 import { duck, sfx, startAmbience, startMusic, stopMusic, unlockAudio } from './audio.ts';
@@ -216,7 +218,18 @@ export function startGame(opts: GameOptions): void {
   let cmdId = 0;
   const dayAgoTreasury: number[] = [];
 
-  const dpr = () => Math.max(1, window.devicePixelRatio || 1);
+  // 2.8 (ronda 24): con ratón y una pantalla de dpr < 2, el zoom más lejano pone el lienzo a resolución ×2
+  // («dpr virtual»): el zoom 1 da entonces 16 px por casilla y se ve el pueblo entero, sin zoom fraccionario.
+  // Solo en ese paso: a ×2 el lienzo tiene 4 veces más píxeles (medido con el spec v28-escritorio).
+  // En el móvil (puntero grueso) no cambia nada.
+  const finePointer = matchMedia('(pointer: fine)');
+  const realDpr = () => Math.max(1, window.devicePixelRatio || 1);
+  let farZoom = false;
+  const dpr = () => (farZoom ? 2 : realDpr());
+  /** 2.8: el ratón sobre el mapa (sin pulsar): dónde está y qué casilla o edificio señala en «Mirar». */
+  let mouseAt: { x: number; y: number } | null = null;
+  let hoverKey = '';
+  let hoverBox: { x: number; y: number; size: number } | null = null;
   const cam: Camera = { x: 0, y: 0, zoom: 2 };
   const tileSize = () => T * cam.zoom;
 
@@ -1372,6 +1385,16 @@ export function startGame(opts: GameOptions): void {
   const touchZoom = () => Math.max(1, Math.ceil((24 * dpr()) / T));
   const maxZoom = () => Math.round(dpr() * 4);
   function setZoom(z: number, ax = canvas.width / 2, ay = canvas.height / 2) {
+    // 2.8: con ratón y dpr < 2, un paso más allá del mínimo (16 px por casilla) y vuelta.
+    if (!farZoom && Math.round(z) < minZoom() && finePointer.matches && realDpr() < 2) return setFar(true, ax, ay);
+    if (farZoom) {
+      if (Math.round(z) <= cam.zoom) return;
+      // Al salir, el zoom pedido (en unidades del lienzo ×2) pasa a las del lienzo normal.
+      const k = realDpr() / 2;
+      setFar(false, ax, ay);
+      if (z * k > 1.5) setZoom(z * k, ax * k, ay * k);
+      return;
+    }
     const nz = Math.max(minZoom(), Math.min(maxZoom(), Math.round(z)));
     if (nz === cam.zoom) return;
     const wx = (cam.x + ax) / cam.zoom;
@@ -1380,6 +1403,32 @@ export function startGame(opts: GameOptions): void {
     cam.x = Math.round(wx * nz - ax);
     cam.y = Math.round(wy * nz - ay);
     clampCam();
+    paintZoomClass();
+    hoverRefresh();
+  }
+  /** 2.8: entra o sale del zoom lejano (lienzo a ×2, zoom 1): el punto bajo `ax, ay` no se mueve. */
+  function setFar(on: boolean, ax: number, ay: number) {
+    const wx = (cam.x + ax) / cam.zoom;
+    const wy = (cam.y + ay) / cam.zoom;
+    const cssX = ax / dpr();
+    const cssY = ay / dpr();
+    farZoom = on;
+    const r = canvas.getBoundingClientRect();
+    canvas.width = Math.round(r.width * dpr());
+    canvas.height = Math.round(r.height * dpr());
+    cam.zoom = 1;
+    cam.x = Math.round(wx - cssX * dpr());
+    cam.y = Math.round(wy - cssY * dpr());
+    clampCam();
+    paintZoomClass();
+    hoverRefresh();
+  }
+  /**
+   * 2.8: en el zoom lejano, cada píxel de arte mide medio píxel de pantalla: el navegador suaviza al
+   * reducir (con `pixelated` se perderían filas enteras del dibujo).
+   */
+  function paintZoomClass() {
+    canvas.classList.toggle('px-smooth', farZoom);
   }
   function tileAt(cx: number, cy: number) {
     const r = canvas.getBoundingClientRect();
@@ -1400,6 +1449,8 @@ export function startGame(opts: GameOptions): void {
     startTile: { x: number; y: number } | null;
     pinchDist?: number;
     pinchZoom?: number;
+    /** 2.8: botón del ratón (2 = derecho: sin moverse, cancela). */
+    button?: number;
   } | null = null;
 
   function previewFor(a: { x: number; y: number }, b: { x: number; y: number }) {
@@ -1459,9 +1510,16 @@ export function startGame(opts: GameOptions): void {
       return;
     }
     const pan = e.button === 1 || e.button === 2;
-    gesture = { mode: pan ? 'pan' : 'pending', sx: e.clientX, sy: e.clientY, startTile: tileAt(e.clientX, e.clientY) };
+    gesture = { mode: pan ? 'pan' : 'pending', sx: e.clientX, sy: e.clientY, startTile: tileAt(e.clientX, e.clientY), button: e.button };
+    hoverHide();
   });
+  // Sin menú del navegador sobre el mapa: el clic derecho cancela (2.8) y, arrastrando, mueve el mapa.
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  canvas.addEventListener('pointerleave', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    mouseAt = null;
+    hoverHide();
+  });
 
   canvas.addEventListener('pointermove', (e) => {
     const prev = pointers.get(e.pointerId);
@@ -1469,6 +1527,7 @@ export function startGame(opts: GameOptions): void {
       // Ratón sin pulsar: vista previa del tile bajo el cursor.
       const t0 = tileAt(e.clientX, e.clientY);
       if (!pendingEnd && !pendingPlace) preview = t0 && tool.id !== 'inspect' ? previewFor(anchor ?? t0, t0) : null;
+      if (e.pointerType === 'mouse') hoverAt(e.clientX, e.clientY);
       return;
     }
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -1531,6 +1590,11 @@ export function startGame(opts: GameOptions): void {
       preview = null;
       return;
     }
+    // 2.8: clic derecho sin arrastrar: un paso atrás (la obra propuesta, el inicio marcado o la herramienta).
+    if (g.button === 2 && Math.hypot(e.clientX - g.sx, e.clientY - g.sy) < DRAG_PX) {
+      cancelStep();
+      return;
+    }
     if (g.mode === 'pan' && touchInput && performance.now() - fling.t < 80) startFling();
     const t1 = tileAt(e.clientX, e.clientY);
     if (g.mode === 'pending' && t1 && performance.now() >= quietUntil) {
@@ -1557,15 +1621,108 @@ export function startGame(opts: GameOptions): void {
   canvas.addEventListener('pointerup', endPointer);
   canvas.addEventListener('pointercancel', endPointer);
 
+  let wheelAcc = 0;
   canvas.addEventListener(
     'wheel',
     (e) => {
       e.preventDefault();
+      // 2.8: un paso por cada golpe de rueda (~100) hacia el puntero; los pasos pequeños del panel táctil se suman.
+      const dy = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaMode === 2 ? e.deltaY * 800 : e.deltaY;
+      if (Math.sign(dy) !== Math.sign(wheelAcc)) wheelAcc = 0;
+      wheelAcc += dy;
+      if (Math.abs(wheelAcc) < 50) return;
       const r = canvas.getBoundingClientRect();
-      setZoom(cam.zoom + (e.deltaY < 0 ? 1 : -1), (e.clientX - r.left) * dpr(), (e.clientY - r.top) * dpr());
+      setZoom(cam.zoom + (wheelAcc < 0 ? 1 : -1), (e.clientX - r.left) * dpr(), (e.clientY - r.top) * dpr());
+      wheelAcc = 0;
     },
     { passive: false },
   );
+
+  /* ---------- 2.8: el ratón en «Mirar»: borde, tooltip y cursor de mano ---------- */
+  /** Qué señala el ratón (se calcula solo al cambiar de casilla o de edificio; nunca en cada fotograma). */
+  function hoverAt(cx: number, cy: number) {
+    mouseAt = { x: cx, y: cy };
+    const tip = document.getElementById('hover-tip');
+    const t0 = tool.id === 'inspect' && !dedicating && !gesture ? tileAt(cx, cy) : null;
+    const t = t0 ? pickTile(cx, cy, t0) : null;
+    const b = t ? buildingAt(state, t.x, t.y) : undefined;
+    const road = !!t && !b && state.map.tiles[t.y * state.map.w + t.x] === Tile.Road;
+    const key = b ? `b${b.id}` : road && t ? `r${t.x},${t.y}` : '';
+    if (key !== hoverKey) {
+      hoverKey = key;
+      hoverBox = b ? { x: b.x, y: b.y, size: b.size ?? 1 } : road && t ? { x: t.x, y: t.y, size: 1 } : null;
+      // Mano sobre lo que se abre al hacer clic; flecha sobre el resto (en «Mirar»); con herramienta, la cruz.
+      if (tool.id === 'inspect') canvas.dataset.hover = key ? 'hit' : 'none';
+      else delete canvas.dataset.hover;
+      if (tip) {
+        if (b) {
+          const st = buildingStatus(b, state.projects.find((p) => p.buildingId === b.id));
+          const word = st.querySelector('strong')?.textContent ?? '';
+          const home = b.kind === 'house' || b.kind === 'res' || b.kind === 'vpo';
+          const n = home ? occupants(state, b).length : 0;
+          const num = home ? (n ? plural(n, 'vecino', 'vecinos') : '') : (st.querySelector('.fc-num')?.textContent ?? '');
+          const tone = [...st.classList].find((c) => c.startsWith('tone-')) ?? 'tone-ok';
+          tip.className = `hover-tip ${tone}`;
+          tip.replaceChildren(h('b', {}, b.name ?? BUILD_NAMES[b.kind] ?? b.kind), ` · ${word}${num ? ` · ${num}` : ''}`);
+        } else if (road && t) {
+          tip.className = 'hover-tip tone-info';
+          tip.replaceChildren(h('b', {}, terrainAt(state, t.x, t.y) === Terrain.River ? 'Puente' : 'Carretera'));
+        }
+        tip.hidden = !key;
+      }
+    }
+    if (tip && !tip.hidden) {
+      // Junto al puntero, sin salirse de la ventana.
+      const w = tip.offsetWidth;
+      const hh = tip.offsetHeight;
+      const x = cx + 16 + w > window.innerWidth - 4 ? cx - 12 - w : cx + 16;
+      const y = cy + 20 + hh > window.innerHeight - 4 ? cy - 12 - hh : cy + 20;
+      tip.style.transform = `translate(${Math.round(Math.max(4, x))}px, ${Math.round(Math.max(4, y))}px)`;
+    }
+  }
+  function hoverHide() {
+    hoverKey = '';
+    hoverBox = null;
+    const tip = document.getElementById('hover-tip');
+    if (tip) tip.hidden = true;
+    if (canvas.dataset.hover) delete canvas.dataset.hover;
+  }
+  /** Tras mover la cámara sin mover el ratón (rueda, teclas): lo que hay ahora bajo el puntero. */
+  function hoverRefresh() {
+    if (!mouseAt) return;
+    hoverKey = '\u0000';
+    hoverAt(mouseAt.x, mouseAt.y);
+  }
+  /** Borde de un píxel de arte alrededor de lo señalado (encima del dibujo). */
+  function drawHover(view: Camera) {
+    if (!hoverBox || tool.id !== 'inspect') return;
+    const ts = tileSize();
+    const z = cam.zoom;
+    const px = hoverBox.x * ts - view.x;
+    const py = hoverBox.y * ts - view.y;
+    const s = hoverBox.size * ts;
+    ctx.fillStyle = PALETTE[12];
+    ctx.fillRect(px, py, s, z);
+    ctx.fillRect(px, py + s - z, s, z);
+    ctx.fillRect(px, py, z, s);
+    ctx.fillRect(px + s - z, py, z, s);
+  }
+
+  /** 2.8: un paso atrás en el mapa (Escape sin bandeja ni hoja, y el clic derecho). Falso si no había nada. */
+  function cancelStep(): boolean {
+    if (dedicating) endDedication();
+    else if (pendingPlace) cancelPlace();
+    else if (anchor && touchInput) cancelAnchor();
+    else if (anchor) {
+      anchor = null;
+      pendingEnd = null;
+      preview = null;
+      document.body.classList.remove('placing');
+      selectTool(tool.id);
+    } else if (tool.id !== 'inspect') selectTool('inspect');
+    else return false;
+    return true;
+  }
 
   async function tapTile(tile: { x: number; y: number }) {
     if (dedicating) return proposeDedication(tile);
@@ -2048,6 +2205,11 @@ export function startGame(opts: GameOptions): void {
     if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
     const step = Math.round(64 * dpr());
     const k = e.key;
+    // 2.8: atajos de paneles y velocidad (también con una hoja abierta); se quitan con los demás en Ajustes.
+    if (prefs().shortcuts && !e.ctrlKey && !e.metaKey && !e.altKey && panelKey(e)) {
+      e.preventDefault();
+      return;
+    }
     // Con una hoja abierta el teclado es de la hoja: el mapa no se mueve por detrás.
     if (isSheetOpen() && k !== 'Escape') return;
     // Con el mapa enfocado, las flechas mueven un cursor de casilla e Intro actúa en él.
@@ -2081,6 +2243,7 @@ export function startGame(opts: GameOptions): void {
     else if (k === 'ArrowDown' || k === 's') cam.y += step;
     else if (k === '+' || k === '=') setZoom(cam.zoom + 1);
     else if (k === '-') setZoom(cam.zoom - 1);
+    else if (k === 'Home') $('#home').click();
     else if (k === 'l') setLayer(LAYERS[(LAYERS.findIndex((l) => l.id === layer) + 1) % LAYERS.length]!.id);
     // Atajo de Ajustes: solo la tecla sola (Ctrl+O abre archivos en el navegador), con o sin mayúsculas.
     else if (k.toLowerCase() === 'o') openSettingsGame();
@@ -2090,16 +2253,7 @@ export function startGame(opts: GameOptions): void {
     } else if (k === 'Escape') {
       if (!tray.hidden) closeTray();
       else if (isSheetOpen()) closeSheet();
-      else if (dedicating) endDedication();
-      else if (pendingPlace) cancelPlace();
-      else if (anchor && touchInput) cancelAnchor();
-      else if (anchor) {
-        anchor = null;
-        pendingEnd = null;
-        preview = null;
-        document.body.classList.remove('placing');
-        selectTool(tool.id);
-      } else selectTool('inspect');
+      else if (!cancelStep()) selectTool('inspect');
     } else {
       const tl = TOOLS.find((x) => x.key === k);
       if (tl) selectTool(tl.id);
@@ -2107,6 +2261,50 @@ export function startGame(opts: GameOptions): void {
     }
     clampCam();
   });
+
+  /**
+   * 2.8: Mayús+P (Pueblo), Mayús+A (avisos), «?» (la chuleta), «<»/«>» (velocidad) y Mayús+1/2/3 (x1/x3/x10).
+   * Por `code` para no depender de la distribución del teclado (con Bloq Mayús, «p» sigue siendo Policía).
+   */
+  function panelKey(e: KeyboardEvent): boolean {
+    const k = e.key;
+    if (e.shiftKey && e.code === 'KeyP') $('#menu').click();
+    else if (e.shiftKey && e.code === 'KeyA') {
+      if (currentSheet()?.querySelector('#sheet-title')?.textContent === 'Avisos') closeSheet();
+      else $('#bell').click();
+    } else if (k === '?') {
+      if (currentSheet()?.querySelector('#sheet-title')?.textContent === SHORTCUTS_TITLE) closeSheet();
+      else openShortcuts(TOOLS);
+    } else if (k === '<' || k === '>') {
+      const order = [0, 1, 3, 10];
+      const i = order.indexOf(speed);
+      userSpeed(order[Math.max(0, Math.min(order.length - 1, i + (k === '>' ? 1 : -1)))]!);
+    } else if (e.shiftKey && /^Digit[123]$/.test(e.code) && !/^\d$/.test(k)) userSpeed([1, 3, 10][Number(e.code.slice(5)) - 1]!);
+    else return false;
+    return true;
+  }
+  /** 2.8: la tecla de cada botón, en su `title` (solo si los atajos están puestos; Espacio e Inicio valen siempre). */
+  function paintKeyTitles() {
+    const on = prefs().shortcuts;
+    const keys: [string, string, string, boolean?][] = [
+      ['#play-pause', 'Pausar o seguir', 'Espacio', true],
+      ['#speed', 'Velocidad', '< y >; Mayús+1, 2 o 3'],
+      ['#menu', 'Pueblo', 'Mayús+P'],
+      ['#bell', 'Avisos', 'Mayús+A'],
+      ['#zoom-in', 'Acercar', '+ o rueda'],
+      ['#zoom-out', 'Alejar', '− o rueda'],
+      ['#layers', 'Capas de datos', 'L'],
+      ['#home', 'Volver al ayuntamiento', 'Inicio', true],
+      ['#tab-inspect', 'Mirar', '0'],
+      ['#tab-road', 'Carretera', '1'],
+      ['#tab-demolish', 'Derribar', 'X'],
+    ];
+    for (const [sel, label, key, always] of keys) {
+      const el = document.querySelector<HTMLElement>(sel);
+      if (el) el.title = on || always ? `${label} (${key})` : label;
+    }
+    document.body.classList.toggle('keys-on', on && finePointer.matches);
+  }
 
   /* ---------- herramientas (v1.6: cinco pestañas y la bandeja «Construir») ---------- */
   function toolIcon(tl: Tool): HTMLElement {
@@ -2240,6 +2438,8 @@ export function startGame(opts: GameOptions): void {
         'button',
         { class: 'tool', 'data-tool': tl.id, 'aria-pressed': 'false', title: tl.key ? `${tl.label} (${tl.key})` : tl.label },
         toolIcon(tl),
+        // 2.8: la tecla en la esquina (solo con ratón y los atajos puestos: `body.keys-on`).
+        tl.key ? h('span', { class: 'tool-key', 'aria-hidden': 'true' }, tl.key.toUpperCase()) : '',
         h('span', { class: 'tool-label' }, tl.label),
         h('span', { class: 'tool-cost' }, trayCost(tl)),
         // 2.6: lo que cuesta al mes, debajo del precio (2.7: como gasto, «−1050 €/mes»).
@@ -2647,6 +2847,7 @@ export function startGame(opts: GameOptions): void {
     cam.x = Math.round(((x0 + x1 + 1) / 2) * ts - ((left + right) / 2 - r.left) * dpr());
     cam.y = Math.round(((y0 + y1 + 1) / 2) * ts - ((top + bottom) / 2 - r.top) * dpr());
     clampCam();
+    paintZoomClass();
     noteReveal(before);
   }
 
@@ -2679,6 +2880,7 @@ export function startGame(opts: GameOptions): void {
     cam.x = back.before.x;
     cam.y = back.before.y;
     clampCam();
+    paintZoomClass();
   }
   /** 2.7: las fichas (edificio, casilla) abren asomadas: el mapa y el edificio quedan a la vista. */
   function asFicha(el: HTMLElement): HTMLElement {
@@ -2754,6 +2956,7 @@ export function startGame(opts: GameOptions): void {
     cam.x = Math.round((t.x + 0.5) * tileSize() - ((left + right) / 2 - r.left) * dpr());
     cam.y = Math.round((t.y + 0.5) * tileSize() - ((top + bottom) / 2 - r.top) * dpr());
     clampCam();
+    paintZoomClass();
     noteReveal(before);
   }
 
@@ -4122,14 +4325,24 @@ export function startGame(opts: GameOptions): void {
   };
 
   /* ---------- bucle de pintado ---------- */
+  let farSkip = false;
   function frame(time: number) {
     if ($('#game').hidden) return;
+    // 2.8: en el zoom lejano (lienzo ×2, el mapa entero), a 30 fotogramas por segundo: a 16 px por
+    // casilla la animación no pierde nada y el lienzo tiene 4 veces más píxeles.
+    farSkip = farZoom && !farSkip;
+    if (farSkip) {
+      requestAnimationFrame(frame);
+      return;
+    }
     tutorialGlow();
     // La sacudida se aplica a una copia de la cámara: no cambia dónde mira el jugador.
     const [sx, sy] = shakeOffset(time);
     const view = sx || sy ? { ...cam, x: cam.x + sx * dpr(), y: cam.y + sy * dpr() } : cam;
     reachHint();
     render(ctx, state, view, { preview, selected, cursor: document.activeElement === canvas ? cursor : null, time, reducedMotion: reducedMotion(), layer, highlight, labels: cam.zoom >= touchZoom(), fast: speed >= 10, reach: currentReach(), missingKey: layer === 'missing' ? missingKey : null, bad: badFlash });
+    drawHover(view);
+    if (hoverKey && tool.id !== 'inspect') hoverHide();
     placeBubbles();
     requestAnimationFrame(frame);
   }
@@ -4167,9 +4380,11 @@ export function startGame(opts: GameOptions): void {
     $('#speed').setAttribute('aria-disabled', String(prefs().calm));
   };
   markCalm();
+  paintKeyTitles();
   const offPrefs = onPrefs((p) => {
     if (p.calm && speed > 1) setSpeed(1);
     markCalm();
+    paintKeyTitles();
     // El tamaño del texto cambia lo que cabe arriba.
     topbarKey = '';
     fitTopbar();
