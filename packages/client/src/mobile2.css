@@ -920,3 +920,9 @@ html[data-colorblind='rojo-verde'] .legend-item.lv0.bad::before { background: ra
 html[data-colorblind='rojo-verde'] .legend-item.lv1.bad::before { background: radial-gradient(#41a6f6 35%, transparent 36%) 0 0 / 4px 4px; }
 html[data-colorblind='rojo-verde'] .legend-item.lv2.bad::before { background: repeating-conic-gradient(#3b5dc9 0 25%, transparent 0 50%) 0 0 / 4px 4px; }
 html[data-colorblind='rojo-verde'] .legend-item.lv3.bad::before { background: repeating-linear-gradient(90deg, #29366f 0 6px, transparent 6px 8px) #94b0c2; }
+
+
+/* ---------- 2.8 · A (ritmo y avisos): «Bajo a x1: … · Ver ›» y la pausa del modo tranquilo ---------- */
+.slow-note .slow-text { flex: 1 1 12em; min-width: 0; overflow-wrap: break-word; }
+.slow-note .btn { min-width: 44px; min-height: 44px; }
+#slow-go[hidden] { display: none; }

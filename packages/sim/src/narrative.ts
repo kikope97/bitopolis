@@ -4,7 +4,7 @@ import { activeObjectives, lowerFirst, NEED_TEXT, needOf } from './social.ts';
 import { daysToElection, FACTION_TEXT, politicsActive } from './politics.ts';
 import { fmt, loanCapacity, loanLoad, monthlyQuotas } from './loans.ts';
 import { LOANS } from './balance.ts';
-import { ownIncome } from './money.ts';
+import { ownIncome, runningExpenses } from './money.ts';
 import { nextLevel } from './townhall.ts';
 import type { GameEvent, GameState } from './state.ts';
 import { type Season, seasonOf } from './weather.ts';
@@ -54,6 +54,10 @@ export function ruleAdvice(state: GameState, q: AdvisorQuestion): string[] {
     const parks = state.buildings.filter((b) => b.kind === 'park').length;
     if (state.bankrupt || f.caja < -5_000) lines.push(parks > Math.ceil(f.poblacion / 25) ? `Si no basta, derriba algún parque: tienes ${parks} y con ${Math.ceil(f.poblacion / 25)} llega.` : 'Si no basta, derriba lo que menos se usa: cada servicio cuesta sueldos y mantenimiento todos los meses.');
   }
+  // 2.8 (informes 01, 05): si el mes (sin obras) sale en pérdidas, primero subir impuestos o esperar; el préstamo, después.
+  const last = state.stats.at(-1);
+  const running = last ? ownIncome(last) - runningExpenses(last) : 0;
+  if (f.caja >= 0 && running < 0) lines.push(`Sin contar las obras, el mes pasado se perdieron ${fmt(-running)} €: sube un escalón los impuestos o espera a que acaben las obras antes de pedir un préstamo, y no abras servicios nuevos hasta que cuadre.`);
   lines.push(...loanAdvice(state));
   if (f.promesas_pendientes.length) lines.push(`Cumple lo prometido antes de que venza: ${f.promesas_pendientes[0]}.`);
   const worry = f.preocupaciones[0]?.problema;
@@ -87,7 +91,10 @@ export function loanAdvice(state: GameState): string[] {
   if (treasury) return [state.treasury > treasury.left * 2 ? 'Tienes un préstamo de tesorería, el más caro: amortízalo ya, que la caja lo permite.' : 'La caja cerró un mes en negativo y el banco lo cubrió con un préstamo de tesorería, más caro: que no se repita, o la nota bajará a D.'];
   const up = nextLevel(state);
   const cap = loanCapacity(state);
-  if (up && state.citizens.length >= up.pop && state.treasury < up.cost && (state.rating === 'A' || state.rating === 'B') && cap >= up.cost - state.treasury) {
+  // 2.8: el préstamo para ampliar, solo si el mes (sin obras) ya sale en positivo; si no, sería deuda sobre pérdidas.
+  const last = state.stats.at(-1);
+  const monthOk = !last || ownIncome(last) - runningExpenses(last) >= 0;
+  if (monthOk && up && state.citizens.length >= up.pop && state.treasury < up.cost && (state.rating === 'A' || state.rating === 'B') && cap >= up.cost - state.treasury) {
     return [`Con nota ${state.rating}, el banco te presta hasta ${fmt(cap)} €: un préstamo adelantaría la ampliación del ayuntamiento (cuesta ${fmt(up.cost)} €).`];
   }
   return [];
