@@ -846,3 +846,5 @@ html[data-font='pixel'] .topbar .tb-unit, html[data-font='pixel'] .topbar.tb-tig
 /* ===== 2.8 · parte E (vecinos y textos): servicio aún bloqueado en la ficha de una casa ===== */
 .svc-icons:not(.open) .svc.lock { border-bottom-color: var(--c-card-line); opacity: 0.85; }
 .svc.lock .svc-mark { color: var(--muted); }
+/* El número de la campana crece con el texto (al 200 %, 18 px; salía a 12 px cuando había peticiones). */
+.bell-n { font-size: min(var(--fs-xs), 18px); min-width: 1.5em; height: 1.5em; line-height: 1.5em; }
