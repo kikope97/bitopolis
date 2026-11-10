@@ -43,13 +43,13 @@
       <header class="topbar" aria-label="Estado del pueblo">
         <button id="play-pause" class="tb-btn tb-time" aria-label="Poner en marcha">▶</button>
         <button id="speed" class="tb-btn tb-speed" aria-label="Velocidad x1. Toca para cambiarla">x1</button>
-        <button id="hud-money" class="tb-btn tb-stat" aria-label="Caja del ayuntamiento: ver cuentas"></button>
-        <button id="hud-pop" class="tb-btn tb-stat"></button>
-        <button id="hud-happy" class="tb-btn tb-stat" aria-label="Felicidad media: ver por qué"></button>
-        <button id="hud-poll" class="tb-btn" hidden></button>
-        <button id="ai-chip" class="ai-chip" hidden>IA ✦</button>
+        <button id="hud-money" class="tb-btn tb-stat" aria-label="Caja del ayuntamiento: ver cuentas" title="Caja del ayuntamiento"></button>
+        <button id="hud-pop" class="tb-btn tb-stat" title="Vecinos"></button>
+        <button id="hud-happy" class="tb-btn tb-stat" aria-label="Felicidad media: ver por qué" title="Felicidad media"></button>
+        <button id="hud-poll" class="tb-btn" hidden title="Intención de voto"></button>
+        <button id="ai-chip" class="ai-chip" hidden title="IA: ver gasto">IA ✦</button>
         <!-- 2.7: lo que no cabe en una fila (vecinos, votos, IA) va aquí; la barra nunca pasa a dos filas. -->
-        <button id="hud-more" class="tb-btn" aria-label="Más datos del pueblo: vecinos, votos e IA">⋯</button>
+        <button id="hud-more" class="tb-btn" aria-label="Más datos del pueblo: vecinos, votos e IA" title="Más datos">⋯</button>
         <div id="calendar" class="calendar" hidden aria-hidden="true"><span class="cal-m"></span><span class="cal-d"></span></div>
         <span id="saved" class="saved" aria-live="off"></span>
         <button id="bell" class="tb-btn tb-bell" aria-label="Avisos"><span class="bell-n" hidden></span></button>
@@ -60,10 +60,12 @@
           <button id="zoom-in" class="fab zoom" aria-label="Acercar">+</button>
           <button id="zoom-out" class="fab zoom" aria-label="Alejar">−</button>
           <button id="layers" class="chip" aria-label="Capas de datos: sin capa" aria-haspopup="dialog"><span class="chip-text">Capas</span></button>
-          <button id="whatnow" class="chip chip-help" aria-label="¿Qué hago ahora?">?</button>
+          <button id="whatnow" class="chip chip-help" aria-label="¿Qué hago ahora?" title="¿Qué hago ahora?">?</button>
           <button id="home" class="fab fab-home" aria-label="Volver al ayuntamiento">⌂</button>
         </div>
         <div id="bubbles" class="bubbles"></div>
+        <!-- 2.8: con ratón, en «Mirar», qué hay bajo el puntero (nombre, estado y vecinos o lleno). -->
+        <div id="hover-tip" class="hover-tip" aria-hidden="true" hidden></div>
         <div id="legend" class="legend" hidden></div>
         <div id="objectives" class="objectives" hidden></div>
         <!-- Al bajar a x1 por un suceso: se dice por qué y se ofrece volver a la velocidad de antes. -->
