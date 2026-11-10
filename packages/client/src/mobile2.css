@@ -842,3 +842,8 @@ body.tool-active .map-btns #whatnow, body.tool-active .map-btns #home { display:
 }
 /* La letra pixel solo admite tamaños de píxel exacto: el «€» de la caja, al mismo tamaño que la cifra. */
 html[data-font='pixel'] .topbar .tb-unit, html[data-font='pixel'] .topbar.tb-tight .tb-unit { font-size: 1em; }
+
+/* ---------- 2.8 · A (ritmo y avisos): «Bajo a x1: … · Ver ›» y la pausa del modo tranquilo ---------- */
+.slow-note .slow-text { flex: 1 1 12em; min-width: 0; overflow-wrap: break-word; }
+.slow-note .btn { min-width: 44px; min-height: 44px; }
+#slow-go[hidden] { display: none; }

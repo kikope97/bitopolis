@@ -136,13 +136,13 @@ export function openSettings(ai?: AiShareCtl, share?: Node): void {
       (v) => setPrefs({ motion: v }),
     ),
     h('h4', { class: 'set-sub' }, 'Ritmo'),
-    toggle('Modo tranquilo', 'calm', '(velocidad x1, pausa en los eventos importantes y avisos sin tiempo límite)'),
+    toggle('Modo tranquilo', 'calm', '(velocidad x1, pausa en los eventos importantes, que se dicen abajo, y avisos sin tiempo límite)'),
     // 2.7: a x3/x10 el tiempo se frenaba solo cada poco por cosas menores.
     radioGroup<Prefs['slowFor']>(
       'A x3 y x10, bajar a x1 por',
       [
-        ['emergencias', 'Emergencias y lo que te piden con plazo (incendio, riada, disturbios, subvenciones…)'],
-        ['importante', 'También ofertas, dilemas y fiestas'],
+        ['emergencias', 'Emergencias (incendio, riada, disturbios) y lo que vence en 10 días o menos; como mucho una vez por minuto'],
+        ['importante', 'También lo importante (dilemas, manifestaciones convocadas, calabozos llenos, el rango)'],
         ['nada', 'Nada (avisa sin frenar; lo que te piden puede caducar)'],
       ],
       p.slowFor,
