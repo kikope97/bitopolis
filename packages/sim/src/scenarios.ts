@@ -103,7 +103,7 @@ function settle(state: GameState, n: number, age: readonly [number, number], mon
     const c = newResident(state, { age: nextInt(state.rng, age[0], age[1]) });
     c.arrivedMonth = 0;
     c.money = nextInt(state.rng, money[0], money[1]);
-    if (c.age >= 65 && c.named) c.profession = 'jubilado';
+    // 2.8: el oficio ya sale según la edad (newResident).
     state.citizens.push(c);
   }
   // Cada uno en una casa libre (por orden; las destrozadas no cuentan).

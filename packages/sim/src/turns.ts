@@ -1,6 +1,6 @@
 import { TICKS_PER_DAY, TICKS_PER_MONTH } from '@bitopolis/shared';
 import { protestFor, type Association } from './associations.ts';
-import { DEBT, FIRE, KIDS_MAX, LISTS, SEASONS, TOURISM, TURN } from './balance.ts';
+import { CARE, DEBT, FIRE, KIDS_MAX, LISTS, PROFESSION_AGE, SEASONS, TOURISM, TURN } from './balance.ts';
 import { canPresent, politicsPrune, presentCandidacy } from './politics.ts';
 import { BUILD_NAMES, cancelRefund, removeBuilding } from './commands.ts';
 import { homeRobbery } from './crime.ts';
@@ -12,7 +12,7 @@ import { hash32 } from './hash.ts';
 import { totalDebt } from './household.ts';
 import { askVpo, homesOf, vpoMenu } from './density.ts';
 import { jobsOf } from './levels.ts';
-import { addMemory, goalFor, NEED_TEXT, needOf, needsOf, plenoAwaits, plenoQuickIds, plenoReactFromTurn, plenoReactionMenu, PROFESSIONS, relation, setRelation } from './social.ts';
+import { addMemory, goalFor, NEED_TEXT, needOf, needsOf, plenoAwaits, plenoQuickIds, plenoReactFromTurn, plenoReactionMenu, professionForAge, relation, setRelation } from './social.ts';
 import { dilemmaMayorText, dilemmaQuickIds } from './dilemmas.ts';
 import { transfer } from './money.ts';
 import { canDump, dumpTrash } from './trash.ts';
@@ -767,7 +767,8 @@ export function setAiShare(state: GameState, share: number): void {
     c.traits = { terco: h(1) % 101, ahorro: h(2) % 101, social: h(3) % 101, ambicion: h(4) % 101 };
     c.desire = DESIRES[h(5) % DESIRES.length]!;
     c.fear = FEARS[h(6) % FEARS.length]!;
-    c.profession = PROFESSIONS[h(7) % PROFESSIONS.length]!;
+    // 2.8: según la edad (antes al azar: «estudiante de 72»).
+    c.profession = professionForAge(c.age, h(7), { ...PROFESSION_AGE, pensionAge: CARE.pensionAge });
     c.goal = goalFor(c.desire);
   }
 }

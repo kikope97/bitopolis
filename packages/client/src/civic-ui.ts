@@ -242,7 +242,9 @@ function seasonsSection(ctx: SocialCtx, s: GameState, reopen: () => void): (Node
   const f = cur && cur.season === sel && cur.year === d.year ? cur : null;
   const box: (Node | string)[] = [h('p', {}, h('strong', {}, SEASON_NAMES[sel]), ` · ${when(sel)}`)];
   if (!f || f.status === 'cancelada') {
-    if (f?.status === 'cancelada' || s.seasons?.held[sel] === d.year) box.push(h('p', { class: 'muted small' }, 'Ya se celebró este año.'));
+    // 2.8 (ronda 24): la cancelada no «se celebró» (las patronales que organiza el ayuntamiento disuelven la comisión).
+    if (f?.status === 'cancelada') box.push(h('p', { class: 'muted small' }, sel === 'patronales' ? 'Este año las patronales las organiza el ayuntamiento: la comisión se disolvió.' : 'Este año se canceló.'));
+    else if (s.seasons?.held[sel] === d.year) box.push(h('p', { class: 'muted small' }, 'Ya se celebró este año.'));
     else if (!seasonPossible(s, sel)) box.push(h('p', { class: 'muted small' }, 'Hace falta una ermita: sin ermita no hay romería.'));
     else box.push(h('p', { class: 'muted small' }, `La comisión se forma un mes antes (el ${SEASONS.day[sel]} de ${MONTH_NAME[SEASONS.month[sel]! - 2] ?? 'noviembre'}).`));
     if (sel === 'patronales') box.push(h('p', { class: 'muted small' }, 'Las patronales también puedes organizarlas tú en julio o agosto (más abajo).'));

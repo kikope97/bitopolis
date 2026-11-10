@@ -18,14 +18,14 @@ import {
 import { monthRates, sellOnDeparture, unitValue } from './economy.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance } from './prng.ts';
-import { addMemory } from './social.ts';
+import { addMemory, professionForAge, professionStale } from './social.ts';
 import type { Citizen, GameState } from './state.ts';
 import { pushEvent } from './state.ts';
 import { freeHomes, newResident } from './tick.ts';
 import { tryAmbulance } from './fire.ts';
 import { tendersForget } from './tenders.ts';
 import { birthFx, nurseryUse, onBirth } from './care.ts';
-import { CARE } from './balance.ts';
+import { CARE, PROFESSION_AGE } from './balance.ts';
 
 /**
  * Ciclo vital (v1.5): cumpleaños, nacimientos, hijos que se independizan,
@@ -98,6 +98,16 @@ export function dies(state: GameState, c: Citizen): void {
 /** Una vez al año (1 de enero): cumpleaños, hijos que cumplen 18 y fallecimientos. */
 export function lifeYear(state: GameState): void {
   for (const c of state.citizens) c.age++;
+  // 2.8 (ronda 24): el oficio cambia con la edad. Al llegar a la edad de pensión se
+  // jubila (y lo recuerda); quien terminó de estudiar busca oficio. También corrige
+  // las partidas viejas (oficio al azar) sin migración: basta con cumplir años.
+  const ages = { ...PROFESSION_AGE, pensionAge: CARE.pensionAge };
+  for (const c of state.citizens) {
+    if (!c.named || !professionStale(c.profession, c.age, ages)) continue;
+    const retires = c.age >= ages.pensionAge;
+    c.profession = professionForAge(c.age, hash32(state.seed, c.id, 7), ages);
+    if (retires && c.age - ages.pensionAge < 3) addMemory(state, c, 'se_jubilo', 4, 1);
+  }
   // Hijos que se hacen mayores: se independizan en el pueblo si hay casa; si no, se van a estudiar fuera.
   for (const c of [...state.citizens]) {
     const kids = c.kids ?? [];

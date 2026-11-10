@@ -842,3 +842,7 @@ body.tool-active .map-btns #whatnow, body.tool-active .map-btns #home { display:
 }
 /* La letra pixel solo admite tamaños de píxel exacto: el «€» de la caja, al mismo tamaño que la cifra. */
 html[data-font='pixel'] .topbar .tb-unit, html[data-font='pixel'] .topbar.tb-tight .tb-unit { font-size: 1em; }
+
+/* ===== 2.8 · parte E (vecinos y textos): servicio aún bloqueado en la ficha de una casa ===== */
+.svc-icons:not(.open) .svc.lock { border-bottom-color: var(--c-card-line); opacity: 0.85; }
+.svc.lock .svc-mark { color: var(--muted); }

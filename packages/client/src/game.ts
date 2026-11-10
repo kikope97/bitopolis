@@ -58,6 +58,8 @@ import {
   happinessFactors,
   worriesOf,
   missingServices,
+  activeNeeds,
+  NEED_KINDS,
   NEED_LABEL,
   occupants,
   roadCost,
@@ -2808,13 +2810,20 @@ export function startGame(opts: GameOptions): void {
       if (b.damaged) {
         const dmg = b.damaged;
         const fire = dmg.cause === 'fuego';
+        // 2.8 (ronda 24): la riada tiene su texto (antes decía «Destrozada en unos disturbios»).
+        const flood = dmg.cause === 'riada';
         const home = b.kind === 'house' || b.kind === 'res';
         const why = fire
           ? home
             ? 'Quien vivía aquí está sin casa hasta que se repare (lo nota en su felicidad) y no entra nadie nuevo.'
             : 'No funciona ni contrata hasta repararlo. Nunca se pierde: se arregla pagando la obra.'
-          : 'No vende hasta repararla, pero sigue pagando sueldos e impuestos con sus ahorros: si dos meses seguidos no llega a las nóminas, cierra.';
-        const box = h('div', { class: 'petition danger-box' }, h('p', {}, h('strong', {}, fire ? 'Destrozado por el fuego. ' : 'Destrozada en unos disturbios. '), why));
+          : flood
+            ? home
+              ? 'Nadie puede vivir aquí hasta que se repare. Nunca se pierde: se arregla pagando la obra.'
+              : 'No funciona ni da trabajo hasta repararlo. Nunca se pierde: se arregla pagando la obra.'
+            : 'No vende hasta repararla, pero sigue pagando sueldos e impuestos con sus ahorros: si dos meses seguidos no llega a las nóminas, cierra.';
+        const title = fire ? 'Destrozado por el fuego. ' : flood ? 'Destrozado por la riada. ' : 'Destrozada en unos disturbios. ';
+        const box = h('div', { class: 'petition danger-box', 'data-test': 'damaged-cause', 'data-cause': dmg.cause ?? 'disturbios' }, h('p', {}, h('strong', {}, title), why));
         // 2.7: «Reparar» es el botón principal de la ficha (arriba).
         if (dmg.repairUntil >= 0) box.append(h('p', { class: 'muted small' }, `En reparación: reabre el ${formatDate(tickToDate(dmg.repairUntil))}.`));
         content.push(box);
@@ -2958,18 +2967,25 @@ export function startGame(opts: GameOptions): void {
    */
   function servicesTable(b: Building): HTMLElement {
     const needs = new Map(missingServices(state, b.x, b.y).map((n) => [n.key, n.status] as const));
-    const row = (icon: string, label: string, ok: boolean | 'warn', text: string) =>
+    const row = (icon: string, label: string, ok: boolean | 'warn' | 'lock', text: string) =>
       // Ronda 14 (aplazado): lista de definición para los lectores de pantalla («Agua: Sí»), mismo aspecto.
       // 2.7: plegada, una fila de iconos con ✓/✗ (el texto sigue ahí para el lector de pantalla).
       h(
         'div',
-        { class: `svc ${ok === true ? 'ok' : ok === 'warn' ? 'warn' : 'bad'}`, title: `${label}: ${text}` },
+        { class: `svc ${ok === true ? 'ok' : ok === 'warn' ? 'warn' : ok === 'lock' ? 'lock' : 'bad'}`, title: `${label}: ${text}` },
         pixelIcon(icon),
-        h('span', { class: 'svc-mark', 'aria-hidden': 'true' }, ok === true ? '✓' : ok === 'warn' ? '!' : '✗'),
+        h('span', { class: 'svc-mark', 'aria-hidden': 'true' }, ok === true ? '✓' : ok === 'warn' ? '!' : ok === 'lock' ? '🔒' : '✗'),
         h('dt', { class: 'svc-label' }, label),
         h('dd', { class: 'svc-state' }, text),
       );
+    const active = activeNeeds(state);
     const svc = (key: NeedKey, icon: string, label: string) => {
+      // 2.8 (ronda 24): un servicio que aún no se puede construir no está «Cubierto»: dice qué falta.
+      if (!active.includes(key)) {
+        const tool = TOOLS.find((t) => t.build === NEED_KINDS[key][0]);
+        const lock = tool ? lockShort(tool, state) : null;
+        return row(icon, label, 'lock', `🔒 ${lock ?? 'aún no'}`);
+      }
       const st = needs.get(key);
       return row(icon, label, st === undefined ? true : st === 'lleno' ? 'warn' : false, st === undefined ? 'Cubierto' : st === 'lleno' ? 'Lleno' : 'No llega');
     };
@@ -2989,7 +3005,7 @@ export function startGame(opts: GameOptions): void {
       row('bar', 'Tienda', state.buildings.some((s) => s.kind === 'shop' && s.built && !s.damaged && Math.abs(s.x - b.x) + Math.abs(s.y - b.y) <= 6), state.buildings.some((s) => s.kind === 'shop' && s.built && !s.damaged && Math.abs(s.x - b.x) + Math.abs(s.y - b.y) <= 6) ? 'Cerca' : 'Lejos'),
     ];
     const dl = h('dl', { class: `svc-table svc-icons${svcOpen ? ' open' : ''}`, id: 'svc-table', 'aria-label': 'Servicios de la vivienda' }, ...rows);
-    const bad = rows.filter((r) => !r.classList.contains('ok')).length;
+    const bad = rows.filter((r) => !r.classList.contains('ok') && !r.classList.contains('lock')).length;
     const more = h('button', { class: 'btn small svc-more', 'aria-expanded': String(svcOpen), 'aria-controls': 'svc-table' }, svcOpen ? 'Ocultar el detalle' : 'Ver el detalle');
     const toggle = () => {
       svcOpen = !svcOpen;

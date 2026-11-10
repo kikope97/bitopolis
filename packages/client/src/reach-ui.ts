@@ -49,9 +49,13 @@ const posOf = (state: GameState, id: number) => state.buildings.find((b) => b.id
 export function kindName(kind: string): string {
   return (BUILD_NAMES[kind] ?? kind).toLowerCase();
 }
-/** «el colegio del Centro», «el parque de la Huerta»… */
+/** 2.8 (ronda 24): artículo de cada edificio (antes «el comisaría»). */
+const FEMININE = new Set(['water', 'power', 'chapel', 'library', 'jail', 'civilprotection', 'police', 'plaza', 'shop', 'farm', 'station', 'fair', 'cathedral', 'bigfactory', 'nursery', 'residence', 'busstation', 'sewage', 'vpo', 'coop']);
+const PLURAL = new Set(['res', 'solar']);
+/** «el colegio del Centro», «la comisaría de la Huerta»… */
 export function whereName(state: GameState, b: { kind: string; x: number; y: number }): string {
-  return `${b.kind === 'plaza' ? 'la' : 'el'} ${kindName(b.kind)} ${barrioOf(state, b.x, b.y)}`;
+  const art = PLURAL.has(b.kind) ? 'las' : FEMININE.has(b.kind) ? 'la' : 'el';
+  return `${art} ${kindName(b.kind)} ${barrioOf(state, b.x, b.y)}`;
 }
 
 /** Zona de un servicio ya puesto (al tocarlo). */
@@ -211,7 +215,7 @@ export function placeLines(state: GameState, what: string, x: number, y: number)
   const warn: string[] = siteNetworkWarn(state, kind, x, y);
   const over = info.overlaps.filter((o) => o.shared > 0 || info.mode !== 'radio').sort((a, b) => b.shared - a.shared)[0];
   if (over && info.mode === 'radio') warn.push(`⚠ Se solapa con ${whereName(state, over)} (${plural(over.shared, 'casa', 'casas')} en común)`);
-  for (const o of info.overlaps) if (o.full && o.used !== undefined && o.of !== undefined) warn.push(`${cap0(whereName(state, o))} está lleno (${o.used}/${o.of})`);
+  for (const o of info.overlaps) if (o.full && o.used !== undefined && o.of !== undefined) warn.push(`${cap0(whereName(state, o))} está ${FEMININE.has(o.kind) ? 'llena' : 'lleno'} (${o.used}/${o.of})`);
   return { info, gain, warn: warn.slice(0, 2), none: homes === 0 };
 }
 const cap0 = (s: string) => `${s[0]!.toUpperCase()}${s.slice(1)}`;

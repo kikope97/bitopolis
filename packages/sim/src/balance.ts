@@ -1642,3 +1642,13 @@ export const ZONE_GROWTH = {
   /** Uso de una bomba o central desde el que se avisa (una vez) de que se está llenando. */
   plantWarnAt: 0.9,
 };
+
+/**
+ * 2.8 (ronda 24, parte E): oficio según la edad. Estudiante solo de joven
+ * (siempre hasta `studentAlways`, la mitad hasta `studentUntil`); jubilado o
+ * jubilada desde `CARE.pensionAge`.
+ */
+export const PROFESSION_AGE = {
+  studentAlways: 20,
+  studentUntil: 24,
+};
