@@ -65,7 +65,11 @@ async function openTown(page: Page, request: import('@playwright/test').APIReque
   await page.evaluate(() => document.querySelectorAll('#toasts > *').forEach((t) => t.remove()));
 }
 
-const hook = (page: Page) => page.evaluate(() => (window as any).__bitopolis.reach);
+const hook = async (page: Page) => {
+  // 2.8: el dibujo puede ir a 30 fps (al alejar en escritorio); se espera al primer fotograma con la zona.
+  await expect.poll(() => page.evaluate(() => (window as any).__bitopolis.reach !== null && (window as any).__bitopolis.reach !== undefined)).toBe(true);
+  return page.evaluate(() => (window as any).__bitopolis.reach);
+};
 
 for (const d of DEVICES) {
   test.describe(`cobertura ${d.name} px`, () => {
