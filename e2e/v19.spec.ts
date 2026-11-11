@@ -36,7 +36,7 @@ test('v1.9: ficha con el bolsillo del vecino; aplazar su deuda; sueldo mínimo; 
   await expect(page.locator('.sheet')).toContainText('deben dinero');
   await page.locator('.sheet .person-row').filter({ hasText: c.name }).first().click();
   await expect(page.locator('.sheet .pocket')).toContainText('Debe 940');
-  await expect(page.locator('.sheet .pocket')).toContainText('endeudado');
+  await expect(page.locator('.sheet .pocket')).toContainText(/endeudad[oa]/);
   await shot('1-bolsillo');
   await page.getByRole('button', { name: /Aplazar/ }).click();
   await expect(page.locator('.sheet .pocket')).toContainText('Aplazado');
