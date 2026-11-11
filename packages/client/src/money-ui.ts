@@ -1,5 +1,6 @@
+import { forPerson } from './wording.ts';
 import { TICKS_PER_DAY, tickToDate } from '@bitopolis/shared';
-import { type Citizen, canMicrocredit, DEBT, canSettleDebt, type GameState, MICROCREDIT, type Pocket, pocketOf, totalDebt } from '@bitopolis/sim';
+import { type Citizen, canMicrocredit, DEBT, canSettleDebt, type GameState, MICROCREDIT, ownIncome, type Pocket, pocketOf, totalDebt } from '@bitopolis/sim';
 import { formatDate, money } from './i18n.ts';
 import type { SocialCtx } from './social-ui.ts';
 import { confirmDialog, h, toast } from './ui.ts';
@@ -38,7 +39,7 @@ export function pocketBox(ctx: SocialCtx, c: Citizen, reopen: () => void): HTMLE
       ),
     );
   } else box.append(h('p', { class: 'muted small' }, 'Aún no ha cerrado ningún mes en el pueblo.'));
-  box.append(h('p', {}, h('span', { class: `pocket-tag ${p}` }, POCKET_TEXT[p]), ` · ahorros: ${money(c.money)}`));
+  box.append(h('p', {}, h('span', { class: `pocket-tag ${p}` }, forPerson(POCKET_TEXT[p], c.name)), ` · ahorros: ${money(c.money)}`));
   if (c.jobId === null && c.unemployedSince !== undefined) {
     box.append(h('p', { class: 'neg' }, `En paro desde el ${formatDate(tickToDate(c.unemployedSince))}${(c.benefitLeft ?? 0) > 0 ? ` · cobra la prestación (${c.benefitLeft} meses más)` : ' · sin prestación'}.`));
   }
@@ -127,7 +128,7 @@ export function economyLines(state: GameState): { label: string; value: string; 
     { label: 'En paro', value: String(jobless), bad: jobless / pop > 0.1 },
   ];
   if (last) {
-    out.push({ label: 'Impagos el mes pasado', value: money(last.unpaid ?? 0), bad: (last.unpaid ?? 0) > 0.03 * last.income });
+    out.push({ label: 'Impagos el mes pasado', value: money(last.unpaid ?? 0), bad: (last.unpaid ?? 0) > 0.03 * ownIncome(last) }); // 2.8: sin contar lo prestado
     out.push({ label: 'Sueldo mínimo en las empresas', value: `${money(last.wage ?? 0)}/mes` });
     out.push({ label: 'Margen medio de las empresas', value: money(last.margin ?? 0), bad: (last.margin ?? 0) < 0 });
     out.push({ label: 'Empresas que pierden dinero', value: `${last.losing ?? 0} de ${last.businesses ?? 0}`, bad: (last.losing ?? 0) > 0 });

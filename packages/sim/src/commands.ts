@@ -30,6 +30,8 @@ import { canBuildBusStation, canSetBusFare, setBusFare } from './transit.ts';
 import { campaign, canCampaign, canMotion, motion } from './politics.ts';
 import { addMemory, answerPetition, canConvenePleno, closePleno, convenePleno, talkTo } from './social.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
+// 2.8 (parte D): lo que destrozó la riada del escenario no se derriba (derribar no es reparar).
+import { floodSitePending } from './scenarios.ts';
 import {
   type Building,
   buildingAt,
@@ -306,6 +308,8 @@ export function validateCommand(state: GameState, raw: unknown): CommandResult {
       if (b?.kind === 'townhall') return { ok: false, error: 'El ayuntamiento no se derriba' };
       const t = state.map.tiles[tileIndex(state, cmd.x, cmd.y)];
       if (b?.fire) return { ok: false, error: 'Está ardiendo: espera a que se apague' };
+      // 2.8: en «Tras la riada», derribar lo destrozado contaba como «todo reparado».
+      if (b && floodSitePending(state, b)) return { ok: false, error: 'Lo destrozó la riada: la meta es repararlo (Reparar, en su ficha)' };
       if (!b && t !== Tile.Road && !hasDike(state, cmd.x, cmd.y)) return { ok: false, error: 'No hay nada que derribar' };
       // Ronda 22: «Cancelar la obra» y «Deshacer» solo valen si aún se devuelve lo pagado.
       if (cmd.cancelOnly && (!b || cancelRefund(state, b) === 0)) return { ok: false, error: 'La obra ya ha empezado: no se puede cancelar' };

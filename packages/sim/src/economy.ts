@@ -1,5 +1,5 @@
 import { TICKS_PER_MONTH, type TaxLevel } from '@bitopolis/shared';
-import { regionFx } from './region.ts';
+import { bigCompanyIbi, regionFx } from './region.ts';
 import {
   TAX_RELIEF_DAYS,
   BUSINESS_CASH_CAP,
@@ -440,6 +440,45 @@ export function businessTaxes(state: GameState, b: Building, r: MonthRates): voi
   const rustic = b.kind === 'farm' ? FARM.ibiRustic : 1;
   transfer(state, b.id, TREASURY, Math.round((unitValue(state, b) * r.ibi * rustic) / 12), 'IBI');
   if (b.kind === 'shop') transfer(state, b.id, TREASURY, r.terrazas, 'tasas');
+}
+
+/**
+ * 2.8 (ronda 24): el IBI que se cobraría en un mes con el nivel `lv`, contado
+ * igual que lo cobran `monthlyHousing`, `businessTaxes` y la gran empresa:
+ * viviendas según la densidad (`homesOf`), casas vacías de dueños de fuera,
+ * nada de las casas quemadas ni de los inquilinos municipales, fincas con el
+ * rústico y la gran empresa. Puro (lo usa la hoja de Impuestos).
+ */
+export function ibiForecast(state: GameState, lv: TaxLevel): number {
+  const rate = IBI_RATE[lv];
+  const byHome = new Map<number, Citizen[]>();
+  for (const c of state.citizens) {
+    if (c.homeId === null) continue;
+    const list = byHome.get(c.homeId) ?? [];
+    list.push(c);
+    byHome.set(c.homeId, list);
+  }
+  let total = 0;
+  for (const b of state.buildings) {
+    if (!b.built) continue;
+    if (b.kind === 'house' || b.kind === 'res') {
+      if (b.damaged?.cause === 'fuego') continue;
+      const residents = byHome.get(b.id) ?? [];
+      const ibi = Math.round((unitValue(state, b) * rate) / 12);
+      let municipal = municipalUnits(b);
+      for (const c of residents) {
+        if (c.owns) total += ibi;
+        else if (municipal > 0) municipal--;
+        else total += ibi;
+      }
+      const privateEmpty = b.kind === 'res' ? homesOf(b) - residents.length : Math.max(0, (b.privateUnits ?? 0) - residents.filter((c) => c.owns).length);
+      if (privateEmpty > 0) total += ibi * privateEmpty;
+    } else if (b.kind === 'shop' || b.kind === 'factory' || b.kind === 'farm') {
+      // Como `isBusiness` (tick.ts) y `businessTaxes`.
+      total += Math.round((unitValue(state, b) * rate * (b.kind === 'farm' ? FARM.ibiRustic : 1)) / 12);
+    }
+  }
+  return total + bigCompanyIbi(state);
 }
 
 /** Mercado mensual: inquilinos estadísticos que compran y vecinos que emprenden. */

@@ -1,5 +1,5 @@
 import { DAYS_PER_MONTH, MONTHS_PER_YEAR, TICKS_PER_DAY, tickToDate } from '@bitopolis/shared';
-import { canHoldFestival, DEBT, DILEMMA_TITLE, type GameState, GRANT_NAME, GRANT_OFFER_DAYS, OFFER_TEXT, seasonName, SEASONS } from '@bitopolis/sim';
+import { canHoldFestival, DEBT, DILEMMA_TITLE, type GameState, GRANT_NAME, GRANT_OFFER_DAYS, ofGrant, OFFER_TEXT, seasonName, SEASONS } from '@bitopolis/sim';
 import { plural } from './i18n.ts';
 
 /**
@@ -35,7 +35,7 @@ export function pendingAsks(state: GameState): Ask[] {
     if (g.status !== 'offered') continue;
     const due = g.offeredTick + (g.offerDays ?? GRANT_OFFER_DAYS) * TICKS_PER_DAY;
     if (due <= now) continue;
-    const what = g.feder ? 'Fondos europeos (FEDER)' : `La Diputación paga el ${Math.round(g.share * 100)} % de ${GRANT_NAME[g.kind] ?? 'una obra'}`;
+    const what = g.feder ? 'Fondos europeos (FEDER)' : `La Diputación paga el ${Math.round(g.share * 100)} % ${GRANT_NAME[g.kind] ? ofGrant(g.kind) : 'de una obra'}`;
     out.push({ key: `grant:${g.id}`, text: what, due, go: 'th:grants', action: 'Responder' });
   }
   const f = state.seasons?.current;

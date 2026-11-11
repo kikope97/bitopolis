@@ -94,7 +94,8 @@ function ruleHeadlines(state: GameState): Headline[] {
     const n = state.citizens.length;
     const happy = n ? Math.round(state.citizens.reduce((a, c) => a + c.happiness, 0) / n) : 0;
     const shop = state.buildings.filter((b) => b.kind === 'shop' && b.built && (b.books?.sales ?? 0) > 0).sort((a, b) => (b.books?.sales ?? 0) - (a.books?.sales ?? 0) || a.id - b.id)[0];
-    const oldest = [...state.citizens].filter((c) => c.named).sort((a, b) => b.age - a.age || a.id - b.id)[0];
+    // 2.8 (ronda 24): entre todos los vecinos (antes solo los que tienen nombre: decía 72 con vecinos de 76).
+    const oldest = [...state.citizens].sort((a, b) => b.age - a.age || a.id - b.id)[0];
     const pending = state.errands?.list.filter((e) => e.status === 'aceptado').length ?? 0;
     const fillers = [
       `El pueblo sigue con ${n} vecinos y felicidad ${happy}`,

@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { ACTION_LABELS, cleanMotivo, MOTIVO_MAX } from './decisions.ts';
 import { BUILD_NAMES } from './commands.ts';
 import type { Citizen, GameState, Pending } from './state.ts';
-import { GOAL_TEXT, HOOK_TEXT, hookFor, memoryText, NEED_TEXT } from './social.ts';
+import { GOAL_TEXT, HOOK_TEXT, hookFor, memoryText, NEED_TEXT, professionOf } from './social.ts';
 import { averageHappiness } from './tick.ts';
 import { daysToElection, FACTION_TEXT, factionOf, politicsActive } from './politics.ts';
 
@@ -17,7 +17,7 @@ import { daysToElection, FACTION_TEXT, factionOf, politicsActive } from './polit
  * - Salida estructurada con enum de acciones válidas; se valida con zod.
  */
 
-export const PROMPT_VERSION = 5;
+export const PROMPT_VERSION = 6;
 
 export const SYSTEM_PROMPT = `Eres el narrador de Bitópolis, un pueblo español pequeño. Interpretas a vecinos con nombre que toman UNA decisión cada uno.
 
@@ -155,7 +155,8 @@ function citizenView(state: GameState, c: Citizen, p: Pending) {
     casa: home ? (c.owns ? 'vivienda en propiedad' : home.kind === 'house' ? 'casa municipal de alquiler' : 'piso de alquiler') : 'sin casa',
     hipoteca: c.mortgage > 0,
     trabajo: job ? BUILD_NAMES[job.kind]!.toLowerCase() : c.unemployedSince !== undefined ? 'en paro' : 'fuera del pueblo',
-    profesion: c.profession,
+    // 2.8: con su género («enfermera»).
+    profesion: professionOf(c),
     meta: GOAL_TEXT[c.goal],
     // Capa 1 (hechos) y capa 2 (recuerdos): solo datos y plantillas del motor.
     relaciones: c.relations.map((r) => ({ con: state.citizens.find((x) => x.id === r.id)?.name.split(' ')[0] ?? '?', tipo: r.kind, intensidad: r.strength >= 70 ? 'fuerte' : r.strength >= 40 ? 'media' : 'leve' })),

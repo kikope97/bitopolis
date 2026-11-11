@@ -1,9 +1,12 @@
+import { forPerson } from './wording.ts';
 import type { Command } from '@bitopolis/shared';
 import { POCKET_TEXT, pocketBox } from './money-ui.ts';
 import { fold, statusBar } from './hub-ui.ts';
 import { mindBox } from './ai-town-ui.ts';
+import { resultLine, retryScenario } from './celebrate-ui.ts';
 import {
   activeObjectives,
+  scenarioResult,
   scenarioStatus,
   type Citizen,
   diary,
@@ -68,7 +71,7 @@ const DESIRE_TEXT: Record<string, string> = {
 const FEAR_TEXT: Record<string, string> = { paro: 'el paro', impuestos: 'los impuestos', soledad: 'la soledad', ruido: 'el ruido', deudas: 'las deudas' };
 const TRAIT_TEXT: Record<string, string> = { terco: 'Terquedad', ahorro: 'Ahorro', social: 'Sociable', ambicion: 'Ambición' };
 
-const moodWord = (h0: number) => (h0 >= 65 ? 'contento' : h0 >= 40 ? 'regular' : 'descontento');
+const moodWord = (h0: number, name = '') => forPerson(h0 >= 65 ? 'contento' : h0 >= 40 ? 'regular' : 'descontento', name);
 
 /** Ficha completa del vecino (§6.2) con «Hablar» (§7). */
 export function openCitizen(ctx: SocialCtx, citizenId: number): void {
@@ -121,10 +124,10 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
   const owner = isFemaleName(c.name) ? 'Propietaria' : 'Propietario';
   // 2.7: arriba, el retrato y una frase suya; el ánimo y el dinero en palabras, con su número.
   const happy = Math.round(c.happiness);
-  const mood = moodWord(happy);
+  const mood = moodWord(happy, c.name);
   const debt = totalDebt(c);
   const pocket = pocketOf(c);
-  const moneyWords = debt > 0 ? `debe ${money(debt)}` : `${POCKET_TEXT[pocket]} · ahorros: ${money(c.money)}`;
+  const moneyWords = debt > 0 ? `debe ${money(debt)}` : `${forPerson(POCKET_TEXT[pocket], c.name)} · ahorros: ${money(c.money)}`;
   const said = last[0] ? `«${last[0].motivo}»` : worries[0] ? `Le preocupa ${lowerFirst(worries[0])}.` : `Quiere ${DESIRE_TEXT[c.desire]}.`;
   const relations = c.relations.length ? h('ul', { class: 'people' }, ...c.relations.map((r) => h('li', {}, `${nameOf(r.id)}: ${RELATION_TEXT[r.kind]}`))) : h('p', { class: 'muted' }, 'Aún no tiene relaciones en el pueblo.');
   const memories = c.memories.length ? h('ul', { class: 'people' }, ...memoryLines(state, c).map((t) => h('li', {}, t))) : h('p', { class: 'muted' }, 'Nada que contar todavía.');
@@ -142,13 +145,13 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
       statusBar(happy >= 65 ? 'ok' : happy >= 40 ? 'warn' : 'bad', mood[0]!.toUpperCase() + mood.slice(1), `${happy} de 100`, moneyWords),
       h('div', { class: 'fc-main cz-talk' }, h('p', { class: 'cz-talk-h' }, 'Hablar'), ask, answer),
     ),
-    h('p', {}, `${c.owns ? (c.mortgage > 0 ? `${owner} (le quedan ${money(c.mortgage)} de hipoteca)` : owner) : c.homeId === null ? 'Sin casa' : 'De alquiler'} · ${job ? `trabaja en ${workplaceText(job)}` : c.unemployedSince !== undefined ? 'en paro' : 'trabaja fuera'}`),
+    h('p', {}, `${c.owns ? (c.mortgage > 0 ? `${owner} (le quedan ${money(c.mortgage)} de hipoteca)` : owner) : c.homeId === null ? 'Sin casa' : 'De alquiler'} · ${job ? `${/^jubilad/.test(c.profession) ? 'sigue trabajando' : 'trabaja'} en ${workplaceText(job)}` : c.unemployedSince !== undefined ? 'en paro' : 'trabaja fuera'}`),
     c.kids?.length ? h('p', { class: 'muted small' }, c.kids.length === 1 ? 'Tiene un hijo en casa.' : `Tiene ${c.kids.length} hijos en casa.`) : '',
     hook ? h('p', { class: 'hook' }, h('strong', {}, 'Ahora mismo: '), `${HOOK_TEXT[hook.kind]}.`) : '',
     // 2.0: lo que piensa y planea (si piensa con IA).
     mindBox(state, c) ?? '',
     // v1.9: su balance y sus deudas (2.7: abierto si debe o no llega).
-    fold(`cz-pocket:${c.id}`, `Su bolsillo · ${debt > 0 ? `debe ${money(debt)}` : POCKET_TEXT[pocket]}`, debt > 0 || pocket === 'no_llega', pocketBox(ctx, c, () => openCitizen(ctx, citizenId))),
+    fold(`cz-pocket:${c.id}`, `Su bolsillo · ${debt > 0 ? `debe ${money(debt)}` : forPerson(POCKET_TEXT[pocket], c.name)}`, debt > 0 || pocket === 'no_llega', pocketBox(ctx, c, () => openCitizen(ctx, citizenId))),
     h('p', {}, `Quiere ${DESIRE_TEXT[c.desire]}; teme ${FEAR_TEXT[c.fear]}. Meta: ${GOAL_TEXT[c.goal]} ${goalDone(state, c) ? '✓' : ''}`),
     politicsActive(state)
       ? h(
@@ -195,8 +198,9 @@ function memoryLines(state: GameState, c: GameState['citizens'][number]): string
   for (const m of [...c.memories].reverse()) {
     const text = memoryText(state, m);
     const same = out.find((o) => o.text === text);
-    if (same) same.n++;
-    else out.push({ text, n: 1 });
+    // 2.8: el motor ya junta los repetidos y los cuenta en `times`.
+    if (same) same.n += m.times ?? 1;
+    else out.push({ text, n: m.times ?? 1 });
   }
   return out.map((o) => (o.n > 1 ? `${o.text} (×${o.n})` : o.text));
 }
@@ -437,9 +441,21 @@ export function objectivesNode(state: GameState): HTMLElement {
   const list = activeObjectives(state);
   // 2.3: la meta del escenario (mientras dura), antes que los objetivos de siempre.
   const sc = scenarioStatus(state);
+  // 2.8: al terminar, el resultado se queda («Cumplida en 13 meses») con «Reintentar».
+  const res = scenarioResult(state);
+  const token = location.pathname.match(/^\/p\/([0-9A-Za-z]{22})/)?.[1];
+  const retry = res && token ? h('button', { class: 'btn', type: 'button', 'data-test': 'scenario-retry' }, 'Reintentar este escenario') : '';
+  if (retry && token) retry.addEventListener('click', () => void retryScenario(state, token));
   const goal = sc
     ? h('p', { class: 'scenario-goal', 'data-scenario': sc.id }, h('strong', {}, `${sc.name}: `), sc.goal, h('br', {}), h('small', {}, `${sc.progress}. ${sc.monthsLeft === 1 ? 'Queda 1 mes' : `Quedan ${sc.monthsLeft} meses`}.`))
-    : '';
+    : res
+      ? h(
+          'div',
+          { class: `scenario-goal scenario-result ${res.won ? 'won' : 'lost'}`, 'data-scenario': res.id, 'data-test': 'scenario-result' },
+          h('p', {}, h('strong', {}, `${res.name}: `), `${res.won ? '✔ ' : ''}${resultLine(res)}.`),
+          retry,
+        )
+      : '';
   if (!list.length) return h('div', {}, goal, h('p', { class: 'muted' }, 'Todos los objetivos cumplidos.'));
   return h('div', {}, goal, h('ul', { class: 'obj-list' }, ...list.map((o) => h('li', {}, `○ ${objectiveText(state, o)}`, h('small', {}, ` +${money(o.reward)}${o.unlock ? ' y un edificio' : ''}`)))));
 }

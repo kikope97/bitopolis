@@ -1,6 +1,6 @@
 import { monthFlow } from './cash.ts';
 import { TICKS_PER_DAY, tickToDate } from '@bitopolis/shared';
-import { type GameState, hash32, rankName } from '@bitopolis/sim';
+import { type GameState, hash32, monthNet, professionOf, rankName } from '@bitopolis/sim';
 import { type Ask, dueSoon, dueText } from './asks.ts';
 import { formatDate, money, plural } from './i18n.ts';
 import { portraitCanvas } from './social-ui.ts';
@@ -38,11 +38,12 @@ const signed = (n: number) => (n > 0 ? `+${money(n)}` : n < 0 ? `−${money(-n)}
 export function townLine(state: GameState): string {
   const happy = avgHappy(state);
   const last = state.stats.at(-1);
-  const net = last ? last.income - last.expenses : 0;
   // 2.7: «va bien» mira el gasto corriente (un mes con una obra grande no es un mal mes).
   const f = monthFlow(state);
   const how = state.treasury < 0 || happy < 40 ? 'pasa un mal momento' : happy >= 65 && f.income - f.running >= 0 ? 'va bien' : 'va tirando';
-  const month = last ? ` (el último mes, ${signed(net)})` : '';
+  // 2.8 (ronda 24): el neto del mes sin obras (`monthNet`); las obras, aparte. Antes, «−21.855 €» por una estación de tren.
+  const n = last ? monthNet(last) : null;
+  const month = n ? ` (el último mes, ${signed(n.net)}${n.works ? `; aparte, ${money(n.works)} en obras` : ''})` : '';
   return `${rankName(state)} de Bitópolis ${how}: ${plural(state.citizens.length, 'vecino', 'vecinos')}, felicidad ${happy} de 100 y ${money(state.treasury)} en caja${month}.`;
 }
 
@@ -137,7 +138,7 @@ export function openHoy(state: GameState, since: AwaySince, asks: readonly Ask[]
     // Su frase: lo que piensa (IA o reglas); si no, cómo anda. El resumen largo va en su ficha.
     const mood = c.happiness >= 70 ? 'Aquí se vive bien.' : c.happiness >= 45 ? 'Vamos tirando.' : 'Esto tiene que mejorar.';
     const said = c.thought?.trim() || mood;
-    const who = h('button', { class: 'hoy-face', 'aria-label': `La cara del día: ${c.name}. Ver su ficha` }, portraitCanvas(c.id, 3, 'portrait hoy-portrait'), h('span', { class: 'hoy-who' }, h('strong', {}, c.name), h('span', { class: 'hoy-sub' }, `${c.age} años${c.profession ? ` · ${c.profession}` : ''}`), h('span', { class: 'hoy-quote' }, `«${said}»`)));
+    const who = h('button', { class: 'hoy-face', 'aria-label': `La cara del día: ${c.name}. Ver su ficha` }, portraitCanvas(c.id, 3, 'portrait hoy-portrait'), h('span', { class: 'hoy-who' }, h('strong', {}, c.name), h('span', { class: 'hoy-sub' }, `${c.age} años${c.profession ? ` · ${professionOf(c)}` : ''}`), h('span', { class: 'hoy-quote' }, `«${said}»`)));
     who.addEventListener('click', () => close(() => act.openCitizen(c.id)));
     face = h('section', { class: 'hoy-day', 'aria-label': 'La cara del día' }, h('h3', {}, 'La cara del día'), who);
   }

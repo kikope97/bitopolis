@@ -1,6 +1,6 @@
 import { TICKS_PER_MONTH } from '@bitopolis/shared';
 import { LOANS } from './balance.ts';
-import { OUTSIDE, ownIncome, TREASURY, transfer } from './money.ts';
+import { monthNet, OUTSIDE, ownIncome, TREASURY, transfer } from './money.ts';
 import { type GameState, type Loan, type Rating, pushEvent } from './state.ts';
 
 /**
@@ -82,25 +82,64 @@ export function recentTreasuryLoans(state: GameState): number {
  * Nota de las cuentas: A (< 10 % y 6 meses de superávit), B (< 20 %), C (< 35 %
  * o una tesorería en 12 meses), D (≥ 35 %, dos tesorerías o quiebra). Se calcula
  * al cerrar el mes, con el mes en curso dentro.
+ *
+ * 2.8 (ronda 24): el superávit es el neto del mes (`monthNet`: sin obras ni
+ * amortizaciones; devolver un préstamo no rompe la racha) y la caja cuenta: si
+ * cubre todo lo que se debe, la nota no baja de B.
  */
 export function ratingOf(state: GameState): Rating {
   const load = loanLoad(state, true);
   const treasuries = recentTreasuryLoans(state);
-  if (state.bankrupt || treasuries >= 2 || load >= LOANS.load.C) return 'D';
-  if (treasuries >= 1 || load >= LOANS.load.B) return 'C';
-  if (load >= LOANS.load.A) return 'B';
-  const months = [...state.stats.slice(-(LOANS.surplusMonths - 1)), state.month];
-  const surplus = months.length >= LOANS.surplusMonths && months.every((m) => ownIncome(m) >= m.expenses);
-  return surplus ? 'A' : 'B';
+  let r: Rating;
+  if (state.bankrupt || treasuries >= 2 || load >= LOANS.load.C) r = 'D';
+  else if (treasuries >= 1 || load >= LOANS.load.B) r = 'C';
+  else if (load >= LOANS.load.A) r = 'B';
+  else {
+    const months = [...state.stats.slice(-(LOANS.surplusMonths - 1)), state.month];
+    const surplus = months.length >= LOANS.surplusMonths && months.every((m) => monthNet(m).net >= 0);
+    r = surplus ? 'A' : 'B';
+  }
+  if ((r === 'C' || r === 'D') && !state.bankrupt && cashCoversDebt(state)) r = 'B';
+  return r;
+}
+
+/** 2.8: ¿la caja cubre todo lo que se debe al banco? (la deuda neta es cero o menos). */
+export function cashCoversDebt(state: GameState): boolean {
+  return state.treasury >= 0 && state.treasury >= totalOwed(state);
+}
+
+/**
+ * 2.8 (ronda 24): la nota que tendrías al cerrar el mes si pides `amount` a
+ * `months` meses (puro). `spent`: con el dinero ya gastado (lo normal); si no, con
+ * el préstamo aún en la caja. Usa el último mes cerrado como mes tipo. Con
+ * `amount` 0, la nota que se espera al cerrar el mes con lo que ya se debe.
+ */
+export function ratingAfter(state: GameState, amount: number, months: number, spent = true): Rating {
+  const last = state.stats.at(-1);
+  const base = last ? { income: last.income, expenses: last.expenses, breakdown: { ...last.breakdown } } : { income: state.month.income, expenses: state.month.expenses, breakdown: { ...state.month.breakdown } };
+  // El mes tipo, sin préstamos recibidos ni amortizaciones de aquel mes.
+  base.income -= Math.max(0, base.breakdown['préstamo'] ?? 0);
+  delete base.breakdown['préstamo'];
+  const loans = [...(state.loans ?? [])];
+  if (amount > 0) {
+    const { rate, quota: q } = loanOffer(state, amount, months);
+    loans.push({ id: -1, principal: amount, left: amount, quota: q, rate, monthsLeft: months, kind: 'banco', tick: state.tick });
+  }
+  const month = { ...state.month, income: base.income + Math.max(0, amount), expenses: base.expenses, breakdown: amount > 0 ? { ...base.breakdown, préstamo: amount } : base.breakdown };
+  const treasury = state.treasury + (spent ? 0 : amount);
+  return ratingOf({ ...state, loans, treasury, month, stats: state.stats.slice(0, -1) } as GameState);
 }
 
 /** Lo que aún se puede pedir ahora (múltiplo de 1.000; 0 si no se puede). */
 export function loanCapacity(state: GameState, months?: number): number {
   const rating = state.rating ?? 'B';
   let room = LOANS.maxRatio[rating] * averageIncome(state) * 12 - totalOwed(state);
-  // Ronda 18: a un plazo dado, la cuota nueva y las que ya hay no pasan de la carga de la nota C.
+  // Ronda 18: a un plazo dado, la cuota nueva y las que ya hay tienen un tope de carga.
+  // 2.8 (ronda 24): el tope queda por debajo del umbral de la C (`LOANS.capLoad` < `load.B`)
+  // con margen: `ratingOf` usa la media con el mes en curso, que se mueve un poco. Antes llegaba
+  // justo a la carga de la D y pedir el máximo te dejaba sin crédito.
   if (months) {
-    const free = LOANS.load.C * averageIncome(state) - monthlyQuotas(state);
+    const free = LOANS.capLoad * averageIncome(state) - monthlyQuotas(state);
     const perEuro = quota(100_000, LOANS.rate[rating], months) / 100_000;
     room = Math.min(room, free / perEuro);
   }
@@ -157,7 +196,8 @@ export function repayLoan(state: GameState, loanId: number, amount: number): voi
   const loan = state.loans.find((l) => l.id === loanId)!;
   const paid = Math.min(amount, loan.left);
   const fee = earlyFee(paid);
-  transfer(state, TREASURY, OUTSIDE, paid, 'préstamos');
+  // 2.8: lo amortizado va aparte (no es gasto de cada mes ni rompe el superávit); la comisión, sí.
+  transfer(state, TREASURY, OUTSIDE, paid, 'amortización');
   transfer(state, TREASURY, OUTSIDE, fee, 'préstamos');
   state.loanLedger.repaid += paid;
   state.loanLedger.interest += fee;
@@ -211,9 +251,12 @@ export function loansMonth(state: GameState): void {
       state.loans.push({ id: state.nextId++, principal: gap, left: gap, quota: quota(gap, rate, LOANS.treasuryMonths), rate, monthsLeft: LOANS.treasuryMonths, kind: 'tesoreria', tick: state.tick });
     }
     state.loanLedger.lent += gap;
-    state.loanLedger.treasuryTicks.push(state.tick);
+    // Ronda 25: un descubierto pequeño (menos del 25 % de lo que entra al mes) no baja la nota;
+    // si no, dos sustos de 1.000 € dejaban la D y sin banco (y de ahí a la quiebra).
+    const counts = gap >= LOANS.smallGap * averageIncome(state);
+    if (counts) state.loanLedger.treasuryTicks.push(state.tick);
     transfer(state, OUTSIDE, TREASURY, gap, 'préstamo');
-    pushEvent(state, 'warning', `La caja cerró el mes en negativo: el banco cubre ${fmt(gap)} € con un préstamo de tesorería a ${LOANS.treasuryMonths} meses (más caro, y la nota baja)`, { notify: true });
+    pushEvent(state, 'warning', `La caja cerró el mes en negativo: el banco cubre ${fmt(gap)} € con un préstamo de tesorería a ${LOANS.treasuryMonths} meses (más caro${counts ? ', y la nota baja' : '; al ser poco, la nota no baja'})`, { notify: true });
   }
   // Ronda 18: con nota D, nadie cubre la caja en negativo, pero sí se pagan intereses de demora.
   if (state.treasury < 0 && prev === 'D') {

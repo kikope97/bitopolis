@@ -90,7 +90,10 @@ test('v1.8: el ayuntamiento abre el panel de gestión y se amplía; calendario a
   // Calendario: solo a x3/x10.
   await expect(page.locator('#calendar')).toBeHidden();
   await setSpeed(page, 3);
-  await expect(page.locator('#calendar')).toBeVisible();
+  // 2.7/2.8: si la barra no cabe en una fila, el calendario se quita antes que la campana (`tb-nocal`).
+  await expect
+    .poll(async () => (await page.locator('#calendar').isVisible()) || (await page.locator('.topbar').evaluate((el) => el.classList.contains('tb-nocal'))))
+    .toBe(true);
   await setSpeed(page, 1);
   await expect(page.locator('#calendar')).toBeHidden();
   expect(errors).toEqual([]);

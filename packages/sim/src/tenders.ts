@@ -16,6 +16,7 @@ import { directorOwns } from './director-core.ts';
 import { systemOn } from './gates.ts';
 import { OUTSIDE, TREASURY, transfer } from './money.ts';
 import { FACTIONS } from './politics-core.ts';
+import { isFemaleName } from './names.ts';
 import { chance } from './prng.ts';
 import { addMemory } from './social.ts';
 import { type Building, type Citizen, type GameState, type Project, pushEvent } from './state.ts';
@@ -81,6 +82,20 @@ export function cronyOf(state: GameState): { councillor: Citizen; owner: Citizen
   return null;
 }
 
+/**
+ * 2.8 (ronda 24): quién es el primo, sin repetir al dueño («Bar de Celia de Celia»)
+ * y con su género («amiga de la concejala»).
+ */
+function cronyText(crony: { councillor: Citizen; owner: Citizen; business: Building }): string {
+  const own = first(crony.owner);
+  const name = crony.business.name;
+  const biz = name ? (name.includes(own) ? name : `${name} de ${own}`) : `El negocio de ${own}`;
+  const fc = isFemaleName(crony.councillor.name);
+  const role = fc ? 'la concejala' : 'el concejal';
+  if (crony.owner === crony.councillor) return `${biz}, ${role}`;
+  return `${biz}, ${isFemaleName(crony.owner.name) ? 'amiga' : 'amigo'} ${fc ? 'de la concejala' : 'del concejal'} ${first(crony.councillor)}`;
+}
+
 export interface OfferInfo {
   offer: Offer;
   /** Precio previsto (materiales + mano de obra). */
@@ -122,7 +137,7 @@ export function tenderOffers(state: GameState, kind: BuildKind, x: number, y: nu
       offer: 'primo',
       price: Math.round(mat * TENDER.crony.mat) + Math.round(localLabor * TENDER.crony.days),
       days: cronyDays,
-      who: crony ? `${crony.business.name ?? 'El negocio'} de ${first(crony.owner)}, ${crony.owner === crony.councillor ? 'el concejal' : `amigo del concejal ${first(crony.councillor)}`}` : 'No hay ningún primo con negocio en el pueblo',
+      who: crony ? cronyText(crony) : 'No hay ningún primo con negocio en el pueblo',
       risk: crony ? 'Si se sabe, escándalo en el pueblo' : '—',
       available: !!crony,
     },
@@ -239,7 +254,7 @@ export function scandal(state: GameState, t: Tender): boolean {
   const councillor = state.citizens.find((c) => c.id === t.councillorId);
   // Ronda 18: «Ferretería de Lucía» no repite «de Lucía».
   const who = owner ? ((t.businessName ?? '').includes(owner.name.split(' ')[0]!) ? t.businessName : `${t.businessName} de ${owner.name}`) : 'una empresa amiga';
-  pushEvent(state, 'crime', `Escándalo en el ayuntamiento: la obra de ${worksName(t.kind)} fue para ${who}${councillor && councillor !== owner ? `, amigo del concejal ${councillor.name}` : ''}`, { ref: t.buildingId, notify: true });
+  pushEvent(state, 'crime', `Escándalo en el ayuntamiento: la obra de ${worksName(t.kind)} fue para ${who}${councillor && councillor !== owner ? `, ${owner && isFemaleName(owner.name) ? 'amiga' : 'amigo'} ${isFemaleName(councillor.name) ? 'de la concejala' : 'del concejal'} ${councillor.name}` : ''}`, { ref: t.buildingId, notify: true });
   return true;
 }
 

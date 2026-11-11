@@ -1,9 +1,9 @@
 import { TICKS_PER_MONTH } from '@bitopolis/shared';
-import { TURN } from './balance.ts';
+import { CARE, PROFESSION_AGE, TURN } from './balance.ts';
 import { hash32 } from './hash.ts';
 import { FIRST_NAMES, SURNAMES } from './names.ts';
-import { pick } from './prng.ts';
-import { goalFor, PROFESSIONS } from './social-core.ts';
+import { nextU32, pick } from './prng.ts';
+import { goalFor, professionForAge } from './social-core.ts';
 import { type Citizen, DESIRES, FEARS, type GameState, NO_PROPERTY, randomTraits } from './state.ts';
 
 /**
@@ -20,6 +20,9 @@ function uniqueName(state: GameState): string {
   }
   return `${pick(state.rng, FIRST_NAMES)} ${pick(state.rng, SURNAMES)} ${state.nextId}`;
 }
+
+/** 2.8: edades del oficio (estudiante, jubilado) para `professionForAge`. */
+export const PROFESSION_AGES = { ...PROFESSION_AGE, pensionAge: CARE.pensionAge };
 
 /** Misma regla que `aiByShare` (turns.ts; lo comprueba un test): ¿piensa con IA el vecino `id`? */
 export function byShare(state: GameState, id: number): boolean {
@@ -53,7 +56,8 @@ export function newResident(state: GameState, opts: { age: number; surname?: str
     fear: named ? pick(state.rng, FEARS) : 'paro',
     cooldownUntil: 0,
     ...NO_PROPERTY,
-    profession: named ? pick(state.rng, PROFESSIONS) : '',
+    // 2.8: el oficio según la edad (antes al azar: «jubilada de 31»).
+    profession: named ? professionForAge(opts.age, nextU32(state.rng), PROFESSION_AGES) : '',
     goal: 'ahorrar',
     relations: [],
     memories: [],

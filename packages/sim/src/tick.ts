@@ -46,7 +46,7 @@ import { farmMonth, growFarms } from './farm.ts';
 import { coopFees, coopMonth } from './coop.ts';
 import { postMonth } from './post.ts';
 import { applyCommand, BUILD_NAMES, removeBuilding } from './commands.ts';
-import { OUTSIDE, ownIncome, TREASURY, transfer } from './money.ts';
+import { monthNet, OUTSIDE, TREASURY, transfer } from './money.ts';
 import { chance, nextInt, pick } from './prng.ts';
 import { detectTriggers, onNamedArrival, resolveDuePending } from './decisions.ts';
 import {
@@ -858,7 +858,8 @@ function endOfMonth(state: GameState): void {
     state.bankrupt = false;
     pushEvent(state, 'info', 'La caja vuelve a estar sana');
   }
-  const net = ownIncome(state.month) - state.month.expenses;
+  // 2.8 (ronda 24): el neto del mes sin obras (antes contaba las obras y avisaba de 2 meses con 240.000 € en caja).
+  const net = monthNet(state.month).net;
   if (net < 0 && state.treasury > 0 && state.treasury / -net < 3) {
     const months = Math.max(1, Math.floor(state.treasury / -net));
     pushEvent(state, 'warning', `A este ritmo, la caja aguanta ${months} ${months === 1 ? 'mes' : 'meses'}`);

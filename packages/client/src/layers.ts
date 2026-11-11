@@ -8,7 +8,7 @@ import { T } from './sprites.ts';
  * antigua «Cobertura de servicios» va dentro, filtrando por servicio) y contaminación. Cada nivel usa una trama distinta además del
  * color, para que el color nunca sea la única señal.
  */
-export type LayerId = 'none' | 'missing' | 'happiness' | 'pocket' | 'land' | 'pollution' | 'clean' | 'rural' | 'river' | 'density';
+export type LayerId = 'none' | 'missing' | 'happiness' | 'pocket' | 'land' | 'pollution' | 'noise' | 'crime' | 'clean' | 'rural' | 'river' | 'density';
 
 interface LayerDef {
   id: LayerId;
@@ -23,13 +23,33 @@ const BAD: [number, number, number, number] = [12, 4, 3, 1];
 /** Azul-amarillo (tritanopia): rampa de oscuro a claro sin azul ni amarillo. */
 const GOOD_TRI: [number, number, number, number] = [1, 2, 20, 12];
 const BAD_TRI: [number, number, number, number] = [12, 21, 2, 1];
+/**
+ * 2.8 (ronda 24): rojo-verde (deuteranopía), rampa por luminosidad sin rojo ni verde:
+ * azul oscuro → azul → celeste → amarillo (lo bueno, claro y cálido) y, en lo malo, de blanco a azul oscuro.
+ */
+const GOOD_DEU: [number, number, number, number] = [8, 9, 10, 4];
+const BAD_DEU: [number, number, number, number] = [12, 10, 9, 8];
 /** 2.4: el río, de azul (limpio) a marrón (sucio). */
 const RIVER: [number, number, number, number] = [48, 49, 45, 47];
 
 /** Colores del nivel según el modo de daltonismo (la trama no cambia). */
 function levelColor(colors: [number, number, number, number], lv: number): number {
-  if (prefs().colorblind !== 'azul-amarillo') return colors[lv]!;
-  return (colors === BAD || colors === RIVER ? BAD_TRI : GOOD_TRI)[lv]!;
+  const mode = prefs().colorblind;
+  if (mode === 'azul-amarillo') return (colors === BAD || colors === RIVER ? BAD_TRI : GOOD_TRI)[lv]!;
+  // El río ya va de azul a marrón (se distingue sin rojo ni verde).
+  if (mode === 'rojo-verde' && colors !== RIVER) return (colors === BAD ? BAD_DEU : GOOD_DEU)[lv]!;
+  return colors[lv]!;
+}
+
+/**
+ * Trama de cada nivel en bloques de 2×2 (la misma que la leyenda, style.css `.legend-item.lvN`):
+ * puntos sueltos → puntos juntos → damero → rayas verticales. Así el nivel se lee sin el color.
+ */
+export function patternOn(lv: number, gx: number, gy: number): boolean {
+  if (lv === 0) return gx % 4 === 0 && gy % 4 === 0;
+  if (lv === 1) return gx % 2 === 0 && gy % 2 === 0;
+  if (lv === 2) return (gx + gy) % 2 === 0;
+  return gx % 4 !== 3;
 }
 
 export const LAYERS: LayerDef[] = [
@@ -41,6 +61,9 @@ export const LAYERS: LayerDef[] = [
   { id: 'pocket', label: 'Bolsillo de los vecinos', colors: GOOD, legend: legend(['Endeudados', 'No llegan', 'Van justos', 'Holgados'], 'good') },
   { id: 'land', label: 'Valor del suelo', colors: GOOD, legend: legend(['Muy bajo', 'Bajo', 'Alto', 'Muy alto'], 'good') },
   { id: 'pollution', label: 'Contaminación', colors: BAD, legend: legend(['Limpio', 'Algo', 'Bastante', 'Mucha'], 'bad') },
+  // 2.8 (ronda 24): ruido y delincuencia (fields.noise y fields.crime): dónde molesta y dónde hace falta la policía.
+  { id: 'noise', label: 'Ruido', colors: BAD, legend: legend(['Tranquilo', 'Algo de ruido', 'Ruidoso', 'Mucho ruido'], 'bad') },
+  { id: 'crime', label: 'Delincuencia', colors: BAD, legend: legend(['Segura', 'Algún robo', 'Bastante', 'Mucha'], 'bad') },
   // 2.1: basura. Por dónde pasa el camión y cómo está cada edificio.
   { id: 'clean', label: 'Limpieza', colors: GOOD, legend: legend(['Ratas', 'Bolsas en la calle', 'Sin camión', 'Pasa el camión'], 'good') },
   // 2.3: turismo. Casas rurales, el patrimonio con su entorno y quién paga más alquiler por ellas.
@@ -60,6 +83,8 @@ function values(state: GameState, layer: LayerId): (number | null)[] {
   const n = w * h;
   if (layer === 'land') return state.fields.land;
   if (layer === 'pollution') return state.fields.pollution.map((v) => (v < 3 ? null : v));
+  if (layer === 'noise') return (state.fields.noise ?? []).map((v) => (v < 5 ? null : v));
+  if (layer === 'crime') return (state.fields.crime ?? []).map((v) => (v < 3 ? null : v));
   // 2.4: solo en las casillas de río (0 limpio … 100 muy sucio; la salida, igual).
   if (layer === 'river') return state.map.terrain.map((t, i) => (t === 1 ? (state.fields.river?.[i] ?? 0) : null));
   // 2.5: solo en la zona R; el bloque que ya creció, en lo más alto.
@@ -161,16 +186,8 @@ export function layerCanvas(state: GameState, layer: LayerId): HTMLCanvasElement
     const px = (i % w) * T;
     const py = Math.floor(i / w) * T;
     g.fillStyle = PALETTE[levelColor(def.colors, lv)]!;
-    // Trama por nivel (bloques de 2×2): dispersa → media → damero → casi llena.
-    for (let y = 0; y < T; y += 2) {
-      for (let x = 0; x < T; x += 2) {
-        const gx = x / 2;
-        const gy = y / 2;
-        const on =
-          lv === 0 ? gx % 4 === 0 && gy % 4 === 0 : lv === 1 ? gx % 2 === 0 && gy % 2 === 0 : lv === 2 ? (gx + gy) % 2 === 0 : !(gx % 4 === 0 && gy % 4 === 0);
-        if (on) g.fillRect(px + x, py + y, 2, 2);
-      }
-    }
+    // Trama por nivel (bloques de 2×2), la misma que la leyenda.
+    for (let y = 0; y < T; y += 2) for (let x = 0; x < T; x += 2) if (patternOn(lv, x / 2, y / 2)) g.fillRect(px + x, py + y, 2, 2);
   }
   cache = { key, canvas: c };
   return c;

@@ -1,6 +1,6 @@
 import { tickToDate } from '@bitopolis/shared';
 import { ambulanceFor, busStation, buildingAt, type GameState, type NeedKey, heritageVariant, isWater, seasonOf, streetSegment, Terrain, Tile, trashStateOf, truckRoutes, Zone } from '@bitopolis/sim';
-import { happinessMarks, type LayerId, layerCanvas, missingMarks, NEED_ICON, ruralMarks } from './layers.ts';
+import { happinessMarks, type LayerId, layerCanvas, missingMarks, NEED_ICON, patternOn, ruralMarks } from './layers.ts';
 import type { ReachOverlay } from './reach-ui.ts';
 import { pixelIcon } from './icons.ts';
 import { lotsOf } from './nucleo-ui.ts';
@@ -69,6 +69,8 @@ export interface Camera {
 export interface Preview {
   tiles: { x: number; y: number }[];
   ok: boolean;
+  /** 2.8 (ronda 24): casillas de una zona que quedan sin carretera (llevan una ✗ pequeña). */
+  noRoad?: { x: number; y: number }[];
 }
 
 const P = (i: number) => PALETTE[i]!;
@@ -732,8 +734,8 @@ export function render(
         for (let x = 0; x < 10; x += 2) {
           const gx = x / 2;
           const gy = y / 2;
-          const on = m.lv === 0 ? (gx + gy) % 4 === 0 : m.lv === 1 ? (gx + gy) % 2 === 0 && gy % 2 === 0 : m.lv === 2 ? (gx + gy) % 2 === 0 : true;
-          if (on) ctx.fillRect(px + x * z, py + y * z, 2 * z, 2 * z);
+          // 2.8 (ronda 24): la misma trama que la capa y la leyenda (antes «Muy alta» era un cuadro lleno).
+          if (patternOn(m.lv, gx, gy)) ctx.fillRect(px + x * z, py + y * z, 2 * z, 2 * z);
         }
       }
     }
@@ -844,8 +846,29 @@ export function render(
     ctx.fillRect(px + ts - L, py + ts - t, L, t);
     ctx.fillRect(px + ts - t, py + ts - L, t, L);
   };
+  // 2.8 (ronda 24): donde no se puede, una ✗ blanca gruesa con borde negro (el rojo solo no se ve en la hierba
+  // ni con daltonismo). `size` es la fracción de la casilla: 0,6 la grande; 0,32 la de «sin carretera».
+  const cross = (tx: number, ty: number, size: number) => {
+    const u = Math.max(1, Math.round(ts / 16));
+    const n = Math.max(3, Math.round((ts * size) / u / 2));
+    const c = Math.max(2, Math.round(ts * size * 0.18));
+    const x0 = tx * ts - cam.x + Math.round((ts - n * 2 * u) / 2);
+    const y0 = ty * ts - cam.y + Math.round((ts - n * 2 * u) / 2);
+    const span = n * 2 * u;
+    for (const [color, grow] of [[0, u], [12, 0]] as const) {
+      ctx.fillStyle = P(color);
+      const sz = c + grow * 2;
+      for (let k = 0; k <= n * 2; k++) {
+        const d = Math.round((k * (span - c)) / (n * 2));
+        ctx.fillRect(x0 + d - grow, y0 + d - grow, sz, sz);
+        ctx.fillRect(x0 + span - c - d - grow, y0 + d - grow, sz, sz);
+      }
+    }
+  };
   if (opts.preview) {
-    for (const t of opts.preview.tiles) corner(t.x, t.y, opts.preview.ok ? 12 : 2, 2);
+    for (const t of opts.preview.tiles) corner(t.x, t.y, opts.preview.ok ? 12 : 2, opts.preview.ok ? 2 : 3);
+    if (!opts.preview.ok) for (const t of opts.preview.tiles) cross(t.x, t.y, 0.6);
+    else for (const t of opts.preview.noRoad ?? []) cross(t.x, t.y, 0.32);
   }
   // 2.7: la casilla donde no se puede construir parpadea en rojo un momento (fija con movimiento reducido).
   if (opts.bad) {
@@ -856,6 +879,7 @@ export function render(
       for (const t of opts.bad.tiles) ctx.fillRect(t.x * ts - cam.x, t.y * ts - cam.y, ts, ts);
       ctx.globalAlpha = 1;
       for (const t of opts.bad.tiles) corner(t.x, t.y, 2, 3);
+      for (const t of opts.bad.tiles) cross(t.x, t.y, 0.6);
     }
   }
   if (opts.selected) corner(opts.selected.x, opts.selected.y, 4, 2);

@@ -2,14 +2,27 @@ import { describe, expect, it } from 'vitest';
 import { checkInvariants, createInitialState, earlyReady, type EarlySystem, EARLY, type GameState, hashState, runSimulation } from '../src/index.ts';
 
 describe('2.6: sucesos que llegan cuando toca (gates.ts)', () => {
-  it('cada suceso, a partir de sus vecinos o del ayuntamiento 3', () => {
+  it('cada suceso, a partir de sus vecinos o de su nivel del ayuntamiento', () => {
     const s = createInitialState({ seed: 5 });
     for (const sys of Object.keys(EARLY) as EarlySystem[]) expect(earlyReady(s, sys), sys).toBe(false);
-    s.townhallLevel = 3;
+    for (const lv of [3, 4]) {
+      s.townhallLevel = lv;
+      for (const sys of Object.keys(EARLY) as EarlySystem[]) expect(earlyReady(s, sys), `${sys} con el nivel ${lv}`).toBe(EARLY[sys].level <= lv);
+    }
+    s.townhallLevel = 5;
     for (const sys of Object.keys(EARLY) as EarlySystem[]) expect(earlyReady(s, sys), sys).toBe(true);
     s.townhallLevel = 1;
-    while (s.citizens.length < 30) s.citizens.push({} as never);
-    for (const sys of Object.keys(EARLY) as EarlySystem[]) expect(earlyReady(s, sys), sys).toBe(EARLY[sys].pop <= 30);
+    for (const n of [30, 40, 45, 50, 60, 70]) {
+      while (s.citizens.length < n) s.citizens.push({} as never);
+      for (const sys of Object.keys(EARLY) as EarlySystem[]) expect(earlyReady(s, sys), `${sys} con ${n} vecinos`).toBe(EARLY[sys].pop <= n);
+    }
+  });
+
+  it('2.8: escalonados, no todos a la vez (encargos 30, El Eco 40, ofertas 45, cartas 50, dilemas 60, gran empresa 70)', () => {
+    const pops = (['errands', 'press', 'neighborOffers', 'letters', 'dilemmas', 'bigCompany'] as const).map((k) => EARLY[k].pop);
+    expect(pops).toEqual([30, 40, 45, 50, 60, 70]);
+    // Ningún umbral de vecinos repetido: cada sistema llega solo.
+    expect(new Set(Object.values(EARLY).map((g) => g.pop)).size).toBe(Object.keys(EARLY).length);
   });
 
   it('en una partida, nada llega antes de su momento y en una media sí llega', () => {

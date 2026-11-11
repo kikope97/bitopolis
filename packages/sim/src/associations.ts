@@ -107,8 +107,16 @@ function centerOf(state: GameState, ids: number[]): { x: number; y: number } {
 
 /** La queja principal de un vecino, si la tiene (lo que más le resta). */
 export function grievanceOf(state: GameState, c: Citizen, ctx = coverageCtx(state)): Cause | null {
+  return grievancesOf(state, c, ctx)[0] ?? null;
+}
+
+/**
+ * 2.8 (ronda 24): todas las quejas de un vecino, la que más le resta primero. Una
+ * asociación sigue mientras sus socios tengan su queja, aunque ya no sea la principal.
+ */
+export function grievancesOf(state: GameState, c: Citizen, ctx = coverageCtx(state)): Cause[] {
   const home = state.buildings.find((b) => b.id === c.homeId);
-  if (!home) return null;
+  if (!home) return [];
   const i = home.y * state.map.w + home.x;
   const scored: [Cause, number][] = [];
   for (const n of missingServices(state, home.x, home.y, ctx)) {
@@ -129,9 +137,9 @@ export function grievanceOf(state: GameState, c: Citizen, ctx = coverageCtx(stat
   if (!c.owns && home.kind === 'res' && touristified(state)) scored.push(['vivienda', 4 + (ruralShare(state) - TOURISM.touristified.share) * 40]);
   // 2.4: el río sucio en la orilla y los molinos junto a los jubilados.
   scored.push(...waterGrievances(state, c, home));
-  if (!scored.length) return null;
+  // Orden estable: a igualdad de peso, la que se añadió antes (como antes con `sort`).
   scored.sort((a, b) => b[1] - a[1]);
-  return scored[0]![0];
+  return [...new Set(scored.map((x) => x[0]))];
 }
 
 /** Cada mes: nacen asociaciones, se renuevan sus socios y, si consiguen lo que piden, lo celebran. */
@@ -140,21 +148,51 @@ export function associationsMonth(state: GameState): void {
   const ctx = coverageCtx(state);
   const named = state.citizens.filter((c) => c.named);
   const byCause = new Map<Cause, Citizen[]>();
+  // 2.8: todas las quejas de cada uno (aunque no sean la principal).
+  const all = new Map<number, Cause[]>();
   for (const c of named) {
-    const g = grievanceOf(state, c, ctx);
-    if (!g) continue;
-    byCause.set(g, [...(byCause.get(g) ?? []), c]);
+    const gs = grievancesOf(state, c, ctx);
+    all.set(c.id, gs);
+    if (gs[0]) byCause.set(gs[0], [...(byCause.get(gs[0]) ?? []), c]);
   }
-  // Las que ya existen: socios al día; si casi nadie sigue con la queja, celebran y se disuelven.
+  // Las que ya existen: socios al día. 2.8 (ronda 24): solo se disuelven si su causa se
+  // cumple (antes, en cuanto la queja principal de los socios cambiaba, y celebraban
+  // «ya hay policía» sin policía); si la causa se cumple pero siguen con otra queja
+  // compartida, cambian de bandera.
   for (const a of [...state.associations]) {
-    const still = byCause.get(a.cause) ?? [];
     const before = a.members;
+    // Siguen los socios que aún tienen la queja; se suman quienes la tienen como principal.
+    const still = named.filter((c) => (all.get(c.id) ?? []).includes(a.cause) && (before.includes(c.id) || all.get(c.id)?.[0] === a.cause));
     a.members = still.map((c) => c.id);
     if (still.length < ASSOCIATIONS.dissolveBelow) {
-      // Lo celebran los socios que siguen en el pueblo (ronda 13: se lo daba a otros vecinos).
       const old = state.citizens.filter((c) => before.includes(c.id));
-      for (const c of old) addMemory(state, c, 'logro_vecinal', 3, 3);
-      pushEvent(state, 'politics', `La ${a.name} celebra que ya hay ${CAUSE_TEXT[a.cause]}. Se disuelve: misión cumplida`);
+      // Lo consiguieron los socios que siguen en el pueblo y ya no tienen esa queja.
+      const won = old.filter((c) => c.named && !(all.get(c.id) ?? []).includes(a.cause));
+      const fixed = won.length > 0 && won.length >= old.filter((c) => (all.get(c.id) ?? []).includes(a.cause)).length;
+      // ¿Comparten ahora otra queja (sin asociación)? Entonces cambian de bandera.
+      const next = fixed ? nextBanner(state, a, won, all) : null;
+      if (next) {
+        const prev = a.cause;
+        for (const c of won) addMemory(state, c, 'logro_vecinal', 3, 3);
+        a.cause = next.cause;
+        a.members = next.members.map((c) => c.id);
+        if (!a.members.includes(a.leaderId)) a.leaderId = leaderOf(next.members).id;
+        if (a.name.endsWith(` por ${CAUSE_TEXT[prev]}`)) a.name = `${a.name.slice(0, -` por ${CAUSE_TEXT[prev]}`.length)} por ${CAUSE_TEXT[next.cause]}`;
+        a.founded = state.tick;
+        a.protestDay = -1;
+        a.promiseUntil = -1;
+        a.protests = 0;
+        for (const c of state.citizens) if (c.protest === a.id || c.protest === -a.id) delete c.protest;
+        pushEvent(state, 'politics', `La ${a.name} cambia de bandera: ya tienen ${CAUSE_TEXT[prev]} y ahora piden ${CAUSE_ASK[next.cause]}`, { ref: a.leaderId });
+        continue;
+      }
+      if (fixed) {
+        // Lo celebran solo quienes lo han conseguido (ronda 13: se lo daba a otros vecinos).
+        for (const c of won) addMemory(state, c, 'logro_vecinal', 3, 3);
+        pushEvent(state, 'politics', `La ${a.name} celebra que ya tienen ${CAUSE_TEXT[a.cause]}. Se disuelve: misión cumplida`);
+      } else {
+        pushEvent(state, 'politics', `La ${a.name} se disuelve: ${old.length ? 'casi no le quedan socios' : 'sus socios se han ido del pueblo'}`);
+      }
       state.associations = state.associations.filter((x) => x !== a);
       continue;
     }
@@ -194,7 +232,19 @@ export function freshCauses(state: GameState, byCause?: Map<Cause, Citizen[]>): 
       if (g) byCause.set(g, [...(byCause.get(g) ?? []), c]);
     }
   }
-  return [...byCause.entries()].filter(([cause, cs]) => cs.length >= ASSOCIATIONS.minMembers && !state.associations.some((a) => a.cause === cause)).sort((a, b) => b[1].length - a[1].length);
+  // Ronda 25: quien ya es socio de una asociación no funda otra (salían dos o tres con los mismos
+  // vecinos y el mismo líder, cada una con su manifestación), y policía e inseguridad son la misma queja.
+  const taken = new Set(state.associations.flatMap((a) => a.members));
+  return [...byCause.entries()]
+    .map(([cause, cs]) => [cause, cs.filter((c) => !taken.has(c.id))] as [Cause, Citizen[]])
+    .filter(([cause, cs]) => cs.length >= ASSOCIATIONS.minMembers && !state.associations.some((a) => sameCause(a.cause, cause)))
+    .sort((a, b) => b[1].length - a[1].length);
+}
+
+/** Ronda 25: «falta policía» e «inseguridad» piden lo mismo. */
+function sameCause(a: Cause, b: Cause): boolean {
+  const k = (x: Cause) => (x === 'inseguridad' ? 'policia' : x);
+  return k(a) === k(b);
 }
 
 /** Funda la asociación de una queja con estos socios. */
@@ -226,6 +276,17 @@ export function foundAssociation(state: GameState, cause: Cause, cs: Citizen[]):
   for (const c of cs) addMemory(state, c, 'asociacion', 3, 1);
   pushEvent(state, 'politics', `Nace la ${a.name}: ${cs.length} socios, con ${leader.name} al frente. Piden ${CAUSE_ASK[cause]}`, { ref: leader.id });
   return a;
+}
+
+/** 2.8: la queja que ahora comparten los antiguos socios (la más común, sin otra asociación que la pida). */
+function nextBanner(state: GameState, a: Association, cs: Citizen[], all: Map<number, Cause[]>): { cause: Cause; members: Citizen[] } | null {
+  const by = new Map<Cause, Citizen[]>();
+  for (const c of cs) {
+    const g = all.get(c.id)?.[0];
+    if (g && !sameCause(g, a.cause) && !state.associations.some((x) => x !== a && sameCause(x.cause, g))) by.set(g, [...(by.get(g) ?? []), c]);
+  }
+  const best = [...by.entries()].filter(([, m]) => m.length >= ASSOCIATIONS.minMembers).sort((p, q) => q[1].length - p[1].length)[0];
+  return best ? { cause: best[0], members: best[1] } : null;
 }
 
 function leaderOf(cs: Citizen[]): Citizen {

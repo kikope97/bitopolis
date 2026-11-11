@@ -127,6 +127,8 @@ export const MEMORY_KINDS = [
   'volvio',
   // 2.5 (bloque F): vivienda protegida.
   'piso_protegido',
+  // 2.8 (ronda 24): el oficio cambia con la edad.
+  'se_jubilo',
 ] as const;
 export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Recuerdo: plantilla del motor (nunca texto del LLM ni del jugador). */
@@ -140,10 +142,12 @@ export interface Memory {
   valence: number;
   /** Nombres de pila de `about` cuando se creó (v1.3). */
   names?: string[];
+  /** 2.8: cuántas veces lo ha vivido (los repetidos se juntan en uno; sin definir = 1). */
+  times?: number;
 }
 
 // 2.3: en social-core.ts (sin dependencias) para crear vecinos desde createInitialState.
-export { GOALS, goalFor, PROFESSIONS, type Goal } from './social-core.ts';
+export { GOALS, goalFor, PROFESSIONS, professionForAge, professionStale, WORK_PROFESSIONS, type Goal } from './social-core.ts';
 
 /** Oficios en masculino y femenino (v1.9.1: «Rosa, enfermero»). Se guarda una forma; se dice la que toca. */
 const PROFESSION_FORMS: [string, string][] = [
@@ -230,6 +234,14 @@ export interface PromiseRecord {
 }
 
 export const MEMORY_MAX = 5;
+/**
+ * 2.8 (ronda 24): recuerdos «ancla», los que hacen la historia de un vecino. No se
+ * olvidan (hasta `ANCHOR_MAX`, además de los `MEMORY_MAX` que rotan): llegar al
+ * pueblo, la pareja, un hijo, fundar un partido o presentarse (y ganar o perder),
+ * el incendio y la despedida de un ser querido.
+ */
+export const ANCHOR_KINDS: readonly MemoryKind[] = ['llego', 'nueva_pareja', 'nacio_hijo', 'fundo_partido', 'gano_elecciones', 'perdio_elecciones', 'incendio', 'perdio_a'];
+export const ANCHOR_MAX = 3;
 const MEMORY_DAYS = 60;
 const RELATIONS_MAX = 5;
 export const PLENO_COST = 300;
@@ -244,15 +256,36 @@ const HOOKS_MAX = 3;
 /* ---------------- memoria ---------------- */
 
 export function addMemory(state: GameState, c: Citizen, kind: MemoryKind, importance: number, valence: number, about: number[] = []): void {
+  // 2.8: lo mismo otra vez («fue a las fiestas» ×4) no ocupa otro hueco: se refresca y se cuenta.
+  const key = [...about].sort((a, b) => a - b).join(',');
+  const same = c.memories.findIndex((m) => m.kind === kind && [...m.about].sort((a, b) => a - b).join(',') === key);
+  if (same >= 0) {
+    const m = c.memories.splice(same, 1)[0]!;
+    m.tick = state.tick;
+    m.importance = Math.max(m.importance, importance);
+    m.valence = valence;
+    m.times = (m.times ?? 1) + 1;
+    c.memories.push(m);
+    return;
+  }
   // Se guarda el nombre de pila: si esa persona se va, el recuerdo no se queda sin nombre.
   const names = about.map((id) => state.citizens.find((x) => x.id === id)?.name.split(' ')[0] ?? '');
   c.memories.push({ tick: state.tick, kind, about, importance, valence, ...(about.length ? { names } : {}) });
-  if (c.memories.length > MEMORY_MAX) {
+  // 2.8: las anclas que se quedan (la llegada primero; luego las más importantes y, a igualdad, las más antiguas).
+  const anchors = c.memories
+    .filter((m) => ANCHOR_KINDS.includes(m.kind))
+    .sort((a, b) => Number(b.kind === 'llego') - Number(a.kind === 'llego') || b.importance - a.importance || a.tick - b.tick)
+    .slice(0, ANCHOR_MAX);
+  const pool = c.memories.filter((m) => !anchors.includes(m));
+  while (pool.length > MEMORY_MAX) {
     // Se olvida el menos importante, ponderado por antigüedad; nunca lo que acaba de vivir.
     const score = (m: Memory) => m.importance - (state.tick - m.tick) / (TICKS_PER_DAY * 60);
-    let worst = 0;
-    for (let i = 1; i < c.memories.length - 1; i++) if (score(c.memories[i]!) < score(c.memories[worst]!)) worst = i;
-    c.memories.splice(worst, 1);
+    const last = c.memories[c.memories.length - 1];
+    let worst: Memory | undefined;
+    for (const m of pool) if (m !== last && (!worst || score(m) < score(worst))) worst = m;
+    if (!worst) break;
+    pool.splice(pool.indexOf(worst), 1);
+    c.memories.splice(c.memories.indexOf(worst), 1);
   }
 }
 
@@ -424,6 +457,8 @@ export function memoryText(state: GameState, m: Memory): string {
       return 'Volvió al pueblo';
     case 'piso_protegido':
       return 'Le tocó un piso de la vivienda protegida';
+    case 'se_jubilo':
+      return 'Se jubiló';
   }
 }
 
@@ -1003,7 +1038,7 @@ export function ruleAnswer(state: GameState, c: Citizen, q: Question, worst: str
 }
 
 /** Frase sobre lo que ha vivido hace poco (v1.3). Plantillas del motor; nada del LLM ni del jugador. */
-const MEMORY_LINE: Partial<Record<MemoryKind, (who: string) => string>> = {
+const MEMORY_LINE: Partial<Record<MemoryKind, (who: string, fem: boolean) => string>> = {
   promesa_rota: () => 'Desde que no cumplió lo que prometió, ya no me fío igual.',
   promesa_cumplida: () => 'Cumplió lo que prometió, y eso se agradece.',
   perdio_trabajo: () => 'Desde que perdí el trabajo, no levanto cabeza.',
@@ -1025,7 +1060,8 @@ const MEMORY_LINE: Partial<Record<MemoryKind, (who: string) => string>> = {
   // v1.9 (ronda 15).
   desahuciado: () => 'Desde que me echaron de casa, duermo donde puedo.',
   embargado: () => 'El banco se quedó mi casa; ahora pago alquiler en ella.',
-  robo_en_casa: () => 'Me entraron a robar en casa; ya no estoy tranquilo.',
+  // 2.8: con su género («tranquila»).
+  robo_en_casa: (_w, fem) => `Me entraron a robar en casa; ya no estoy ${fem ? 'tranquila' : 'tranquilo'}.`,
   en_paro: () => 'Sigo buscando trabajo.',
   deuda_perdonada: () => 'El alcalde me perdonó lo que debía. No lo olvido.',
   cerro_negocio: () => 'Tuve que cerrar mi negocio; las nóminas me comían.',
@@ -1034,15 +1070,17 @@ const MEMORY_LINE: Partial<Record<MemoryKind, (who: string) => string>> = {
   incendio: () => 'Todavía huelo a humo cuando me acuerdo del incendio.',
   bomberos: () => 'Menos mal que los bomberos llegaron a tiempo.',
   le_acogieron: (who) => `No olvidaré que ${who} me abrió su casa tras el fuego.`,
-  voluntario: () => 'Desde que soy voluntario de protección civil me siento útil.',
+  voluntario: (_w, fem) => `Desde que soy ${fem ? 'voluntaria' : 'voluntario'} de protección civil me siento útil.`,
   ambulancia: () => 'Si no llega a ser por la ambulancia, no lo cuento.',
   // 2.5: correos.
   carta: (who) => `Me ha escrito ${who}; me ha alegrado el día.`,
   volvio: () => 'Qué alegría haber vuelto al pueblo.',
+  // 2.8.
+  se_jubilo: (_w, fem) => `Desde que estoy ${fem ? 'jubilada' : 'jubilado'}, tengo tiempo para todo.`,
 };
 
 /** Frase de un recuerdo; las pérdidas, distintas para la pareja y para una amistad (ronda 11). */
-function lineFor(state: GameState, m: Memory): string {
+function lineFor(state: GameState, m: Memory, c: Citizen): string {
   const who = memoryWho(state, m);
   if (m.kind === 'perdio_a') {
     const pareja = [`Sin ${who} la casa está muy callada.`, `Todavía pongo dos tazas por la mañana. Echo de menos a ${who}.`];
@@ -1051,7 +1089,7 @@ function lineFor(state: GameState, m: Memory): string {
     return list[hash32(m.tick, m.about[0] ?? 0) % list.length]!;
   }
   if (m.kind === 'nacio_hijo') return ['Con el bebé en casa no paro, pero estoy feliz.', 'El bebé ya duerme del tirón… casi.', 'Desde que llegó el bebé, la casa es otra.'][hash32(m.tick, 3) % 3]!;
-  return MEMORY_LINE[m.kind]!(who);
+  return MEMORY_LINE[m.kind]!(who, isFemaleName(c.name));
 }
 
 function recentMemory(state: GameState, c: Citizen): Memory | undefined {
@@ -1062,7 +1100,7 @@ function recentMemory(state: GameState, c: Citizen): Memory | undefined {
 
 export function memoryLine(state: GameState, c: Citizen): string | null {
   const recent = recentMemory(state, c);
-  return recent ? lineFor(state, recent) : null;
+  return recent ? lineFor(state, recent, c) : null;
 }
 
 function answerText(state: GameState, c: Citizen, q: Question, worst: string | undefined): string {
@@ -1070,7 +1108,7 @@ function answerText(state: GameState, c: Citizen, q: Question, worst: string | u
   if (q !== 'como_estas') return base;
   const m = recentMemory(state, c);
   if (!m) return base;
-  const line = lineFor(state, m);
+  const line = lineFor(state, m, c);
   // Si el recuerdo va en contra del ánimo, un enlace para que no suene incoherente.
   const lower = line.charAt(0).toLowerCase() + line.slice(1);
   if (c.happiness >= 70 && m.valence < 0) return `${base} Eso sí, ${lower}`;
@@ -1079,7 +1117,6 @@ function answerText(state: GameState, c: Citizen, q: Question, worst: string | u
 }
 
 function baseAnswer(state: GameState, c: Citizen, q: Question, worst: string | undefined): string {
-  const first = c.name.split(' ')[0];
   const pending = state.promises.find((p) => p.status === 'pending' && p.supporters.includes(c.id));
   const broken = state.promises.find((p) => p.status === 'broken' && p.supporters.includes(c.id));
   const v = hash32(c.id, state.tick, q.length) % 3;
@@ -1095,9 +1132,14 @@ function baseAnswer(state: GameState, c: Citizen, q: Question, worst: string | u
       const score = c.happiness - c.grudge + (broken ? -20 : 0) + (pending ? 5 : 0);
       if (broken) return `¿Después de prometer ${NEED_TEXT[broken.need]} y no cumplir? Lo dudo mucho.`;
       if (state.politics.mayor === c.id) return 'Ahora el alcalde soy yo. Ya veremos en las próximas elecciones.';
-      if (state.politics.party?.leaderId === c.id) return `Yo me presento con «${state.politics.party.name}». Ya sabe la respuesta.`;
+      // 2.8 (ronda 24): quien encabeza una candidatura, o ya se presentó y perdió, no le vota.
+      const list = state.politics.party?.leaderId === c.id ? state.politics.party : (state.politics.lists ?? []).find((l) => l.leaderId === c.id);
+      if (list) return `Yo me presento con «${list.name}». Ya sabe la respuesta.`;
+      const ran = c.memories.some((m) => m.kind === 'perdio_elecciones') || state.politics.history.some((e) => e.lists?.some((l) => l.leaderId === c.id));
+      if (ran) return 'Ya sabe que yo me presenté contra usted. Mi voto no lo va a tener.';
       if (c.vote) return 'El voto es secreto, alcalde. Ya lo tengo decidido.';
-      if (score >= 65) return `Sí, ${first} le votaría. Lo está haciendo bien.`;
+      // 2.8: en primera persona (antes «Sí, Víctor le votaría»).
+      if (score >= 65) return 'Sí, le votaría. Lo está haciendo bien.';
       if (score >= 45) return 'Depende de lo que haga estos meses.';
       return 'Hoy por hoy, no.';
     }

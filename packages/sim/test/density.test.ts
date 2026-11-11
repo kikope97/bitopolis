@@ -9,6 +9,7 @@ import {
   DENSITY,
   densityAt,
   densityDay,
+  EARLY,
   dilemmaCandidates,
   extraAction,
   freeHomes,
@@ -246,8 +247,8 @@ describe('vivienda protegida (2.5)', () => {
   it('dilema «la última VPO»: el motor da las opciones y la VPO espera a que decida el alcalde', () => {
     const s = blank();
     const v = vpo(s);
-    // Hasta `minPop` vecinos para que haya dilemas; cinco ya viven en la VPO.
-    const all = people(s, 45, 500);
+    // Hasta los vecinos de `EARLY.dilemmas` (con los dos de abajo) para que haya dilemas; cinco ya viven en la VPO.
+    const all = people(s, EARLY.dilemmas.pop - 2, 500);
     for (const c of all.slice(0, VPO.homes - 1)) c.homeId = v.id;
     for (const c of all) c.last = { in: 1_500, out: 0, repaid: 0 };
     const [x, y] = people(s, 2, 500, true);
@@ -275,7 +276,7 @@ describe('vivienda protegida (2.5)', () => {
   it('dilema por sorteo: gana uno de los dos, el mismo en cualquier motor', () => {
     const s = blank();
     const v = vpo(s);
-    const all = people(s, 45, 500);
+    const all = people(s, EARLY.dilemmas.pop - 2, 500);
     for (const c of all.slice(0, VPO.homes - 1)) c.homeId = v.id;
     for (const c of all) c.last = { in: 1_500, out: 0, repaid: 0 };
     const [x, y] = people(s, 2, 500, true);

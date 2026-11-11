@@ -20,7 +20,7 @@ import { earlyReady, systemOn } from './gates.ts';
 import { rankCandidates } from './rank.ts';
 import { rivalAiWanted, rivalPromptData } from './rival-ai.ts';
 import { inventedName, inventedNumber, toneOf } from './prompt.ts';
-import { GOAL_TEXT, HOOK_TEXT, hookFor, memoryText, narrativeSummary, NEED_TEXT, NEEDS, needsOf } from './social.ts';
+import { GOAL_TEXT, HOOK_TEXT, hookFor, memoryText, narrativeSummary, NEED_TEXT, NEEDS, needsOf, professionOf } from './social.ts';
 import type { Citizen, GameState } from './state.ts';
 import { LANDMARK_EFFECT, LANDMARK_NAMES } from './landmarks.ts';
 import { ruralHomes, touristified } from './tourism.ts';
@@ -42,7 +42,7 @@ import { GESTURES, gestureCandidates, isAiCitizen, PLANS, planText, SPEND, type 
  * La salida tiene un esquema fijo (sin uniones por vecino); cada parte se valida
  * en el motor con el menú del vecino. Nunca va texto libre del jugador.
  */
-export const TURN_PROMPT_VERSION = 16;
+export const TURN_PROMPT_VERSION = 17;
 
 export const TURN_SYSTEM = `Eres la mente de los vecinos de Bitópolis, un pueblo español pequeño. Cada semana decides, a la vez, qué hace cada vecino de la lista. Ellos viven de verdad: trabajan, compran, se enamoran, se enfadan, ahorran o se arruinan, y reaccionan a lo que hace quien gobierna: el alcalde (el jugador) o, si ganó las elecciones, el rival (mira "politica.gobierna"). El vecino que tenga "es_alcalde" gobierna él: piensa y actúa como alcalde.
 
@@ -253,7 +253,8 @@ function citizenBrief(state: GameState, c: Citizen) {
     vecino: c.id,
     nombre: c.name,
     edad: c.age,
-    profesion: c.profession,
+    // 2.8: con su género («enfermera»).
+    profesion: professionOf(c),
     rasgos: { terquedad: c.traits.terco, ahorrador: c.traits.ahorro, sociable: c.traits.social, ambicioso: c.traits.ambicion },
     tono: toneOf(c),
     deseo: c.desire.replace('_', ' '),

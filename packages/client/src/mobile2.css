@@ -115,15 +115,16 @@ html[data-text='200'] { --ui: 2; }
 /* Cuánto aguanta la caja si el mes va en negativo. */
 .tb-runway { margin-left: 2px; padding: 0 4px; border-radius: 2px; background: var(--c-urgent); color: #f4f4f4; font-size: 0.75em; }
 .tb-runway[hidden] { display: none; }
-/* Lo que no cabe va en «Más» (vecinos, votos, IA): nunca dos filas. */
+/* Lo que no cabe va en «Más» (votos e IA, luego la felicidad y, lo último, los vecinos): nunca dos filas. */
 #hud-more { display: none; }
 .topbar.tb-more #hud-more { display: inline-flex; }
-.topbar.tb-more #hud-pop, .topbar.tb-more #hud-poll, .topbar.tb-more .ai-chip, .topbar.tb-more2 #hud-happy { display: none !important; }
-/* «Guardado» y el calendario viven en la barra: «Guardado» es un punto (verde, ámbar guardando, rojo si falla). */
+.topbar.tb-more #hud-poll, .topbar.tb-more .ai-chip, .topbar.tb-more2 #hud-happy, .topbar.tb-more3 #hud-pop { display: none !important; }
+/* «Guardado» y el calendario viven en la barra: «Guardado» es un punto con forma por estado (2.8, ronda 24):
+   ● guardado, ◐ guardando (medio lleno) y ✕ si falla; el color solo acompaña. */
 .topbar .saved { position: static; flex: 0 0 auto; width: 18px; height: 44px; padding: 0; background: none; font-size: 0; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; }
-.topbar .saved::before { content: ''; width: 8px; height: 8px; background: var(--good); }
-.topbar .saved[data-pending='true']::before { background: var(--c-warn); }
-.topbar .saved.err::before { background: var(--c-urgent); width: 10px; height: 10px; }
+.topbar .saved::before { content: ''; box-sizing: border-box; width: 10px; height: 10px; border-radius: 50%; background: var(--good); }
+.topbar .saved[data-pending='true']::before { border: 2px solid var(--c-warn); background: linear-gradient(90deg, var(--c-warn) 50%, transparent 50%); }
+.topbar .saved.err::before { content: '✕'; width: auto; height: auto; border: 0; border-radius: 0; background: none; color: var(--bad); font-size: 16px; font-weight: 700; line-height: 1; }
 .topbar .saved:empty { display: none; }
 .topbar .calendar { position: static; flex: 0 0 auto; width: 44px; margin: 0 2px; transform: scale(0.82); transform-origin: center; }
 
@@ -301,7 +302,6 @@ body.in-game:has(> .sheet:not(.ficha)) .dock #menu .tab-label { color: var(--acc
 /* Contraste: todo texto a 4,5:1 o más sobre su fondo (R y C de la franja, ánimo en verde de la lista de vecinos). */
 :root { --good-text: #a7f070; }
 html[data-colorblind='rojo-verde'] { --good-text: #9fe4ff; }
-.d-row[data-d='R'] b { color: #a7f070; }
 .d-row[data-d='C'] b { color: #73eff7; }
 .p-mood.good, .trend.up { color: var(--good-text); }
 /* ⏯ en pausa: el latido salta entre dos estados (con pasos intermedios, texto y fondo llegaban a ser del mismo color). */
@@ -836,9 +836,242 @@ body.tool-active .map-btns #whatnow, body.tool-active .map-btns #home { display:
 /* Ronda 23: un texto largo de la franja (con letra grande) ensanchaba la columna y «Construir» quedaba fuera. */
 .game { grid-template-columns: minmax(0, 1fr); }
 .strip, .tool-info, #confirm-text, .confirm-bar { min-width: 0; max-width: 100%; }
-.tool-info, #confirm-text { overflow-wrap: anywhere; }
+/* 2.8 (ronda 24): `anywhere` dejaba el ancho mínimo en una letra y partía «casill/as»; `break-word` solo parte lo que no cabe. */
+.tool-info, #confirm-text { overflow-wrap: break-word; }
 @media (orientation: landscape) and (max-height: 500px) {
   .game { grid-template-columns: minmax(0, 1fr) var(--dock-w); }
 }
 /* La letra pixel solo admite tamaños de píxel exacto: el «€» de la caja, al mismo tamaño que la cifra. */
 html[data-font='pixel'] .topbar .tb-unit, html[data-font='pixel'] .topbar.tb-tight .tb-unit { font-size: 1em; }
+
+/* ---------- 2.8 (ronda 24) · parte C: texto grande, horizontal, daltonismo y capas ---------- */
+
+/*
+ * Con el texto al 150/200 % o en horizontal, nada se come el mapa: «Construir / ✕», «Deshacer» y el
+ * tutorial van en columna (el texto arriba, los botones en una fila a todo el ancho debajo) y con un
+ * alto máximo del 28 % de la pantalla (botones incluidos, con una rejilla: la fila del texto encoge y se desplaza).
+ */
+html[data-text='150'] :is(.confirm-bar, .undo-bar), html[data-text='200'] :is(.confirm-bar, .undo-bar) {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); grid-template-rows: minmax(0, 1fr) auto; align-items: stretch; gap: 6px; padding: 6px 8px; max-height: 28dvh;
+}
+html[data-text='150'] :is(.confirm-bar, .undo-bar) > p, html[data-text='200'] :is(.confirm-bar, .undo-bar) > p { grid-column: 1 / -1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+html[data-text='150'] :is(.confirm-bar, .undo-bar) > .btn, html[data-text='200'] :is(.confirm-bar, .undo-bar) > .btn { min-height: 48px; }
+html[data-text='150'] #undo-btn, html[data-text='200'] #undo-btn { grid-column: 1 / -1; }
+html[data-text='150'] .tut-box, html[data-text='200'] .tut-box { flex-direction: column; align-items: stretch; max-height: 28dvh; overflow: hidden; }
+html[data-text='150'] .tut-box p, html[data-text='200'] .tut-box p { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+html[data-text='150'] .tut-actions, html[data-text='200'] .tut-actions { padding: 6px 0 0; border-left: 0; border-top: 2px solid var(--c-card-line); }
+html[data-text='150'] .tut-actions > button, html[data-text='200'] .tut-actions > button { flex: 1 1 0; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .confirm-bar, .undo-bar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); grid-template-rows: minmax(0, 1fr) auto; align-items: stretch; gap: 6px; padding: 6px 8px; max-height: 28dvh; }
+  :is(.confirm-bar, .undo-bar) > p { grid-column: 1 / -1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  :is(.confirm-bar, .undo-bar) > .btn { min-height: 44px; }
+  #undo-btn { grid-column: 1 / -1; }
+  .tut-box { flex-direction: column; align-items: stretch; max-height: 28dvh; overflow: hidden; }
+  .tut-box p { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  .tut-actions { padding: 6px 0 0; border-left: 0; border-top: 2px solid var(--c-card-line); }
+  .tut-actions > button { flex: 1 1 0; }
+}
+/* Sin «Construir» (casilla que no vale), «✕» ocupa la fila entera. */
+.confirm-bar:has(> #confirm-yes[hidden]) > #confirm-no { grid-column: 1 / -1; }
+/* Mientras hay una herramienta elegida, el tutorial se pliega a una línea (lo que pide se lee en la franja). */
+body.tool-active .tut-box { flex-direction: row; align-items: center; max-height: none; }
+body.tool-active .tut-box p { flex: 1 1 auto; min-width: 0; max-height: none; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+body.tool-active .tut-actions { padding: 0 0 0 8px; border-top: 0; border-left: 2px solid var(--c-card-line); }
+body.tool-active .tut-actions > button { flex: none; }
+/* El tutorial no tapa la bandeja (ni la carta que pide tocar): en vertical, con la bandeja abierta, va arriba. */
+body.tray-open .tut-box { top: calc(var(--top-h) + 4px); bottom: auto; }
+body.tray-open .tray { padding-bottom: 10px; scroll-padding-bottom: 0; }
+@media (orientation: landscape) and (max-height: 500px) {
+  body.tray-open .tut-box { top: auto; bottom: var(--strip-h); right: calc(var(--dock-w) + min(360px, 62vw)); }
+}
+/* Los bocadillos de los vecinos: como mucho 3 líneas (con letra grande tapaban el mapa de arriba abajo). */
+.bubble strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.bubble-text { display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Bandeja: chips de 44 px; la cabecera fija no tapa la carta a la que se lleva (tutorial, scrollIntoView). */
+.tray-chip { min-height: var(--tap-min); }
+.tray-chip::before { content: none; }
+.tray { scroll-padding-top: calc(var(--tap-min) + 20px + 2 * 1.35 * var(--fs-xs) + 8px); }
+
+/*
+ * «Rojo-verde» de verdad: lo que estaba en verde o rojo fijo va con variables que cambian con el modo.
+ * En rojo-verde, lo bueno es azul (el rojo y el azul sí se distinguen) y la R de la franja, blanca.
+ */
+:root { --ok-fill: #38b764; --no-fill: #b13e53; --zone-r: #38b764; --zone-r-text: #a7f070; }
+html[data-colorblind='rojo-verde'] { --ok-fill: #3b5dc9; --zone-r: #f4f4f4; --zone-r-text: #f4f4f4; --c-ok: #9fe4ff; }
+.d-row[data-d='R'] b { color: var(--zone-r-text); }
+.bar-r { background: var(--zone-r); }
+.cc-reach b { color: var(--good-text); }
+.load-bar .bar-fill { background: var(--ok-fill); }
+.load-bar.over .bar-fill { background: var(--no-fill); }
+.lot-box.ok { border-color: var(--ok-fill); }
+.lot-box.no { border-color: var(--no-fill); }
+.pill.good { border-color: var(--ok-fill); }
+.pill.bad { border-color: var(--no-fill); color: var(--bad); }
+.rk { color: #f4f4f4; }
+.rk.ok { background: var(--ok-fill); }
+.rk.no { background: var(--no-fill); }
+/* Leyenda de las capas en rojo-verde: la misma rampa que el mapa (layers.ts, GOOD_DEU y BAD_DEU); el azul oscuro, sobre gris (si no, no se ve). */
+html[data-colorblind='rojo-verde'] .legend-item.lv0.good::before { background: radial-gradient(#29366f 30%, transparent 31%) 0 0 / 8px 8px #94b0c2; }
+html[data-colorblind='rojo-verde'] .legend-item.lv1.good::before { background: radial-gradient(#3b5dc9 35%, transparent 36%) 0 0 / 4px 4px; }
+html[data-colorblind='rojo-verde'] .legend-item.lv2.good::before { background: repeating-conic-gradient(#41a6f6 0 25%, transparent 0 50%) 0 0 / 4px 4px; }
+html[data-colorblind='rojo-verde'] .legend-item.lv3.good::before { background: repeating-linear-gradient(90deg, #ffcd75 0 6px, transparent 6px 8px); }
+html[data-colorblind='rojo-verde'] .legend-item.lv0.bad::before { background: radial-gradient(#f4f4f4 30%, transparent 31%) 0 0 / 8px 8px; }
+html[data-colorblind='rojo-verde'] .legend-item.lv1.bad::before { background: radial-gradient(#41a6f6 35%, transparent 36%) 0 0 / 4px 4px; }
+html[data-colorblind='rojo-verde'] .legend-item.lv2.bad::before { background: repeating-conic-gradient(#3b5dc9 0 25%, transparent 0 50%) 0 0 / 4px 4px; }
+html[data-colorblind='rojo-verde'] .legend-item.lv3.bad::before { background: repeating-linear-gradient(90deg, #29366f 0 6px, transparent 6px 8px) #94b0c2; }
+
+
+/* ---------- 2.8 · A (ritmo y avisos): «Bajo a x1: … · Ver ›» y la pausa del modo tranquilo ---------- */
+.slow-note .slow-text { flex: 1 1 12em; min-width: 0; overflow-wrap: break-word; }
+.slow-note .btn { min-width: 44px; min-height: 44px; }
+#slow-go[hidden] { display: none; }
+
+
+/* ===== 2.8 (ronda 24, parte F): el juego con ratón y teclado ===== */
+/* Con el dpr virtual y un zoom impar, el navegador suaviza al reducir (con `pixelated` se perderían filas). */
+#map.px-smooth { image-rendering: auto; }
+/* «Mirar»: mano sobre lo que se abre con un clic; flecha sobre el resto (con herramienta, la cruz de siempre). */
+#map[data-hover='hit'] { cursor: pointer; }
+#map[data-hover='none'] { cursor: default; }
+/* Tooltip pequeño junto al puntero: no se toca y no tapa el clic. */
+.hover-tip {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: var(--z-toast);
+  max-width: min(320px, 60vw);
+  padding: var(--sp-1) var(--sp-2);
+  background: var(--c-ink);
+  color: var(--text);
+  border: 2px solid var(--c-card-line);
+  border-left: 6px solid var(--c-ok);
+  border-radius: 2px;
+  font-size: var(--fs-s);
+  line-height: 1.3;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hover-tip[hidden] { display: none; }
+.hover-tip.tone-warn { border-left-color: var(--c-warn); }
+.hover-tip.tone-bad { border-left-color: var(--c-urgent); }
+.hover-tip.tone-info { border-left-color: var(--c-info); }
+/* La tecla de cada carta de la bandeja, en la esquina (solo con ratón y los atajos puestos). */
+.tray .tool .tool-key { display: none; }
+body.keys-on .tray .tool .tool-key {
+  display: block;
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  min-width: 1.4em;
+  padding: 0 2px;
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+  color: var(--c-gold);
+  border: 1px solid var(--c-card-line);
+  border-radius: 2px;
+  text-align: center;
+}
+/* La chuleta de atajos («?»). */
+.kb-group h3 { margin: var(--sp-3) 0 var(--sp-1); font-size: var(--fs-m); }
+.kb-list { list-style: none; margin: 0; padding: 0; }
+.kb-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1) var(--sp-2); padding: var(--sp-1) 0; border-bottom: 1px solid var(--c-card-line); }
+.kb-keys { flex: 0 0 auto; min-width: 9em; }
+.kb-what { flex: 1 1 12em; }
+.kb-row kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0 var(--sp-1);
+  font: inherit;
+  font-size: var(--fs-s);
+  text-align: center;
+  color: var(--c-gold);
+  background: var(--c-chip);
+  border: 1px solid var(--c-chip-line);
+  border-bottom-width: 3px;
+  border-radius: 2px;
+}
+
+
+/* ---------- 2.8 · parte D: celebrar los logros (celebrate-ui.ts) ---------- */
+/* Barra de meta del escenario: una línea encima de la fecha y la demanda, que se toca. */
+.strip.has-goal { flex-wrap: wrap; }
+.goal-bar {
+  position: relative;
+  flex: 1 0 100%;
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-3);
+  border: 0;
+  border-bottom: 1px solid var(--c-card-line);
+  background: var(--c-deep);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-s);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+.goal-bar[hidden], .strip:not([data-mode='info']) .goal-bar { display: none !important; }
+.goal-fill { position: absolute; left: 0; bottom: 0; height: 4px; width: 0; background: var(--c-gold); }
+.goal-bar .px-icon { width: 18px; height: 18px; flex: 0 0 auto; margin: 0; }
+.goal-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+/* Con el texto grande, hasta dos líneas antes que perder «quedan N». */
+html[data-text='150'] .goal-text, html[data-text='200'] .goal-text { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.15; padding: 2px 0; }
+.goal-bar:focus-visible { outline: 3px solid var(--c-gold); outline-offset: -3px; }
+
+/* Tarjeta de celebración: sobre la franja (los avisos salen arriba), sin tapar las hojas ni el dock. */
+.celebrate {
+  position: fixed;
+  bottom: calc(var(--dock-h) + var(--strip-h) + var(--sp-2));
+  left: max(var(--sp-2), env(safe-area-inset-left));
+  right: max(var(--sp-2), env(safe-area-inset-right));
+  margin: 0 auto;
+  max-width: 440px;
+  max-height: calc(100dvh - var(--top-h) - var(--dock-h) - var(--strip-h) - 24px);
+  overflow-y: auto;
+  z-index: calc(var(--z-sheet) - 1);
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  background: var(--c-card);
+  color: var(--text);
+  border: 3px solid var(--c-gold);
+  border-radius: 2px;
+  box-shadow: 0 4px 0 var(--c-ink);
+  font-size: var(--fs-m);
+}
+.celebrate.lost { border-color: var(--c-surface-line); }
+.celebrate-head { display: flex; align-items: center; gap: var(--sp-2); }
+.celebrate-head .px-icon { width: 32px; height: 32px; flex: 0 0 auto; margin: 0; }
+.celebrate h2 { flex: 1; min-width: 0; margin: 0; font-size: var(--fs-l); color: var(--c-gold); }
+.celebrate.lost h2 { color: var(--text); }
+.celebrate-x { min-width: 44px; min-height: 44px; padding: 0; }
+.celebrate p { margin: var(--sp-1) 0; }
+.celebrate-sub { color: var(--muted); }
+.celebrate-result { font-size: var(--fs-l); font-weight: 700; }
+.celebrate-list { margin: var(--sp-1) 0 var(--sp-3); padding-left: 1.2em; display: grid; gap: 2px; }
+.celebrate-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.celebrate-row .btn { flex: 1 1 auto; min-height: 48px; }
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-motion='reducido']) .celebrate { animation: celebrate-in 0.45s steps(6) both; }
+}
+@keyframes celebrate-in { from { transform: translateY(12px) scale(0.92); opacity: 0; } to { transform: none; opacity: 1; } }
+/* En horizontal (alto ≤ 500 px) el dock va a la derecha: la tarjeta no lo tapa. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .celebrate { right: calc(var(--dock-w) + var(--sp-2)); max-height: calc(100dvh - var(--top-h) - var(--strip-h) - 16px); }
+}
+/* El resultado del escenario en Objetivos. */
+.scenario-result p { margin: 0 0 var(--sp-2); }
+.scenario-result.won strong { color: var(--c-gold); }
+.scenario-result .btn { min-height: 44px; }
+
+
+/* ===== 2.8 · parte E (vecinos y textos): servicio aún bloqueado en la ficha de una casa ===== */
+.svc-icons:not(.open) .svc.lock { border-bottom-color: var(--c-card-line); opacity: 0.85; }
+.svc.lock .svc-mark { color: var(--muted); }
+/* El número de la campana crece con el texto (al 200 %, 18 px; salía a 12 px cuando había peticiones). */
+.bell-n { font-size: min(var(--fs-xs), 18px); min-width: 1.5em; height: 1.5em; line-height: 1.5em; }

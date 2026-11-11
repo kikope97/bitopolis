@@ -46,6 +46,8 @@ function usualTreasury(state: GameState): number {
 
 /** Préstamos: con la caja en negativo, por debajo del 20 % de lo habitual o con un préstamo vivo. */
 export function loansWanted(state: GameState): boolean {
+  // Ronda 25: en los escenarios de la riada y la quiebra el préstamo es parte del juego desde el principio.
+  if ((state.scenario.id === 'riada' || state.scenario.id === 'quiebra') && !state.scenario.done) return true;
   if ((state.loans ?? []).length > 0 || state.treasury < 0) return true;
   const usual = usualTreasury(state);
   return state.stats.length > 0 && usual > 0 && state.treasury < usual * 0.2;

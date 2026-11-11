@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState, OUTSIDE, runningExpenses, transfer, TREASURY, worksSpent, type GameState } from '@bitopolis/sim';
-import { monthFlow, runwayMonths, runwayWarn, splitText } from '../src/cash.ts';
+import { lastNet, monthFlow, netText, runwayMonths, runwayWarn, splitText, streakText } from '../src/cash.ts';
 import { nextHint } from '../src/hints.ts';
 
 /** Un mes cerrado con 3.200 € de gasto corriente y una estación de tren de 32.160 €. */
@@ -50,5 +50,29 @@ describe('2.7: gasto corriente y obras por separado', () => {
     const hint = nextHint(s);
     expect(hint.text).toMatch(/la caja aguanta/);
     expect(hint.tool).toBeUndefined();
+  });
+});
+
+describe('2.8: un solo neto del mes y la racha de la quiebra', () => {
+  const month = (income: number, expenses: number, breakdown: Record<string, number>) => ({ month: 1, population: 20, treasury: 0, happiness: 60, income, expenses, breakdown });
+
+  it('el neto no cuenta el préstamo ni las obras', () => {
+    const s = createInitialState({ seed: 1 });
+    s.stats.push(month(205_000, 40_000, { IBI: 5_000, préstamo: 200_000, mantenimiento: -4_000, obras: -36_000 }));
+    expect(lastNet(s)).toBe(1_000);
+    expect(netText(-1_234)).toBe('−1234 €');
+  });
+
+  it('«Racha: 3/13» o «Racha rota: te faltaron 430 €»', () => {
+    const s = createInitialState({ seed: 1, scenario: 'quiebra' });
+    expect(streakText(s)).toBe('');
+    s.stats.push(month(5_000, 4_000, { IBI: 5_000, sueldos: -4_000 }));
+    s.scenario.goal = { kind: 'superavit', target: 13, progress: 3 };
+    expect(streakText(s)).toBe('Racha: 3/13');
+    s.stats.push(month(5_000, 5_430, { IBI: 5_000, sueldos: -5_430 }));
+    s.scenario.goal.progress = 0;
+    expect(streakText(s)).toBe('Racha rota: te faltaron 430 €');
+    s.stats.push(month(5_000, 5_430, { IBI: 5_000, sueldos: -5_430 }));
+    expect(streakText(s)).toBe('Sin superávit este mes: te faltaron 430 € (racha 0/13)');
   });
 });

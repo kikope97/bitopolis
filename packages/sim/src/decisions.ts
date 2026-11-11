@@ -445,7 +445,7 @@ const FLAVOR: Record<keyof Citizen['traits'], string[]> = {
   terco: ['Y no hay más que hablar.', 'Digan lo que digan.', 'Lo tengo decidido.', 'Cuando digo algo, lo cumplo.'],
   ahorro: ['Cada euro cuenta.', 'Las cuentas mandan.', 'Hay que mirar el bolsillo.', 'Sin gastar de más.'],
   social: ['Ya lo comentaré en el bar.', 'Seguro que más vecinos piensan igual.', 'Se lo diré a todos.', 'Aquí nos conocemos todos.'],
-  ambicion: ['Quiero llegar lejos.', 'Esto es solo el principio.', 'Aspiro a más.', 'No pienso quedarme quieto.'],
+  ambicion: ['Quiero llegar lejos.', 'Esto es solo el principio.', 'Aspiro a más.', 'No pienso quedarme de brazos cruzados.'],
 };
 
 const NEED_TEXT: Record<string, string> = {

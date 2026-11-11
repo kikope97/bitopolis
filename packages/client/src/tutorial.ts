@@ -1,11 +1,13 @@
 import type { GameState } from '@bitopolis/sim';
 import type { ToolId } from './tools.ts';
+import { prefs } from './prefs.ts';
 import { $, confirmDialog, h } from './ui.ts';
+import { buildTabShows, coarse, onceGet, onceSet, tabName, verbo, whereOf } from './wording.ts';
 
 /** Tutorial guiado (~3 min): una flecha señala qué tocar. */
 interface Step {
-  /** Texto; puede depender del puntero (ratón o dedo). */
-  text: string | (() => string);
+  /** Texto; puede depender del puntero (ratón o dedo), de la herramienta y de cómo se ven las pestañas. */
+  text: string | ((tool: ToolId) => string);
   /** Selector del elemento al que apunta la flecha (o null: el mapa). */
   target: (tool: ToolId) => string | null;
   done: (s: GameState, tool: ToolId, ctx: Ctx) => boolean;
@@ -19,15 +21,34 @@ interface Ctx {
   roads0: number;
 }
 
-const coarse = () => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 const roadCount = (s: GameState) => s.map.tiles.filter((t) => t === 1).length;
 /** v1.6: las obras están en la bandeja «Construir»: primero la pestaña, luego la casilla. */
 const inTray = (id: string) => (document.querySelector('#tray:not([hidden])') ? `#tray [data-tool="${id}"]` : '#tab-build');
 const has = (s: GameState, k: string) => s.buildings.some((b) => b.kind === k);
 
+/**
+ * 2.8: el tutorial habla como la pantalla: el nombre que se ve en la pestaña
+ * («Carretera» o «Calle»), dónde está el dock («abajo» o «a la derecha») y «toca» o «haz clic».
+ */
+const dock = () => whereOf('#dock');
+const Verbo = () => verbo({ cap: true });
+/** «abre «Construir»» (u «Obras»); si la pestaña enseña la herramienta elegida, lo dice. */
+const openBuild = (cap = false) => {
+  const shows = buildTabShows();
+  return `${cap ? 'Abre' : 'abre'} «${tabName('build')}»${shows ? ` (ahora pone «${shows}»)` : ''}`;
+};
+/** En modo tranquilo solo hay x1. */
+const calmOnly = () => prefs().calm;
+
 const STEPS: Step[] = [
   {
-    text: 'Bienvenido, alcalde. El tiempo está parado. Toca «Carretera», abajo.',
+    text: () => {
+      const road = tabName('road');
+      // Con el nombre corto («Calle»), se dice también qué es (la carretera).
+      return road === 'Carretera'
+        ? `Bienvenido, alcalde. El tiempo está parado. ${Verbo()} «Carretera», ${dock()}.`
+        : `Bienvenido, alcalde. El tiempo está parado. Carretera: ${verbo()} «${road}», ${dock()}.`;
+    },
     target: () => '[data-tool="road"]',
     done: (s, tool, c) => tool === 'road' || roadCount(s) > c.roads0,
   },
@@ -41,43 +62,60 @@ const STEPS: Step[] = [
     done: (s, _t, c) => roadCount(s) > c.roads0,
   },
   {
-    text: 'Ahora el agua: abre «Construir», elige «Agua» y toca una casilla junto a la carretera.',
+    text: (tool) =>
+      tool === 'water'
+        ? `Ahora el agua: ${verbo()} una casilla junto a la carretera.`
+        : `Ahora el agua: ${openBuild()}, elige «Agua» y ${verbo()} una casilla junto a la carretera.`,
     target: (tool) => (tool === 'water' ? null : inTray('water')),
     done: (s) => has(s, 'water'),
   },
   {
-    text: 'Y la luz: «Construir» › «Luz», junto a la carretera.',
+    text: (tool) => (tool === 'power' ? `Y la luz: ${verbo()} una casilla junto a la carretera.` : `Y la luz: «${tabName('build')}» › «Luz», junto a la carretera.`),
     target: (tool) => (tool === 'power' ? null : inTray('power')),
     done: (s) => has(s, 'power'),
   },
   {
-    text: 'Construye una «Casa» (en «Construir») para que llegue gente.',
+    text: (tool) => (tool === 'house' ? `Ahora ${verbo()} una casilla junto a la carretera para la «Casa».` : `Construye una «Casa» (en «${tabName('build')}») para que llegue gente.`),
     target: (tool) => (tool === 'house' ? null : inTray('house')),
     done: (s) => has(s, 'house'),
   },
   {
-    text: 'Las obras tardan unos días. Pon el tiempo en marcha con ▶ (arriba) y acelera con x3, al lado.',
+    // 2.8: en modo tranquilo solo hay x1: no se pide acelerar.
+    text: () =>
+      calmOnly()
+        ? 'Las obras tardan unos días. Pon el tiempo en marcha con ▶ (arriba). En modo tranquilo va siempre a x1.'
+        : 'Las obras tardan unos días. Pon el tiempo en marcha con ▶ (arriba) y acelera con x3, al lado.',
     target: () => '#play-pause',
     done: (s) => s.citizens.length >= 2,
   },
   {
-    text: '¡Ya tienes vecinos! Con 10 podrás ampliar el ayuntamiento (el edificio del centro) y desbloquear las zonas R, C e I: abajo ves cuántos faltan. Si dudas, pulsa «?».',
+    text: () => `¡Ya tienes vecinos! Con 10 podrás ampliar el ayuntamiento (el edificio del centro) y desbloquear las zonas R, C e I: en la franja de ${whereOf('#strip')} ves cuántos faltan. Si dudas, pulsa «?».`,
     target: () => null,
     done: (s) => s.citizens.length >= 10,
     info: true,
   },
   {
     // v1.8: el ayuntamiento por niveles.
-    text: 'Toca el ayuntamiento (el edificio que destella, en el centro) y pulsa «Ampliar a nivel 2»: desbloquea las zonas, el colegio, la policía y los plenos.',
+    text: () => `${Verbo()} el ayuntamiento (el edificio que destella, en el centro) y pulsa «Ampliar a nivel 2»: desbloquea las zonas, el colegio, la policía y los plenos.`,
     target: () => null,
     done: (s) => (s.townhallLevel ?? 1) >= 2,
     focus: 'townhall',
   },
   {
     // Ronda 12: el paso anterior no se cerraba nunca; ahora llega el momento del desbloqueo.
-    text: '¡Zonas desbloqueadas! Abre «Construir», elige «Zona R» y marca un rectángulo junto a la carretera: los vecinos construirán sus casas.',
+    text: (tool) =>
+      tool === 'zoneR'
+        ? `Marca un rectángulo junto a la carretera (${coarse() ? 'toca una esquina y luego la otra' : 'arrastra de una esquina a la otra'}): los vecinos construirán sus casas.`
+        : `¡Zonas desbloqueadas! ${openBuild(true)}, elige «Zona R» y marca un rectángulo junto a la carretera: los vecinos construirán sus casas.`,
     target: (tool) => (tool === 'zoneR' ? null : inTray('zoneR')),
     done: (s) => s.map.zones.some((z) => z === 1),
+  },
+  {
+    // 2.8 (informe 01): la C, la I y las cifras de la franja no se explicaban nunca. Se cierra con «Entendido».
+    text: () =>
+      `R son casas, C tiendas e I talleres y fábricas (empleo). En la franja de ${whereOf('#strip')}, «R +24» dice cuánta falta hace cada zona: cuanto más larga la barra, más hace falta; en negativo, sobra. ${Verbo()} la franja para ver el detalle.`,
+    target: () => '#strip-info',
+    done: () => false,
   },
 ];
 
@@ -100,12 +138,17 @@ export class Tutorial {
   /** Lo pone game.ts: destaca en el mapa lo que pide el paso. */
   onFocus: ((what: 'townhall') => void) | null = null;
 
-  constructor(private storageKey: string) {
+  /** 2.8: la partida (para guardar el «Siguiente» en este navegador; antes vivía solo en memoria). */
+  private token: string;
+
+  constructor(private storageKey: string, token?: string) {
+    this.token = token ?? storageKey.replace(/^bitopolis\.tut\./, '');
     this.arrow = h('div', { class: 'tut-arrow', 'aria-hidden': 'true' }, '▼');
     this.skip = h('button', { class: 'tut-skip' }, 'Saltar');
     this.next = h('button', { class: 'tut-next' }, 'Siguiente');
     this.next.addEventListener('click', () => {
       this.dismissed = this.step;
+      onceSet(this.token, 'tutSeen', this.step);
       this.box.hidden = true;
       document.documentElement.style.setProperty('--tut-h', '0px');
     });
@@ -134,10 +177,13 @@ export class Tutorial {
 
   start(state: GameState, fromScratch = false) {
     this.focused = -1;
-    this.dismissed = -1;
-    if (fromScratch) this.step = 0;
-    // Un pueblo ya hecho (importado o de otra partida) no empieza el tutorial desde cero (ronda 11).
-    else if (this.step === 0 && state.citizens.length >= 10) {
+    // 2.8: el paso informativo ya leído no vuelve al abrir la partida otra vez (informes 01, 03, 04).
+    this.dismissed = fromScratch ? -1 : (onceGet(this.token, 'tutSeen') ?? -1);
+    if (fromScratch) {
+      this.step = 0;
+      onceSet(this.token, 'tutSeen', -1);
+    } else if (this.step === 0 && state.citizens.length >= 10) {
+      // Un pueblo ya hecho (importado o de otra partida) no empieza el tutorial desde cero (ronda 11).
       this.finish();
       return;
     }
@@ -202,7 +248,7 @@ export class Tutorial {
       this.onFocus?.(cur.focus);
     }
     const p = this.box.querySelector('p')!;
-    const text = typeof cur.text === 'function' ? cur.text() : cur.text;
+    const text = typeof cur.text === 'function' ? cur.text(tool) : cur.text;
     if (p.textContent !== text) p.textContent = text;
     // Los botones del mapa suben por encima de la caja (ronda 12: la caja tapaba «Capas» y «?»).
     if (this.box.isConnected) document.documentElement.style.setProperty('--tut-h', `${this.box.offsetHeight + 8}px`);

@@ -103,7 +103,7 @@ export function errandCandidates(state: GameState): ErrandCandidate[] {
         return h && crimeAt(state, h.x, h.y) >= ERRANDS.crimeFrom;
       })
       .sort((a, b) => a.id - b.id)[0];
-    if (c && !busy.has(`delincuencia:${c.id}`)) out.push({ key: `delincuencia:${c.id}`, kind: 'delincuencia', by: c.id, text: `${first(c)} quiere poder volver tranquilo a casa: baja la delincuencia de su calle`, target: ERRANDS.crimeTo, reward: ERRANDS.reward.delincuencia });
+    if (c && !busy.has(`delincuencia:${c.id}`)) out.push({ key: `delincuencia:${c.id}`, kind: 'delincuencia', by: c.id, text: `${first(c)} quiere poder volver a casa sin miedo: baja la delincuencia de su calle`, target: ERRANDS.crimeTo, reward: ERRANDS.reward.delincuencia });
   }
   const h = avgHappy(state);
   if (h < ERRANDS.happyBelow && !kindsBusy.has('felicidad') && !busy.has('felicidad:pueblo')) {
