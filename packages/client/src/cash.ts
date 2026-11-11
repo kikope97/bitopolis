@@ -53,6 +53,8 @@ export function netText(n: number): string {
  */
 export function runwayMonths(s: GameState, cash = s.treasury, extra = 0): number | null {
   const f = monthFlow(s);
+  // Ronda 25: sin un mes cerrado no se sabe lo que entra (salía «2 m» en rojo y «entran 0 €» tras el tutorial).
+  if (!f.closed) return null;
   const net = f.income - f.running - extra;
   if (net >= 0) return null;
   return Math.max(0, cash) / -net;

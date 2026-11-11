@@ -232,7 +232,19 @@ export function freshCauses(state: GameState, byCause?: Map<Cause, Citizen[]>): 
       if (g) byCause.set(g, [...(byCause.get(g) ?? []), c]);
     }
   }
-  return [...byCause.entries()].filter(([cause, cs]) => cs.length >= ASSOCIATIONS.minMembers && !state.associations.some((a) => a.cause === cause)).sort((a, b) => b[1].length - a[1].length);
+  // Ronda 25: quien ya es socio de una asociación no funda otra (salían dos o tres con los mismos
+  // vecinos y el mismo líder, cada una con su manifestación), y policía e inseguridad son la misma queja.
+  const taken = new Set(state.associations.flatMap((a) => a.members));
+  return [...byCause.entries()]
+    .map(([cause, cs]) => [cause, cs.filter((c) => !taken.has(c.id))] as [Cause, Citizen[]])
+    .filter(([cause, cs]) => cs.length >= ASSOCIATIONS.minMembers && !state.associations.some((a) => sameCause(a.cause, cause)))
+    .sort((a, b) => b[1].length - a[1].length);
+}
+
+/** Ronda 25: «falta policía» e «inseguridad» piden lo mismo. */
+function sameCause(a: Cause, b: Cause): boolean {
+  const k = (x: Cause) => (x === 'inseguridad' ? 'policia' : x);
+  return k(a) === k(b);
 }
 
 /** Funda la asociación de una queja con estos socios. */
@@ -271,7 +283,7 @@ function nextBanner(state: GameState, a: Association, cs: Citizen[], all: Map<nu
   const by = new Map<Cause, Citizen[]>();
   for (const c of cs) {
     const g = all.get(c.id)?.[0];
-    if (g && g !== a.cause && !state.associations.some((x) => x !== a && x.cause === g)) by.set(g, [...(by.get(g) ?? []), c]);
+    if (g && !sameCause(g, a.cause) && !state.associations.some((x) => x !== a && sameCause(x.cause, g))) by.set(g, [...(by.get(g) ?? []), c]);
   }
   const best = [...by.entries()].filter(([, m]) => m.length >= ASSOCIATIONS.minMembers).sort((p, q) => q[1].length - p[1].length)[0];
   return best ? { cause: best[0], members: best[1] } : null;

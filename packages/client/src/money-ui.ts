@@ -1,3 +1,4 @@
+import { forPerson } from './wording.ts';
 import { TICKS_PER_DAY, tickToDate } from '@bitopolis/shared';
 import { type Citizen, canMicrocredit, DEBT, canSettleDebt, type GameState, MICROCREDIT, ownIncome, type Pocket, pocketOf, totalDebt } from '@bitopolis/sim';
 import { formatDate, money } from './i18n.ts';
@@ -38,7 +39,7 @@ export function pocketBox(ctx: SocialCtx, c: Citizen, reopen: () => void): HTMLE
       ),
     );
   } else box.append(h('p', { class: 'muted small' }, 'Aún no ha cerrado ningún mes en el pueblo.'));
-  box.append(h('p', {}, h('span', { class: `pocket-tag ${p}` }, POCKET_TEXT[p]), ` · ahorros: ${money(c.money)}`));
+  box.append(h('p', {}, h('span', { class: `pocket-tag ${p}` }, forPerson(POCKET_TEXT[p], c.name)), ` · ahorros: ${money(c.money)}`));
   if (c.jobId === null && c.unemployedSince !== undefined) {
     box.append(h('p', { class: 'neg' }, `En paro desde el ${formatDate(tickToDate(c.unemployedSince))}${(c.benefitLeft ?? 0) > 0 ? ` · cobra la prestación (${c.benefitLeft} meses más)` : ' · sin prestación'}.`));
   }

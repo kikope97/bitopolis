@@ -1,3 +1,4 @@
+import { isFemaleName } from '@bitopolis/sim';
 /**
  * 2.8 (ronda 24, parte A): los textos hablan como la pantalla.
  * - `verbo()`: «toca» con el dedo, «haz clic en» con el ratón.
@@ -86,4 +87,13 @@ export function onceSet(token: string, key: string, value: number): void {
   } catch {
     /* sin almacenamiento: vale para esta sesión */
   }
+}
+
+/**
+ * Ronda 25: «contento» → «contenta», «holgado» → «holgada» si es vecina (por el nombre).
+ * Solo cambia la última palabra si acaba en «o» (las demás, como «regular», no cambian).
+ */
+export function forPerson(word: string, name: string): string {
+  if (!isFemaleName(name)) return word;
+  return word.replace(/o$/, 'a');
 }

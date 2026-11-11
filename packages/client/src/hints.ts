@@ -1,5 +1,5 @@
 import type { BuildKind } from '@bitopolis/shared';
-import { buildingAt, canUpgradeTownhall, LANDMARK_KINDS, LANDMARK_NAMES, landmarkReqs, phaseCost, coverageSummary, type GameState, monthlyCostOf, NEED_LABEL, nextLevel, TOWNHALL_LEVELS, freeHomes, taxLevels, zonesUnlocked } from '@bitopolis/sim';
+import { floodLeft, buildingAt, canUpgradeTownhall, LANDMARK_KINDS, LANDMARK_NAMES, landmarkReqs, phaseCost, coverageSummary, type GameState, monthlyCostOf, NEED_LABEL, nextLevel, TOWNHALL_LEVELS, freeHomes, taxLevels, zonesUnlocked } from '@bitopolis/sim';
 import { monthFlow, monthsText, runwayMonths } from './cash.ts';
 import { money, plural } from './i18n.ts';
 import type { ToolId } from './tools.ts';
@@ -52,6 +52,11 @@ export function nextHint(state: GameState): Hint {
   const has = (k: string) => state.buildings.some((b) => b.kind === k);
   const pop = state.citizens.length;
   const roads = state.map.tiles.filter((t) => t === 1).length;
+  // Ronda 25: en «Tras la riada» la meta es reparar; el consejo lo dice antes que cualquier obra nueva.
+  if (state.scenario.id === 'riada' && !state.scenario.done && floodLeft(state) > 0 && state.treasury >= 0) {
+    const left = floodLeft(state);
+    return { text: `La meta: reparar lo que destrozó la riada (quedan ${left}). Toca un edificio destrozado y pulsa «Reparar»; empieza por los que dan trabajo (fábricas y tiendas). Si no llega el dinero, pide un préstamo (Pueblo › Préstamos) antes que construir nada nuevo.` };
+  }
   if (state.bankrupt || state.treasury < 0) {
     // Ronda 12: no pedir que suban los impuestos si ya están en «Alto».
     const allHigh = Object.values(taxLevels(state)).every((l) => l === 'high');

@@ -625,7 +625,7 @@ for (const size of SIZES.slice(0, 2)) {
     await page.getByRole('button', { name: 'Vecinos', exact: true }).click();
     await page.locator('.person-row').first().click();
     await expect(page.locator('.sheet .cz-head .cz-face')).toBeVisible();
-    await expect(page.locator('.sheet .cz-head [data-test="fiche-status"]')).toHaveText(/(Contento|Regular|Descontento).*\d+ de 100/);
+    await expect(page.locator('.sheet .cz-head [data-test="fiche-status"]')).toHaveText(/(Content[oa]|Regular|Descontent[oa]).*\d+ de 100/);
     const talk = page.getByRole('button', { name: '¿Cómo estás?' });
     await expect(talk).toBeVisible();
     expect((await talk.boundingBox())!.y + 44).toBeLessThanOrEqual(size.h);

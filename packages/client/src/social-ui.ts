@@ -1,3 +1,4 @@
+import { forPerson } from './wording.ts';
 import type { Command } from '@bitopolis/shared';
 import { POCKET_TEXT, pocketBox } from './money-ui.ts';
 import { fold, statusBar } from './hub-ui.ts';
@@ -70,7 +71,7 @@ const DESIRE_TEXT: Record<string, string> = {
 const FEAR_TEXT: Record<string, string> = { paro: 'el paro', impuestos: 'los impuestos', soledad: 'la soledad', ruido: 'el ruido', deudas: 'las deudas' };
 const TRAIT_TEXT: Record<string, string> = { terco: 'Terquedad', ahorro: 'Ahorro', social: 'Sociable', ambicion: 'Ambición' };
 
-const moodWord = (h0: number) => (h0 >= 65 ? 'contento' : h0 >= 40 ? 'regular' : 'descontento');
+const moodWord = (h0: number, name = '') => forPerson(h0 >= 65 ? 'contento' : h0 >= 40 ? 'regular' : 'descontento', name);
 
 /** Ficha completa del vecino (§6.2) con «Hablar» (§7). */
 export function openCitizen(ctx: SocialCtx, citizenId: number): void {
@@ -123,10 +124,10 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
   const owner = isFemaleName(c.name) ? 'Propietaria' : 'Propietario';
   // 2.7: arriba, el retrato y una frase suya; el ánimo y el dinero en palabras, con su número.
   const happy = Math.round(c.happiness);
-  const mood = moodWord(happy);
+  const mood = moodWord(happy, c.name);
   const debt = totalDebt(c);
   const pocket = pocketOf(c);
-  const moneyWords = debt > 0 ? `debe ${money(debt)}` : `${POCKET_TEXT[pocket]} · ahorros: ${money(c.money)}`;
+  const moneyWords = debt > 0 ? `debe ${money(debt)}` : `${forPerson(POCKET_TEXT[pocket], c.name)} · ahorros: ${money(c.money)}`;
   const said = last[0] ? `«${last[0].motivo}»` : worries[0] ? `Le preocupa ${lowerFirst(worries[0])}.` : `Quiere ${DESIRE_TEXT[c.desire]}.`;
   const relations = c.relations.length ? h('ul', { class: 'people' }, ...c.relations.map((r) => h('li', {}, `${nameOf(r.id)}: ${RELATION_TEXT[r.kind]}`))) : h('p', { class: 'muted' }, 'Aún no tiene relaciones en el pueblo.');
   const memories = c.memories.length ? h('ul', { class: 'people' }, ...memoryLines(state, c).map((t) => h('li', {}, t))) : h('p', { class: 'muted' }, 'Nada que contar todavía.');
@@ -150,7 +151,7 @@ export function openCitizen(ctx: SocialCtx, citizenId: number): void {
     // 2.0: lo que piensa y planea (si piensa con IA).
     mindBox(state, c) ?? '',
     // v1.9: su balance y sus deudas (2.7: abierto si debe o no llega).
-    fold(`cz-pocket:${c.id}`, `Su bolsillo · ${debt > 0 ? `debe ${money(debt)}` : POCKET_TEXT[pocket]}`, debt > 0 || pocket === 'no_llega', pocketBox(ctx, c, () => openCitizen(ctx, citizenId))),
+    fold(`cz-pocket:${c.id}`, `Su bolsillo · ${debt > 0 ? `debe ${money(debt)}` : forPerson(POCKET_TEXT[pocket], c.name)}`, debt > 0 || pocket === 'no_llega', pocketBox(ctx, c, () => openCitizen(ctx, citizenId))),
     h('p', {}, `Quiere ${DESIRE_TEXT[c.desire]}; teme ${FEAR_TEXT[c.fear]}. Meta: ${GOAL_TEXT[c.goal]} ${goalDone(state, c) ? '✓' : ''}`),
     politicsActive(state)
       ? h(

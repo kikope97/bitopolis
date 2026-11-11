@@ -1,3 +1,4 @@
+import { forPerson } from './wording.ts';
 import type { Command, TaxLevel } from '@bitopolis/shared';
 import { BUILD_NAMES, IBI_RATE, ibiForecast, isFemaleName, monthNet, totalDebt, type Citizen, type GameState, MIN_WAGE, type MinWageLevel, PLUSVALIA_RATE, TASA_BASURAS, TASA_TERRAZAS, TAX_SPLIT_POP, trashActive, trashFee, trashServed } from '@bitopolis/sim';
 import { money, MONTHS } from './i18n.ts';
@@ -309,7 +310,7 @@ export function openNeighbours(state: GameState, onPick: (c: Citizen) => void, o
   const ul = h('ul', { class: 'people' });
   for (const c of named) {
     const job = state.buildings.find((b) => b.id === c.jobId);
-    const mood = c.happiness >= 65 ? ['😊', 'contento'] : c.happiness >= 40 ? ['😐', 'regular'] : ['☹️', 'descontento'];
+    const mood = c.happiness >= 65 ? ['😊', forPerson('contento', c.name)] : c.happiness >= 40 ? ['😐', 'regular'] : ['☹️', forPerson('descontento', c.name)];
     const btn = h(
       'button',
       { class: 'person-row' },

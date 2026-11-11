@@ -115,7 +115,7 @@ import { openTourism, openTownHall } from './civic-ui.ts';
 import { openAlbum, snapMoments } from './album-ui.ts';
 import { type AwaySince, closeHoy, hoyHasNews, isHoyOpen, openHoy } from './hoy-ui.ts';
 import { type Ask, dueSoon, dueText, pendingAsks } from './asks.ts';
-import { onceGet, onceSet, TAB_SHORT, tabName, verbo } from './wording.ts';
+import { forPerson, onceGet, onceSet, TAB_SHORT, tabName, verbo } from './wording.ts';
 import { openRank, rankCard } from './rank-ui.ts';
 import { dilemmaSpot, openDilemmaSheet, type DilemmaCtx } from './dilemma-ui.ts';
 import { objectiveText, objectivesNode, openAdvisor, openCitizen, openDiary, openPleno, portraitCanvas, rememberSeen, renderObjectives, resumeSummary, type SocialCtx } from './social-ui.ts';
@@ -2802,7 +2802,7 @@ export function startGame(opts: GameOptions): void {
       if (!res.length) return statusBar('info', 'Vacía', undefined, 'aún no vive nadie');
       const avg = Math.round(res.reduce((t, c) => t + c.happiness, 0) / res.length);
       const one = res.length === 1;
-      const word = avg >= 65 ? (one ? 'Contento' : 'Contentos') : avg >= 40 ? 'Regular' : one ? 'Descontento' : 'Descontentos';
+      const word = forPerson(avg >= 65 ? (one ? 'Contento' : 'Contentos') : avg >= 40 ? 'Regular' : one ? 'Descontento' : 'Descontentos', one ? res[0]!.name : '');
       const lack = missingServices(state, b.x, b.y).filter((n) => n.status === 'falta').length;
       return statusBar(avg >= 65 ? 'ok' : avg >= 40 ? 'warn' : 'bad', word, `${avg} de 100`, `${plural(res.length, 'vecino', 'vecinos')}${lack ? ` · le ${lack === 1 ? 'falta un servicio' : `faltan ${lack} servicios`}` : ''}`);
     }
@@ -3347,7 +3347,7 @@ export function startGame(opts: GameOptions): void {
     const others = all.length - list.length;
     for (const c of list) {
       const worry = worriesOf(state, c)[0];
-      const moodText = c.happiness >= 65 ? 'contento' : c.happiness >= 40 ? 'regular' : 'descontento';
+      const moodText = forPerson(c.happiness >= 65 ? 'contento' : c.happiness >= 40 ? 'regular' : 'descontento', c.name);
       const last = [...state.decisionLog].reverse().find((d) => d.citizenId === c.id);
       const btn = h(
         'button',
