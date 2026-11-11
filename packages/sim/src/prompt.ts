@@ -17,7 +17,7 @@ import { daysToElection, FACTION_TEXT, factionOf, politicsActive } from './polit
  * - Salida estructurada con enum de acciones válidas; se valida con zod.
  */
 
-export const PROMPT_VERSION = 5;
+export const PROMPT_VERSION = 6;
 
 export const SYSTEM_PROMPT = `Eres el narrador de Bitópolis, un pueblo español pequeño. Interpretas a vecinos con nombre que toman UNA decisión cada uno.
 

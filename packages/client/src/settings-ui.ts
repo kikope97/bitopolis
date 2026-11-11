@@ -149,7 +149,7 @@ export function openSettings(ai?: AiShareCtl, share?: Node): void {
       (v) => setPrefs({ slowFor: v }),
     ),
     h('h4', { class: 'set-sub' }, 'Teclado'),
-    toggle('Atajos de una tecla', 'shortcuts', '(W A S D, L, O y las herramientas; con lector de pantalla puede ir mejor sin ellos)'),
+    toggle('Atajos de una tecla', 'shortcuts', '(W A S D, L, O, las herramientas, < y > para la velocidad y ? para verlos todos; con lector de pantalla puede ir mejor sin ellos)'),
     ...(share ? [share] : []),
     ...aiBlock,
     h('h3', {}, 'Sonido'),
